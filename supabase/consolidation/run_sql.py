@@ -17,7 +17,7 @@ segs = [('(檔首)', parts[0])] + [(parts[i], parts[i+1]) for i in range(1, len(
 ok = 0
 for i, (name, body) in enumerate(segs, 1):
     if i < a.frm or not body.strip(): continue
-    if a.sp: body = f'set local search_path = {a.sp}, public;\n' + body
+    if a.sp: body = f'set local search_path = {a.sp}, public, extensions;\n' + body
     payload = json.dumps({'query': body})
     r = subprocess.run(['curl', '-s', '--max-time', '180', '-X', 'POST', f'https://api.supabase.com/v1/projects/{a.ref}/database/query',
                         '-H', f'Authorization: Bearer {tok}', '-H', 'Content-Type: application/json', '-d', payload],

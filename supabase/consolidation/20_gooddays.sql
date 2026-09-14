@@ -4,7 +4,7 @@ create schema if not exists gooddays_private;
 
 
 -- ===== 20260718000001_init.sql =====
-set search_path = gooddays, public;
+set search_path = gooddays, public, extensions;
 -- interval 初始 schema:會員、商品、訂單、AI 報價、設定
 -- 設計原則(仿 gather-landing / realreal):
 --  * 全部資料表開 RLS;公開頁面一律經由 server(service role)以 token 讀取
@@ -267,7 +267,7 @@ create trigger touch_quotes before update on gooddays.quotes
 create trigger touch_chat_logs before update on gooddays.ai_chat_logs
   for each row execute function gooddays.touch_updated_at();
 -- ===== 20260719000001_littlemoments.sql =====
-set search_path = gooddays, public;
+set search_path = gooddays, public, extensions;
 -- 小時光 Little Moments 改造:商品三模式(藝術/旅程/會員)、點數帳本、會員等級、預約參訪
 -- 沿用既有風格(裸 alter/create + RLS 全開;由 provision 的 _migrations 表去重,不需 IF NOT EXISTS)
 
@@ -379,7 +379,7 @@ create policy "bookings_public_insert" on gooddays.bookings
 create policy "bookings_admin_all" on gooddays.bookings
   for all using (gooddays.is_admin());
 -- ===== 20260720000001_checkout_v2.sql =====
-set search_path = gooddays, public;
+set search_path = gooddays, public, extensions;
 -- 小時光二期:購物車 flyout + 結帳強化(收件方式/發票/轉帳強化) + 運費設定 + Idempotency-Key
 -- 沿用既有風格(裸 alter/create + RLS 全開;由 provision 的 _migrations 表去重,不需 IF NOT EXISTS)。
 -- orders 既有 RLS policy(orders_admin_write 全靠 service role 寫入)已涵蓋新欄位,不需額外 RLS。
@@ -391,7 +391,7 @@ alter table gooddays.orders add column invoice jsonb not null default '{}'::json
 alter table gooddays.orders add column payment_report jsonb; -- {last5, reported_at}(客戶回報匯款末五碼)
 alter table gooddays.orders add column idempotency_key text unique;
 -- ===== 20260720000002_pchomepay.sql =====
-set search_path = gooddays, public;
+set search_path = gooddays, public, extensions;
 -- 小時光:PChomePay 支付連(信用卡/ATM/超商代碼)金流
 -- 沿用既有風格(裸 alter/create + RLS;由 provision 的 _migrations 表去重,不需 IF NOT EXISTS)。
 
@@ -421,12 +421,12 @@ alter table gooddays.webhook_events enable row level security;
 create policy "webhook_events_admin_read" on gooddays.webhook_events
   for select using (gooddays.is_admin());
 -- ===== 20260720000003_chat_uploads_private.sql =====
-set search_path = gooddays, public;
+set search_path = gooddays, public, extensions;
 -- chat-uploads 轉為私密:客戶家中照片不應可被任意人以公開網址存取。
 -- 讀取一律改走短期簽名網址(伺服器端以 service role 產生)。
 update storage.buckets set public = false where id = 'chat-uploads';
 -- ===== 20260722000001_rename_to_goodays.sql =====
-set search_path = gooddays, public;
+set search_path = gooddays, public, extensions;
 -- 品牌改名:小時光 Little Moments → 好日子 Good Days
 -- 只更新 company_profile 中含舊名的欄位(name/email/address);tagline/hours/phone 不含舊名,保留原值。
 -- 重佈建(provision.mjs 重跑或新環境)時,20260719000001_littlemoments.sql 仍會先種下舊名,
@@ -440,7 +440,7 @@ set value = value
   )
 where key = 'company_profile';
 -- ===== 20260722000002_product_i18n.sql =====
-set search_path = gooddays, public;
+set search_path = gooddays, public, extensions;
 -- Phase D1:商品內容英文欄位(AI 翻譯管線的資料層)
 --
 -- 只加欄位、default null,不動任何既有資料——對中文站與後台零風險:
@@ -463,7 +463,7 @@ alter table gooddays.products add column if not exists description_en text;
 alter table gooddays.membership_tiers add column if not exists name_en text;
 alter table gooddays.membership_tiers add column if not exists perks_en jsonb;
 -- ===== 20260722000003_order_locale.sql =====
-set search_path = gooddays, public;
+set search_path = gooddays, public, extensions;
 -- Phase F1:orders 加 locale 欄位(通知信英文化的資料層)
 --
 -- 只加欄位、default 'zh'、不動任何既有資料——對中文站與後台零風險:
@@ -477,7 +477,7 @@ set search_path = gooddays, public;
 
 alter table gooddays.orders add column if not exists locale text not null default 'zh';
 -- ===== 20260722000004_quote_locale.sql =====
-set search_path = gooddays, public;
+set search_path = gooddays, public, extensions;
 -- 報價 email 英文化的資料層:quotes 加 locale 欄位
 --
 -- 只加欄位、default 'zh'、不動任何既有資料——對中文站與後台零風險:
@@ -492,7 +492,7 @@ set search_path = gooddays, public;
 
 alter table gooddays.quotes add column if not exists locale text not null default 'zh';
 -- ===== 20260723000001_courses.sql =====
-set search_path = gooddays, public;
+set search_path = gooddays, public, extensions;
 -- 課程系統
 --   報名型課程(live):有日期、有名額上限,可免費報名或付費報名
 --   線上預錄課程(recorded):付費購買後可觀看多支 YouTube 單元影片
@@ -824,7 +824,7 @@ create trigger touch_course_details before update on gooddays.course_details
 create trigger touch_course_lessons before update on gooddays.course_lessons
   for each row execute function gooddays.touch_updated_at();
 -- ===== 20260806000001_course_landing.sql =====
-set search_path = gooddays, public;
+set search_path = gooddays, public, extensions;
 -- 課程「完整活動頁」所需欄位
 --
 -- 設計判斷:固定欄位,不做彈性區塊表(course_sections)。
@@ -866,10 +866,10 @@ alter table gooddays.course_details drop constraint if exists course_details_faq
 alter table gooddays.course_details add constraint course_details_faq_is_array
   check (jsonb_typeof(faq) = 'array');
 -- ===== 20260806000002_product_images_bucket.sql =====
-set search_path = gooddays, public;
+set search_path = gooddays, public, extensions;
 
 -- ===== 20260809000001_atomic_deduct_product_stock.sql =====
-set search_path = gooddays, public;
+set search_path = gooddays, public, extensions;
 -- 修復商品庫存超賣(見 web/src/app/api/orders/route.ts 扣庫存段落)。
 --
 -- 舊實作的兩個疊在一起的缺陷:
@@ -949,7 +949,7 @@ $$;
 revoke execute on function gooddays.deduct_product_stock(jsonb) from public, anon, authenticated;
 grant execute on function gooddays.deduct_product_stock(jsonb) to service_role;
 -- ===== 20260819000001_security_hardening.sql =====
-set search_path = gooddays, public;
+set search_path = gooddays, public, extensions;
 -- 修掉 Supabase Security Advisor 的項目,外加一個 advisor 沒抓到、但實際更嚴重的外洩。
 --
 -- ⚠️ 本檔手動單獨執行,不可跑 provision.mjs(_migrations 與實際 schema 早已不同步,
@@ -992,7 +992,7 @@ alter function gooddays.touch_updated_at() set search_path = '';
 revoke execute on function gooddays.ai_rate_check(text, int, int) from public, anon, authenticated;
 revoke execute on function gooddays.handle_new_user()             from public, anon, authenticated;
 -- ===== 20260819000002_is_admin_private_schema.sql =====
-set search_path = gooddays, public;
+set search_path = gooddays, public, extensions;
 -- 把 is_admin() 從 public 搬到 PostgREST 不曝露的 private schema。
 --
 -- 為什麼不能照 advisor 字面「revoke EXECUTE」:實測過,revoke 之後

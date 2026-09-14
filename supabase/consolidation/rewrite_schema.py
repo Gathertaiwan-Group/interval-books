@@ -107,7 +107,9 @@ def main():
             elif k == 'keep': kept.append(st)
         # 每段自帶 search_path：原檔裡沒寫 schema 前綴的表名（例如 policy 的 using 子句）建立時才解析得到本 schema，
         # 不依賴執行器是 psql 還是 Management API。這是 20 第 16 段在排練時炸出來的教訓。
-        kept_parts.append(f'\n-- ===== {base} =====\nset search_path = {a.schema}, public;\n' + ''.join(kept))
+        # 🔴 一定要帶 extensions：Supabase 預設 search_path 含它（pgcrypto 的 gen_random_bytes 等住在那裡），
+        #    只寫 <schema>, public 會把它擠掉——第二次排練 20 第 2 段就是這樣炸的。
+        kept_parts.append(f'\n-- ===== {base} =====\nset search_path = {a.schema}, public, extensions;\n' + ''.join(kept))
     body = ''.join(kept_parts)
     body, stats = rewrite(body, a.schema, a.private)
     header = a.header.replace('\\n', '\n')
