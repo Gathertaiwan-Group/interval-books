@@ -31,5 +31,5 @@
 ## 🔴 未限定表名（PostgREST search_path 下會靜默落到小時光 public 同名表）：2
 | 行 | 所在函式 | 該函式 search_path | 判定 | 片段 |
 |---|---|---|---|---|
-| 1043 | gooddays_private.is_admin | gooddays | ✅ 安全 | `FROM products p` |
-| 1069 | gooddays_private.is_admin | gooddays | ✅ 安全 | `FROM orders o` |
+| 1058 | gooddays_private.is_admin | gooddays | ✅ 安全 | `FROM products p` |
+| 1084 | gooddays_private.is_admin | gooddays | ✅ 安全 | `FROM orders o` |

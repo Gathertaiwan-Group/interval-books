@@ -11,7 +11,7 @@
 | 30 | `30_gooddays_grants.sql` | 好日子原本沒寫的 grant（照 public 預設補） | ✅ |
 | 40 | `40_auth_triggers.sql` | 三個獨立的 auth trigger（扇出＋吃例外） | ✅ |
 | 50 | `50_load_data.sh` | 三站 `pg_dump --data-only` → 目標；auth.users/identities 明列欄位、remap 重複 2 人 | ⏳ 等連線字串 |
-| 60 | `60_url_rewrite.sql` | 14 列舊 ref URL 改寫 | 🟡 骨架，2 張表欄位待查 |
+| 60 | `60_url_rewrite.sql` | 14 列舊 ref URL 改寫（四張表欄位已確認：cover_url text、其餘 jsonb） | ✅ |
 | 70 | `70_verify.sql` | 十段驗證，任一不符就停 | ✅ |
 | 80 | `80_reverse_delta.sh` | 快樂手回退用的反向增量 | 🟡 骨架，排練時實跑 |
 
@@ -28,6 +28,10 @@
 ## 來源列數（載入後 70 第 9 段要對的數字）
 auth.users 46（8+39+2−3 重複）；public.orders 10；inv.purchases 1,029；happyhands.orders 38／profiles 39；gooddays.orders 2／profiles 2。
 
-## TODO（有 token 之後）
-- 查 `happyhands.site_settings`（1 列）與 `gooddays.ai_chat_logs`（2 列）含 ref 的確切欄位，補進 60。
-- 建丟棄式專案 `consolidation-rehearsal`（使用者已同意），跑 00→70 兩次乾淨。
+## 排練紀錄
+- **2026-09-15 第一次（schema 部分）**：丟棄式專案 `consolidation-rehearsal`。10（21 段）／20（16 段）／30／40 全過；70 的 schema 段：表數、函式數、policy 數、search_path 0、殘留 0、三個 trigger、grant 全對。
+- 教訓：20 第 16 段 `alter policy … using (…)` 裡有原檔就沒寫前綴的表名，Management API 的 session search_path 是 public 就找不到 → 產生器改成**每段自帶 `set search_path = <schema>, public;`**；`run_sql.py` 另有 `--search-path` 當保險、`--from N` 重跑失敗段。
+- 待做：00 baseline 與 50 資料（等連線字串）；60／80 在有資料後排練。
+
+## TODO
+- 三站 Session pooler 連線字串到位後：跑 00 → 50 → 60 → 70 全段，然後刪掉 rehearsal 重來一次乾淨的。

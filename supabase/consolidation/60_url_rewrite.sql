@@ -1,12 +1,14 @@
--- 60_url_rewrite.sql — 14 列含舊專案 ref 的 URL 改寫。用 psql 變數帶入：
+-- 60_url_rewrite.sql — 14 列含舊專案 ref 的 URL 改寫（欄位已於 2026-09-15 實查確認）。
 --   psql "$NEW_URL" -v new_ref=<新 ref> -v old_hh=soglfvjtysqqqzbcwwci -v old_gd=xptltqokykpmiqwlnasm -f 60_url_rewrite.sql
--- ⚠️ 骨架。site_settings.value 與 ai_chat_logs 的確切欄位要在有 token 時查清楚再填（見 README TODO）。
+--   （run_sql.py 跑時會先把 :'var' 換成字面值）
 begin;
-update happyhands.products      set cover_url = replace(cover_url, :'old_hh', :'new_ref') where cover_url like '%' || :'old_hh' || '%';
--- TODO happyhands.site_settings（1 列；value 欄位型別待查：text 直接 replace、jsonb 用 replace(value::text,…)::jsonb）
-update gooddays.products        set images = replace(images::text, :'old_gd', :'new_ref')::jsonb where images::text like '%' || :'old_gd' || '%';
--- TODO gooddays.ai_chat_logs（2 列；含 ref 的欄位待查）
--- 改寫後不得殘留（70 的第 10 段會再驗一次）
+update happyhands.products      set cover_url = replace(cover_url, :'old_hh', :'new_ref')               where cover_url like '%' || :'old_hh' || '%';           -- 8 列
+update happyhands.site_settings set value     = replace(value::text, :'old_hh', :'new_ref')::jsonb      where key = 'teacher' and value::text like '%' || :'old_hh' || '%';  -- 1 列
+update gooddays.products        set images    = replace(images::text, :'old_gd', :'new_ref')::jsonb     where images::text like '%' || :'old_gd' || '%';        -- 3 列
+update gooddays.ai_chat_logs    set messages  = replace(messages::text, :'old_gd', :'new_ref')::jsonb   where messages::text like '%' || :'old_gd' || '%';      -- 2 列
+-- 改寫後不得殘留（70 第 10 段會再驗）
 select 'happyhands.products' t, count(*) left_over from happyhands.products p where p::text like '%' || :'old_hh' || '%'
-union all select 'gooddays.products', count(*) from gooddays.products x where x::text like '%' || :'old_gd' || '%';
+union all select 'happyhands.site_settings', count(*) from happyhands.site_settings x where x::text like '%' || :'old_hh' || '%'
+union all select 'gooddays.products',        count(*) from gooddays.products x where x::text like '%' || :'old_gd' || '%'
+union all select 'gooddays.ai_chat_logs',    count(*) from gooddays.ai_chat_logs x where x::text like '%' || :'old_gd' || '%';
 commit;

@@ -7,6 +7,7 @@ alter default privileges in schema happyhands grant all on functions to service_
 
 
 -- ===== 20260808000001_init.sql =====
+set search_path = happyhands, public;
 -- =============================================================================
 -- 快樂手 HAPPY HEALING HANDS — 初始 schema
 -- 來源規格：design_handoff_happyhands/STACK.md §3、apps/web/lib/content.ts、
@@ -661,6 +662,7 @@ $$;
 comment on function happyhands.release_seat_hold(uuid) is
   '使用者放棄結帳時主動釋放暫扣：刪除 seat_holds 並把 seats_taken 減回去。';
 -- ===== 20260808000002_rls.sql =====
+set search_path = happyhands, public;
 -- =============================================================================
 -- 快樂手 — Row Level Security 與授權
 -- 規格：design_handoff_happyhands/STACK.md §3「RLS 要點」
@@ -942,6 +944,7 @@ exception when others then
   raise notice '略過 storage bucket 建立（權限不足或 storage schema 不存在）：%', sqlerrm;
 end $$;
 -- ===== 20260810000001_staff_roles.sql =====
+set search_path = happyhands, public;
 -- =============================================================================
 -- 快樂手 — 員工角色、邀請制與註冊時自動建檔
 --
@@ -1111,8 +1114,10 @@ revoke all on function happyhands.handle_new_user()
 comment on function happyhands.handle_new_user() is
   '註冊時自動建 profile；email 命中 staff_invites 就套用該角色並刪除邀請。';
 -- ===== 20260810000002_media_bucket.sql =====
+set search_path = happyhands, public;
 
 -- ===== 20260810000003_audit_log.sql =====
+set search_path = happyhands, public;
 -- =============================================================================
 -- 快樂手 — 後台操作稽核紀錄
 --
@@ -1163,6 +1168,7 @@ comment on table happyhands.audit_log is
   '後台寫入操作的稽核紀錄。由 apps/web/lib/admin/audit.ts 的 writeAudit() 寫入，'
   '只有 service role 進得去。';
 -- ===== 20260810000004_workshop_waitlist.sql =====
+set search_path = happyhands, public;
 -- =============================================================================
 -- 快樂手 — 工作坊候補名單
 --
@@ -1208,6 +1214,7 @@ create trigger set_updated_at_workshop_waitlist
 comment on table happyhands.workshop_waitlist is
   '工作坊候補名單，由客服在 /admin/sessions 手動登記。只有 service role 進得去。';
 -- ===== 20260810000005_admin_seat_adjust.sql =====
+set search_path = happyhands, public;
 -- =============================================================================
 -- 快樂手 — 後台調整場次已報名人數
 --
@@ -1274,6 +1281,7 @@ grant execute on function happyhands.admin_adjust_seats(uuid, int) to service_ro
 comment on function happyhands.admin_adjust_seats(uuid, int) is
   '後台調整場次已報名人數，clamp 到 [0, capacity]。只有 service role 可執行。';
 -- ===== 20260810000006_member_portal.sql =====
+set search_path = happyhands, public;
 -- =============================================================================
 -- 學員會員中心：訂單歸戶、課程開通、寄信 outbox、YouTube 影片
 -- =============================================================================
@@ -1815,6 +1823,7 @@ begin
 end;
 $$;
 -- ===== 20260810000007_member_visibility.sql =====
+set search_path = happyhands, public;
 -- =============================================================================
 -- 學員對「自己買過的東西」的可見性
 -- =============================================================================
@@ -1940,6 +1949,7 @@ create policy "workshop_sessions_select_registered"
     or happyhands.owns_product(product_id)
   );
 -- ===== 20260810000008_fix_grant_entitlements.sql =====
+set search_path = happyhands, public;
 -- =============================================================================
 -- 修正 grant_entitlements_for_order()：CTE 跨語句不存在
 -- =============================================================================
@@ -2054,6 +2064,7 @@ comment on function happyhands.grant_entitlements_for_order(uuid) is
   '把一筆已付款訂單的線上課程開通給訂單的 user_id。冪等（重跑 granted=0、kept=N）。'
   '回 {ok, reason?, granted, kept, products[]}。reason 為 not_found/not_paid/no_user/price_unverified。';
 -- ===== 20260817000001_payment_blackcat.sql =====
+set search_path = happyhands, public;
 -- 黑貓 PAY（統一客樂得多元支付平台）線上刷卡串接
 --
 -- 只做「線上刷卡」（COCS），收單行統一金流 PAYUNi。代收代付（ibon／ATM）
@@ -2171,6 +2182,7 @@ comment on function happyhands.count_payment_alerts() is
   '近 30 天實收金額不符或找不到訂單的 APN 筆數。這兩種都代表有人付了錢卻沒拿到東西，'
   '必須有人看到 —— 顯示在 /admin 總覽。';
 -- ===== 20260827000001_seat_hold_window.sql =====
+set search_path = happyhands, public;
 -- 未付款訂單的佔位時效
 --
 -- 問題：checkSessionCapacity（api/orders）把**所有** status='pending' 的
@@ -2223,6 +2235,7 @@ comment on function happyhands.workshop_holds() is
   '各場次被有效未付款訂單佔住的名額數。前台顯示剩餘名額與 /api/orders 的容量檢查'
   '都要用這一支，否則兩邊算式會再度分岔。';
 -- ===== 20260827000002_list_unfulfilled_orders.sql =====
+set search_path = happyhands, public;
 -- 列出「已收款但沒開通」的訂單，給每日 cron 補救用。
 --
 -- 為什麼需要這一支：cron 原本是抓 status='paid' 的訂單 limit 50 逐筆重跑
@@ -2265,6 +2278,7 @@ comment on function happyhands.list_unfulfilled_paid_orders(int) is
   '已收款、金額已核、已綁帳號，但還沒開通任何 entitlement 的訂單。'
   '條件與 count_unfulfilled_paid_orders() 一致，改一支要改兩支。';
 -- ===== 20260827000003_workshop_content.sql =====
+set search_path = happyhands, public;
 -- 工作坊報名頁的可上架內容
 --
 -- 目標：客戶每次開新工作坊時，從後台填內容就有一個完整的報名頁，
@@ -2409,6 +2423,7 @@ create policy product_blocks_select_owned on happyhands.product_blocks
   to authenticated
   using (happyhands.owns_product(product_id));
 -- ===== 20260827000004_intake_and_settings.sql =====
+set search_path = happyhands, public;
 -- 報名問題與站台共用內容
 
 -- ---------------------------------------------------------------------------
@@ -2468,6 +2483,7 @@ create policy site_settings_select_all on happyhands.site_settings
   to anon, authenticated
   using (true);
 -- ===== 20260827000005_workshop_intake_default.sql =====
+set search_path = happyhands, public;
 -- 有實體場次的商品，結帳時要問報名問題並勾健康聲明。
 --
 -- asks_intake 在 20260827000003 加進來時預設 false，但前台原本的行為是
@@ -2490,6 +2506,7 @@ update happyhands.products p
      )
    );
 -- ===== 20260827000006_ai_helper.sql =====
+set search_path = happyhands, public;
 -- AI 小幫手：對話記錄、聯絡資訊萃取、用量上限。
 --
 -- 這張表存的是**未登入訪客**在官網右下角小幫手裡打的字，可能含姓名、
@@ -2620,6 +2637,7 @@ $$;
 revoke all on function happyhands.count_pending_inquiries() from public, anon, authenticated;
 grant execute on function happyhands.count_pending_inquiries() to service_role;
 -- ===== 20260828000001_lesson_content.sql =====
+set search_path = happyhands, public;
 -- =============================================================================
 -- 快樂手 — 每一堂課的文字內容、講義與圖片
 --
@@ -2688,6 +2706,7 @@ alter table happyhands.lesson_materials enable row level security;
 --    學員端一律經 /api/lessons/[id]/materials（驗過 entitlement 才回傳）。
 revoke all on happyhands.lesson_materials from anon, authenticated;
 -- ===== 20260831000001_invoice_amego.sql =====
+set search_path = happyhands, public;
 -- ---------------------------------------------------------------------------
 -- 電子發票（Amego）
 --
@@ -3136,6 +3155,7 @@ grant execute on function happyhands.fail_invoice_issue(uuid, text, boolean, int
 grant execute on function happyhands.reclaim_stale_invoices(interval) to service_role;
 grant execute on function happyhands.count_invoice_alerts() to service_role;
 -- ===== 20260901000001_payment_alerts.sql =====
+set search_path = happyhands, public;
 -- 付款告警：把「有人付了錢卻沒拿到東西」真的變成看得見的數字
 --
 -- 背景：count_payment_alerts() 在 20260817000001 就寫好了，但
