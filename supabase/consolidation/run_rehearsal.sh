@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
-# run_rehearsal.sh <目標 ref> — 從零跑完整套：reset → 00 → 10 → 20 → 30 → 40 → 50 → 60 → 70。
-#   NEW_URL 由 pg_rehearsal.url 讀（psql 用），ref 給 Management API 用。log 落在 scratchpad。
-#   ⚠️ 只對丟棄式／全新的目標專案跑；reset 會清光 public 與 inv。
+# run_rehearsal.sh <目標 ref> [--no-reset] — 跑完整套：[reset →] 00 → 10 → 20 → 30 → 40 → 50 → 60 → 70 → 72 → 73 → 71。
+#   NEW_URL 由 pg_rehearsal.url 讀（psql 用；正式目標請改成該專案的連線字串），ref 給 Management API 用。
+#   🔴 reset 會清光 public 與 inv，只能對丟棄式／全新專案跑。正式目標請加 --no-reset。
+#   Storage／cron／vault／Auth 不在這支裡（90／91／92 各自跑，順序見 README）。
 set -euo pipefail
-ref=${1:?用法: run_rehearsal.sh <ref>}
+ref=${1:?用法: run_rehearsal.sh <ref> [--no-reset]}
+do_reset=1; [ "${2:-}" = "--no-reset" ] && do_reset=0
 SP=${SP:-/private/tmp/claude-501/-Users-aimand--gemini-File/dad55a43-d978-488c-bb46-f3353af97feb/scratchpad}
 here=$(cd "$(dirname "$0")" && pwd); export NEW_URL="$(cat "$SP/pg_rehearsal.url")"
 step() { echo; echo "───── $* ─────"; }
-step "reset（清空目標）";      python3 "$SP/q.py" "$ref" "@$SP/rehearsal_reset.sql"
+if [ "$do_reset" = 1 ]; then
+  step "reset（清空目標）";    python3 "$here/q.py" "$ref" "@$here/rehearsal_reset.sql"
+else
+  step "略過 reset（正式目標）"
+fi
 # 🔴 grep 不接 terminal 時是區塊緩衝，不加 --line-buffered 會讓長步驟看起來像卡住（00 載入約五分鐘）
 step "00 小時光 baseline";     "$here/00_load_baseline.sh"      2>&1 | grep --line-buffered -v 'NOTICE\|^ *$\|set_config\|^-\+$\|(1 row)'
 step "10 happyhands";          python3 "$here/run_sql.py" "$ref" "$here/10_happyhands.sql"      | tail -1

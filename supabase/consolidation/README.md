@@ -16,10 +16,12 @@
 | 60 | `60_url_rewrite.sql` | 14 列舊 ref URL 改寫（replica 模式，不動 updated_at） |
 | 70 | `70_verify.sql` | 十段 catalog 驗證，任一不符就停 |
 | 71 | `71_behaviour_checks.sql` | 七段**行為**驗證：真的冒充帳號呼叫 `is_admin()`、真的在 PostgREST 的 search_path 下讀裸表名、真的建一個帳號看三個 trigger 扇出（最後 rollback） |
+| 74 | `74_postgrest_checks.sh` | **從外面**用 HTTP 驗：同一個 `/products` 端點靠 `Accept-Profile` 分流到三個 schema、`gooddays_private` 不可曝露、anon 讀不到點數 view |
 | 80 | `80_reverse_delta.sh` | 快樂手回退用的反向增量（新增＋狀態更新＋序列同步） |
 | 90 | `90_storage_migrate.py` | Storage 桶子與物件（三站 8 桶 205 物件約 19MB），逐物件 md5 驗證 |
 | 91 | `91_cron_vault.py` | 小時光的 3 個 pg_cron 排程與 3 個 vault secret；**排程預設 active=false**，切換那一刻才 `--activate` |
 | 92 | `92_auth_settings.py` | Auth 集團級設定：redirect 白名單聯集、信箱驗證開啟、密碼長度取最嚴、寄件人「好日子 Good Days」 |
+| 93 | `93_api_settings.py` | PostgREST 曝露 `happyhands`／`gooddays`（不做這步，client 設了 `db.schema` 也會 404 PGRST106） |
 
 一鍵跑完（只對丟棄式／全新專案）：`./run_rehearsal.sh <ref>`（含 reset）。
 
@@ -55,6 +57,12 @@
 - 快樂手 → `happyhands`：20 表全部相同（UUID remap 與 URL 改寫後）。
 - 好日子 → `gooddays`：16 表全部相同（`_migrations` 依設計不搬）。
 - `auth.users` 46（8＋39＋2−3 重複）；三個 schema 的 `profiles` 各 46 列（每個帳號在每站都有一列）。
+
+**Storage／cron／vault／Auth／PostgREST**（全部在排練專案實跑過）
+- 205 個物件全搬完（139＋9＋57），逐一下載→上傳→抓回來比 md5，桶子設定一致，總數與位元組數相符。
+- 3 個 vault secret 寫入後兩邊 md5 相同；3 個排程建成 `active=false`，重跑冪等。
+- Auth：白名單 9 條、`site_url`、密碼長度 8 已套用；寄件人與額度等自訂 SMTP。
+- PostgREST：`74_postgrest_checks.sh` 四項全過。
 
 **權限**（`72_grant_parity.py`，252 組物件×角色）
 - 快樂手 → `happyhands` 153 組、好日子 → `gooddays` 93 組、`private` → `gooddays_private` 6 組，**有效權限完全一致**。
@@ -100,6 +108,12 @@ auth.users 46；public.orders 10；inv.purchases 1,029；happyhands.orders 38／
 - **cron／vault**（`91_cron_vault.py`）：3 個排程與 3 個 secret。secret 的值不經過對話、只比對兩邊各自算的 md5。
   🔴 排程**建成 active=false**，切換那一刻才 `--activate`——早開會讓新舊兩邊各跑一次 `dispatch_invoice_task`，
   同一張單開兩張發票。（`update cron.job` 會 permission denied，開關一律走 `cron.alter_job()`。）
+- **PostgREST**（`93_api_settings.py`）：`db_schema` 補上 happyhands／gooddays；
+  🔴 `db_extra_search_path` 維持 `public, extensions` **不要動**——把新 schema 加進去等於讓三個 schema 的
+  裸表名互相污染（計畫裡「最陰的失敗模式」）。`gooddays_private` 不曝露。
+  設定完用 `74_postgrest_checks.sh` 從 HTTP 驗一次：同一個 `/products` 端點三個 profile 各回自己的數字
+  （22／6／20，快樂手的 6 是 RLS 擋掉未上架的，不是錯），`gooddays_private` 回 PGRST106，
+  anon 讀點數 view 回 42501。
 - **Auth**（`92_auth_settings.py`）：白名單聯集 9 條、`site_url`、密碼長度 8。
   🔴 **好日子現在 `mailer_autoconfirm = true`（信箱驗證是關的）**，合併後必須開——小時光與快樂手的
   `claim_guest_orders()` 都以 `email_confirmed_at is not null` 當第一道閘，關著等於任何人註冊別人的信箱
@@ -109,8 +123,10 @@ auth.users 46；public.orders 10；inv.purchases 1,029；happyhands.orders 38／
 
 ## 下一步
 
-1. 建正式目標專案，跑 `00 → 10 → 20 → 30 → 40 → 50 → 60`，再跑 `70／71／72／schema_diff／data_diff` 六道驗證。
-2. Dashboard 設自訂 SMTP → 跑 `92`（補寄件人與額度）→ 跑 `90`、`91`（排程維持 active=false）。
+1. 建正式目標專案，跑 `run_rehearsal.sh <ref> --no-reset`（= `00 → … → 60` 再自動跑 `70／72／73／71`），
+   另外手動跑 `data_diff.py` 三站與 `74_postgrest_checks.sh`。
+2. 跑 `93`（曝露 schema）→ Dashboard 設自訂 SMTP → 跑 `92`（補寄件人與額度）→ 跑 `90`、`91`
+   （排程維持 active=false，切換那一刻才 `--activate`）。
 3. 各站 codebase 加 `db: { schema }`；快樂手 `listUsers` 改以 `happyhands.profiles` 過濾；小時光員工清單加
    `role in (...)`；快樂手補「登入時套用未消費 `staff_invites`」。
 4. 切換順序：小時光 → 好日子 → 快樂手，各自照計畫的固定七步（排空 → 停 worker/cron → 備份快照 → 切 env →
