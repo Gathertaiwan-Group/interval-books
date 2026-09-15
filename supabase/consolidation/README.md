@@ -17,6 +17,9 @@
 | 70 | `70_verify.sql` | 十段 catalog 驗證，任一不符就停 |
 | 71 | `71_behaviour_checks.sql` | 七段**行為**驗證：真的冒充帳號呼叫 `is_admin()`、真的在 PostgREST 的 search_path 下讀裸表名、真的建一個帳號看三個 trigger 扇出（最後 rollback） |
 | 80 | `80_reverse_delta.sh` | 快樂手回退用的反向增量（新增＋狀態更新＋序列同步） |
+| 90 | `90_storage_migrate.py` | Storage 桶子與物件（三站 8 桶 205 物件約 19MB），逐物件 md5 驗證 |
+| 91 | `91_cron_vault.py` | 小時光的 3 個 pg_cron 排程與 3 個 vault secret；**排程預設 active=false**，切換那一刻才 `--activate` |
+| 92 | `92_auth_settings.py` | Auth 集團級設定：redirect 白名單聯集、信箱驗證開啟、密碼長度取最嚴、寄件人「好日子 Good Days」 |
 
 一鍵跑完（只對丟棄式／全新專案）：`./run_rehearsal.sh <ref>`（含 reset）。
 
@@ -89,10 +92,26 @@
 
 auth.users 46；public.orders 10；inv.purchases 1,029；happyhands.orders 38／profiles 39；gooddays.orders 2／profiles 2。
 
-## 下一步（Phase 2 起，照計畫）
+## Phase 2 的周邊（腳本已寫好並在排練專案實跑過）
 
-1. 建正式目標專案，跑同一套腳本（`run_rehearsal.sh` 的 reset 段不要跑）。
-2. 重建 3 個 cron job 與 3 個 vault secret（`tasks_secret`／`tasks_endpoint_url`／`notify_tasks_endpoint_url`）、搬 Storage 物件。
-3. Auth 設定：寄件人「好日子 Good Days」、三站 redirect 白名單聯集、**email 確認維持開啟**。
-4. 各站 codebase 加 `db: { schema }`；快樂手 `listUsers` 改以 `happyhands.profiles` 過濾；小時光員工清單加 `role in (...)`；快樂手補「登入時套用未消費 `staff_invites`」。
-5. 切換順序：小時光 → 好日子 → 快樂手，各自照計畫的固定七步（排空 → 停 worker/cron → 備份快照 → 切 env → 冒煙 → delta 重放 → 重啟）。
+- **Storage**（`90_storage_migrate.py`）：三站 8 個桶、205 個物件、約 19MB，桶名沒有衝突。走 Storage API
+  （`storage.buckets`／`storage.objects` 有平台保護，SQL 直接寫會被擋），service_role key 即時從
+  Management API 取、不落地。逐物件下載→上傳→再抓回來比 md5。
+- **cron／vault**（`91_cron_vault.py`）：3 個排程與 3 個 secret。secret 的值不經過對話、只比對兩邊各自算的 md5。
+  🔴 排程**建成 active=false**，切換那一刻才 `--activate`——早開會讓新舊兩邊各跑一次 `dispatch_invoice_task`，
+  同一張單開兩張發票。（`update cron.job` 會 permission denied，開關一律走 `cron.alter_job()`。）
+- **Auth**（`92_auth_settings.py`）：白名單聯集 9 條、`site_url`、密碼長度 8。
+  🔴 **好日子現在 `mailer_autoconfirm = true`（信箱驗證是關的）**，合併後必須開——小時光與快樂手的
+  `claim_guest_orders()` 都以 `email_confirmed_at is not null` 當第一道閘，關著等於任何人註冊別人的信箱
+  就能認領訪客訂單；好日子既有的 2 個帳號要手動補 `email_confirmed_at`。
+  🔴 沒設自訂 SMTP 之前，`smtp_sender_name` 與 `rate_limit_email_sent` 改不了（HTTP 401），而且 PATCH 是
+  全有全無——腳本已拆成兩組。SMTP 密碼搬不了（Supabase 存雜湊），要在 Dashboard 手填一次。
+
+## 下一步
+
+1. 建正式目標專案，跑 `00 → 10 → 20 → 30 → 40 → 50 → 60`，再跑 `70／71／72／schema_diff／data_diff` 六道驗證。
+2. Dashboard 設自訂 SMTP → 跑 `92`（補寄件人與額度）→ 跑 `90`、`91`（排程維持 active=false）。
+3. 各站 codebase 加 `db: { schema }`；快樂手 `listUsers` 改以 `happyhands.profiles` 過濾；小時光員工清單加
+   `role in (...)`；快樂手補「登入時套用未消費 `staff_invites`」。
+4. 切換順序：小時光 → 好日子 → 快樂手，各自照計畫的固定七步（排空 → 停 worker/cron → 備份快照 → 切 env →
+   冒煙 → delta 重放 → 重啟），小時光那一步結束後才 `91 --activate`。
