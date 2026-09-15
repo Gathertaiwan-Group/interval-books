@@ -1008,7 +1008,7 @@ set search_path = gooddays, public, extensions;
 -- (policy 需要),但 PostgREST 的 db-schemas 只有 public / graphql_public,
 -- 打不到 /rest/v1/rpc/is_admin,advisor 的 0028/0029 也只掃曝露的 schema。
 
-create schema if not exists private;
+create schema if not exists gooddays_private;
 revoke all on schema gooddays_private from public;
 grant usage on schema gooddays_private to anon, authenticated, service_role;
 

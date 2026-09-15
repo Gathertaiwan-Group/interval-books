@@ -1,10 +1,10 @@
 -- 70_verify.sql — 在「目標專案」上跑，每一段都印出實際值與期望值；任何一段不符就停下來。
--- 期望值來自 2026-09-14 三站盤點（drift/ 快照）：public 39 表／98 函式、inv 21／35、happyhands 20／28、gooddays 16／8＋private 1。
+-- 期望值來自 2026-09-14 三站盤點（drift/ 快照）：public 39 表／98 函式、inv 21／35（policy 74 全在 public）、happyhands 20／28、gooddays 16／8＋private 1。
 
 \echo '=== 1. 表數（期望 public 39, inv 21, happyhands 20, gooddays 16）==='
 select schemaname, count(*) from pg_tables where schemaname in ('public','inv','happyhands','gooddays','gooddays_private') group by 1 order by 1;
 
-\echo '=== 2. 函式數（期望 public 98+3 wrapper, inv 35, happyhands 28+1, gooddays 8+1, gooddays_private 1）==='
+\echo '=== 2. 函式數（期望 public 98+1 wrapper=99, inv 35, happyhands 28+1=29, gooddays 8+1=9, gooddays_private 1）==='
 select n.nspname, count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
  where n.nspname in ('public','inv','happyhands','gooddays','gooddays_private') group by 1 order by 1;
 
@@ -18,7 +18,8 @@ select n.nspname, p.proname, p.proconfig from pg_proc p join pg_namespace n on n
 
 \echo '=== 5. 🔴 新 schema 的函式本體不可殘留 public.（期望 0 列）==='
 select n.nspname, p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
- where n.nspname in ('happyhands','gooddays','gooddays_private') and pg_get_functiondef(p.oid) ~ '\mpublic\.';
+ where n.nspname in ('happyhands','gooddays','gooddays_private')
+   and (case when p.prokind in ('f','p') then pg_get_functiondef(p.oid) end) ~ '\mpublic\.';  -- CASE 保證不對 aggregate 呼叫 pg_get_functiondef（planner 可能先算再過濾）
 
 \echo '=== 6. 🔴 view 只依賴自己 schema（期望 0 列）==='
 select distinct vn.nspname||'.'||v.relname as view, dn.nspname||'.'||d.relname as depends_on

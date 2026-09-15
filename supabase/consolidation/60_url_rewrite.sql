@@ -2,6 +2,9 @@
 --   psql "$NEW_URL" -v new_ref=<新 ref> -v old_hh=soglfvjtysqqqzbcwwci -v old_gd=xptltqokykpmiqwlnasm -f 60_url_rewrite.sql
 --   （run_sql.py 跑時會先把 :'var' 換成字面值）
 begin;
+-- 🔴 replica 模式：這四張表都有 set_updated_at trigger，直接 update 會把 14 列的 updated_at 蓋成搬遷當下時間
+--    （2026-09-15 第三次排練用 md5 逐表比對時抓到）。搬遷不該改資料的時間戳。
+set local session_replication_role = replica;
 update happyhands.products      set cover_url = replace(cover_url, :'old_hh', :'new_ref')               where cover_url like '%' || :'old_hh' || '%';           -- 8 列
 update happyhands.site_settings set value     = replace(value::text, :'old_hh', :'new_ref')::jsonb      where key = 'teacher' and value::text like '%' || :'old_hh' || '%';  -- 1 列
 update gooddays.products        set images    = replace(images::text, :'old_gd', :'new_ref')::jsonb     where images::text like '%' || :'old_gd' || '%';        -- 3 列

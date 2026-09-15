@@ -63,7 +63,7 @@ def rewrite(text: str, schema: str, priv: str | None):
     text, stats['search_path'] = re.subn(r"(search_path\s*(?:=|to)\s*)'?public'?(?=\s*[,;)\n]|\s*$)", lambda m: f"{m.group(1)}{schema}", text, flags=re.I)
     if priv:
         text, stats['private_dot'] = re.subn(r'\bprivate\.', f'{priv}.', text)
-        text, stats['schema_private'] = re.subn(r'\bschema private\b', f'schema {priv}', text, flags=re.I)
+        text, stats['schema_private'] = re.subn(r'\bschema (if not exists )?private\b', lambda m: f'schema {m.group(1) or ""}{priv}', text, flags=re.I)
     return text, stats
 
 def table_names(sql: str, schema: str):

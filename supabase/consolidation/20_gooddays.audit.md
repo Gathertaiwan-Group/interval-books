@@ -2,7 +2,7 @@
 
 - 來源 migration：16 支（跳過 1：20260719000002_seed_artwork_images.sql）
 - 本 schema 的表：16 張
-- 改寫統計：{'public_dot': 248, 'schema_public': 1, 'search_path': 9, 'private_dot': 27, 'schema_private': 2}
+- 改寫統計：{'public_dot': 248, 'schema_public': 1, 'search_path': 9, 'private_dot': 27, 'schema_private': 3}
 - 移除：auth_trigger 1, bucket 2, insert 7, migrations_table 1
 
 ## 移除的 auth_trigger

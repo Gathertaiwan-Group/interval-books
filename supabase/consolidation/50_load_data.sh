@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# 50 — 三站資料載入目標（吃使用者跑的 pg_dump COPY 格式）。順序：remap → auth（每站載入前快照、濾重複）→ 業務表（replica）→ profiles 覆蓋回填 → 列數。
+# 50 — 三站資料載入目標。吃 scratchpad 裡的七個 dump（api_dump.py 產的，格式＝pg_dump --data-only；真的用 pg_dump 也一樣吃）。
+#   順序：remap → auth（每站載入前快照、濾重複）→ 業務表（replica）→ profiles 覆蓋回填 → 列數。
 #   用法：NEW_URL="$(cat …/pg_rehearsal.url)" ./50_load_data.sh
+#   ⚠️ 第 1 步的 sed 是對 UUID（32 個十六進位字元＋連字號）做全域替換，那是安全的；
+#      但**不要**用 sed 改 schema 名，BSD sed 沒有 \b（見第 3 步的 rename_schema）。
 set -euo pipefail
 SP=${SP:-/private/tmp/claude-501/-Users-aimand--gemini-File/dad55a43-d978-488c-bb46-f3353af97feb/scratchpad}
 : "${NEW_URL:?}"; W=$(mktemp -d); echo "工作目錄 $W"
@@ -11,6 +14,7 @@ SP=${SP:-/private/tmp/claude-501/-Users-aimand--gemini-File/dad55a43-d978-488c-b
 cp "$SP"/dump_{hh,gd}_{data,auth}.sql "$W/"
 while IFS=$'\t' read -r site old canon; do
   [ -z "${old:-}" ] && continue
+  case "$old" in [0-9a-f]????????-*) ;; *) echo "❌ remap.tsv 的 old 不像 UUID：$old"; exit 1;; esac
   for f in "$W/dump_${site}_data.sql" "$W/dump_${site}_auth.sql"; do sed -i '' "s/$old/$canon/g" "$f"; done
 done < "$SP/remap.tsv"
 
@@ -44,19 +48,33 @@ psql "$NEW_URL" -Atc "select 'auth.users='||count(*)||'（期望 46）' from aut
 # 3. 業務表（replica 模式不觸發 updated_at／audit）；profiles 與好日子 _migrations 的 COPY 段先抽掉。
 strip_copy() { python3 - "$@" <<'PY'
 import sys, re
-src, dst, *tables = sys.argv[1:]
-out, skip = [], False
+src, dst, *tables = sys.argv[1:]          # tables 一律寫完整的 schema.table
+out, skip, hit = [], False, set()
 for l in open(src).read().split('\n'):
     m = re.match(r'^COPY (\S+) ', l)
-    if m and any(m.group(1).endswith('.' + t) for t in tables): skip = True
+    if m and m.group(1) in tables: skip = True; hit.add(m.group(1))   # 🔴 精確比對：用「結尾是 .profiles」會把 inv.profiles 一起抽掉
     if not skip: out.append(l)
     if skip and l == '\\.': skip = False
+missing = set(tables) - hit
+if missing: raise SystemExit(f'❌ {src} 裡找不到要抽掉的段：{missing}')
 open(dst, 'w').write('\n'.join(out))
 PY
 }
-strip_copy "$SP/dump_ib_data.sql" "$W/ib_data.sql" profiles
-sed 's/\bpublic\./happyhands./g' "$W/dump_hh_data.sql" > "$W/hh_data.raw.sql"; strip_copy "$W/hh_data.raw.sql" "$W/hh_data.sql" profiles
-sed 's/\bpublic\./gooddays./g'   "$W/dump_gd_data.sql" > "$W/gd_data.raw.sql"; strip_copy "$W/gd_data.raw.sql" "$W/gd_data.sql" profiles _migrations
+strip_copy "$SP/dump_ib_data.sql" "$W/ib_data.sql" public.profiles
+# 🔴 macOS 的 BSD sed 不支援 \b，原本 sed 's/\bpublic\./…/' 在這台機器會「什麼都不換」→ 快樂手資料靜默灌進小時光的 public 表。
+#    改成只改寫 COPY 標頭與 setval 行（資料列裡就算出現 public. 也不會被誤傷）。
+rename_schema() { python3 - "$@" <<'PY'
+import sys, re
+src, dst, new = sys.argv[1:4]
+pat = re.compile(r"^(COPY |SELECT pg_catalog\.setval\(')public\.")
+n = 0; out = []
+for l in open(src).read().split('\n'):
+    l2 = pat.sub(lambda m: m.group(1) + new + '.', l); n += (l2 != l); out.append(l2)
+open(dst, 'w').write('\n'.join(out)); print(f'  {dst.split("/")[-1]}: {n} 行 public. → {new}.')
+PY
+}
+rename_schema "$W/dump_hh_data.sql" "$W/hh_data.raw.sql" happyhands; strip_copy "$W/hh_data.raw.sql" "$W/hh_data.sql" happyhands.profiles
+rename_schema "$W/dump_gd_data.sql" "$W/gd_data.raw.sql" gooddays;   strip_copy "$W/gd_data.raw.sql" "$W/gd_data.sql" gooddays.profiles gooddays._migrations
 for f in ib_data hh_data gd_data; do
   { echo "set session_replication_role = replica;"; cat "$W/$f.sql"; } | psql "$NEW_URL" -v ON_ERROR_STOP=1 -q
   echo "  $f 載入"
@@ -69,10 +87,11 @@ import sys, re, subprocess
 src, sch, URL = sys.argv[1:4]
 seg, grab, col = [], False, None
 for l in open(src).read().split('\n'):
-    m = re.match(r'^COPY \S+\.profiles \(([^)]*)\)', l)
+    m = re.match(r'^COPY ' + re.escape(sch) + r'\.profiles \(([^)]*)\)', l)   # 🔴 精確比對本 schema；第一次排練時抓到 inv.profiles，小時光 8 筆員工 profile 全沒載
     if m: grab = True; col = [c.strip().strip('"') for c in m.group(1).split(',')].index('id')
     if grab: seg.append(l)
     if grab and l == '\\.': break
+if not seg: raise SystemExit(f'❌ {src} 裡沒有 COPY {sch}.profiles 段')
 ids = [l.split('\t')[col] for l in seg[1:-1] if l]
 sql = "set session_replication_role = replica;\ndelete from %s.profiles where id = any(array[%s]::uuid[]);\n%s\n" % (sch, ','.join(f"'{i}'" for i in ids), '\n'.join(seg))
 subprocess.run(['psql', URL, '-v', 'ON_ERROR_STOP=1', '-q'], input=sql, text=True, check=True)
