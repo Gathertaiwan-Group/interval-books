@@ -5,12 +5,12 @@
 ## 執行順序（目標專案上）
 | 順序 | 檔案 | 做什麼 | 狀態 |
 |---|---|---|---|
-| 00 | `00_intervalbooks_baseline.sql` | 小時光 live `pg_dump --schema-only`（public+inv+auth trigger 除外） | ⏳ 等連線字串 |
+| 00 | `00_load_baseline.sh` | 載入使用者跑的小時光 schema dump（先啟 pg_cron/pg_net） | ✅ 等 dump 檔 |
 | 10 | `10_happyhands.sql` | 快樂手 21 支 → `happyhands` schema（515 處改寫、殘留 0、未限定 0） | ✅ 產生器輸出 |
 | 20 | `20_gooddays.sql` | 好日子 16 支 → `gooddays` + `gooddays_private`（275 處、殘留 0） | ✅ |
 | 30 | `30_gooddays_grants.sql` | 好日子原本沒寫的 grant（照 public 預設補） | ✅ |
 | 40 | `40_auth_triggers.sql` | 三個獨立的 auth trigger（扇出＋吃例外） | ✅ |
-| 50 | `50_load_data.sh` | 三站 `pg_dump --data-only` → 目標；auth.users/identities 明列欄位、remap 重複 2 人 | ⏳ 等連線字串 |
+| 50 | `50_load_data.sh` | 吃 7 個 dump：remap → auth（濾重複）→ 業務表（replica）→ profiles 回填 | ✅ 等 dump 檔 |
 | 60 | `60_url_rewrite.sql` | 14 列舊 ref URL 改寫（四張表欄位已確認：cover_url text、其餘 jsonb） | ✅ |
 | 70 | `70_verify.sql` | 十段驗證，任一不符就停 | ✅ |
 | 80 | `80_reverse_delta.sh` | 快樂手回退用的反向增量 | 🟡 骨架，排練時實跑 |
