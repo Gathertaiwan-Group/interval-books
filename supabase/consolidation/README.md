@@ -127,6 +127,14 @@ auth.users 46；public.orders 10；inv.purchases 1,029；happyhands.orders 38／
 `gooddays-group` / `noijrmhdfbfvjyvchvzj`，ap-northeast-1，建在 **gathertaiwan's Org**。
 來源三站仍在 lqtech2026's Org，所以來源與目標是**不同帳號**，token 對照表見 `mgmt.py` 那列。
 
+**2026-09-25 首次實跑結果**：00→60 全段完成，六道驗證全過——schema 逐字 11,185 行一致、
+三站資料逐表 md5 全同、權限 252 組全同、70 十段、71 七段、74 的 HTTP 四項。
+cron 3 個（`active=false`）、vault 3 個、Auth 白名單與密碼長度已套用，Storage 205 物件搬遷中。
+
+實跑時抓到三個「整套回報成功卻什麼都沒做」的 bug（已修）：`run_sql.py` 沒跟著改用 `mgmt.token(ref)`；
+50 的 UUID 防呆 pattern 少算一個字元位，把正確的 UUID 也擋掉；`run_rehearsal.sh` 每步都接 grep 卻
+沒有 `pipefail`，步驟失敗被管線結束碼蓋掉。**第一次跑完 exit=0，但 `auth.users` 是 0。**
+
 🔴 **這個組織目前是 free 方案**：沒有每日備份與 PITR、閒置七天會自動暫停（恢復後 auth 暖機期會假報
 密碼錯誤）。在升級到 Pro 之前，這顆庫只能拿來組裝與驗證，**不要把任何一站的 env 指過來**。
 `94_check_target_plan.py` 會擋。
