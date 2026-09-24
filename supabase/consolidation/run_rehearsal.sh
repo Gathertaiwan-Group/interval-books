@@ -7,7 +7,12 @@ set -euo pipefail
 ref=${1:?用法: run_rehearsal.sh <ref> [--no-reset]}
 do_reset=1; [ "${2:-}" = "--no-reset" ] && do_reset=0
 SP=${SP:-/private/tmp/claude-501/-Users-aimand--gemini-File/dad55a43-d978-488c-bb46-f3353af97feb/scratchpad}
-here=$(cd "$(dirname "$0")" && pwd); export NEW_URL="$(cat "$SP/pg_rehearsal.url")"
+here=$(cd "$(dirname "$0")" && pwd)
+# 連線字串：優先吃環境變數，其次 pg_target.url（正式目標），最後 pg_rehearsal.url（丟棄式排練）
+if [ -z "${NEW_URL:-}" ]; then
+  for f in pg_target.url pg_rehearsal.url; do [ -s "$SP/$f" ] && { NEW_URL="$(cat "$SP/$f")"; break; }; done
+fi
+: "${NEW_URL:?找不到連線字串（設 NEW_URL，或放 scratchpad/pg_target.url）}"; export NEW_URL
 step() { echo; echo "───── $* ─────"; }
 if [ "$do_reset" = 1 ]; then
   step "reset（清空目標）";    python3 "$here/q.py" "$ref" "@$here/rehearsal_reset.sql"

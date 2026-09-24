@@ -22,6 +22,7 @@
 | 91 | `91_cron_vault.py` | 小時光的 3 個 pg_cron 排程與 3 個 vault secret；**排程預設 active=false**，切換那一刻才 `--activate` |
 | 92 | `92_auth_settings.py` | Auth 集團級設定：redirect 白名單聯集、信箱驗證開啟、密碼長度取最嚴、寄件人「好日子 Good Days」 |
 | 93 | `93_api_settings.py` | PostgREST 曝露 `happyhands`／`gooddays`（不做這步，client 設了 `db.schema` 也會 404 PGRST106） |
+| 94 | `94_check_target_plan.py` | 切換前的方案檢查：free 方案沒有備份、閒置會暫停，不能承載三站正式資料 |
 
 一鍵跑完（只對丟棄式／全新專案）：`./run_rehearsal.sh <ref>`（含 reset）。
 
@@ -120,6 +121,15 @@ auth.users 46；public.orders 10；inv.purchases 1,029；happyhands.orders 38／
   就能認領訪客訂單；好日子既有的 2 個帳號要手動補 `email_confirmed_at`。
   🔴 沒設自訂 SMTP 之前，`smtp_sender_name` 與 `rate_limit_email_sent` 改不了（HTTP 401），而且 PATCH 是
   全有全無——腳本已拆成兩組。SMTP 密碼搬不了（Supabase 存雜湊），要在 Dashboard 手填一次。
+
+## 正式目標專案（2026-09-25 建立）
+
+`gooddays-group` / `noijrmhdfbfvjyvchvzj`，ap-northeast-1，建在 **gathertaiwan's Org**。
+來源三站仍在 lqtech2026's Org，所以來源與目標是**不同帳號**，token 對照表見 `mgmt.py` 那列。
+
+🔴 **這個組織目前是 free 方案**：沒有每日備份與 PITR、閒置七天會自動暫停（恢復後 auth 暖機期會假報
+密碼錯誤）。在升級到 Pro 之前，這顆庫只能拿來組裝與驗證，**不要把任何一站的 env 指過來**。
+`94_check_target_plan.py` 會擋。
 
 ## 下一步
 
