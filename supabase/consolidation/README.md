@@ -129,7 +129,8 @@ auth.users 46；public.orders 10；inv.purchases 1,029；happyhands.orders 38／
 
 **2026-09-25 首次實跑結果**：00→60 全段完成，六道驗證全過——schema 逐字 11,185 行一致、
 三站資料逐表 md5 全同、權限 252 組全同、70 十段、71 七段、74 的 HTTP 四項。
-cron 3 個（`active=false`）、vault 3 個、Auth 白名單與密碼長度已套用，Storage 205 物件搬遷中。
+cron 3 個（`active=false`）、vault 3 個、Auth 白名單與密碼長度已套用，Storage **206 個物件**全部搬完
+（140＋9＋57，逐物件 md5 相符）。目標現況：46 帳號／96 表／120 policy／8 桶／三站訂單 10、38、2。
 
 實跑時抓到三個「整套回報成功卻什麼都沒做」的 bug（已修）：`run_sql.py` 沒跟著改用 `mgmt.token(ref)`；
 50 的 UUID 防呆 pattern 少算一個字元位，把正確的 UUID 也擋掉；`run_rehearsal.sh` 每步都接 grep 卻
