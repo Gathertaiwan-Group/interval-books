@@ -4,6 +4,7 @@
 #   🔴 reset 會清光 public 與 inv，只能對丟棄式／全新專案跑。正式目標請加 --no-reset。
 #   Storage／cron／vault／Auth 不在這支裡（90／91／92 各自跑，順序見 README）。
 set -euo pipefail
+set -o pipefail   # 🔴 每個步驟都接 grep／tail，沒有 pipefail 的話步驟失敗會被管線的結束碼蓋掉，整套「成功」跑完卻什麼都沒做
 ref=${1:?用法: run_rehearsal.sh <ref> [--no-reset]}
 do_reset=1; [ "${2:-}" = "--no-reset" ] && do_reset=0
 SP=${SP:-/private/tmp/claude-501/-Users-aimand--gemini-File/dad55a43-d978-488c-bb46-f3353af97feb/scratchpad}

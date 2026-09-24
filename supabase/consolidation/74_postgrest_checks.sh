@@ -6,9 +6,17 @@
 set -euo pipefail
 ref=${1:?用法: 74_postgrest_checks.sh <ref>}
 here=$(cd "$(dirname "$0")" && pwd)
-tok=$(cat "${SP:-/private/tmp/claude-501/-Users-aimand--gemini-File/dad55a43-d978-488c-bb46-f3353af97feb/scratchpad}/supabase_mgmt_token")
-anon=$(curl -s -H "Authorization: Bearer $tok" "https://api.supabase.com/v1/projects/$ref/api-keys?reveal=true" \
-        | python3 -c 'import json,sys; print(next(k["api_key"] for k in json.load(sys.stdin) if k["id"]=="anon"))')
+# token 按專案 ref 解析（來源與目標可能在不同 Supabase 帳號下）
+anon=$(HERE="$here" python3 - "$ref" <<'PY'
+import json, subprocess, sys, os
+sys.path.insert(0, os.environ['HERE'])
+from mgmt import token
+ref = sys.argv[1]
+r = subprocess.run(['curl', '-s', '--max-time', '60', f'https://api.supabase.com/v1/projects/{ref}/api-keys?reveal=true',
+                    '-H', f'Authorization: Bearer {token(ref)}'], capture_output=True, text=True, timeout=80)
+print(next(k['api_key'] for k in json.loads(r.stdout) if k['id'] == 'anon'))
+PY
+)
 base="https://$ref.supabase.co/rest/v1"
 
 # 期望值＝「以 anon 身分在資料庫裡查得到幾列」。

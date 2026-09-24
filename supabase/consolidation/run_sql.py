@@ -7,8 +7,9 @@ import sys, re, json, subprocess, os, argparse
 ap = argparse.ArgumentParser(); ap.add_argument('ref'); ap.add_argument('file'); ap.add_argument('--var', action='append', default=[]); ap.add_argument('--search-path', dest='sp', default=None, help='每段前綴 set local search_path = <sp>, public（裸表名落到對的 schema）')
 ap.add_argument('--from', dest='frm', type=int, default=1, help='從第 N 段開始（重跑失敗段用）')
 a = ap.parse_args()
-SP = os.environ.get('SP', '/private/tmp/claude-501/-Users-aimand--gemini-File/dad55a43-d978-488c-bb46-f3353af97feb/scratchpad')
-tok = open(os.path.join(SP, 'supabase_mgmt_token')).read().strip()
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from mgmt import token          # token 按專案 ref 解析（來源與目標可能不同 Supabase 帳號）
+tok = token(a.ref)
 src = open(a.file, encoding='utf-8').read()
 for kv in a.var:
     k, v = kv.split('=', 1); src = src.replace(f":'{k}'", f"'{v}'")

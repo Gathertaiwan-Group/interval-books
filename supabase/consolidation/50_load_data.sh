@@ -14,7 +14,12 @@ SP=${SP:-/private/tmp/claude-501/-Users-aimand--gemini-File/dad55a43-d978-488c-b
 cp "$SP"/dump_{hh,gd}_{data,auth}.sql "$W/"
 while IFS=$'\t' read -r site old canon; do
   [ -z "${old:-}" ] && continue
-  case "$old" in [0-9a-f]????????-*) ;; *) echo "❌ remap.tsv 的 old 不像 UUID：$old"; exit 1;; esac
+  # 🔴 這個防呆要精確：sed 會把 old 當成全域字串替換，萬一 remap.tsv 寫錯（例如放了 email）
+  #    會把整份 dump 改爛。之前寫成 [0-9a-f]????????-* 少算一個字元位，結果把正確的 UUID 也擋掉。
+  case "$old" in
+    [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+    *) echo "❌ remap.tsv 的 old 不是 UUID：$old"; exit 1;;
+  esac
   for f in "$W/dump_${site}_data.sql" "$W/dump_${site}_auth.sql"; do sed -i '' "s/$old/$canon/g" "$f"; done
 done < "$SP/remap.tsv"
 
