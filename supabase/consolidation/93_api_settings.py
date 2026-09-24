@@ -20,9 +20,10 @@ WANT_SCHEMAS = ['public', 'graphql_public', 'happyhands', 'gooddays']
 WANT_EXTRA_PATH = 'public, extensions'
 
 
-def call(method, path, body=None):
+def call(method, path, body=None, ref=None):
+    # ref 決定用哪一組 token：來源三站與目標可能在不同的 Supabase 帳號下
     args = ['curl', '-s', '-w', '\n%{http_code}', '-X', method, f'{API}{path}',
-            '-H', f'Authorization: Bearer {token()}']
+            '-H', f'Authorization: Bearer {token(ref)}']
     if body is not None:
         args += ['-H', 'Content-Type: application/json', '-d', json.dumps(body)]
     r = subprocess.run(args, capture_output=True, text=True, timeout=90)
@@ -34,7 +35,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--dst', required=True); ap.add_argument('--apply', action='store_true')
     a = ap.parse_args()
-    code, cur = call('GET', f'/projects/{a.dst}/postgrest')
+    code, cur = call('GET', f'/projects/{a.dst}/postgrest', ref=a.dst)
     if code != 200:
         sys.exit(f'❌ 讀不到 PostgREST 設定（HTTP {code}）')
     now = [x.strip() for x in (cur.get('db_schema') or '').split(',') if x.strip()]
@@ -50,11 +51,11 @@ def main():
         print("✅ 已經一致"); return
     if not a.apply:
         print(f"═══ 有 {len(diff)} 項要改；確認無誤後加 --apply"); return
-    code, body = call('PATCH', f'/projects/{a.dst}/postgrest', diff)
+    code, body = call('PATCH', f'/projects/{a.dst}/postgrest', diff, ref=a.dst)
     print(f"═══ 寫入 → HTTP {code}")
     if code >= 300:
         sys.exit(json.dumps(body, ensure_ascii=False)[:400])
-    code, after = call('GET', f'/projects/{a.dst}/postgrest')
+    code, after = call('GET', f'/projects/{a.dst}/postgrest', ref=a.dst)
     got = [x.strip() for x in (after.get('db_schema') or '').split(',')]
     ok = got == want and (after.get('db_extra_search_path') or '').strip() == WANT_EXTRA_PATH
     print(f"{'✅' if ok else '❌'} 回讀：db_schema={got}，extra_search_path={after.get('db_extra_search_path')!r}")

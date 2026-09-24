@@ -31,7 +31,7 @@ def curl(args, binary=False, timeout=180):
 
 
 def service_key(ref):
-    code, body = curl(['-H', f'Authorization: Bearer {token()}', f'{API}/projects/{ref}/api-keys?reveal=true'])
+    code, body = curl(['-H', f'Authorization: Bearer {token(ref)}', f'{API}/projects/{ref}/api-keys?reveal=true'])
     if code != 200:
         sys.exit(f'❌ 取不到 {ref} 的 API key（HTTP {code}）')
     for k in json.loads(body):

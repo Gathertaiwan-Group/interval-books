@@ -8,7 +8,31 @@ class ApiError(Exception):
     pass
 
 
-def token():
+def token(ref=None):
+    """解析該專案要用哪一組 Management token。
+
+    合併的來源與目標可能在**不同的 Supabase 帳號／組織**下（來源三站在 lqtech2026's Org，
+    目標可能建在另一個帳號），所以 token 要按專案 ref 決定，不能只有一組。
+    `scratchpad/supabase_tokens.tsv` 每行 `<ref 或 *>\t<token 檔名>`；找不到就退回
+    `supabase_mgmt_token`。token 只從檔案讀，不寫進腳本、不印出來。
+    """
+    m = os.path.join(SP, 'supabase_tokens.tsv')
+    if os.path.exists(m):
+        default = None
+        for line in open(m):
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            key, _, fname = line.partition('\t')
+            key, fname = key.strip(), fname.strip()
+            if not fname:
+                continue
+            if key == ref:
+                return open(os.path.join(SP, fname)).read().strip()
+            if key == '*':
+                default = fname
+        if default:
+            return open(os.path.join(SP, default)).read().strip()
     return open(os.path.join(SP, 'supabase_mgmt_token')).read().strip()
 
 
@@ -18,7 +42,7 @@ def query(ref, sql, timeout=170, retries=3):
         r = subprocess.run(
             ['curl', '-s', '--max-time', str(timeout), '-X', 'POST',
              f'https://api.supabase.com/v1/projects/{ref}/database/query',
-             '-H', f'Authorization: Bearer {token()}', '-H', 'Content-Type: application/json', '-d', '@-'],
+             '-H', f'Authorization: Bearer {token(ref)}', '-H', 'Content-Type: application/json', '-d', '@-'],
             input=json.dumps({'query': sql}), capture_output=True, text=True, timeout=timeout + 15)
         try:
             d = json.loads(r.stdout)

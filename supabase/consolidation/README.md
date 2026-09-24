@@ -29,7 +29,7 @@
 
 | 檔案 | 用途 |
 |---|---|
-| `mgmt.py` | Management API 查詢 helper（curl，非 requests——Cloudflare 1010） |
+| `mgmt.py` | Management API 查詢 helper（curl，非 requests——Cloudflare 1010）。**token 按專案 ref 解析**：來源三站與目標可能在不同的 Supabase 帳號下，對照表放 `scratchpad/supabase_tokens.tsv`（`<ref 或 *>` → token 檔名） |
 | `api_ddl.py` | 從 catalog 產 schema-only DDL（＝ `pg_dump --schema-only --no-owner`，但不需要 DB 密碼） |
 | `api_dump.py` | 從 catalog 產 data-only dump（COPY 段＋setval，格式與 `pg_dump --data-only` 相同） |
 | `schema_diff.sh` | 兩個專案各跑一次 `api_ddl.py` 再 diff——schema 忠實度的證據（`IGNORE_RE` 略過刻意多出來的物件，略過的是整個區塊不是單行） |

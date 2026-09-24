@@ -24,9 +24,10 @@ API = 'https://api.supabase.com/v1'
 SENDER_NAME = '好日子 Good Days'
 
 
-def call(method, path, body=None):
+def call(method, path, body=None, ref=None):
+    # ref 決定用哪一組 token：來源三站與目標可能在不同的 Supabase 帳號下
     args = ['curl', '-s', '-w', '\n%{http_code}', '-X', method, f'{API}{path}',
-            '-H', f'Authorization: Bearer {token()}']
+            '-H', f'Authorization: Bearer {token(ref)}']
     if body is not None:
         args += ['-H', 'Content-Type: application/json', '-d', json.dumps(body)]
     r = subprocess.run(args, capture_output=True, text=True, timeout=90)
@@ -44,7 +45,7 @@ def main():
 
     srcs = {}
     for ref in a.src:
-        code, cfg = call('GET', f'/projects/{ref}/config/auth')
+        code, cfg = call('GET', f'/projects/{ref}/config/auth', ref=ref)
         if code != 200:
             sys.exit(f'❌ 讀不到 {ref} 的 auth 設定（HTTP {code}）')
         srcs[ref] = cfg
@@ -70,7 +71,7 @@ def main():
         'disable_signup': False,
     }
 
-    code, cur = call('GET', f'/projects/{a.dst}/config/auth')
+    code, cur = call('GET', f'/projects/{a.dst}/config/auth', ref=a.dst)
     if code != 200:
         sys.exit(f'❌ 讀不到目標 {a.dst} 的 auth 設定（HTTP {code}）')
     print(f"═══ 目標 {a.dst} 的 Auth 設定")
@@ -95,11 +96,11 @@ def main():
             print(f"   （其中 {sorted(later)} 要等自訂 SMTP 設好才改得動）")
     else:
         if now_diff:
-            code, body = call('PATCH', f'/projects/{a.dst}/config/auth', now_diff)
+            code, body = call('PATCH', f'/projects/{a.dst}/config/auth', now_diff, ref=a.dst)
             print(f"═══ 寫入 {sorted(now_diff)} → HTTP {code}")
             if code >= 300:
                 sys.exit(json.dumps(body, ensure_ascii=False)[:400])
-            code, after = call('GET', f'/projects/{a.dst}/config/auth')
+            code, after = call('GET', f'/projects/{a.dst}/config/auth', ref=a.dst)
             bad = [k for k, v in now_diff.items() if str(after.get(k)) != str(v)]
             print("  ✅ 回讀全部相符" if not bad else f"  ❌ 回讀不符：{bad}")
         if later:
