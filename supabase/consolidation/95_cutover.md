@@ -7,8 +7,16 @@
 cat /private/tmp/claude-501/-Users-aimand--gemini-File/<session>/scratchpad/target_env.txt
 ```
 
+🔴 **三站的 env 目前都是 production＋preview＋development 共用同一組值**（實查 Vercel）。
+   改的時候三個環境會一起換；不想讓 preview 跟著動就要先把 production 拆成獨立的一筆。
+
 ## 開始之前（三站共同）
 
+0. 🔴 **自訂 SMTP 沒設 ＝ 現在切過去會讓三站的註冊與密碼重設壞掉**。實查目標專案：
+   `smtp_host`／`smtp_user`／`smtp_admin_email` 都是 null、`rate_limit_email_sent` 只有 **2 封／小時**，
+   寄件人也還是 Supabase 預設。小時光的 `customer-auth.ts` 登入前會檢查 `email_confirmed_at`，
+   `claim_guest_orders()` 也以它當第一道閘——驗證信寄不出去，新客人就註冊不了、也認領不了訪客訂單。
+   **這一項沒做完，前面幾步都不用開始。**
 1. 🔴 **組織要先升級到 Pro**。free 方案沒有每日備份、沒有 PITR、閒置七天會自動暫停。
    這顆庫裝的是三站訂單與**已開立的電子發票**（稅務文件），沒有回復點不可以上線。
    `python3 94_check_target_plan.py --dst noijrmhdfbfvjyvchvzj` 會擋。
@@ -41,10 +49,10 @@ anon 與 service_role 用 `target_env.txt` 裡的。
 
 | 站 | 平台 | 變數 |
 |---|---|---|
-| 小時光 | Vercel（另一個 team，本機 CLI 看不到） | `VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`、`SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY` |
-| 好日子 web | Vercel | `NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY` |
+| 小時光 | Vercel `interval-books`（team `lqtechs-projects`） | `VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY`（實查：Vercel 上**沒有** `SUPABASE_URL`，`src/server/env.ts` 的 `supabaseUrl()` 會 fallback 到 `VITE_SUPABASE_URL`，所以三個就夠。`src/lib/images.ts` 也讀 `VITE_SUPABASE_URL` 組 storage 公開網址——140 個 site-images 物件已經搬過去，改這個變數圖片就跟著換。） |
+| 好日子 web | Vercel `goodday` | `NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY` |
 | 好日子 api | Railway（`interval`） | `SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY` |
-| 快樂手 web | Vercel（team `lqtechs-projects`） | `NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY` |
+| 快樂手 web | Vercel `happyhands` | `NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY` |
 | 快樂手 worker | Railway／Vercel cron | `SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY` |
 
 🔴 **快樂手的 38 位客戶與好日子的 2 位需要重新登入**：JWT secret 與 cookie 名
