@@ -12,11 +12,15 @@ cat /private/tmp/claude-501/-Users-aimand--gemini-File/<session>/scratchpad/targ
 
 ## 開始之前（三站共同）
 
-0. 🔴 **自訂 SMTP 沒設 ＝ 現在切過去會讓三站的註冊與密碼重設壞掉**。實查目標專案：
-   `smtp_host`／`smtp_user`／`smtp_admin_email` 都是 null、`rate_limit_email_sent` 只有 **2 封／小時**，
-   寄件人也還是 Supabase 預設。小時光的 `customer-auth.ts` 登入前會檢查 `email_confirmed_at`，
-   `claim_guest_orders()` 也以它當第一道閘——驗證信寄不出去，新客人就註冊不了、也認領不了訪客訂單。
-   **這一項沒做完，前面幾步都不用開始。**
+0. ✅ **信件已設定好（2026-10-07）**：自訂 SMTP 走 Resend（`smtp.resend.com:465`），寄件人
+   `好日子 Good Days <noreply@gathertaiwan.com>`，寄信額度 60 封／小時，六種信件模板改成中文並統一走
+   `{{ .RedirectTo }}`（`auth_email_templates.py`）。已實寄三封驗證信到 Resend 測試信箱：快樂手、好日子、
+   以及「沒傳 redirect 的退路」三種情況的連結都導到正確的網站，信裡的 token 也真的能完成驗證。
+   - 寄件網域是 gathertaiwan.com：這把 Resend key 的帳號裡只驗證了 gathertaiwan.com／beunion.tw／ifoodmap.ai，
+     三站自己的網域都不在（快樂手原本的驗證信就是從這個地址寄）。要換成集團自己的網域：在這個 Resend 帳號
+     加網域、DNS 驗證通過後，改 `92_auth_settings.py --smtp-from` 重跑一次即可。
+   - 網站端配套（已上線，對現行舊專案是 no-op）：快樂手 `cddbe1f` 把註冊與忘記密碼的 redirect 改成剛好
+     `<網域>/auth/confirm`；好日子 `c2345ae` 新增 `/auth/confirm` 落地頁並在註冊時帶 redirect。小時光原本就是。
 1. 🔴 **組織要先升級到 Pro**。free 方案沒有每日備份、沒有 PITR、閒置七天會自動暫停。
    這顆庫裝的是三站訂單與**已開立的電子發票**（稅務文件），沒有回復點不可以上線。
    `python3 94_check_target_plan.py --dst noijrmhdfbfvjyvchvzj` 會擋。
@@ -64,7 +68,13 @@ iron-session、只存 userId，UUID 沒變所以不受影響。
 改回舊 env 即可，舊庫從頭到尾在原地。唯一不免費的是快樂手：切換後的新訂單要倒回舊庫，
 用 `80_reverse_delta.sh`（已在丟棄式專案演練過：新增＋窗口內狀態更新＋序列同步，重跑冪等）。
 
-## 程式改動狀態（2026-09-28 已完成）
+## 程式改動狀態
+
+🔴 **schema 改動只能跟切換一起上線**：快樂手與好日子的 `db:{schema}` 放在各自 repo 的
+`cutover/merged-db` 分支（已 rebase 到最新 main，測試與型別檢查全過）。**不要先合進 main**——
+現在推上去，網站會去舊專案找 `happyhands`／`gooddays` schema，整站讀不到資料。切換第 4 步才合併部署。
+
+（2026-09-28 完成的內容）
 
 - 快樂手 `5039605`：五支工廠帶 `db:{schema:"happyhands"}`、worker 的 `ServiceClient` 型別釘住 schema
   （不釘 tsc 會擋）、eslint 禁止工廠以外直接 import supabase 套件。
