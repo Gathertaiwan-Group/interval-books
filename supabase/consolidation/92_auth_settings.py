@@ -15,8 +15,11 @@
   claim_guest_orders() 都以 email_confirmed_at 當第一道閘，關著等於註冊別人的信箱就能認領訪客訂單。
 - **password_min_length**：取三站最嚴的（8）。**mailer_otp_exp = 3600**：模板文案寫「一小時內有效」，明寫才不會說謊。
 - **SMTP**：Resend（smtp.resend.com:465，帳號固定是 `resend`，密碼就是 API key）。寄件人「好日子 Good Days」。
-  寄件地址必須是**這把 key 的 Resend 帳號裡已驗證**的網域——目前只有 gathertaiwan.com／beunion.tw／ifoodmap.ai，
-  三站自己的網域都不在裡面，所以用 noreply@gathertaiwan.com（快樂手原本的驗證信就是從這個地址寄的）。
+  寄件地址必須是**這把 key 的 Resend 帳號裡已驗證**的網域。用的是**集團自己的 Resend 帳號**（team 裡的 key
+  叫 `for claude`／`Onboarding`，網域 intervalbooks.tw、happyhands.com.tw 已驗證，mygoodday.com.tw 7/10 加入
+  但還沒驗證）。目前暫用 noreply@intervalbooks.tw；mygoodday.com.tw 驗證通過後改成 noreply@mygoodday.com.tw
+  （`--smtp-from` 重跑一次）。
+  ⚠️ 2026-10-07 曾短暫用過 RealReal／給樂共用的 Resend 帳號（noreply@gathertaiwan.com），那是廠商的網域，已換掉。
 - **rate_limit_email_sent = 三站最大值（60/小時）**：三站共用一個額度。沒有自訂 SMTP 時 Supabase 不准改它（401）。
 - **信件模板**：auth_email_templates.py。連結一律走 {{ .RedirectTo }}，見那支檔案的說明。
 """
@@ -54,7 +57,7 @@ def main():
                     default=['kmpwughmwpdzsizrxhms', 'soglfvjtysqqqzbcwwci', 'xptltqokykpmiqwlnasm'])
     ap.add_argument('--site-url', default=None, help='預設：第一個來源（小時光）的 site_url + /auth/confirm')
     ap.add_argument('--smtp-key-file', default=None)
-    ap.add_argument('--smtp-from', default='noreply@gathertaiwan.com')
+    ap.add_argument('--smtp-from', default='noreply@intervalbooks.tw')
     ap.add_argument('--apply', action='store_true')
     a = ap.parse_args()
 

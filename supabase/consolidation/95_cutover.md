@@ -16,9 +16,13 @@ cat /private/tmp/claude-501/-Users-aimand--gemini-File/<session>/scratchpad/targ
    `好日子 Good Days <noreply@gathertaiwan.com>`，寄信額度 60 封／小時，六種信件模板改成中文並統一走
    `{{ .RedirectTo }}`（`auth_email_templates.py`）。已實寄三封驗證信到 Resend 測試信箱：快樂手、好日子、
    以及「沒傳 redirect 的退路」三種情況的連結都導到正確的網站，信裡的 token 也真的能完成驗證。
-   - 寄件網域是 gathertaiwan.com：這把 Resend key 的帳號裡只驗證了 gathertaiwan.com／beunion.tw／ifoodmap.ai，
-     三站自己的網域都不在（快樂手原本的驗證信就是從這個地址寄）。要換成集團自己的網域：在這個 Resend 帳號
-     加網域、DNS 驗證通過後，改 `92_auth_settings.py --smtp-from` 重跑一次即可。
+   - 寄件帳號是**集團自己的 Resend**（intervalbooks.tw、happyhands.com.tw 已驗證），目前寄件地址
+     `noreply@intervalbooks.tw`，已用它實寄三封驗證信確認連結與 token 都正確。
+   - 🟡 **好日子自己的網域 mygoodday.com.tw 還沒驗證**（Resend 狀態 not_started）。它的 DNS 在 Cloudflare，
+     要補三筆紀錄（都在子網域，不影響根網域的 Google Workspace 信箱）：
+     `TXT resend._domainkey`（DKIM）、`MX send → feedback-smtp.ap-northeast-1.amazonses.com`（優先 10）、
+     `TXT send → v=spf1 include:amazonses.com ~all`。完整值用 Resend API `GET /domains/<id>` 取。
+     驗證通過後：`92_auth_settings.py --smtp-from noreply@mygoodday.com.tw --apply`。
    - 網站端配套（已上線，對現行舊專案是 no-op）：快樂手 `cddbe1f` 把註冊與忘記密碼的 redirect 改成剛好
      `<網域>/auth/confirm`；好日子 `c2345ae` 新增 `/auth/confirm` 落地頁並在註冊時帶 redirect。小時光原本就是。
 1. 🔴 **組織要先升級到 Pro**。free 方案沒有每日備份、沒有 PITR、閒置七天會自動暫停。
