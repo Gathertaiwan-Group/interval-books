@@ -8,6 +8,9 @@
 - **uri_allow_list**：三站白名單的聯集，**再加上每一站自己的 site_url**。
   🔴 2026-10-07 修：好日子原本的白名單是空的（它只靠 site_url），只取聯集會把好日子整個漏掉，
      它傳的 redirect 會被 GoTrue 判成不合法、退回 site_url，客人就被導到小時光。
+  🔴 2026-10-08 修：好日子的 Vercel 專案還掛著 goodday-tw.vercel.app，三站的來源白名單都沒有它
+     （好日子用 window.location.origin 組 redirect），從那個網址註冊的人會被導到小時光 → EXTRA_ALLOW。
+     目標專案上**已經有的項目一律保留**：重跑這支只會加、不會把手動加的砍掉。
 - **site_url = 小時光的 /auth/confirm**：這是「某一站沒傳 redirect」時 {{ .RedirectTo }} 的退路。
   設成落地頁而不是首頁，是因為模板會在後面接 ?token_hash=…；接在首頁後面等於一條什麼都不做的連結。
   三站共用 auth，所以就算別站的客人掉到這裡，小時光的 verifyOtp 一樣能幫他把信箱驗證掉。
@@ -32,6 +35,7 @@ API = 'https://api.supabase.com/v1'
 SENDER_NAME = '好日子 Good Days'
 WRITE_ONLY = {'smtp_pass'}          # GET 拿不回明文，不拿來比對
 SMTP_DEPENDENT = {'smtp_sender_name', 'rate_limit_email_sent'}
+EXTRA_ALLOW = ['https://goodday-tw.vercel.app/**']   # 來源白名單沒列、但站還掛著的網域
 
 
 def call(method, path, body=None, ref=None):
@@ -68,6 +72,10 @@ def main():
             sys.exit(f'❌ 讀不到 {ref} 的 auth 設定（HTTP {code}）')
         srcs[ref] = cfg
 
+    code, cur = call('GET', f'/projects/{a.dst}/config/auth', ref=a.dst)
+    if code != 200:
+        sys.exit(f'❌ 讀不到目標 {a.dst} 的 auth 設定（HTTP {code}）')
+
     allow = []
     def add(u):
         u = u.strip()
@@ -79,6 +87,8 @@ def main():
         su = (cfg.get('site_url') or '').rstrip('/')
         if su.startswith('https://'):
             add(su + '/**')                      # 🔴 好日子只有 site_url、白名單是空的
+    for u in EXTRA_ALLOW + (cur.get('uri_allow_list') or '').split(','):
+        add(u)                                   # 目標上已有的保留，只加不砍
     base = (srcs[a.src[0]].get('site_url') or '').rstrip('/')
 
     want = {
@@ -101,9 +111,6 @@ def main():
             'smtp_pass': open(a.smtp_key_file).read().strip(),
         })
 
-    code, cur = call('GET', f'/projects/{a.dst}/config/auth', ref=a.dst)
-    if code != 200:
-        sys.exit(f'❌ 讀不到目標 {a.dst} 的 auth 設定（HTTP {code}）')
     has_smtp = bool(cur.get('smtp_host') and cur.get('smtp_user') and cur.get('smtp_admin_email')) or bool(a.smtp_key_file)
 
     print(f'═══ 目標 {a.dst} 的 Auth 設定')

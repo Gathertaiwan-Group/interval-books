@@ -22,7 +22,9 @@ cat /private/tmp/claude-501/-Users-aimand--gemini-File/<session>/scratchpad/targ
      要補三筆紀錄（都在子網域，不影響根網域的 Google Workspace 信箱）：
      `TXT resend._domainkey`（DKIM）、`MX send → feedback-smtp.ap-northeast-1.amazonses.com`（優先 10）、
      `TXT send → v=spf1 include:amazonses.com ~all`。完整值用 Resend API `GET /domains/<id>` 取。
-     驗證通過後：`92_auth_settings.py --smtp-from noreply@mygoodday.com.tw --apply`。
+     驗證通過後：`92_auth_settings.py --dst noijrmhdfbfvjyvchvzj --smtp-key-file <Resend key 檔> --smtp-from noreply@mygoodday.com.tw --apply`
+     （沒帶 `--smtp-key-file` 時 SMTP 欄位整組不寫，只帶 `--smtp-from` 等於沒做）。
+     🔴 92 會讀三個舊專案的設定，**舊庫關掉後它就跑不了**——要在關庫前換好，不然只能直接 PATCH `smtp_admin_email`。
    - 網站端配套（已上線，對現行舊專案是 no-op）：快樂手 `cddbe1f` 把註冊與忘記密碼的 redirect 改成剛好
      `<網域>/auth/confirm`；好日子 `c2345ae` 新增 `/auth/confirm` 落地頁並在註冊時帶 redirect。小時光原本就是。
 1. 🔴 **組織要先升級到 Pro**。free 方案沒有每日備份、沒有 PITR、閒置七天會自動暫停。
@@ -116,6 +118,7 @@ python3 sync_delta.py --apply   # 切換窗口內寫進舊庫的資料補過來�
 6. 本機 `happyhand/supabase/.temp` 還連著舊庫：關掉後 `supabase db push` 會失敗（安全）。
    🔴 不要把快樂手／好日子的 repo 重新 link 到新專案跑 `db push`——它們的 migration 是寫給 public 的，會直接套進小時光的 schema。
 7. 小時光自檢腳本的線上實測預設已改指新專案（小時光的表在新專案仍是 public／inv）。
+8. 好日子寄件地址要換成 mygoodday.com.tw 的話，**關庫前做**（`92_auth_settings.py` 要讀舊專案，見上方 Auth 那段）。
 
 
 ## ✅ 切換完成（2026-10-08）
@@ -129,4 +132,6 @@ python3 sync_delta.py --apply   # 切換窗口內寫進舊庫的資料補過來�
 - 切換前後各跑一次 `sync_delta.py`：切換窗口內三站舊庫都沒有新寫入，不需要補。
 - 舊小時光庫的三個排程已停；新庫三個排程已開，第一輪全部 succeeded，打到網站任務端點都回 200。
 - ⚠️ 小時光第一次重新部署失敗時，舊排程已先被停掉，停了約兩小時才恢復；期間訂單逾期、補開發票、寄信都沒跑，恢復後下一輪會補上。
+- 10/8 補：好日子 Vercel 還掛著 `goodday-tw.vercel.app`，它不在 Auth 白名單裡，從那個網址註冊的人，驗證信會把他導到小時光。已加進白名單（`92_auth_settings.py` 的 EXTRA_ALLOW），前後讀回比對：只多這一筆、其他沒少。
+  好日子正式網址是 `https://interval-livid.vercel.app`（`NEXT_PUBLIC_SITE_URL`），後台 `/admin`。`mygoodday.com.tw` 沒有掛在 Vercel 上，目前連線會逾時。
 - 三個舊專案目前仍在運作但已沒有網站在用。**關閉前請照上面的「關閉舊庫前的確認清單」。**
