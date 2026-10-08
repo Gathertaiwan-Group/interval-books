@@ -29,6 +29,7 @@ SITES = {
 }
 SKIP = {('gd', '_migrations')}
 BATCH = 150
+INSERT_ONLY = False
 
 
 def remap_pairs(site):
@@ -105,18 +106,19 @@ def fetch_rows(ref, qn, pk, keys, gen, reps):
 
 def upsert(qn, cols, pk, rows, ident_always, replica=True):
     if not rows: return 0
-    collist = cols
-    sets = ','.join(f'{c}=excluded.{c}' for c in cols.split(',') if c not in pk.split(','))
+    pkcols = pk.split(',')
+    sets = ','.join(f'{c}=excluded.{c}' for c in cols.split(',') if c not in pkcols) or f'{pkcols[0]}=excluded.{pkcols[0]}'
+    conflict = f'on conflict ({pk}) do nothing' if INSERT_ONLY else f'on conflict ({pk}) do update set {sets}'
+    overriding = 'overriding system value' if ident_always else ''
     total = 0
     for i in range(0, len(rows), BATCH):
         payload = json.dumps(rows[i:i + BATCH], ensure_ascii=False)
         tag = '$syncj$'
         assert tag not in payload
-        sql = ((f"set local session_replication_role = replica;\n" if replica else '') +
-               f"with ins as (insert into {qn} ({collist}) {'overriding system value' if ident_always else ''} "
-               f"select {collist} from jsonb_populate_recordset(null::{qn}, {tag}{payload}{tag}::jsonb) "
-               f"on conflict ({pk}) do update set {sets or pk.split(',')[0] + '=excluded.' + pk.split(',')[0]} returning 1) "
-               f"select count(*) n from ins")
+        sql = ('set local session_replication_role = replica;\n' if replica else '') + (
+            f'with ins as (insert into {qn} ({cols}) {overriding} '
+            f'select {cols} from jsonb_populate_recordset(null::{qn}, {tag}{payload}{tag}::jsonb) '
+            f'{conflict} returning 1) select count(*) n from ins')
         total += int(query(TARGET, sql)[0]['n'])
     return total
 
@@ -138,8 +140,9 @@ def sync_auth(site, ref, apply_):
         missing = [k for k in src if k not in dst]
         changed = [k for k in src if k in dst and src[k] != dst[k]]
         n = 0
-        if apply_ and (missing or changed):
-            rows = fetch_rows(ref, tbl, pk, missing + changed, meta['gen'], reps)
+        todo = missing if INSERT_ONLY else missing + changed
+        if apply_ and todo:
+            rows = fetch_rows(ref, tbl, pk, todo, meta['gen'], reps)
             # 帳號用正常模式：新帳號要觸發 fan-out trigger 長出三個 schema 的 profile
             n = upsert(tbl, meta['cols'], pk, rows, False, replica=False)
         results.append((tbl, len(src), len(missing), len(changed), n))
@@ -161,8 +164,9 @@ def sync_schema(site, ref, s_schema, d_schema, apply_):
         changed = [k for k in src if k in dst and src[k] != dst[k]]
         extra = len([k for k in dst if k not in src])
         n = 0
-        if apply_ and (missing or changed):
-            rows = fetch_rows(ref, sq, m['pk'], missing + changed, m['gen'], reps)
+        todo = missing if INSERT_ONLY else missing + changed
+        if apply_ and todo:
+            rows = fetch_rows(ref, sq, m['pk'], todo, m['gen'], reps)
             n = upsert(dq, m['cols'], m['pk'], rows, m['ident_always'])
         if missing or changed or (extra and t != 'profiles'):
             out.append((t, len(src), len(missing), len(changed), extra, n))
@@ -173,6 +177,8 @@ def sync_schema(site, ref, s_schema, d_schema, apply_):
         sv = query(ref, f'select last_value v, is_called c from "{s_schema}"."{s["n"]}"')[0]
         dv = query(TARGET, f'select last_value v, is_called c from "{d_schema}"."{s["n"]}"')[0]
         if (str(sv['v']), sv['c']) != (str(dv['v']), dv['c']):
+            if INSERT_ONLY and int(sv['v']) <= int(dv['v']):
+                continue                                   # 新庫已經往前走了，不可以倒退
             seq_fix += 1
             if apply_:
                 query(TARGET, f"select setval({sql_str(d_schema + '.' + s['n'])}, {sv['v']}, {'true' if sv['c'] else 'false'})")
@@ -182,10 +188,15 @@ def sync_schema(site, ref, s_schema, d_schema, apply_):
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument('--apply', action='store_true')
     ap.add_argument('--site', action='append', choices=list(SITES))
+    ap.add_argument('--insert-only', action='store_true',
+                    help='切換「之後」用：只補新庫沒有的列，不拿舊庫的版本覆蓋新庫——新庫已經是正本，'
+                         '舊庫裡內容不同的列只回報、不寫。')
     a = ap.parse_args()
+    global INSERT_ONLY
+    INSERT_ONLY = a.insert_only
     for site in a.site or ['ib', 'hh', 'gd']:
         name, ref, pairs = SITES[site]
-        print(f"═══ {name}{'（套用）' if a.apply else '（試跑，不寫入）'}")
+        print(f"═══ {name}{'（套用' + ('，只新增' if INSERT_ONLY else '') + '）' if a.apply else '（試跑，不寫入）'}")
         for tbl, total, miss, chg, n in sync_auth(site, ref, a.apply):
             print(f"  {tbl:<16} 來源 {total}：缺 {miss}、變動 {chg}" + (f" → 已寫入 {n}" if a.apply else ''))
         for s_schema, d_schema in pairs:
