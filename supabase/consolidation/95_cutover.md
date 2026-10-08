@@ -87,3 +87,32 @@ iron-session、只存 userId，UUID 沒變所以不受影響。
 - 小時光**不需要改**：它留在 `public`。實查四處讀 `profiles` 的地方都已經 fail-closed
   （`listStaffAccounts` 有 `role in (admin,staff,pending)`、後台與廠商登入各自只認自己的 role、
   進銷存那支用 id 清單過濾），合併後多出來的 38 個 customer 不會出現在任何後台清單。
+
+
+## 實際切換（2026-10-08）
+
+使用者決定**維持免費方案**直接切換（接受：沒有每日備份；上線後有流量不會再閒置暫停）。
+
+一站一個指令（都在本目錄）：
+
+```bash
+python3 96_switch.py ib     # 小時光：停舊庫排程 → 改 Vercel env → 重新部署 → 煙霧測試 → 開新庫排程
+python3 96_switch.py gd     # 好日子：Vercel env → Railway env（先不部署）→ 合併 cutover 分支推上 → 等上線 → Railway 部署同一 commit → 煙霧測試
+python3 96_switch.py hh     # 快樂手：Vercel env → 合併 cutover 分支推上 → 等上線 → 煙霧測試
+python3 sync_delta.py --apply   # 切換窗口內寫進舊庫的資料補過來（只新增／更新，不刪）
+```
+
+切換前已用 `sync_delta.py` 把合併庫補到與三站一致（小時光 +1 帳號、24 筆寄信佇列狀態；快樂手 Alice 的 owner 角色與稽核）。
+清空重灌被 auto-mode 權限檢查以「大量刪除」擋下，所以改成只補差異——反而更快，也能重複跑。
+
+## 關閉舊庫前的確認清單（舊庫關掉就沒有回退路線）
+
+1. 三站 `96_switch.py` 都 ✅（頁面 200、網站程式指向新庫）。
+2. 切換後跑 `sync_delta.py --apply`，再跑一次試跑確認全部 0。
+3. 觀察 24–48 小時：`cron.job_run_details` 的三個排程有成功紀錄、`net._http_response` 沒有 4xx/5xx、有訂單的話確認金流 webhook 寫進新庫、驗證信能收到。
+4. **關庫前最後再備份一次**（切換到關閉之間舊庫若還有寫入）。目前備份：
+   `~/supabase-backups/2026-10-08-pre-shutdown/`（三站資料＋Auth、結構 DDL、Auth／PostgREST 設定、Storage 206 個檔，權限 700）。
+5. 舊庫關掉後**會失效且救不回來**的：已寄出的信、LINE、Google 索引裡指向舊 Storage 網址的圖（快樂手 media、好日子 product-images）。Supabase 不提供轉址。
+6. 本機 `happyhand/supabase/.temp` 還連著舊庫：關掉後 `supabase db push` 會失敗（安全）。
+   🔴 不要把快樂手／好日子的 repo 重新 link 到新專案跑 `db push`——它們的 migration 是寫給 public 的，會直接套進小時光的 schema。
+7. 小時光自檢腳本的線上實測預設已改指新專案（小時光的表在新專案仍是 public／inv）。

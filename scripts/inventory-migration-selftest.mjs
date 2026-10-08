@@ -19,7 +19,7 @@
  *
  * 環境變數：
  *   SUPABASE_ACCESS_TOKEN   Management API token（連線段的開關）
- *   SUPABASE_PROJECT_REF    目標專案 ref，預設 kmpwughmwpdzsizrxhms
+ *   SUPABASE_PROJECT_REF    目標專案 ref，預設 noijrmhdfbfvjyvchvzj（2026-10 三站合併後的專案；小時光的表仍在 public／inv）
  *   VITE_SUPABASE_URL       anon 可達性測試用；沒設會去讀 .env.local
  *   VITE_SUPABASE_ANON_KEY  同上
  */
@@ -265,7 +265,7 @@ checkTrue(
 // ══════════════════════════════════════════════════════════════════════════
 
 const TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
-const REF = process.env.SUPABASE_PROJECT_REF ?? "kmpwughmwpdzsizrxhms";
+const REF = process.env.SUPABASE_PROJECT_REF ?? "noijrmhdfbfvjyvchvzj";
 
 async function q(sql) {
   const res = await fetch(`https://api.supabase.com/v1/projects/${REF}/database/query`, {

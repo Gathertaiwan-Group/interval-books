@@ -704,7 +704,7 @@ checkTrue(
 // [9]–[13] 實測
 // -----------------------------------------------------------------------------
 
-const REF = process.env.SUPABASE_PROJECT_REF ?? "kmpwughmwpdzsizrxhms";
+const REF = process.env.SUPABASE_PROJECT_REF ?? "noijrmhdfbfvjyvchvzj";
 const TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
 
 async function q(query) {
