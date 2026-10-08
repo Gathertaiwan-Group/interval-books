@@ -116,3 +116,17 @@ python3 sync_delta.py --apply   # 切換窗口內寫進舊庫的資料補過來�
 6. 本機 `happyhand/supabase/.temp` 還連著舊庫：關掉後 `supabase db push` 會失敗（安全）。
    🔴 不要把快樂手／好日子的 repo 重新 link 到新專案跑 `db push`——它們的 migration 是寫給 public 的，會直接套進小時光的 schema。
 7. 小時光自檢腳本的線上實測預設已改指新專案（小時光的表在新專案仍是 public／inv）。
+
+
+## ✅ 切換完成（2026-10-08）
+
+| 站 | 怎麼切的 | 結果 |
+|---|---|---|
+| 好日子 | `96_switch.py gd`：Vercel env＋Railway env（skipDeploys）→ 合併 cutover 分支 → Vercel 與 Railway 都部署 173c737 | 頁面 200、網站程式指向新庫、Railway api SUCCESS |
+| 快樂手 | `96_switch.py hh`：Vercel env → 合併 cutover 分支 39d2cac → 部署 | 頁面 200、網站程式指向新庫 |
+| 小時光 | 重新部署被 Vercel 擋下（@tanstack/react-start 1.167.39 有 CVE-2026-102989，Vercel 拒絕建置有已知漏洞的套件）→ 升級到 1.168.60（77f99fb）後推上去，同一次部署拿到新 env | 頁面 200、網站程式指向新庫 |
+
+- 切換前後各跑一次 `sync_delta.py`：切換窗口內三站舊庫都沒有新寫入，不需要補。
+- 舊小時光庫的三個排程已停；新庫三個排程已開，第一輪全部 succeeded，打到網站任務端點都回 200。
+- ⚠️ 小時光第一次重新部署失敗時，舊排程已先被停掉，停了約兩小時才恢復；期間訂單逾期、補開發票、寄信都沒跑，恢復後下一輪會補上。
+- 三個舊專案目前仍在運作但已沒有網站在用。**關閉前請照上面的「關閉舊庫前的確認清單」。**
