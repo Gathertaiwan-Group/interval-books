@@ -5,6 +5,7 @@ import { PageShell, PageHeader } from "@/components/PageShell";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { eyebrowOf, fetchEventCategories, fetchEvents, fetchPage, pageText } from "@/lib/cms";
+import { CARD, featureLayout } from "@/lib/feature-layout";
 import { useSiteContent } from "@/lib/site-content";
 import { imageFor } from "@/lib/images";
 import eventImg from "@/assets/event-reading.jpg";
@@ -59,10 +60,15 @@ const DETAIL = { zh: "活動詳情", en: "Event details", ja: "イベント詳�
 /**
  * 零筆結果的文案。
  *
- * 🔴 為什麼非有不可：下面的卡片格線用 `gap-px bg-border` 做 1px 細線 —— 容器鋪
- *    border 色，每張卡片再用 bg-background 蓋回來。list 是空陣列時沒有任何卡片
- *    去蓋，於是整個容器連同 pb-32 的高度變成一大片灰色色塊。那看起來是壞掉，
- *    不是「目前沒有活動」。
+ * 🔴 為什麼非有不可：下面的列表是一張一張獨立的卡片（featureLayout），格線容器
+ *    本身沒有底色。list 是空陣列時格線裡一張卡片都沒有，篩選鈕底下就只剩 pb-32
+ *    的一段空白 —— 看起來像沒載入完或壞掉，不是「目前沒有活動」；「報名中」空了時
+ *    該給的下一步（看過去的活動）也跟著不見。所以零筆時不畫格線，改畫這段文案。
+ *
+ *    以前這裡是 1px 細線磚牆（feature-layout.ts 檔頭 🔴 說的那種）：容器鋪 border 色、
+ *    每張卡片再用 bg-background 蓋回來，空陣列時整個容器連同 pb-32 會變成一大片灰色。
+ *    改成卡片之後灰色色塊不會再出現（單數筆時最後一格的灰色空位也一起沒了），但
+ *    「空白看起來像壞掉」這一半還在，所以這段文案照樣留著。
  *
  * 兩種空狀態分開寫，因為這一頁的兩個 filter 空掉時「下一步」不一樣：「報名中」
  * 空了的時候使用者還有地方可以去（過去辦過的活動），「已結束」空了則沒有。
@@ -149,6 +155,10 @@ function Events() {
   const upcoming = events.filter((e) => !isPastEvent(e.isoDate));
   const past = events.filter((e) => isPastEvent(e.isoDate));
   const list = filter === PAST_FILTER ? past : upcoming;
+  // 卡片排法跟首頁同一套（src/lib/feature-layout.ts）：1 場＝橫版左圖右字佔滿寬，
+  // 2 場兩欄，3 場以上 md 兩欄／lg 三欄。算的是「目前這一格」的筆數，切到
+  // 「已結束」會跟著重算。0 場不畫格線，走下面的空狀態。
+  const layout = featureLayout(list.length);
 
   return (
     <PageShell>
@@ -214,42 +224,70 @@ function Events() {
           </div>
         </section>
       ) : (
-        <section className="container-editorial pb-32 grid gap-px bg-border border border-border md:grid-cols-2">
+        <section className={`container-editorial pb-32 ${layout.grid}`}>
           {list.map((e) => (
-            <article key={e.id} className="bg-background p-8 md:p-10 flex flex-col">
-              <div className="flex flex-wrap items-center gap-3">
-                <p className="eyebrow text-2xl">
-                  {t(
-                    labelById.get(e.category) ?? { zh: e.category, en: e.category, ja: e.category },
-                  )}
-                </p>
-                {/* 已結束要在卡片上看得出來 —— 只靠「它在另一個分頁底下」不夠：
-                  分享出去的連結、從搜尋進來的人都不會看到那個分頁。 */}
-                {isPastEvent(e.isoDate) ? (
-                  <span className="border border-border px-2 py-0.5 text-xs tracking-widest text-muted-foreground">
-                    {t(p.block("filters.pastBadge", PAST_BADGE))}
-                  </span>
-                ) : null}
-              </div>
-              <h3 className="display mt-4 text-2xl md:text-3xl leading-snug">{t(e.title)}</h3>
-              <p className="mt-4 text-sm text-muted-foreground">{e.date}</p>
-              <p className="mt-4 text-sm leading-relaxed text-foreground/75 flex-1">
-                {t(e.summary)}
-              </p>
-              {/* 只留站內的詳情頁。原本旁邊還有一顆「前往活動網站」連到
-                events.external_url —— 但正式庫七場活動裡有五場的那一欄還是
-                https://example.com/event-N（0001 的種子資料，從未替換），所以
-                那顆按鈕多半是把人送去一個不存在的地方。活動詳情頁存在之後，
-                站內那一頁本來就是我們說得最清楚的地方；真的有外部售票連結時，
-                由詳情頁自己決定要不要顯示。 */}
-              <div className="mt-8">
-                <Link
-                  to="/events/$slug"
-                  params={{ slug: e.slug }}
-                  className="inline-block border border-foreground px-5 py-3 tracking-widest hover:bg-foreground hover:text-primary-foreground transition-colors text-base"
+            // 整張卡片不是連結（唯一的連結是底下那顆「活動詳情」），所以不加 CARD_HOVER。
+            <article key={e.id} className={`${CARD} ${layout.card}`}>
+              {/* ⚠️ 先判斷 imageKey 非空**再**呼叫 imageFor()。imageFor(key, fallback)
+                  永遠會回一張圖，順序反過來就是每一張卡片都長同一張不相干的照片
+                  （見 EventEntry.imageKey）。沒設封面的活動就是沒有圖，不放佔位。 */}
+              {e.imageKey ? (
+                <div className={`aspect-[4/3] overflow-hidden ${layout.image}`}>
+                  <img
+                    src={imageFor(e.imageKey, eventImg)}
+                    alt=""
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ) : null}
+              {/* 按鈕靠摘要的 flex-1 推到卡片底部，同一列的按鈕因此對齊；只有一場時
+                  featureLayout 給 summary 的 md:flex-none 會把它拿掉，讓整段文字在
+                  橫版裡垂直置中（見 feature-layout.ts）。不用 mt-auto：auto margin 會
+                  先吃掉剩餘空間，橫版的 md:justify-center 就失效了。 */}
+              <div className={`flex flex-1 flex-col p-6 ${layout.body}`}>
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="eyebrow text-sm tracking-widest">
+                    {t(
+                      labelById.get(e.category) ?? {
+                        zh: e.category,
+                        en: e.category,
+                        ja: e.category,
+                      },
+                    )}
+                  </p>
+                  {/* 已結束要在卡片上看得出來 —— 只靠「它在另一個分頁底下」不夠：
+                    分享出去的連結、從搜尋進來的人都不會看到那個分頁。 */}
+                  {isPastEvent(e.isoDate) ? (
+                    <span className="border border-border px-2 py-0.5 text-xs tracking-widest text-muted-foreground">
+                      {t(p.block("filters.pastBadge", PAST_BADGE))}
+                    </span>
+                  ) : null}
+                </div>
+                <h3 className={`display mt-4 text-2xl leading-snug ${layout.title}`}>
+                  {t(e.title)}
+                </h3>
+                <p className="mt-4 text-sm text-muted-foreground">{e.date}</p>
+                <p
+                  className={`mt-4 text-sm leading-relaxed text-foreground/75 flex-1 ${layout.summary}`}
                 >
-                  {t(p.block("detail", DETAIL))}
-                </Link>
+                  {t(e.summary)}
+                </p>
+                {/* 只留站內的詳情頁。原本旁邊還有一顆「前往活動網站」連到
+                  events.external_url —— 但正式庫七場活動裡有五場的那一欄還是
+                  https://example.com/event-N（0001 的種子資料，從未替換），所以
+                  那顆按鈕多半是把人送去一個不存在的地方。活動詳情頁存在之後，
+                  站內那一頁本來就是我們說得最清楚的地方；真的有外部售票連結時，
+                  由詳情頁自己決定要不要顯示。 */}
+                <div className="mt-8">
+                  <Link
+                    to="/events/$slug"
+                    params={{ slug: e.slug }}
+                    className="inline-block border border-foreground px-5 py-3 tracking-widest hover:bg-foreground hover:text-primary-foreground transition-colors text-base"
+                  >
+                    {t(p.block("detail", DETAIL))}
+                  </Link>
+                </div>
               </div>
             </article>
           ))}

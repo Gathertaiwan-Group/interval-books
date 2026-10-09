@@ -5,8 +5,8 @@
  * 排列：featureLayout(筆數)
  *   0 筆 → 整區（含標題）不顯示，由呼叫端判斷
  *   1 筆 → 橫版：左圖右字、佔滿版面寬，文字垂直置中（手機一樣是上圖下字，窄螢幕並排擠不下）
- *   2 筆 → 兩欄卡片
- *   3 筆以上 → 三欄卡片
+ *   2、4 筆 → 兩欄卡片（4 筆排三欄會變成 3＋1，最後一張孤零零）
+ *   其他 3 筆以上 → md 兩欄、lg 三欄
  * card／image／body／title／summary 是單筆時才加的 class，多筆時都是空字串。
  *
  * 🔴 不要再用 `grid gap-px bg-border` 那種 1px 細線磚牆：只有一筆時，容器的底色會露出一大塊灰色。
@@ -27,7 +27,10 @@ export function featureLayout(count: number) {
     };
   }
   return {
-    grid: count === 2 ? "grid gap-8 md:grid-cols-2" : "grid gap-8 md:grid-cols-2 lg:grid-cols-3",
+    grid:
+      count === 2 || count === 4
+        ? "grid gap-8 md:grid-cols-2"
+        : "grid gap-8 md:grid-cols-2 lg:grid-cols-3",
     card: "",
     image: "",
     body: "",

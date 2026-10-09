@@ -6,6 +6,7 @@ import { SessionPicker, SessionList } from "@/components/shop/SessionPicker";
 import { PlanPicker } from "@/components/shop/PlanPicker";
 import { QuantityStepper } from "@/components/shop/ShopBits";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
+import { CARD } from "@/lib/feature-layout";
 import {
   directAnySeatsLeft,
   directCheckoutSearch,
@@ -472,13 +473,17 @@ function Curation() {
 
         <div className="md:col-span-7">
           <p className="eyebrow text-2xl text-muted-foreground">本場思享題目</p>
-          <ol className="mt-6 grid gap-px bg-border border border-border">
+          {/* 題目是有順序的一串，所以維持單欄直排，只是每題各自一張卡（CARD）。
+              CARD 是直向 flex，編號與題目要左右並排，所以橫排放在裡面那一層。 */}
+          <ol className="mt-6 grid gap-4">
             {SALON.themes.map((t, i) => (
-              <li key={t} className="bg-background flex gap-5 p-6 md:p-7">
-                <span className="font-serif text-xl text-clay tabular-nums shrink-0">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span className="text-base leading-relaxed">{t}</span>
+              <li key={t} className={CARD}>
+                <div className="flex gap-5 p-6">
+                  <span className="font-serif text-xl text-clay tabular-nums shrink-0">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="text-base leading-relaxed">{t}</span>
+                </div>
               </li>
             ))}
           </ol>
@@ -495,9 +500,11 @@ function Speakers() {
     <section className="container-editorial py-16 md:py-24 border-t border-border">
       <SectionHead eyebrow="對談陣容" title="四種看台東的方式" />
 
-      <div className="mt-12 grid gap-px bg-border border border-border sm:grid-cols-2">
+      {/* 卡片外框走共用的 CARD（src/lib/feature-layout.ts）；欄數維持這一頁自己的 2×2——
+          四位講者用 featureLayout 的「3 筆以上三欄」會在寬螢幕排成 3＋1。 */}
+      <div className="mt-12 grid gap-8 sm:grid-cols-2">
         {SALON.speakers.map((s) => (
-          <article key={s.title} className="bg-background p-7 md:p-9 flex flex-col">
+          <article key={s.title} className={`${CARD} p-6`}>
             <p className="text-[0.7rem] tracking-widest text-[var(--salon-sage)]">{s.role}</p>
             <h3 className={`display mt-3 text-2xl ${s.pending ? "text-muted-foreground" : ""}`}>
               {s.name}
@@ -544,9 +551,11 @@ function Paths() {
     <section className="container-editorial py-16 md:py-24 border-t border-border">
       <SectionHead eyebrow="沙龍之後" title="三條可以繼續走的路" />
 
-      <div className="mt-12 grid gap-px bg-border border border-border md:grid-cols-3">
+      {/* 同上：外框用 CARD，欄數維持這一頁原本的 md 起三欄一列（featureLayout 的三筆
+          在 md～lg 之間是兩欄，會排成 2＋1）。 */}
+      <div className="mt-12 grid gap-8 md:grid-cols-3">
         {SALON.paths.map((p, i) => (
-          <article key={p.label} className="bg-background p-7 md:p-8">
+          <article key={p.label} className={`${CARD} p-6`}>
             <p className="font-serif text-xl text-clay tabular-nums">
               {String(i + 1).padStart(2, "0")}
             </p>

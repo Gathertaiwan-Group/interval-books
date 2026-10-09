@@ -3,6 +3,7 @@ import { PageShell, PageHeader } from "@/components/PageShell";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fetchJourneys, fetchPage, pageText, eyebrowOf } from "@/lib/cms";
+import { CARD, CARD_HOVER, featureLayout } from "@/lib/feature-layout";
 import { useSiteContent } from "@/lib/site-content";
 import { imageFor } from "@/lib/images";
 import { journeyLinkProps } from "@/lib/journey-link";
@@ -65,6 +66,7 @@ function Journeys() {
   const { page, journeys } = Route.useLoaderData();
   const p = pageText(page);
   const { ui, contactEmail } = useSiteContent();
+  const layout = featureLayout(journeys.length);
 
   useDocumentMeta({
     title: p.metaTitle(PAGE.metaTitle),
@@ -80,35 +82,55 @@ function Journeys() {
         intro={t(p.intro(PAGE.intro))}
       />
 
-      <section className="container-editorial pb-24 grid gap-12 md:grid-cols-3">
-        {journeys.map((j) => (
-          <article key={j.id} className="flex flex-col">
-            <div className="aspect-[4/3] overflow-hidden bg-muted">
-              <img
-                src={journeyImg}
-                alt={t(j.title)}
-                loading="lazy"
-                className="h-full w-full object-cover"
-              />
-            </div>
-            <p className="eyebrow text-2xl mt-6">
-              {t(j.days)} ／ {t(j.theme)}
-            </p>
-            <h3 className="display mt-3 text-2xl leading-snug whitespace-pre-line">{t(j.title)}</h3>
-            <p className="mt-4 text-sm leading-relaxed text-foreground/75 flex-1">{t(j.summary)}</p>
-            {(() => {
-              const link = journeyLinkProps(j.externalUrl);
-              return link ? (
-                <a
-                  {...link}
-                  className="mt-6 inline-block self-start tracking-widest text-clay hover-underline text-base"
+      <section className={`container-editorial pb-24 ${layout.grid}`}>
+        {journeys.map((j) => {
+          // 與首頁「精選策旅」同一種卡片：有連結就整張卡可點，還沒設連結的策旅
+          // 仍然看得到卡片，只是不可點（不要讓它消失）。
+          const link = journeyLinkProps(j.externalUrl);
+          const body = (
+            <>
+              {/* 每一趟策旅都用同一張固定意象圖（journeys 表沒有 image_key），
+                  它不是這趟旅程的照片，所以當裝飾圖（alt=""），標題就在卡片上。 */}
+              <div className={`aspect-[4/3] overflow-hidden bg-muted ${layout.image}`}>
+                <img
+                  src={journeyImg}
+                  alt=""
+                  loading="lazy"
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                />
+              </div>
+              <div className={`flex flex-1 flex-col p-6 ${layout.body}`}>
+                <p className="eyebrow text-sm tracking-widest">
+                  {t(j.days)} ／ {t(j.theme)}
+                </p>
+                <h3
+                  className={`display mt-3 text-2xl leading-snug whitespace-pre-line ${layout.title}`}
                 >
-                  {t(ui.buttons.toJourney)} →
-                </a>
-              ) : null;
-            })()}
-          </article>
-        ))}
+                  {t(j.title)}
+                </h3>
+                <p
+                  className={`mt-4 text-sm leading-relaxed text-foreground/75 flex-1 ${layout.summary}`}
+                >
+                  {t(j.summary)}
+                </p>
+                {link ? (
+                  <span className="mt-6 inline-block self-start tracking-widest text-clay group-hover:underline text-base">
+                    {t(ui.buttons.toJourney)} →
+                  </span>
+                ) : null}
+              </div>
+            </>
+          );
+          return link ? (
+            <a key={j.id} {...link} className={`${CARD} ${layout.card} ${CARD_HOVER}`}>
+              {body}
+            </a>
+          ) : (
+            <article key={j.id} className={`${CARD} ${layout.card}`}>
+              {body}
+            </article>
+          );
+        })}
       </section>
 
       <section className="container-editorial pb-32">

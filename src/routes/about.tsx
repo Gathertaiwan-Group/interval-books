@@ -33,6 +33,7 @@ import type { Localized } from "@/i18n/types";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fetchPage, pageText, eyebrowOf } from "@/lib/cms";
 import type { PageListEntry } from "@/lib/cms";
+import { CARD, featureLayout } from "@/lib/feature-layout";
 import { imageFor } from "@/lib/images";
 import { useSiteContent } from "@/lib/site-content";
 import interiorImg from "@/assets/bookstore-interior.jpg";
@@ -267,6 +268,8 @@ function About() {
 
   const workList = p.rows("work", WORK_FALLBACK);
   const spaceList = p.rows("space", SPACE_FALLBACK);
+  const workLayout = featureLayout(workList.length);
+  const spaceLayout = featureLayout(spaceList.length);
 
   const metroList = pv.list("metro", METRO);
   const busList = pv.list("bus", BUS);
@@ -317,16 +320,20 @@ function About() {
         <h2 className="display text-3xl md:text-4xl border-t border-border pt-12">
           {t(p.block("workTitle", PAGE.workTitle))}
         </h2>
-        <div className="mt-12 grid gap-px bg-border border border-border md:grid-cols-3">
+        <div className={`mt-12 ${workLayout.grid}`}>
           {workList.map((w, i) => (
-            <article key={i} className="bg-background p-8 md:p-10">
-              <p className="text-[0.65rem] tracking-widest text-muted-foreground">
-                {String(i + 1).padStart(2, "0")}
-              </p>
-              <h3 className="display mt-3 text-2xl">{t(w.label)}</h3>
-              <p className="mt-4 text-sm leading-relaxed text-foreground/75">
-                {t(w.note ?? { zh: "", en: "", ja: "" })}
-              </p>
+            <article key={i} className={`${CARD} ${workLayout.card}`}>
+              <div className={`flex flex-1 flex-col p-6 ${workLayout.body}`}>
+                <p className="text-[0.65rem] tracking-widest text-muted-foreground">
+                  {String(i + 1).padStart(2, "0")}
+                </p>
+                <h3 className={`display mt-3 text-2xl leading-snug ${workLayout.title}`}>
+                  {t(w.label)}
+                </h3>
+                <p className="mt-4 text-sm leading-relaxed text-foreground/75">
+                  {t(w.note ?? { zh: "", en: "", ja: "" })}
+                </p>
+              </div>
             </article>
           ))}
         </div>
@@ -337,10 +344,10 @@ function About() {
         <p className="eyebrow text-2xl border-t border-border pt-12">
           {t(p.block("spaceTitle", PAGE.spaceTitle))}
         </p>
-        <div className="mt-10 grid gap-6 md:grid-cols-3">
+        <div className={`mt-10 ${spaceLayout.grid}`}>
           {spaceList.map((s, i) => (
-            <figure key={i} className="space-y-4">
-              <div className="aspect-[4/5] overflow-hidden bg-muted">
+            <figure key={i} className={`${CARD} ${spaceLayout.card}`}>
+              <div className={`aspect-[4/5] overflow-hidden bg-muted ${spaceLayout.image}`}>
                 <img
                   src={imageFor(s.imageKey, SPACE_FALLBACK_IMAGES[i] ?? interiorImg)}
                   alt={t(s.label)}
@@ -348,8 +355,10 @@ function About() {
                   loading="lazy"
                 />
               </div>
-              <figcaption className="text-sm text-muted-foreground tracking-widest">
-                — {t(s.label)}
+              <figcaption className={`flex flex-1 flex-col p-6 ${spaceLayout.body}`}>
+                <span className={`display text-2xl leading-snug ${spaceLayout.title}`}>
+                  {t(s.label)}
+                </span>
               </figcaption>
             </figure>
           ))}

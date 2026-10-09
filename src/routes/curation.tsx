@@ -3,6 +3,7 @@ import { PageShell, PageHeader } from "@/components/PageShell";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fetchCollaborations, fetchPage, pageText, eyebrowOf } from "@/lib/cms";
+import { CARD, featureLayout } from "@/lib/feature-layout";
 import { useSiteContent } from "@/lib/site-content";
 
 /** Fallback copy — used only when the Supabase read fails. */
@@ -39,8 +40,8 @@ const PAGE = {
 /**
  * 零筆結果的文案。collaborations 是資料庫來的，可以是空的。
  *
- * 沒有這個守衛的話，下面那個 `gap-px bg-border` 的細線格線會因為沒有卡片去蓋，
- * 整片變成 border 色的色塊 —— 看起來是壞掉，不是「還沒有合作案例」。
+ * 沒有這個守衛的話，下面的卡片格線一張卡都畫不出來，整段只剩一塊空白 ——
+ * 看起來是壞掉，不是「還沒有合作案例」。
  */
 const EMPTY = {
   zh: "目前還沒有公開的合作案例。歡迎來信聊聊你的想法。",
@@ -75,6 +76,7 @@ function Curation() {
   const { page, collaborations } = Route.useLoaderData();
   const p = pageText(page);
   const { contactEmail } = useSiteContent();
+  const layout = featureLayout(collaborations.length);
 
   useDocumentMeta({
     title: p.metaTitle(PAGE.metaTitle),
@@ -97,14 +99,20 @@ function Curation() {
           </p>
         </section>
       ) : (
-        <section className="container-editorial pb-24 grid gap-px bg-border border border-border md:grid-cols-2">
+        <section className={`container-editorial pb-24 ${layout.grid}`}>
           {collaborations.map((c, i) => (
-            <article key={c.id} className="bg-background p-8 md:p-10">
-              <p className="text-[0.65rem] tracking-widest text-muted-foreground">
-                {String(i + 1).padStart(2, "0")}
-              </p>
-              <h3 className="display mt-3 text-2xl">{t(c.title)}</h3>
-              <p className="mt-4 text-sm leading-relaxed text-foreground/75">{t(c.description)}</p>
+            <article key={c.id} className={`${CARD} ${layout.card}`}>
+              <div className={`flex flex-1 flex-col p-6 ${layout.body}`}>
+                <p className="text-[0.65rem] tracking-widest text-muted-foreground">
+                  {String(i + 1).padStart(2, "0")}
+                </p>
+                <h3 className={`display mt-3 text-2xl leading-snug ${layout.title}`}>
+                  {t(c.title)}
+                </h3>
+                <p className="mt-4 text-sm leading-relaxed text-foreground/75">
+                  {t(c.description)}
+                </p>
+              </div>
             </article>
           ))}
         </section>

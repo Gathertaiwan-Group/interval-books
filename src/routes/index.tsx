@@ -5,7 +5,7 @@ import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fetchEvents, fetchJourneys, fetchNews, fetchPage, pageText } from "@/lib/cms";
 import { useSiteContent } from "@/lib/site-content";
 import { isPastEvent } from "@/lib/event-status";
-import { featureLayout } from "@/lib/feature-layout";
+import { CARD, featureLayout } from "@/lib/feature-layout";
 import { imageFor } from "@/lib/images";
 import heroImg from "@/assets/hero-mountain.jpg";
 import storefrontImg from "@/assets/storefront.jpg";
@@ -145,6 +145,8 @@ function Index() {
     .slice(0, 3);
   const eventsLayout = featureLayout(featuredEvents.length);
   const journeysLayout = featureLayout(featuredJourneys.length);
+  const latestNews = news.slice(0, 3);
+  const newsLayout = featureLayout(latestNews.length);
   const p = pageText(page);
   const { ui, site, map } = useSiteContent();
   const heroSrc = imageFor(page?.ogImageKey, heroImg);
@@ -225,7 +227,7 @@ function Index() {
                   </div>
                 ) : null}
                 <div className={`flex flex-1 flex-col p-6 ${eventsLayout.body}`}>
-                  <p className="eyebrow text-2xl">{e.category}</p>
+                  <p className="eyebrow text-sm tracking-widest">{e.category}</p>
                   <h3 className={`display mt-3 text-2xl leading-snug ${eventsLayout.title}`}>
                     {t(e.title)}
                   </h3>
@@ -271,7 +273,7 @@ function Index() {
                     />
                   </div>
                   <div className={`flex flex-1 flex-col p-6 ${journeysLayout.body}`}>
-                    <p className="eyebrow text-2xl">
+                    <p className="eyebrow text-sm tracking-widest">
                       {t(j.days)} ／ {t(j.theme)}
                     </p>
                     <h3
@@ -368,25 +370,33 @@ function Index() {
         </div>
       </section>
 
-      {/* 最新消息 */}
-      <SectionHeader
-        eyebrow={t(p.block("sections.newsEyebrow", SECTION_EYEBROWS.news))}
-        title={t(ui.sections.latestNews)}
-        link={{ to: "/news", label: t(ui.buttons.viewAll) }}
-      />
-      <div className="container-editorial pb-24 grid gap-10 md:grid-cols-3">
-        {news.slice(0, 3).map((n) => (
-          <article key={n.id}>
-            <p className="text-muted-foreground tracking-widest text-lg">{n.date}</p>
-            <h3 className="font-serif text-xl mt-3 leading-snug whitespace-pre-line">
-              {t(n.title)}
-            </h3>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
-              {t(n.summary)}
-            </p>
-          </article>
-        ))}
-      </div>
+      {/* 最新消息 —— 沒有任何一則就整區（含標題與「查看全部」）不出現 */}
+      {latestNews.length > 0 && (
+        <>
+          <SectionHeader
+            eyebrow={t(p.block("sections.newsEyebrow", SECTION_EYEBROWS.news))}
+            title={t(ui.sections.latestNews)}
+            link={{ to: "/news", label: t(ui.buttons.viewAll) }}
+          />
+          <div className={`container-editorial pb-24 ${newsLayout.grid}`}>
+            {latestNews.map((n) => (
+              <article key={n.id} className={`${CARD} ${newsLayout.card}`}>
+                <div className={`flex flex-1 flex-col p-6 ${newsLayout.body}`}>
+                  <p className="text-sm tracking-widest text-muted-foreground">{n.date}</p>
+                  <h3
+                    className={`display mt-3 text-2xl leading-snug whitespace-pre-line ${newsLayout.title}`}
+                  >
+                    {t(n.title)}
+                  </h3>
+                  <p className="mt-4 text-sm leading-relaxed text-foreground/75 whitespace-pre-line">
+                    {t(n.summary)}
+                  </p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </>
+      )}
     </PageShell>
   );
 }

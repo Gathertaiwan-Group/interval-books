@@ -3,6 +3,7 @@ import { PageShell, PageHeader } from "@/components/PageShell";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { eyebrowOf, fetchNews, fetchPage, pageText } from "@/lib/cms";
+import { CARD, featureLayout } from "@/lib/feature-layout";
 
 /** Fallback copy — used only when the Supabase read fails. */
 const PAGE = {
@@ -48,6 +49,7 @@ function News() {
   const t = useT();
   const { page, news } = Route.useLoaderData();
   const p = pageText(page);
+  const layout = featureLayout(news.length);
 
   useDocumentMeta({
     title: p.metaTitle(PAGE.metaTitle),
@@ -63,20 +65,24 @@ function News() {
         intro={t(p.intro(PAGE.intro))}
       />
 
-      <section className="container-editorial pb-32 max-w-3xl">
-        <ul className="divide-y divide-border border-y border-border">
+      <section className="container-editorial pb-32">
+        <ul className={layout.grid}>
           {news.map((n) => (
-            <li key={n.id} className="py-10">
-              <p className="text-muted-foreground tracking-widest text-lg">{n.date}</p>
-              <h3 className="font-serif text-2xl mt-3 leading-snug whitespace-pre-line">
-                {t(n.title)}
-              </h3>
-              <p className="mt-4 text-sm leading-relaxed text-foreground/75 whitespace-pre-line">
-                {t(n.summary)}
-              </p>
-              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                {t(n.description)}
-              </p>
+            <li key={n.id} className={`${CARD} ${layout.card}`}>
+              <div className={`flex flex-1 flex-col p-6 ${layout.body}`}>
+                <p className="text-sm tracking-widest text-muted-foreground">{n.date}</p>
+                <h3
+                  className={`display mt-3 text-2xl leading-snug whitespace-pre-line ${layout.title}`}
+                >
+                  {t(n.title)}
+                </h3>
+                <p className="mt-4 text-sm leading-relaxed text-foreground/75 whitespace-pre-line">
+                  {t(n.summary)}
+                </p>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                  {t(n.description)}
+                </p>
+              </div>
             </li>
           ))}
         </ul>
