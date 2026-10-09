@@ -13,24 +13,38 @@
  *
  * 所以「之後在後台補完定價」不需要動這一頁：後台把某一本連上庫存商品之後，
  * 下一次載入這一頁就長出購買鈕。
+ *
+ * 篩選（2026-10 改版）：國家三段切換＋一個「地區」原生下拉，取代原本約 30 顆的
+ * 「關注地域」chips。篩選狀態仍然只是這個元件的 useState（sheet／region），沒有
+ * 進網址——網址上只有 shop.index.tsx 的 ?tab=。篩選的純函式在
+ * ./publication-filters.ts，結果與舊 chips 逐本相同。
  */
 import { Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { Fragment, useEffect, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
+import {
+  ALL_REGIONS,
+  entriesForRegion,
+  entriesForSheet,
+  regionAfterSheetChange,
+  regionOptionGroups,
+  type RegionOption,
+  type RegionOptionGroup,
+  type SheetFilter,
+} from "@/components/shop/publication-filters";
 import { PriceTag, StockBadge } from "@/components/shop/ShopBits";
 import { useT } from "@/i18n/LanguageContext";
 import type { Localized } from "@/i18n/types";
 import { pageText, type PageContent } from "@/lib/cms";
 import { cartInputFor, useCart } from "@/lib/cart";
+import { CARD } from "@/lib/feature-layout";
 import { imageFor } from "@/lib/images";
 import {
   fetchPublicationDetail,
-  presentRegionGroups,
-  regionGroupOf,
   SHEET_LABELS,
   type PublicationListEntry,
   type PublicationListResult,
-  type PublicationSheet,
 } from "@/lib/publications";
 import { isSoldOut, remainingFor, type ShopListCardResult, type ShopProductCard } from "@/lib/shop";
 import { useSiteContent } from "@/lib/site-content";
@@ -49,7 +63,15 @@ const COPY = {
     ja: "基隆の漁村から日本の山あいの町まで、126冊の地域刊行物がひとつの机に並びます。その多くは売るためではなく、遺すためにつくられました。",
   },
   filterAll: { zh: "全部", en: "All", ja: "すべて" },
-  regionLabel: { zh: "關注地域", en: "Region", ja: "対象地域" },
+  regionLabel: { zh: "地區", en: "Region", ja: "地域" },
+  regionAll: { zh: "所有地區", en: "All regions", ja: "すべての地域" },
+  // 下拉選項「基隆（8）」。三語各寫完整的格式，{region}／{n} 是佔位
+  // （與 ParticipantFields.tsx 的 seatLabel 同一種寫法）。
+  regionOption: { zh: "{region}（{n}）", en: "{region} ({n})", ja: "{region}（{n}）" },
+  // 國家選「全部」時下拉裡的三個 <optgroup>。
+  regionGroupTw: { zh: "台灣", en: "Taiwan", ja: "台湾" },
+  regionGroupJp: { zh: "日本", en: "Japan", ja: "日本" },
+  regionGroupOther: { zh: "其他", en: "Other", ja: "その他" },
   publisherLabel: { zh: "製作單位", en: "Published by", ja: "発行" },
   issuesLabel: { zh: "集數", en: "Issues", ja: "号" },
   readMore: { zh: "刊物介紹", en: "About this title", ja: "この刊行物について" },
@@ -67,7 +89,7 @@ const COPY = {
   },
   countSuffix: { zh: "本", en: "titles", ja: "冊" },
   empty: {
-    zh: "這個條件下沒有刊物，換一個地域看看。",
+    zh: "這個條件下沒有刊物，換一個地區看看。",
     en: "Nothing matches this filter — try another region.",
     ja: "この条件に合う刊行物はありません。別の地域をお試しください。",
   },
@@ -94,8 +116,6 @@ const COPY = {
 /** 低於這個數字才把剩餘量說出來。與商品分頁同一個門檻。 */
 const LOW_STOCK_THRESHOLD = 5;
 
-type SheetFilter = "all" | PublicationSheet;
-
 export function PublicationsPanel({
   page,
   list,
@@ -116,36 +136,43 @@ export function PublicationsPanel({
   );
 
   const [sheet, setSheet] = useState<SheetFilter>("all");
-  const [region, setRegion] = useState<string>("all");
+  const [region, setRegion] = useState<string>(ALL_REGIONS);
   const [open, setOpen] = useState<string | null>(null);
+  const regionSelectId = useId();
 
-  const sheetFiltered = useMemo(
-    () => (sheet === "all" ? publications : publications.filter((e) => e.sheet === sheet)),
-    [publications, sheet],
+  const sheetFiltered = useMemo(() => entriesForSheet(publications, sheet), [publications, sheet]);
+
+  // 地區選項跟著國家走：選了「日本刊物」就不該還看得到「基隆」這個選項。
+  const regionGroups = useMemo(
+    () => regionOptionGroups(sheetFiltered, sheet),
+    [sheetFiltered, sheet],
   );
+  const regionOptionCount = regionGroups.reduce((n, g) => n + g.options.length, 0);
 
-  // 地域選項跟著上一層的選擇走：選了「日本刊物」就不該還看得到「基隆」這個選項。
-  const regionGroups = useMemo(() => {
-    const sheets: PublicationSheet[] = sheet === "all" ? ["tw", "jp"] : [sheet];
-    // 「跨區域／其他」在台灣與日本兩份清單裡都會出現，兩邊都選時要合成一顆按鈕，
-    // 不然會有兩個同名選項、同一個 React key。
-    const seen = new Set<string>();
-    return sheets
-      .flatMap((s) => presentRegionGroups(sheetFiltered, s))
-      .filter((g) => (seen.has(g.key) ? false : seen.add(g.key)));
-  }, [sheetFiltered, sheet]);
-
-  const visible = useMemo(
-    () =>
-      region === "all" ? sheetFiltered : sheetFiltered.filter((e) => regionGroupOf(e) === region),
-    [sheetFiltered, region],
-  );
+  const visible = useMemo(() => entriesForRegion(sheetFiltered, region), [sheetFiltered, region]);
 
   function changeSheet(next: SheetFilter) {
     setSheet(next);
-    setRegion("all"); // 舊的地域選項在新的工作表裡可能根本不存在
+    // 原本選的地區在新的國家底下還有刊物就留著，沒有才回到「所有地區」。
+    setRegion(regionAfterSheetChange(publications, next, region));
     setOpen(null);
   }
+
+  function changeRegion(next: string) {
+    setRegion(next);
+    setOpen(null);
+  }
+
+  const optgroupLabel: Record<NonNullable<RegionOptionGroup["group"]>, string> = {
+    tw: t(p.block("regionGroupTw", COPY.regionGroupTw)),
+    jp: t(p.block("regionGroupJp", COPY.regionGroupJp)),
+    other: t(p.block("regionGroupOther", COPY.regionGroupOther)),
+  };
+  // 用函式當替換值：地區名稱裡要是有 "$"，字串替換值會被當成特殊樣式。
+  const optionText = (o: RegionOption) =>
+    t(p.block("regionOption", COPY.regionOption))
+      .replace("{region}", () => t(o.label))
+      .replace("{n}", () => String(o.count));
 
   return (
     <>
@@ -159,71 +186,91 @@ export function PublicationsPanel({
         </section>
       ) : (
         <>
-          <section className="container-editorial pb-8 space-y-4">
-            <div
-              className="flex flex-wrap gap-3 text-xs tracking-widest"
-              data-testid="sheet-filter"
-            >
-              {(["all", "tw", "jp"] as const).map((f) => {
-                const label =
-                  f === "all" ? t(p.block("filters.all", COPY.filterAll)) : t(SHEET_LABELS[f]);
-                const active = sheet === f;
-                const count =
-                  f === "all"
-                    ? publications.length
-                    : publications.filter((e) => e.sheet === f).length;
-                return (
-                  <button
-                    key={f}
-                    onClick={() => changeSheet(f)}
-                    aria-pressed={active}
-                    className={`px-4 py-2 border transition-colors ${
-                      active
-                        ? "border-foreground bg-foreground text-primary-foreground"
-                        : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {label}
-                    <span className="ml-2 tabular-nums opacity-70">{count}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {regionGroups.length > 1 && (
+          {/* 手機：國家／地區／本數上下排，下拉撐滿整列。md 以上排成同一列、本數跟在
+              下拉旁邊；一列放不下（日文、平板寬度）就整項換行，不會撐出橫向捲動。 */}
+          <section className="container-editorial pb-8">
+            <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:gap-x-8">
               <div
-                className="flex flex-wrap items-center gap-2 text-[0.7rem] tracking-widest"
-                data-testid="region-filter"
+                className="flex flex-wrap gap-2 text-xs tracking-widest sm:gap-3"
+                data-testid="sheet-filter"
               >
-                <span className="mr-1 text-muted-foreground">
-                  {t(p.block("regionLabel", COPY.regionLabel))}
-                </span>
-                {[{ key: "all", label: COPY.filterAll }, ...regionGroups].map((g) => {
-                  const active = region === g.key;
+                {(["all", "tw", "jp"] as const).map((f) => {
+                  const label =
+                    f === "all" ? t(p.block("filters.all", COPY.filterAll)) : t(SHEET_LABELS[f]);
+                  const active = sheet === f;
+                  const count =
+                    f === "all"
+                      ? publications.length
+                      : publications.filter((e) => e.sheet === f).length;
+                  // px-3／gap-2 只在手機：390px 寬時三顆才排得進同一行（中、英文）。
                   return (
                     <button
-                      key={g.key}
-                      onClick={() => {
-                        setRegion(g.key);
-                        setOpen(null);
-                      }}
+                      key={f}
+                      onClick={() => changeSheet(f)}
                       aria-pressed={active}
-                      className={`px-3 py-1.5 border transition-colors ${
+                      className={`px-3 py-2 border transition-colors sm:px-4 ${
                         active
-                          ? "border-foreground text-foreground"
-                          : "border-border/60 text-muted-foreground hover:border-foreground hover:text-foreground"
+                          ? "border-foreground bg-foreground text-primary-foreground"
+                          : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
                       }`}
                     >
-                      {t(g.label)}
+                      {label}
+                      <span className="ml-2 tabular-nums opacity-70">{count}</span>
                     </button>
                   );
                 })}
               </div>
-            )}
 
-            <p className="text-xs text-muted-foreground tabular-nums" data-testid="visible-count">
-              {visible.length} {t(p.block("countSuffix", COPY.countSuffix))}
-            </p>
+              {regionOptionCount > 1 && (
+                <div className="flex items-center gap-3">
+                  <label
+                    htmlFor={regionSelectId}
+                    className="shrink-0 text-xs tracking-widest text-muted-foreground"
+                  >
+                    {t(p.block("regionLabel", COPY.regionLabel))}
+                  </label>
+                  <div className="relative min-w-0 flex-1 md:flex-none">
+                    {/* 手機上是 text-base（16px）：iOS Safari 對字級小於 16px 的表單
+                        欄位，點下去會把整頁放大。md 以上回到跟國家切換同一個字級。 */}
+                    <select
+                      id={regionSelectId}
+                      value={region}
+                      onChange={(e) => changeRegion(e.target.value)}
+                      data-testid="region-filter"
+                      className="w-full appearance-none rounded-none border border-border bg-background py-2 pl-3 pr-9 text-base text-foreground transition-colors hover:border-foreground md:w-auto md:min-w-44 md:text-xs md:tracking-widest"
+                    >
+                      <option value={ALL_REGIONS}>{t(p.block("regionAll", COPY.regionAll))}</option>
+                      {regionGroups.map((g) => {
+                        const options = g.options.map((o) => (
+                          <option key={o.key} value={o.key}>
+                            {optionText(o)}
+                          </option>
+                        ));
+                        return g.group === null ? (
+                          <Fragment key="flat">{options}</Fragment>
+                        ) : (
+                          <optgroup key={g.group} label={optgroupLabel[g.group]}>
+                            {options}
+                          </optgroup>
+                        );
+                      })}
+                    </select>
+                    <ChevronDown
+                      aria-hidden="true"
+                      className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <p
+                className="text-xs text-muted-foreground tabular-nums"
+                data-testid="visible-count"
+                aria-live="polite"
+              >
+                {visible.length} {t(p.block("countSuffix", COPY.countSuffix))}
+              </p>
+            </div>
           </section>
 
           {visible.length === 0 ? (
@@ -234,7 +281,7 @@ export function PublicationsPanel({
             </section>
           ) : (
             <section
-              className="container-editorial pb-32 grid gap-px bg-border border border-border sm:grid-cols-2 lg:grid-cols-3"
+              className="container-editorial pb-32 grid grid-cols-1 gap-6 sm:grid-cols-2 md:gap-8 lg:grid-cols-3"
               data-testid="publication-grid"
             >
               {visible.map((entry) => (
@@ -354,13 +401,16 @@ function PublicationCard({
     else toast.error(t(text.block("soldOutToast", COPY.soldOutToast)));
   }
 
+  // 卡片外框用前台共用的 CARD（src/lib/feature-layout.ts），但不加 CARD_HOVER：
+  // 這張卡本身不是連結，可以點的是裡面的「刊物介紹」與購買鈕——首頁不可點的
+  // 策旅卡也是這樣處理。
   return (
     <article
       id={entry.slug}
       data-testid="publication-card"
       data-slug={entry.slug}
       data-purchasable={product !== null && !soldOut ? "yes" : "no"}
-      className="bg-background flex flex-col scroll-mt-24"
+      className={`${CARD} scroll-mt-24`}
     >
       <div className="aspect-[4/3] overflow-hidden bg-muted">
         <img
@@ -371,8 +421,10 @@ function PublicationCard({
         />
       </div>
 
-      <div className="flex flex-1 flex-col p-7 md:p-8">
-        <p className="eyebrow text-2xl">{entry.region || t(SHEET_LABELS[entry.sheet])}</p>
+      <div className="flex flex-1 flex-col p-5 md:p-6">
+        <p className="eyebrow text-sm tracking-widest">
+          {entry.region || t(SHEET_LABELS[entry.sheet])}
+        </p>
         <h3 className="font-serif text-xl mt-3 leading-snug">{t(entry.title)}</h3>
         <p className="mt-2 text-xs text-muted-foreground">
           <span className="opacity-70">{t(text.block("publisherLabel", COPY.publisherLabel))}</span>{" "}

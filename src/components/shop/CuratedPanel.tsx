@@ -10,6 +10,7 @@
 import { useT } from "@/i18n/LanguageContext";
 import type { Localized } from "@/i18n/types";
 import { pageText, type CuratedThemeEntry, type PageContent } from "@/lib/cms";
+import { CARD } from "@/lib/feature-layout";
 import { useSiteContent } from "@/lib/site-content";
 import { PanelIntro } from "./PublicationsPanel";
 
@@ -60,17 +61,18 @@ export function CuratedPanel({
               </p>
             </div>
 
-            {/* 一個還沒放品項的主題，在 `gap-px bg-border` 的細線格線下會變成一片
-                border 色的色塊（沒有卡片去蓋底色）。後台是先建主題、再加品項，
-                所以這個中間狀態是真的會被看到的。 */}
+            {/* 一個還沒放品項的主題，底下會是一個空的格線——主題標題下面什麼都沒有。
+                後台是先建主題、再加品項，所以這個中間狀態是真的會被看到的。 */}
             {theme.items.length === 0 ? (
               <p className="border border-border p-7 text-sm leading-relaxed text-muted-foreground md:p-8">
                 {t(p.block("themeEmpty", COPY.themeEmpty))}
               </p>
             ) : (
-              <div className="grid gap-px bg-border border border-border sm:grid-cols-2 lg:grid-cols-3">
+              // 一件一張獨立卡片，外框用前台共用的 CARD（src/lib/feature-layout.ts）；
+              // 不是連結，所以不加 CARD_HOVER。
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:gap-8 lg:grid-cols-3">
                 {theme.items.map((item, idx) => (
-                  <article key={idx} className="bg-background p-7 md:p-8 flex flex-col">
+                  <article key={idx} className={`${CARD} p-5 md:p-6`}>
                     <p className="text-[0.65rem] tracking-widest text-muted-foreground">
                       {String(idx + 1).padStart(2, "0")}
                     </p>

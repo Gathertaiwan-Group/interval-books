@@ -12,6 +12,7 @@ import { PriceTag, StockBadge } from "@/components/shop/ShopBits";
 import { useT } from "@/i18n/LanguageContext";
 import type { Localized } from "@/i18n/types";
 import { pageText, type PageContent } from "@/lib/cms";
+import { CARD, CARD_HOVER } from "@/lib/feature-layout";
 import { imageFor } from "@/lib/images";
 import { isSoldOut, remainingFor, SHOP_PRODUCT_TYPES, type ShopListCardResult } from "@/lib/shop";
 import { useSiteContent } from "@/lib/site-content";
@@ -140,7 +141,7 @@ export function ProductsPanel({
         </section>
       ) : (
         <section
-          className="container-editorial pb-32 grid gap-px bg-border border border-border sm:grid-cols-2 lg:grid-cols-3"
+          className="container-editorial pb-32 grid grid-cols-1 gap-6 sm:grid-cols-2 md:gap-8 lg:grid-cols-3"
           data-testid="product-grid"
         >
           {list.map((prod) => {
@@ -149,12 +150,14 @@ export function ProductsPanel({
             const low =
               !soldOut && remaining !== null && remaining > 0 && remaining <= LOW_STOCK_THRESHOLD;
             const isBooking = prod.productType === "event" || prod.productType === "journey";
+            // 一件一張獨立卡片，外框用前台共用的 CARD（src/lib/feature-layout.ts）。
+            // 整張卡就是一個連結，所以加 CARD_HOVER（刊物卡不是連結，就不加）。
             return (
-              <article key={prod.id} className="bg-background flex flex-col">
+              <article key={prod.id} className={`${CARD} ${CARD_HOVER}`}>
                 <Link
                   to="/shop/$slug"
                   params={{ slug: prod.slug }}
-                  className="group flex flex-1 flex-col"
+                  className="flex flex-1 flex-col"
                 >
                   <div className="aspect-[4/3] overflow-hidden bg-muted">
                     <img
@@ -166,35 +169,36 @@ export function ProductsPanel({
                       loading="lazy"
                     />
                   </div>
-                  <div className="flex flex-1 flex-col p-7 md:p-8">
-                    <p className="eyebrow text-2xl">{t(PRODUCT_TYPE_LABELS[prod.productType])}</p>
+                  <div className="flex flex-1 flex-col p-5 md:p-6">
+                    <p className="eyebrow text-sm tracking-widest">
+                      {t(PRODUCT_TYPE_LABELS[prod.productType])}
+                    </p>
                     <h2 className="font-serif text-xl mt-3 leading-snug group-hover:underline underline-offset-4">
                       {t(prod.title)}
                     </h2>
-                    <p className="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
+                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                       {t(prod.summary)}
                     </p>
-                    <PriceTag
-                      price={prod.price}
-                      compareAtPrice={prod.compareAtPrice}
-                      className="mt-6"
-                    />
-                    {(soldOut || low) && (
-                      <div className="mt-4">
-                        {soldOut ? (
-                          <StockBadge tone="alert">{t(ui.buttons.soldOut)}</StockBadge>
-                        ) : isBooking ? (
-                          <StockBadge>
-                            {t(p.block("seatsLeft", COPY.seatsLeft))} {remaining}
-                          </StockBadge>
-                        ) : (
-                          <StockBadge>
-                            {t(p.block("lowStock", COPY.lowStock))} {remaining}{" "}
-                            {t(p.block("lowStockUnit", COPY.lowStockUnit))}
-                          </StockBadge>
-                        )}
-                      </div>
-                    )}
+                    {/* 價格與庫存標籤推到卡片底部：同一列的卡片底部對齊。 */}
+                    <div className="mt-auto pt-6">
+                      <PriceTag price={prod.price} compareAtPrice={prod.compareAtPrice} />
+                      {(soldOut || low) && (
+                        <div className="mt-4">
+                          {soldOut ? (
+                            <StockBadge tone="alert">{t(ui.buttons.soldOut)}</StockBadge>
+                          ) : isBooking ? (
+                            <StockBadge>
+                              {t(p.block("seatsLeft", COPY.seatsLeft))} {remaining}
+                            </StockBadge>
+                          ) : (
+                            <StockBadge>
+                              {t(p.block("lowStock", COPY.lowStock))} {remaining}{" "}
+                              {t(p.block("lowStockUnit", COPY.lowStockUnit))}
+                            </StockBadge>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </Link>
               </article>
