@@ -120,7 +120,7 @@ function Index() {
   const t = useT();
   const { page, events, journeys, news } = Route.useLoaderData();
 
-  // 策旅與活動用同一種卡片、同一套版面規則（見 cardGridClass），所以這裡也
+  // 策旅與活動用同一種卡片、同一套版面規則（見 featureLayout），所以這裡也
   // 取到三筆，而不是像以前那樣只挑一筆做成橫幅。
   const featuredJourneys = journeys.slice(0, 3);
   // 🔴 一趟策旅在資料上是**兩列**：events 那一列負責內頁與報名（走活動那一套），
@@ -142,6 +142,8 @@ function Index() {
   const featuredEvents = events
     .filter((e) => !isPastEvent(e.isoDate) && !journeyEventSlugs.has(e.slug))
     .slice(0, 3);
+  const eventsLayout = featureLayout(featuredEvents.length);
+  const journeysLayout = featureLayout(featuredJourneys.length);
   const p = pageText(page);
   const { ui, site, map } = useSiteContent();
   const heroSrc = imageFor(page?.ogImageKey, heroImg);
@@ -188,106 +190,121 @@ function Index() {
         </div>
       </section>
 
-      {/* 精選活動 */}
-      <SectionHeader
-        eyebrow={t(ui.sections.thisMonth)}
-        title={t(ui.sections.featuredEvents)}
-        link={{ to: "/events", label: t(ui.buttons.viewAll) }}
-      />
-      {/* ⚠️ 這裡連的是**站內**的 /events/$slug，不是 e.externalUrl。
-          0001 的種子資料把 externalUrl 填成 https://example.com/event-N，首頁曾經
-          有三顆按鈕直接把客人送去 example.com（那批 ev-1~ev-6 已於 2026-09-12 連同
-          content.ts 與 seed.sql 裡的副本一起清掉）。規則不變：活動詳情頁才是正確的
-          目的地，外部售票連結留在詳情頁上，由那一頁自己決定要不要顯示。 */}
-      <div className={`container-editorial pb-20 ${cardGridClass(featuredEvents.length)}`}>
-        {featuredEvents.map((e) => (
-          <Link
-            key={e.id}
-            to="/events/$slug"
-            params={{ slug: e.slug }}
-            className="group flex flex-col border border-border bg-background/40 hover:border-foreground/40 transition-colors"
-          >
-            {/* ⚠️ 先判斷 imageKey 非空**再**呼叫 imageFor()。imageFor(key, fallback)
-                永遠會回一張圖，順序反過來就是每一張卡片都長同一張不相干的照片。 */}
-            {e.imageKey ? (
-              <div className="aspect-[4/3] overflow-hidden">
-                <img
-                  src={imageFor(e.imageKey, storefrontImg)}
-                  alt=""
-                  loading="lazy"
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                />
-              </div>
-            ) : null}
-            <div className="flex flex-1 flex-col p-6">
-              <p className="eyebrow text-2xl">{e.category}</p>
-              <h3 className="display mt-3 text-2xl leading-snug">{t(e.title)}</h3>
-              <p className="mt-3 text-sm text-muted-foreground">{e.date}</p>
-              <p className="mt-4 text-sm leading-relaxed text-foreground/75 flex-1">
-                {t(e.summary)}
-              </p>
-              <span className="mt-6 inline-block tracking-widest text-clay group-hover:underline self-start text-base">
-                {t(ui.buttons.viewEvent)} →
-              </span>
-            </div>
-          </Link>
-        ))}
-      </div>
-
-      {/* 精選策旅 */}
-      <SectionHeader
-        eyebrow={t(p.block("sections.journeysEyebrow", SECTION_EYEBROWS.journeys))}
-        title={t(ui.sections.featuredJourney)}
-        link={{ to: "/journeys", label: t(ui.buttons.viewAll) }}
-      />
-      <div className={`container-editorial pb-24 ${cardGridClass(featuredJourneys.length)}`}>
-        {featuredJourneys.map((j) => {
-          // 策旅的連結可能是站內路徑、也可能是外部網站（見 journeyLinkProps）。
-          // 還沒設連結的策旅仍然要看得到卡片，只是整張卡不可點——不要讓它消失。
-          const link = journeyLinkProps(j.externalUrl);
-          const body = (
-            <>
-              {/* journeys 表沒有 image_key（見 cms.ts#fetchJourneys 選的欄位），
-                  所以這裡用固定的策旅意象圖，而不是活動卡那種 imageFor()。 */}
-              <div className="aspect-[4/3] overflow-hidden">
-                <img
-                  src={journeyImg}
-                  alt=""
-                  loading="lazy"
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                />
-              </div>
-              <div className="flex flex-1 flex-col p-6">
-                <p className="eyebrow text-2xl">
-                  {t(j.days)} ／ {t(j.theme)}
-                </p>
-                <h3 className="display mt-3 text-2xl leading-snug whitespace-pre-line">
-                  {t(j.title)}
-                </h3>
-                <p className="mt-4 text-sm leading-relaxed text-foreground/75 flex-1">
-                  {t(j.summary)}
-                </p>
-                {link ? (
-                  <span className="mt-6 inline-block tracking-widest text-clay group-hover:underline self-start text-base">
-                    {t(ui.buttons.toJourney)} →
-                  </span>
+      {/* 精選活動 —— 沒有任何一場就整區（含標題與「查看全部」）不出現 */}
+      {featuredEvents.length > 0 && (
+        <>
+          <SectionHeader
+            eyebrow={t(ui.sections.thisMonth)}
+            title={t(ui.sections.featuredEvents)}
+            link={{ to: "/events", label: t(ui.buttons.viewAll) }}
+          />
+          {/* ⚠️ 這裡連的是**站內**的 /events/$slug，不是 e.externalUrl。
+              0001 的種子資料把 externalUrl 填成 https://example.com/event-N，首頁曾經
+              有三顆按鈕直接把客人送去 example.com（那批 ev-1~ev-6 已於 2026-09-12 連同
+              content.ts 與 seed.sql 裡的副本一起清掉）。規則不變：活動詳情頁才是正確的
+              目的地，外部售票連結留在詳情頁上，由那一頁自己決定要不要顯示。 */}
+          <div className={`container-editorial pb-20 ${eventsLayout.grid}`}>
+            {featuredEvents.map((e) => (
+              <Link
+                key={e.id}
+                to="/events/$slug"
+                params={{ slug: e.slug }}
+                className={`group flex flex-col ${eventsLayout.card} border border-border bg-background/40 hover:border-foreground/40 transition-colors`}
+              >
+                {/* ⚠️ 先判斷 imageKey 非空**再**呼叫 imageFor()。imageFor(key, fallback)
+                    永遠會回一張圖，順序反過來就是每一張卡片都長同一張不相干的照片。 */}
+                {e.imageKey ? (
+                  <div className={`aspect-[4/3] overflow-hidden ${eventsLayout.image}`}>
+                    <img
+                      src={imageFor(e.imageKey, storefrontImg)}
+                      alt=""
+                      loading="lazy"
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                    />
+                  </div>
                 ) : null}
-              </div>
-            </>
-          );
-          const cardClass =
-            "group flex flex-col border border-border bg-background/40 transition-colors";
-          return link ? (
-            <a key={j.id} {...link} className={`${cardClass} hover:border-foreground/40`}>
-              {body}
-            </a>
-          ) : (
-            <div key={j.id} className={cardClass}>
-              {body}
-            </div>
-          );
-        })}
-      </div>
+                <div className={`flex flex-1 flex-col p-6 ${eventsLayout.body}`}>
+                  <p className="eyebrow text-2xl">{e.category}</p>
+                  <h3 className={`display mt-3 text-2xl leading-snug ${eventsLayout.title}`}>
+                    {t(e.title)}
+                  </h3>
+                  <p className="mt-3 text-sm text-muted-foreground">{e.date}</p>
+                  <p
+                    className={`mt-4 text-sm leading-relaxed text-foreground/75 flex-1 ${eventsLayout.summary}`}
+                  >
+                    {t(e.summary)}
+                  </p>
+                  <span className="mt-6 inline-block tracking-widest text-clay group-hover:underline self-start text-base">
+                    {t(ui.buttons.viewEvent)} →
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* 精選策旅 —— 沒有任何一趟就整區不出現 */}
+      {featuredJourneys.length > 0 && (
+        <>
+          <SectionHeader
+            eyebrow={t(p.block("sections.journeysEyebrow", SECTION_EYEBROWS.journeys))}
+            title={t(ui.sections.featuredJourney)}
+            link={{ to: "/journeys", label: t(ui.buttons.viewAll) }}
+          />
+          <div className={`container-editorial pb-24 ${journeysLayout.grid}`}>
+            {featuredJourneys.map((j) => {
+              // 策旅的連結可能是站內路徑、也可能是外部網站（見 journeyLinkProps）。
+              // 還沒設連結的策旅仍然要看得到卡片，只是整張卡不可點——不要讓它消失。
+              const link = journeyLinkProps(j.externalUrl);
+              const body = (
+                <>
+                  {/* journeys 表沒有 image_key（見 cms.ts#fetchJourneys 選的欄位），
+                      所以這裡用固定的策旅意象圖，而不是活動卡那種 imageFor()。 */}
+                  <div className={`aspect-[4/3] overflow-hidden ${journeysLayout.image}`}>
+                    <img
+                      src={journeyImg}
+                      alt=""
+                      loading="lazy"
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                    />
+                  </div>
+                  <div className={`flex flex-1 flex-col p-6 ${journeysLayout.body}`}>
+                    <p className="eyebrow text-2xl">
+                      {t(j.days)} ／ {t(j.theme)}
+                    </p>
+                    <h3
+                      className={`display mt-3 text-2xl leading-snug whitespace-pre-line ${journeysLayout.title}`}
+                    >
+                      {t(j.title)}
+                    </h3>
+                    <p
+                      className={`mt-4 text-sm leading-relaxed text-foreground/75 flex-1 ${journeysLayout.summary}`}
+                    >
+                      {t(j.summary)}
+                    </p>
+                    {link ? (
+                      <span className="mt-6 inline-block tracking-widest text-clay group-hover:underline self-start text-base">
+                        {t(ui.buttons.toJourney)} →
+                      </span>
+                    ) : null}
+                  </div>
+                </>
+              );
+              const cardClass = `group flex flex-col ${journeysLayout.card} border border-border bg-background/40 transition-colors`;
+              return link ? (
+                <a key={j.id} {...link} className={`${cardClass} hover:border-foreground/40`}>
+                  {body}
+                </a>
+              ) : (
+                <div key={j.id} className={cardClass}>
+                  {body}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {/* 主理人選品預告 */}
       <section className="container-editorial pb-24">
@@ -374,18 +391,36 @@ function Index() {
 }
 
 /**
- * 首頁卡片區塊的 grid class —— 活動與策旅共用，兩區才不會各長一套版面。
+ * 首頁活動／策旅區塊的版面 —— 兩區共用，才不會各長一套。
  *
- * 重點是「卡片少的時候不要硬撐三欄」：正式站現在常常只有一場未來活動、一趟
- * 策旅，硬套 md:grid-cols-3 會讓那張卡孤零零貼在左邊、右邊空掉三分之二。
- *   1 張 → 單欄、限寬置中（也不會被拉成整個版面寬的巨無霸）
- *   2 張 → 兩欄
- *   3 張以上 → 三欄
+ * 重點是「卡片少的時候不要硬撐三欄」：正式站常常只有一場未來活動、一趟策旅，
+ * 硬套 md:grid-cols-3 會讓那張卡孤零零貼在左邊、右邊空掉三分之二。
+ *   0 筆 → 整區（含標題）不顯示，判斷在 Index 裡
+ *   1 筆 → 橫版：左圖右字、佔滿版面寬，文字垂直置中（手機一樣是上圖下字，窄螢幕並排擠不下）
+ *   2 筆 → 兩欄卡片
+ *   3 筆 → 三欄卡片
+ * card／image／body／title／summary 是單筆時才加的 class，多筆時都是空字串。
  */
-function cardGridClass(count: number): string {
-  if (count <= 1) return "grid gap-8 md:max-w-xl md:mx-auto";
-  if (count === 2) return "grid gap-8 md:grid-cols-2";
-  return "grid gap-8 md:grid-cols-3";
+function featureLayout(count: number) {
+  if (count === 1) {
+    return {
+      grid: "grid",
+      card: "md:flex-row",
+      image: "md:w-1/2 md:shrink-0",
+      body: "md:justify-center md:px-12 md:py-10",
+      title: "md:text-3xl",
+      // 卡片版靠摘要 flex-1 把按鈕推到底；橫版要整段文字置中，所以拿掉
+      summary: "md:flex-none",
+    };
+  }
+  return {
+    grid: count === 2 ? "grid gap-8 md:grid-cols-2" : "grid gap-8 md:grid-cols-3",
+    card: "",
+    image: "",
+    body: "",
+    title: "",
+    summary: "",
+  };
 }
 
 function SectionHeader({
