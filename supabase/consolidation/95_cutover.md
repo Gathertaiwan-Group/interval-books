@@ -135,3 +135,36 @@ python3 sync_delta.py --apply   # 切換窗口內寫進舊庫的資料補過來�
 - 10/8 補：好日子 Vercel 還掛著 `goodday-tw.vercel.app`，它不在 Auth 白名單裡，從那個網址註冊的人，驗證信會把他導到小時光。已加進白名單（`92_auth_settings.py` 的 EXTRA_ALLOW），前後讀回比對：只多這一筆、其他沒少。
   好日子正式網址是 `https://interval-livid.vercel.app`（`NEXT_PUBLIC_SITE_URL`），後台 `/admin`。`mygoodday.com.tw` 沒有掛在 Vercel 上，目前連線會逾時。
 - 三個舊專案目前仍在運作但已沒有網站在用。**關閉前請照上面的「關閉舊庫前的確認清單」。**
+
+
+## 🔍 關庫前檢查（2026-10-09）——結論：沒有漏搬的資料，可以關
+
+| 檢查 | 怎麼查 | 結果 |
+|---|---|---|
+| 業務資料 | `sync_delta.py` 試跑：每張表主鍵＋整列 md5，舊 vs 新 | 三站全部一致；序列都齊 |
+| 帳號 | 同上（auth.users／identities，重複帳號按 remap 比） | 9＋37＋1 個全在。唯一差異是 Alice（0a68e409）：**新庫比較新**（10/8 12:13 在新庫登入、10/9 01:52 在新庫改密碼） |
+| 全庫盤點 | 舊庫**所有 schema** 每張表 `count(*)` 對新庫 | 小時光 60/60、快樂手 20/20、好日子 16/17 新庫列數 ≥ 舊庫 |
+| Storage | `90_storage_migrate.py --verify-only`：逐檔下載比大小＋md5 | 8 個桶、206 個檔全部一致，桶設定一致 |
+| 切換後舊庫有沒有被用 | auth.sessions／refresh_tokens、storage.objects、pg_stat_activity、cron.job_run_details | 沒有新登入／刷新 token、沒有新檔、沒有外部直連、舊排程停用且 0 次執行 |
+| 切換後舊庫有沒有被寫 | 重新 dump 三站，和 10/8 09:18（切換前）的備份逐位元比 | 資料與帳號完全相同；只有好日子一個併掉的重複帳號（b27a6933）的 `updated_at` 變了 |
+| 外部設定 | Vercel 三站所有環境的變數（金鑰解 JWT 看 ref）、Railway 全部服務、三個 repo | 全部指向新庫；Railway 只有好日子 `interval/api` 用 Supabase |
+
+**刻意沒搬的（都在最終備份裡）**：好日子 `public._migrations`（11 列，舊專案自建的 migration 帳本）、
+快樂手 `supabase_migrations.schema_migrations`（21 列，CLI 的 migration 紀錄）、小時光 `cron.job_run_details`
+（30,634 筆舊排程執行紀錄）、`net._http_response`（pg_net 暫存，幾小時就自動清）。
+
+**最終備份**：`~/supabase-backups/2026-10-09-final/`（三站資料＋帳號＋上面那些歷史表，權限 700）。
+Storage、DDL、Auth／PostgREST 設定沿用 `2026-10-08-pre-shutdown/`（切換後都沒變）。
+
+⚠️ 這次發現、已處理或要知道的：
+- **快樂手 CI 的 `migrate` job（push main 就 `supabase link` + `db push`）已移除**（happyhand `151ce43`）。它的 secret 指向舊專案：
+  關庫後每次 push 都會失敗；若有人把 secret 改成新專案，db push 會把寫給 public 的 21 支 migration 重放進小時光的 schema。
+  切換那次它對舊庫回報 `Remote database is up to date`，沒套任何東西。GitHub secrets
+  `SUPABASE_PROJECT_ID`／`SUPABASE_DB_PASSWORD`／`SUPABASE_ACCESS_TOKEN` 已經沒人用，可以刪。
+- 好日子 `scripts/provision.mjs`（`npm run provision`）只有手動才會跑，但它用 `PROJECT_NAME` 找 Supabase 專案、
+  找不到就**新建一個並把 Vercel 的 env 改指過去**；指到合併專案則會把 migration 套進 public、改集團的 Auth 設定。**不要跑。**
+- `auth.audit_log_entries` 在這幾個專案是**空的**（稽核紀錄沒寫進 DB），不能拿來判斷有沒有人登入；改看 sessions／refresh_tokens。
+- Management API 的 `logs.all` 已在 2026-09-23 移除，新的 `/analytics/endpoints/logs` 是 ClickHouse SQL
+  （`FROM logs WHERE source_name = 'edge_logs'`、`log_attributes['request.path']`）；這幾個專案連 `count()` 都回
+  `Backend error`，請求紀錄只能到 Dashboard 的 Logs Explorer 看。
+- mygoodday.com.tw 寄件地址若在關庫後才換：92 讀不到舊專案會停下，改成直接 PATCH `smtp_admin_email`（加 `smtp_pass`）即可。
