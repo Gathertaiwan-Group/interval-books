@@ -1,10 +1,45 @@
+import { useEffect } from "react";
 import { createRouter, useRouter, type ErrorComponentProps } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+
+/**
+ * 部署之後還開著的分頁會壞：頁面記得的是上一版的程式檔名，而 Vercel 每次部署都是一整組新的
+ * /assets（幾乎每個檔名都會變），舊檔名回 404。這時點到任何還沒載入過的頁面，動態 import 失敗，
+ * 掉進下面的錯誤頁，按「Try again」也沒用——2026-10-09 後台按「新增活動」就是這樣。
+ * 整頁重新載入就會拿到新版，所以遇到這類錯誤自動重載一次；10 秒內不重複，真的壞掉時才不會無限重整。
+ */
+const STALE_DEPLOY_ERROR =
+  /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Unable to preload CSS|Loading chunk .+ failed/i;
+const RELOAD_KEY = "ib:stale-deploy-reload-at";
+
+function reloadOnceForNewDeploy(): boolean {
+  try {
+    if (Date.now() - Number(sessionStorage.getItem(RELOAD_KEY) || 0) < 10_000) return false;
+    sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+  } catch {
+    return false; // 沒有 sessionStorage 就記不住重載過沒——寧可停在錯誤頁，也不要冒無限重整的險
+  }
+  window.location.reload();
+  return true;
+}
+
+if (typeof window !== "undefined") {
+  // Vite 預載程式檔失敗時發的事件（Vite 文件「Load Error Handling」建議的做法）
+  window.addEventListener("vite:preloadError", (event) => {
+    if (reloadOnceForNewDeploy()) event.preventDefault();
+  });
+}
 
 function DefaultErrorComponent({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   // @tanstack/react-router 1.170 起 error 的型別是 unknown（被 throw 的不一定是 Error 物件）
   const message = error instanceof Error ? error.message : error == null ? "" : String(error);
+  const staleDeploy = STALE_DEPLOY_ERROR.test(message);
+
+  // vite:preloadError 沒接到的情況（例如程式檔本身 404、沒有要預載的相依）在這裡補
+  useEffect(() => {
+    if (staleDeploy) reloadOnceForNewDeploy();
+  }, [staleDeploy]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -37,6 +72,11 @@ function DefaultErrorComponent({ error, reset }: ErrorComponentProps) {
         <div className="mt-6 flex items-center justify-center gap-3">
           <button
             onClick={() => {
+              // 程式檔過期時 reset() 只會再 import 同一個 404 的檔名，要整頁重載才拿得到新版
+              if (staleDeploy) {
+                window.location.reload();
+                return;
+              }
               router.invalidate();
               reset();
             }}
