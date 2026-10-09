@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/form";
 import { LocalizedField } from "@/components/admin/LocalizedField";
 import { eventSessionSchema, type EventSessionFormValues } from "@/lib/admin/schemas";
+import { formatTaipeiDateTime } from "@/lib/taipei-time";
 import type {
   listBookableProducts,
   listEventSessionPlans,
@@ -204,18 +205,6 @@ function toLocalInput(iso: string | null): string {
 function toIso(local: string): string {
   const d = new Date(local);
   return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
-}
-
-function formatWhen(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("zh-TW", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 function toFormValues(row: SessionRow): EventSessionFormValues {
@@ -493,7 +482,9 @@ function AdminRegistrationsPage() {
                     </TableCell>
                     <TableCell className="max-w-xs truncate font-medium">{s.title.zh}</TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {formatWhen(s.starts_at)}
+                      {/* 不可以 toLocaleString：伺服器（UTC、Node 的 ICU）與瀏覽器印出來的
+                          字不一樣 → React #418。見 src/lib/taipei-time.ts。 */}
+                      {formatTaipeiDateTime(s.starts_at)}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {s.seats_taken} / {s.capacity}

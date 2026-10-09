@@ -95,6 +95,7 @@ import { ImageField } from "@/components/admin/ImageField";
 import { MirrorNote } from "@/components/admin/MirrorNote";
 import { EventBlockEditor, type EventBlockItem } from "@/components/admin/EventBlockEditor";
 import { eventReading } from "@/lib/images";
+import { formatTaipeiDateTime } from "@/lib/taipei-time";
 import { EVENT_BLOCK_KINDS, EVENT_LIST_FIELDS, type EventBlockKind } from "@/lib/event-blocks";
 import { EVENT_BLOCK_COPY } from "@/lib/admin/event-block-copy";
 import { linesToList, listToLines } from "@/lib/admin/localized-list";
@@ -952,14 +953,9 @@ function AdminEventAssemblerPage() {
                     <Badge variant="outline">{SESSION_STATUS_LABEL[s.status] ?? s.status}</Badge>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {new Date(s.starts_at).toLocaleString("zh-TW", {
-                      year: "numeric",
-                      month: "2-digit",
-                      day: "2-digit",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                    ・{s.location.zh || "（未填地點）"}
+                    {/* 不可以 toLocaleString：伺服器（UTC、Node 的 ICU）與瀏覽器印出來的字
+                        不一樣 → React #418。見 src/lib/taipei-time.ts。 */}
+                    {formatTaipeiDateTime(s.starts_at)}・{s.location.zh || "（未填地點）"}
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     名額 {s.seats_taken} / {s.capacity}

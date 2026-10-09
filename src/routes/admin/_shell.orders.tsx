@@ -79,6 +79,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+// 時間一律走這一支，不要再寫 toLocaleString：就算帶了 timeZone，Node 與 Chrome 的
+// ICU 印出來的字也不一樣（空白字元），SSR 會 React #418。見該檔檔頭。
+import { formatTaipeiDateTime } from "@/lib/taipei-time";
 // ⚠️ type-only：編譯後整行消失，不會把 server-only 的 repo 模組拉進瀏覽器
 // bundle（同 _shell.sales.tsx 對 src/server/repos/inv-sales.ts 的做法）。
 import type { AdminOrderDetail, AdminOrderListRow } from "@/server/repos/orders-admin";
@@ -157,20 +160,6 @@ function paymentStatusBadgeVariant(status: string): BadgeVariant {
 
 function money(n: number): string {
   return `NT$ ${n.toLocaleString("zh-TW", { maximumFractionDigits: 0 })}`;
-}
-
-function formatDateTime(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("zh-TW", {
-    timeZone: "Asia/Taipei",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 export const Route = createFileRoute("/admin/_shell/orders")({
@@ -464,7 +453,7 @@ function AdminOrdersPage() {
                   </TableCell>
                   <TableCell className="max-w-[10rem] truncate">{o.customer_name}</TableCell>
                   <TableCell className="whitespace-nowrap text-muted-foreground">
-                    {formatDateTime(o.created_at)}
+                    {formatTaipeiDateTime(o.created_at)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{money(o.total)}</TableCell>
                   <TableCell className="whitespace-nowrap">
@@ -513,8 +502,8 @@ function AdminOrdersPage() {
                   {PAYMENT_STATUS_LABEL[detail.payment_status] ?? detail.payment_status}
                 </Badge>
                 <span className="text-sm text-muted-foreground">
-                  下單於 {formatDateTime(detail.created_at)}
-                  {detail.paid_at ? `・付款於 ${formatDateTime(detail.paid_at)}` : ""}
+                  下單於 {formatTaipeiDateTime(detail.created_at)}
+                  {detail.paid_at ? `・付款於 ${formatTaipeiDateTime(detail.paid_at)}` : ""}
                 </span>
               </div>
 
@@ -528,7 +517,7 @@ function AdminOrdersPage() {
                       <dt className="text-muted-foreground">回報末五碼</dt>
                       <dd className="font-mono">{detail.remittance_last5 ?? "（尚未回報）"}</dd>
                       <dt className="text-muted-foreground">回報時間</dt>
-                      <dd>{formatDateTime(detail.remittance_reported_at)}</dd>
+                      <dd>{formatTaipeiDateTime(detail.remittance_reported_at)}</dd>
                     </>
                   ) : null}
                 </dl>
@@ -569,7 +558,7 @@ function AdminOrdersPage() {
                               <span className="block text-xs text-muted-foreground">
                                 場次：{item.session_title.zh}
                                 {item.session_starts_at
-                                  ? `・${formatDateTime(item.session_starts_at)}`
+                                  ? `・${formatTaipeiDateTime(item.session_starts_at)}`
                                   : ""}
                               </span>
                             ) : null}

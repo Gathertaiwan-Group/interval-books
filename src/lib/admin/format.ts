@@ -13,17 +13,12 @@
  * to "今天 HH:mm" instead — the common case right after an edit — so it reads
  * faster than the full date. Everything else always shows the full date.
  */
+import { formatTaipeiDateTime } from "@/lib/taipei-time";
+
 export function formatUpdatedAt(iso: string): string {
-  const date = new Date(iso);
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
-
-  const isToday =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
-  if (isToday) return `今天 ${time}`;
-
-  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${time}`;
+  // 一律用台北時間：getHours()／getDate() 讀的是執行環境的時區，Vercel 在 UTC，伺服器會印出晚
+  // 8 小時的時間、「今天」也會判錯，瀏覽器再印一次就對不上（React #418）。見 lib/taipei-time.ts。
+  const full = formatTaipeiDateTime(iso); // "2026/10/09 19:05"
+  const today = formatTaipeiDateTime(new Date().toISOString()).slice(0, 10);
+  return full.startsWith(today) ? `今天 ${full.slice(11)}` : full;
 }

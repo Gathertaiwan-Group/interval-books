@@ -127,14 +127,17 @@ export function VendorTable({
               <TableRow key={row.vendor_id} className={busy ? "opacity-60" : undefined}>
                 <TableCell>
                   <div className="space-y-0.5">
-                    <p className="text-sm font-medium">
+                    {/* ⚠️ 這一層是 <div> 不是 <p>：Badge 是 <div>，<p> 裡放 <div> 是不合法的
+                        HTML，瀏覽器解析 SSR 的 HTML 時會先把 <p> 關掉，結構跟 React 的不一樣
+                        → hydration 失敗（React #418，參數 HTML）。 */}
+                    <div className="text-sm font-medium">
                       {row.name}
                       {row.is_preferred ? (
                         <Badge variant="secondary" className="ml-1.5 font-normal">
                           優先
                         </Badge>
                       ) : null}
-                    </p>
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       {row.vendor_code ?? "（未編號）"}
                       {row.short_name ? `・${row.short_name}` : ""}

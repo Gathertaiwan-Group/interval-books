@@ -121,7 +121,10 @@ export function VendorSubmissionQueue({
                 }`}
               >
                 <div className="space-y-0.5">
-                  <p className="text-sm font-medium">
+                  {/* ⚠️ 這一層是 <div> 不是 <p>：ApprovalStatusBadge 是 <div>（Badge），<p>
+                      裡放 <div> 是不合法的 HTML，瀏覽器解析 SSR 的 HTML 時會先把 <p> 關掉，
+                      結構跟 React 的不一樣 → hydration 失敗（React #418，參數 HTML）。 */}
+                  <div className="text-sm font-medium">
                     {row.name}
                     {row.issue_number ? (
                       <span className="ml-1.5 text-xs text-muted-foreground">
@@ -129,7 +132,7 @@ export function VendorSubmissionQueue({
                       </span>
                     ) : null}
                     <ApprovalStatusBadge status={row.approval_status} className="ml-1.5" />
-                  </p>
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {row.vendor_name ?? "未知廠商"}
                     {row.vendor_code ? `（${row.vendor_code}）` : ""}

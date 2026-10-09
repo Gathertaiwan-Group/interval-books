@@ -34,6 +34,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { StockAlertRow } from "@/server/repos/inv-sales";
+import { formatTaipeiDateTime } from "@/lib/taipei-time";
 
 type Status = "open" | "resolved" | "all";
 
@@ -179,7 +180,7 @@ function StockAlertsPage() {
                     {/* 分隔符要寫成字串運算式：單獨一行的全形空白會被 JSX 當成
                         純空白節點修掉，庫存數字就會直接黏在時間戳上（「庫存 02026/8/15」）。 */}
                     {" ・ "}
-                    {new Date(a.created_at).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}
+                    {formatTaipeiDateTime(a.created_at)}
                   </p>
 
                   {a.order_id ? (
@@ -192,9 +193,7 @@ function StockAlertsPage() {
                   {a.resolved_at ? (
                     <p className="rounded-md bg-background px-2.5 py-1.5 text-sm">
                       <span className="text-muted-foreground">
-                        {new Date(a.resolved_at).toLocaleString("zh-TW", {
-                          timeZone: "Asia/Taipei",
-                        })}
+                        {formatTaipeiDateTime(a.resolved_at)}
                         {/* 同上：行首的全形空白會被 JSX 修掉，時間戳會黏住 email。 */}
                         {" ・ "}
                         {a.resolved_by_email ?? "—"}：
