@@ -5,6 +5,7 @@ import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fetchEvents, fetchJourneys, fetchNews, fetchPage, pageText } from "@/lib/cms";
 import { useSiteContent } from "@/lib/site-content";
 import { isPastEvent } from "@/lib/event-status";
+import { featureLayout } from "@/lib/feature-layout";
 import { imageFor } from "@/lib/images";
 import heroImg from "@/assets/hero-mountain.jpg";
 import storefrontImg from "@/assets/storefront.jpg";
@@ -388,39 +389,6 @@ function Index() {
       </div>
     </PageShell>
   );
-}
-
-/**
- * 首頁活動／策旅區塊的版面 —— 兩區共用，才不會各長一套。
- *
- * 重點是「卡片少的時候不要硬撐三欄」：正式站常常只有一場未來活動、一趟策旅，
- * 硬套 md:grid-cols-3 會讓那張卡孤零零貼在左邊、右邊空掉三分之二。
- *   0 筆 → 整區（含標題）不顯示，判斷在 Index 裡
- *   1 筆 → 橫版：左圖右字、佔滿版面寬，文字垂直置中（手機一樣是上圖下字，窄螢幕並排擠不下）
- *   2 筆 → 兩欄卡片
- *   3 筆 → 三欄卡片
- * card／image／body／title／summary 是單筆時才加的 class，多筆時都是空字串。
- */
-function featureLayout(count: number) {
-  if (count === 1) {
-    return {
-      grid: "grid",
-      card: "md:flex-row",
-      image: "md:w-1/2 md:shrink-0",
-      body: "md:justify-center md:px-12 md:py-10",
-      title: "md:text-3xl",
-      // 卡片版靠摘要 flex-1 把按鈕推到底；橫版要整段文字置中，所以拿掉
-      summary: "md:flex-none",
-    };
-  }
-  return {
-    grid: count === 2 ? "grid gap-8 md:grid-cols-2" : "grid gap-8 md:grid-cols-3",
-    card: "",
-    image: "",
-    body: "",
-    title: "",
-    summary: "",
-  };
 }
 
 function SectionHeader({
