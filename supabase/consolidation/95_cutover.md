@@ -168,3 +168,15 @@ Storage、DDL、Auth／PostgREST 設定沿用 `2026-10-08-pre-shutdown/`（切�
   （`FROM logs WHERE source_name = 'edge_logs'`、`log_attributes['request.path']`）；這幾個專案連 `count()` 都回
   `Backend error`，請求紀錄只能到 Dashboard 的 Logs Explorer 看。
 - mygoodday.com.tw 寄件地址若在關庫後才換：92 讀不到舊專案會停下，改成直接 PATCH `smtp_admin_email`（加 `smtp_pass`）即可。
+
+
+## 🗑️ 舊庫已刪除（2026-10-09 約 12:30）＋刪除後檢查
+
+三個舊專案 Management API 都回 404。刪除後：新專案五項服務 ACTIVE_HEALTHY；三站各爬 11–13 頁全 200、沒有任何頁面含舊庫網址、
+公開商品（22／6／20）的名稱都出現在頁面上、頁面引用的新庫圖片抽查全 200；三站後台都正常導到登入頁；
+新庫排程 12:40／12:43／12:45 都 succeeded、打網站回 200；好日子 Railway api（173c737）log 無錯誤；快樂手 CI 重跑通過。
+
+- 🔴 **合併專案是 free 方案，沒有平台的每日備份**，舊庫（Pro）刪掉後唯一的備份是本機 `~/supabase-backups/2026-10-09-final/`。
+- `sync_delta.py`、`92_auth_settings.py`（預設讀舊專案）、`data_diff.py` 對舊專案的用法從此都跑不了。
+- 本機開發用的 `alice-store/.env.local`、`happyhand/apps/web/.env.local` 還指舊庫（只影響在本機跑網站，正式站不受影響）；
+  `happyhand/supabase/.temp` 也還連舊庫——不要改連新專案。
