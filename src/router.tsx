@@ -1,12 +1,21 @@
 import { useEffect } from "react";
 import { createRouter, useRouter, type ErrorComponentProps } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { routeTree } from "./routeTree.gen";
 
 /**
  * 部署之後還開著的分頁會壞：頁面記得的是上一版的程式檔名，而 Vercel 每次部署都是一整組新的
- * /assets（幾乎每個檔名都會變），舊檔名回 404。這時點到任何還沒載入過的頁面，動態 import 失敗，
- * 掉進下面的錯誤頁，按「Try again」也沒用——2026-10-09 後台按「新增活動」就是這樣。
- * 整頁重新載入就會拿到新版，所以遇到這類錯誤自動重載一次；10 秒內不重複，真的壞掉時才不會無限重整。
+ * /assets（幾乎每個檔名都會變），舊檔名回 404。之後只要要載入還沒載過的程式檔就會失敗——
+ * 2026-10-09 後台按「新增活動」就是這樣掉進錯誤頁，按「Try again」也沒用。
+ *
+ * 兩種情況分開處理：
+ * - **換頁**（loader／route 元件）：錯誤會掉進下面的 DefaultErrorComponent，那裡自動整頁重載一次。
+ *   換頁本來就要離開這一頁，沒有東西會不見；10 秒內不重複，真的壞掉時才不會無限重整。
+ * - **按鈕、表單送出、開對話框**（後台約 130 處在事件裡才 `await import()`）：**不能**自動重載——
+ *   表單裡打的字、POS 購物車會全部不見。這時動作在送到伺服器之前就失敗了（沒有寫入任何資料），
+ *   錯誤照常交給呼叫端的 catch，另外跳一個不會自己消失的提示，請使用者先保留內容再重新整理。
+ *   所以 vite:preloadError 監聽器**不** preventDefault：攔下來的話那次 import 會回傳 undefined，
+ *   呼叫端只會看到一個莫名其妙的 TypeError。
  */
 const STALE_DEPLOY_ERROR =
   /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Unable to preload CSS|Loading chunk .+ failed/i;
@@ -23,11 +32,19 @@ function reloadOnceForNewDeploy(): boolean {
   return true;
 }
 
-if (typeof window !== "undefined") {
-  // Vite 預載程式檔失敗時發的事件（Vite 文件「Load Error Handling」建議的做法）
-  window.addEventListener("vite:preloadError", (event) => {
-    if (reloadOnceForNewDeploy()) event.preventDefault();
+function announceNewDeploy() {
+  toast("網站剛更新了", {
+    id: "new-deploy", // 同一次失敗會連發好幾個事件（每個程式檔一個），用同一個 id 只顯示一則
+    description: "剛剛的動作沒有送出。請先複製還沒存的內容，再重新整理頁面。",
+    duration: Infinity,
+    action: { label: "重新整理", onClick: () => window.location.reload() },
   });
+}
+
+if (typeof window !== "undefined") {
+  // Vite 載入程式檔失敗時發的事件（Vite 文件「Load Error Handling」）。換頁的情況錯誤頁會自動重載，
+  // 提示只是一閃；按鈕的情況就靠這則提示。
+  window.addEventListener("vite:preloadError", announceNewDeploy);
 }
 
 function DefaultErrorComponent({ error, reset }: ErrorComponentProps) {
@@ -36,7 +53,7 @@ function DefaultErrorComponent({ error, reset }: ErrorComponentProps) {
   const message = error instanceof Error ? error.message : error == null ? "" : String(error);
   const staleDeploy = STALE_DEPLOY_ERROR.test(message);
 
-  // vite:preloadError 沒接到的情況（例如程式檔本身 404、沒有要預載的相依）在這裡補
+  // 換頁時載不到程式檔：自動重載一次就會拿到新版（見檔頭）
   useEffect(() => {
     if (staleDeploy) reloadOnceForNewDeploy();
   }, [staleDeploy]);
