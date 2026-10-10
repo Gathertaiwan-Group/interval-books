@@ -53,3 +53,9 @@ export function formatTaipeiDateTime(iso: string | null | undefined): string {
   const hour = p.hour === "24" ? "00" : two(p.hour);
   return `${p.year}/${two(p.month)}/${two(p.day)} ${hour}:${two(p.minute)}`;
 }
+
+/** 只要日期：台北的「2026/10/09」。「—」與解不開的字串的規則同 formatTaipeiDateTime。 */
+export function formatTaipeiDate(iso: string | null | undefined): string {
+  const s = formatTaipeiDateTime(iso);
+  return /^\d{4}\/\d{2}\/\d{2} /.test(s) ? s.slice(0, 10) : s;
+}

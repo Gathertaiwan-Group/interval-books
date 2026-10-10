@@ -40,6 +40,7 @@ import { shouldClearCartAfterOrder } from "@/lib/direct-checkout";
 import { submitPaymentForm } from "@/lib/payment-redirect";
 import { formatPrice } from "@/lib/shop";
 import { useSiteContent } from "@/lib/site-content";
+import { formatTaipeiDateTime } from "@/lib/taipei-time";
 
 const PAGE = {
   metaTitle: {
@@ -156,24 +157,16 @@ const PAGE = {
 };
 
 /**
- * 匯款期限的顯示字串。時區固定 Asia/Taipei —— 這是一間台北的書店，而
- * Vercel 的機器是 UTC：不指定時區的話，「9/5 23:59 截止」會在頁面上變成
- * 「9/5 15:59」，客人會以為自己少了 8 小時。同 src/lib/email-templates.ts 的
- * formatDateTime()，兩邊算的是同一個時間點。
+ * 匯款期限的顯示字串：台北時間「2026/10/09 23:59」，三種語言都一樣。
+ * - 時區固定 Asia/Taipei —— 這是一間台北的書店，而 Vercel 的機器是 UTC：不指定時區的話，
+ *   「9/5 23:59 截止」會在頁面上變成「9/5 15:59」，客人會以為自己少了 8 小時。
+ * - 不能直接用 Intl.DateTimeFormat(語系).format()：這頁是 SSR，Node 與瀏覽器的 ICU 印出來的
+ *   空白字元不同（zh-TW 日期後面一個是 U+2009、一個是一般空白），React 對不上就整頁重畫（#418）。
+ *   所以走 src/lib/taipei-time.ts，只拿數字自己拼。
+ * 信裡（email-templates.ts 的 formatDateTime）用各語系的格式，時間點相同；信不經過 hydration。
  */
-function formatDueDate(iso: string, lang: "zh" | "en" | "ja"): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const locale = lang === "ja" ? "ja-JP" : lang === "en" ? "en-US" : "zh-TW";
-  return new Intl.DateTimeFormat(locale, {
-    timeZone: "Asia/Taipei",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(d);
+function formatDueDate(iso: string): string {
+  return formatTaipeiDateTime(iso);
 }
 
 export const Route = createFileRoute("/checkout/complete")({
@@ -489,7 +482,7 @@ function CheckoutComplete() {
               {transfer.dueAt && (
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">{t(PAGE.transferDue)}</dt>
-                  <dd className="text-right tabular-nums">{formatDueDate(transfer.dueAt, lang)}</dd>
+                  <dd className="text-right tabular-nums">{formatDueDate(transfer.dueAt)}</dd>
                 </div>
               )}
             </dl>

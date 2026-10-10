@@ -18,9 +18,11 @@ import { toast } from "sonner";
 import { CalendarDays, LogOut, PackageSearch, ShieldCheck } from "lucide-react";
 import { PageShell, PageHeader } from "@/components/PageShell";
 import { Button } from "@/components/ui/button";
-import { useLang, useT } from "@/i18n/LanguageContext";
+import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import type { MyOrderSummary, MyRegistration } from "@/server/repos/customer-orders";
+// 時間一律台北、輸出與執行環境無關：這頁是 SSR，伺服器（Vercel UTC）與瀏覽器印的字要一樣（見 lib/taipei-time.ts）
+import { formatTaipeiDate, formatTaipeiDateTime } from "@/lib/taipei-time";
 
 const META = {
   title: {
@@ -73,7 +75,6 @@ export const Route = createFileRoute("/account")({
 function AccountPage() {
   const { customer } = Route.useRouteContext();
   const { data } = Route.useLoaderData();
-  const { lang } = useLang();
   const t = useT();
   const navigate = useNavigate();
 
@@ -89,8 +90,6 @@ function AccountPage() {
       toast.error(err instanceof Error ? err.message : "登出失敗，請再試一次");
     }
   }
-
-  const dateLocale = lang === "zh" ? "zh-TW" : lang;
 
   return (
     <PageShell>
@@ -125,16 +124,14 @@ function AccountPage() {
                 >
                   <div>
                     <p className="font-medium">{o.orderNo}</p>
-                    <p className="text-muted-foreground">
-                      {new Date(o.createdAt).toLocaleDateString(dateLocale)}
-                    </p>
+                    <p className="text-muted-foreground">{formatTaipeiDate(o.createdAt)}</p>
                   </div>
                   <div className="text-right">
                     <p>
                       {ORDER_STATUS_LABEL[o.status] ?? o.status} ·{" "}
                       {PAYMENT_STATUS_LABEL[o.paymentStatus] ?? o.paymentStatus}
                     </p>
-                    <p className="text-muted-foreground">NT$ {o.total.toLocaleString()}</p>
+                    <p className="text-muted-foreground">NT$ {o.total.toLocaleString("en-US")}</p>
                   </div>
                 </div>
               ))}
@@ -163,7 +160,7 @@ function AccountPage() {
                     </p>
                   </div>
                   <div className="text-right text-muted-foreground">
-                    <p>{new Date(r.startsAt).toLocaleString(dateLocale)}</p>
+                    <p>{formatTaipeiDateTime(r.startsAt)}</p>
                     <p>{r.orderNo}</p>
                   </div>
                 </div>

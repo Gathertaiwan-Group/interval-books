@@ -111,6 +111,13 @@ check("null → —", f(null), "—");
 check("undefined → —", f(undefined), "—");
 check("空字串 → —", f(""), "—");
 check("解不開的字串原樣回傳（不是 Invalid Date）", f("not-a-date"), "not-a-date");
+check(
+  "formatTaipeiDate：只取日期、跨日照台北算",
+  T.formatTaipeiDate("2026-10-08T16:07:00Z"),
+  "2026/10/09",
+);
+check("formatTaipeiDate：null → —", T.formatTaipeiDate(null), "—");
+check("formatTaipeiDate：解不開的字串原樣回傳", T.formatTaipeiDate("not-a-date"), "not-a-date");
 
 // -----------------------------------------------------------------------------
 console.log("\n[2] 🔴 同一批時間在不同 TZ 的行程裡逐字相同（模擬 Vercel UTC vs 台灣瀏覽器）");
@@ -131,6 +138,7 @@ const CHILD = `
   process.stdout.write(JSON.stringify({
     envHour: new Date("2026-10-09T11:05:00Z").getHours(),
     out: samples.map((s) => T.formatTaipeiDateTime(s)),
+    outDate: samples.map((s) => T.formatTaipeiDate(s)),
     legacy: samples.map(legacy),
   }));
 `;
@@ -175,6 +183,11 @@ if (ZONES.every((tz) => byZone[tz])) {
       byZone[tz].out,
       byZone.UTC.out,
     );
+    check(
+      `TZ=${tz} 與 TZ=UTC 的 formatTaipeiDate 逐字相同（會員中心的訂單日期）`,
+      byZone[tz].outDate,
+      byZone.UTC.outDate,
+    );
   }
   console.log(`      例：${SAMPLES[11]} → UTC ${JSON.stringify(byZone.UTC.out[11])}`);
   console.log(
@@ -207,12 +220,16 @@ check(
 );
 
 // -----------------------------------------------------------------------------
-console.log("\n[4] 三頁的時間都改走 formatTaipeiDateTime()，沒有自己的 toLocaleString");
+console.log(
+  "\n[4] 後台三頁＋前台結帳完成、會員中心的時間都改走 formatTaipeiDateTime()，沒有自己的 toLocaleString",
+);
 // -----------------------------------------------------------------------------
 const TIME_PAGES = [
   "src/routes/admin/_shell.events.$id.tsx",
   "src/routes/admin/_shell.registrations.tsx",
   "src/routes/admin/_shell.orders.tsx",
+  "src/routes/checkout.complete.tsx", // 匯款期限
+  "src/routes/account.tsx", // 訂單日期、報名場次時間
 ];
 
 /** 不靠 grep：註解裡提到 toLocaleString 不算數，數字的 toLocaleString 也不算。 */
