@@ -252,6 +252,14 @@ export const AREAS = Object.freeze({
     label: "沙龍席位回覆",
     identifiers: ["salon_rsvps"],
   },
+  // 推薦碼與分潤（0039）。自成一區：推廣者、月結紀錄與全站分潤設定是新的一組事實，
+  // 不掛進 orders_payments——0039 對 orders 只加了三個 nullable 歸屬欄位（那一部分
+  // 它照樣標 orders_payments，由偵測器確認）。
+  referrals: {
+    witness: "0039_referral_program.sql",
+    label: "推薦碼、推廣者與分潤月結",
+    identifiers: ["referrers", "referral_settings", "referral_settlements"],
+  },
 });
 
 /**
@@ -675,6 +683,15 @@ export const MIGRATION_LEDGER = Object.freeze([
     // 這一區的 witness 仍然是 0037——witness 要的是「毫無疑問屬於這一區」的檔案，
     // 建表那一支比刪表這一支更適合當守門人，而且它還在磁碟上。
     touches: ["salon_rsvp"],
+  },
+  {
+    file: "0039_referral_program.sql",
+    note: "推薦碼與分潤：新表 referrers（推廣者，團隊成員／外部推廣者）、referral_settings（單列全站預設：折扣、估算毛利率、累進分潤級距、新客倍率、團隊獎金池、發放上限、扣回天數）、referral_settlements（推廣者 × 月份唯一的結算紀錄與逐筆快照）；orders 只加三個 nullable 歸屬欄位 referrer_id／referral_code／referral_discount_percent 與一個部分索引，折扣金額沿用 0005 既有的 orders.discount。三張新表 RLS 開、零 policy、只 grant service_role",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的（與 0036 那一列同一個
+    // 做法）：orders_payments（識別字 orders —— alter table public.orders 與
+    // references public.orders 的索引那兩段）、referrals（這一支自己開的區域）。
+    // 沒有碰 order_items、products、event_sessions、email_outbox、invoices 或任何函式。
+    touches: ["orders_payments", "referrals"],
   },
 ]);
 

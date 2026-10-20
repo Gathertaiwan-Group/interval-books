@@ -158,7 +158,9 @@ export async function listAdminOrders(filter: AdminOrderListFilter): Promise<Adm
 const DETAIL_COLUMNS =
   "id, order_no, created_at, paid_at, status, payment_status, payment_method, " +
   "subtotal, shipping_fee, discount, total, shipping_method, " +
-  "remittance_last5, remittance_reported_at, customer_name, customer_email, customer_phone, archived_at";
+  "remittance_last5, remittance_reported_at, customer_name, customer_email, customer_phone, archived_at, " +
+  // 0039：推薦碼與當時的折扣%。⚠️ 這兩欄要等 0039 套上正式庫之後才存在。
+  "referral_code, referral_discount_percent";
 
 type OrderDetailRawRow = {
   id: string;
@@ -177,6 +179,8 @@ type OrderDetailRawRow = {
   remittance_reported_at: string | null;
   customer_name: string;
   archived_at: string | null;
+  referral_code: string | null;
+  referral_discount_percent: number | string | null;
   /** 明文。只在這個函式內部活過 —— 回傳前一定被 maskEmail() 換掉，見下方。 */
   customer_email: string;
   /** 明文。理由同上，回傳前被 maskTail() 換掉。 */
@@ -235,6 +239,9 @@ export type AdminOrderDetail = {
   addresses: AdminOrderAddress[];
   /** 非 null＝已封存（0035）。 */
   archived_at: string | null;
+  /** 推薦碼（0039）。null＝沒有推薦人。 */
+  referral_code: string | null;
+  referral_discount_percent: number | null;
 };
 
 /** PostgREST 對 to-one embed 可能回物件或單元素陣列，兩種都吃（同 customer-orders.ts）。 */
@@ -369,6 +376,11 @@ export async function getAdminOrderDetail(orderId: string): Promise<AdminOrderDe
     customer_phone_masked: maskTail(o.customer_phone, 4),
     items,
     addresses,
+    referral_code: o.referral_code ?? null,
+    referral_discount_percent:
+      o.referral_discount_percent === null || o.referral_discount_percent === undefined
+        ? null
+        : Number(o.referral_discount_percent),
   };
 }
 

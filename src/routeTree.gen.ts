@@ -61,6 +61,7 @@ import { Route as AdminShellPhonesRouteImport } from './routes/admin/_shell.phon
 import { Route as AdminShellPosRouteImport } from './routes/admin/_shell.pos'
 import { Route as AdminShellProductsRouteImport } from './routes/admin/_shell.products'
 import { Route as AdminShellPublicationsRouteImport } from './routes/admin/_shell.publications'
+import { Route as AdminShellReferralsRouteImport } from './routes/admin/_shell.referrals'
 import { Route as AdminShellRegistrationsRouteImport } from './routes/admin/_shell.registrations'
 import { Route as AdminShellSalesRouteImport } from './routes/admin/_shell.sales'
 import { Route as AdminShellSettingsRouteImport } from './routes/admin/_shell.settings'
@@ -342,6 +343,11 @@ const AdminShellPublicationsRoute = AdminShellPublicationsRouteImport.update({
   path: '/publications',
   getParentRoute: () => AdminShellRoute,
 } as any)
+const AdminShellReferralsRoute = AdminShellReferralsRouteImport.update({
+  id: '/referrals',
+  path: '/referrals',
+  getParentRoute: () => AdminShellRoute,
+} as any)
 const AdminShellRegistrationsRoute = AdminShellRegistrationsRouteImport.update({
   id: '/registrations',
   path: '/registrations',
@@ -456,6 +462,7 @@ export interface FileRoutesByFullPath {
   '/admin/pos': typeof AdminShellPosRoute
   '/admin/products': typeof AdminShellProductsRoute
   '/admin/publications': typeof AdminShellPublicationsRoute
+  '/admin/referrals': typeof AdminShellReferralsRoute
   '/admin/registrations': typeof AdminShellRegistrationsRoute
   '/admin/sales': typeof AdminShellSalesRoute
   '/admin/settings': typeof AdminShellSettingsRoute
@@ -520,6 +527,7 @@ export interface FileRoutesByTo {
   '/admin/pos': typeof AdminShellPosRoute
   '/admin/products': typeof AdminShellProductsRoute
   '/admin/publications': typeof AdminShellPublicationsRoute
+  '/admin/referrals': typeof AdminShellReferralsRoute
   '/admin/registrations': typeof AdminShellRegistrationsRoute
   '/admin/sales': typeof AdminShellSalesRoute
   '/admin/settings': typeof AdminShellSettingsRoute
@@ -587,6 +595,7 @@ export interface FileRoutesById {
   '/admin/_shell/pos': typeof AdminShellPosRoute
   '/admin/_shell/products': typeof AdminShellProductsRoute
   '/admin/_shell/publications': typeof AdminShellPublicationsRoute
+  '/admin/_shell/referrals': typeof AdminShellReferralsRoute
   '/admin/_shell/registrations': typeof AdminShellRegistrationsRoute
   '/admin/_shell/sales': typeof AdminShellSalesRoute
   '/admin/_shell/settings': typeof AdminShellSettingsRoute
@@ -655,6 +664,7 @@ export interface FileRouteTypes {
     | '/admin/pos'
     | '/admin/products'
     | '/admin/publications'
+    | '/admin/referrals'
     | '/admin/registrations'
     | '/admin/sales'
     | '/admin/settings'
@@ -719,6 +729,7 @@ export interface FileRouteTypes {
     | '/admin/pos'
     | '/admin/products'
     | '/admin/publications'
+    | '/admin/referrals'
     | '/admin/registrations'
     | '/admin/sales'
     | '/admin/settings'
@@ -785,6 +796,7 @@ export interface FileRouteTypes {
     | '/admin/_shell/pos'
     | '/admin/_shell/products'
     | '/admin/_shell/publications'
+    | '/admin/_shell/referrals'
     | '/admin/_shell/registrations'
     | '/admin/_shell/sales'
     | '/admin/_shell/settings'
@@ -1200,6 +1212,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminShellPublicationsRouteImport
       parentRoute: typeof AdminShellRoute
     }
+    '/admin/_shell/referrals': {
+      id: '/admin/_shell/referrals'
+      path: '/referrals'
+      fullPath: '/admin/referrals'
+      preLoaderRoute: typeof AdminShellReferralsRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
     '/admin/_shell/registrations': {
       id: '/admin/_shell/registrations'
       path: '/registrations'
@@ -1331,6 +1350,7 @@ interface AdminShellRouteChildren {
   AdminShellPosRoute: typeof AdminShellPosRoute
   AdminShellProductsRoute: typeof AdminShellProductsRoute
   AdminShellPublicationsRoute: typeof AdminShellPublicationsRoute
+  AdminShellReferralsRoute: typeof AdminShellReferralsRoute
   AdminShellRegistrationsRoute: typeof AdminShellRegistrationsRoute
   AdminShellSalesRoute: typeof AdminShellSalesRoute
   AdminShellSettingsRoute: typeof AdminShellSettingsRoute
@@ -1363,6 +1383,7 @@ const AdminShellRouteChildren: AdminShellRouteChildren = {
   AdminShellPosRoute: AdminShellPosRoute,
   AdminShellProductsRoute: AdminShellProductsRoute,
   AdminShellPublicationsRoute: AdminShellPublicationsRoute,
+  AdminShellReferralsRoute: AdminShellReferralsRoute,
   AdminShellRegistrationsRoute: AdminShellRegistrationsRoute,
   AdminShellSalesRoute: AdminShellSalesRoute,
   AdminShellSettingsRoute: AdminShellSettingsRoute,

@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { LanguageProvider, useT } from "@/i18n/LanguageContext";
 import { fetchSiteContent, FALLBACK_SITE_CONTENT } from "@/lib/cms";
 import { SiteContentProvider, useSiteContent } from "@/lib/site-content";
+import { ReferralCapture } from "@/components/ReferralCapture";
 
 import appCss from "../styles.css?url";
 
@@ -92,6 +93,7 @@ function RootComponent() {
   return (
     <SiteContentProvider value={site}>
       <LanguageProvider>
+        <ReferralCapture />
         <Outlet />
       </LanguageProvider>
     </SiteContentProvider>

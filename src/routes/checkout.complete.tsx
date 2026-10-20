@@ -65,6 +65,7 @@ const PAGE = {
   subtotal: { zh: "小計", en: "Subtotal", ja: "小計" },
   shipping: { zh: "運費", en: "Shipping", ja: "送料" },
   free: { zh: "免運費", en: "Free", ja: "送料無料" },
+  referralDiscount: { zh: "推薦折扣", en: "Referral discount", ja: "紹介割引" },
   total: { zh: "應付總額", en: "Total", ja: "合計" },
   paymentPending: {
     zh: "這筆訂單尚未付款。線上付款開放前，我們會直接與你聯繫付款方式。",
@@ -564,6 +565,16 @@ function CheckoutComplete() {
                 {order.shippingFee === 0 ? t(PAGE.free) : formatPrice(order.shippingFee)}
               </dd>
             </div>
+            {/* 0039：折扣只有推薦碼一個來源；有碼才顯示（舊訂單 discount = 0、碼 null）。 */}
+            {(order.discount > 0 || order.referralCode) && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">
+                  {t(PAGE.referralDiscount)}
+                  {order.referralCode ? `（${order.referralCode}）` : ""}
+                </dt>
+                <dd className="tabular-nums">−{formatPrice(order.discount)}</dd>
+              </div>
+            )}
           </dl>
 
           <div className="rule my-6" />

@@ -532,6 +532,12 @@ function AdminOrdersPage() {
                   <dd className="text-right">{money(detail.shipping_fee)}</dd>
                   <dt className="text-muted-foreground">折扣</dt>
                   <dd className="text-right">−{money(detail.discount)}</dd>
+                  <dt className="text-muted-foreground">推薦碼</dt>
+                  <dd className="text-right">
+                    {detail.referral_code
+                      ? `${detail.referral_code}（${detail.referral_discount_percent ?? "—"}%）`
+                      : "—"}
+                  </dd>
                   <dt className="font-medium">總計</dt>
                   <dd className="text-right font-medium">{money(detail.total)}</dd>
                 </dl>

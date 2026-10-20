@@ -507,9 +507,9 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
 
   const migFiles = readdirSync(MIG_DIR).filter((f) => f.endsWith(".sql"));
   check(
-    "supabase/migrations 剛好 38 個 .sql 檔（0001–0037 原封不動 + 0038 新增）",
+    "supabase/migrations 剛好 39 個 .sql 檔（0001–0038 原封不動 + 0039 推薦分潤新增）",
     migFiles.length,
-    38,
+    39,
   );
 }
 

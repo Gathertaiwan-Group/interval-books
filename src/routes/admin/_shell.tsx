@@ -136,6 +136,7 @@ const NAV_GROUPS = [
       // 每一支都掛 adminFnMiddleware，門市人員打不進來。這裡只是不要給他一個
       // 一按就跳錯誤頁的連結。
       { to: "/admin/orders", label: "訂單", icon: Landmark, staff: false },
+      { to: "/admin/referrals", label: "推廣與分潤", icon: Handshake, staff: false },
       // 活動場次與報名名單（0020／0021；0035 加移除單筆報名）。名額搬離 products
       // 之後，「這場還剩幾個位子」只有這裡答得出來。
       //
