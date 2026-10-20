@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { isPastEvent } from "@/lib/event-status";
 import { PageShell, PageHeader } from "@/components/PageShell";
+import { CoverImage } from "@/components/CoverImage";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { eyebrowOf, fetchEventCategories, fetchEvents, fetchPage, pageText } from "@/lib/cms";
@@ -232,14 +233,12 @@ function Events() {
                   永遠會回一張圖，順序反過來就是每一張卡片都長同一張不相干的照片
                   （見 EventEntry.imageKey）。沒設封面的活動就是沒有圖，不放佔位。 */}
               {e.imageKey ? (
-                <div className={`aspect-[4/3] overflow-hidden ${layout.image}`}>
-                  <img
-                    src={imageFor(e.imageKey, eventImg)}
-                    alt=""
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
+                <CoverImage
+                  src={imageFor(e.imageKey, eventImg)}
+                  alt=""
+                  loading="lazy"
+                  className={`aspect-[4/3] ${layout.image}`}
+                />
               ) : null}
               {/* 按鈕靠摘要的 flex-1 推到卡片底部，同一列的按鈕因此對齊；只有一場時
                   featureLayout 給 summary 的 md:flex-none 會把它拿掉，讓整段文字在

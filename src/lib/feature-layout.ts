@@ -19,7 +19,9 @@ export function featureLayout(count: number) {
     return {
       grid: "grid",
       card: "md:flex-row",
-      image: "md:w-1/2 md:shrink-0",
+      // md:self-center：不讓圖片框被右邊的文字欄撐高。框被拉高之後 4:3 就不成立，
+      // 封面（常是海報）會被裁得更多；置中後圖片維持自己的 4:3，文字欄照樣垂直置中。
+      image: "md:w-1/2 md:shrink-0 md:self-center",
       body: "md:justify-center md:px-12 md:py-10",
       title: "md:text-3xl",
       // 卡片版靠摘要 flex-1 把按鈕推到底；橫版要整段文字置中，所以拿掉

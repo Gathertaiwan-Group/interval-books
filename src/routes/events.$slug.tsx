@@ -304,24 +304,21 @@ function EventDetail() {
 
       {/* 大圖。⚠️ event.imageKey 非空才畫這整塊——imageFor(key, fallback) 永遠
           會回一張圖，沒有判斷式的話，沒設圖的活動也會畫出同一張假灰框。
-          通欄橫幅（跟 shop.$slug.tsx 的 aspect-[4/5] 兩欄格線刻意不同），
+          整張圖照原比例完整顯示：以前是 aspect-[21/9] + object-cover 的通欄橫幅，
+          直式海報被切到只剩中間一條、上面的標題字全不見。現在不套比例框，
+          高度最多 80vh（太高的直式海報縮小置中，不必捲好幾屏才看到內文）。
           fallback 傳空字串：這個分支只在 imageKey 非空時才會執行，fallback
           永遠不會被用到，傳一個真的圖檔只是多一個沒有用途的 import。 */}
       {event.imageKey ? (
         <section className="container-editorial pb-16">
-          <div className="aspect-[21/9] w-full overflow-hidden bg-muted">
-            {/* 沒有 loading="lazy"：這張通常是這頁的第一塊視覺內容（LCP 候選），
-                lazy 反而會延後它，跟「載入速度優化」的目標反著走。width/height
-                只是 21:9 的比例佔位，容器的 aspect-[21/9] 才是真正決定版面的
-                CSS——兩者都設是保險，不是互相取代。 */}
-            <img
-              src={imageFor(event.imageKey, "")}
-              alt={t(event.title)}
-              width={1260}
-              height={540}
-              className="h-full w-full object-cover"
-            />
-          </div>
+          {/* 沒有 loading="lazy"：這張通常是這頁的第一塊視覺內容（LCP 候選），
+              lazy 反而會延後它，跟「載入速度優化」的目標反著走。不設 width/height：
+              原比例未知（海報、照片都有），寫死比例的佔位反而會讓瀏覽器先排錯高度。 */}
+          <img
+            src={imageFor(event.imageKey, "")}
+            alt={t(event.title)}
+            className="mx-auto block h-auto max-h-[80vh] w-full object-contain"
+          />
         </section>
       ) : null}
 

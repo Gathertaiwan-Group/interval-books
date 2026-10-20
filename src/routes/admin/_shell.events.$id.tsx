@@ -844,10 +844,11 @@ function AdminEventAssemblerPage() {
                   value={field.value ?? null}
                   onChange={field.onChange}
                   fallback={eventReading}
+                  hint="建議橫式 4:3（例如 1600×1200）。直式海報也會完整顯示，兩側以模糊底色補滿。"
                 />
                 <FormDescription>
                   上架之後它也會出現在 /shop 的商品卡與商品頁上；活動頁本身則是這張圖
-                  以通欄大圖的方式出現在標題下方。
+                  以原比例完整顯示在標題下方。
                 </FormDescription>
                 <FormMessage />
               </FormItem>

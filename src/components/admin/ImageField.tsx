@@ -43,6 +43,8 @@ export type ImageFieldProps = {
   /** Bundled asset shown when value is empty/unresolvable — pass the same fallback used with imageFor() at the call site this field is editing. */
   fallback: string;
   label?: string;
+  /** 額外的尺寸／比例建議，顯示在壓縮說明上方（例如活動封面要提醒海報會完整顯示）。 */
+  hint?: string;
   disabled?: boolean;
   className?: string;
 };
@@ -57,6 +59,7 @@ export function ImageField({
   onChange,
   fallback,
   label,
+  hint,
   disabled,
   className,
 }: ImageFieldProps) {
@@ -137,8 +140,10 @@ export function ImageField({
       {label ? <p className="text-sm font-medium">{label}</p> : null}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        <div className="relative aspect-video w-full max-w-xs shrink-0 overflow-hidden rounded-md border border-border bg-muted">
-          <img src={previewSrc} alt="目前圖片預覽" className="h-full w-full object-cover" />
+        {/* object-contain：預覽要讓管理員看到整張圖。用 cover 的話，直式海報在這裡
+            就被裁掉上下，管理員看不出前台會長什麼樣。 */}
+        <div className="relative aspect-[4/3] w-full max-w-xs shrink-0 overflow-hidden rounded-md border border-border bg-muted">
+          <img src={previewSrc} alt="目前圖片預覽" className="h-full w-full object-contain" />
           {busy ? (
             <div className="absolute inset-0 flex items-center justify-center bg-background/70">
               <Loader2 className="size-6 animate-spin text-foreground" />
@@ -189,6 +194,7 @@ export function ImageField({
               </Button>
             ) : null}
           </div>
+          {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
           <p className="text-xs text-muted-foreground">
             會自動壓縮並轉為 WebP 格式（最長邊 {MAX_EDGE_PX}px）。僅接受 JPEG、PNG、WebP。
           </p>

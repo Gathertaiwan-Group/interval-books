@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
+import { CoverImage } from "@/components/CoverImage";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fetchEvents, fetchJourneys, fetchNews, fetchPage, pageText } from "@/lib/cms";
@@ -217,14 +218,13 @@ function Index() {
                 {/* ⚠️ 先判斷 imageKey 非空**再**呼叫 imageFor()。imageFor(key, fallback)
                     永遠會回一張圖，順序反過來就是每一張卡片都長同一張不相干的照片。 */}
                 {e.imageKey ? (
-                  <div className={`aspect-[4/3] overflow-hidden ${eventsLayout.image}`}>
-                    <img
-                      src={imageFor(e.imageKey, storefrontImg)}
-                      alt=""
-                      loading="lazy"
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                    />
-                  </div>
+                  <CoverImage
+                    src={imageFor(e.imageKey, storefrontImg)}
+                    alt=""
+                    loading="lazy"
+                    className={`aspect-[4/3] ${eventsLayout.image}`}
+                    imgClassName="transition-transform duration-500 group-hover:scale-[1.03]"
+                  />
                 ) : null}
                 <div className={`flex flex-1 flex-col p-6 ${eventsLayout.body}`}>
                   <p className="eyebrow text-sm tracking-widest">{e.category}</p>
@@ -264,14 +264,13 @@ function Index() {
                 <>
                   {/* journeys 表沒有 image_key（見 cms.ts#fetchJourneys 選的欄位），
                       所以這裡用固定的策旅意象圖，而不是活動卡那種 imageFor()。 */}
-                  <div className={`aspect-[4/3] overflow-hidden ${journeysLayout.image}`}>
-                    <img
-                      src={journeyImg}
-                      alt=""
-                      loading="lazy"
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                    />
-                  </div>
+                  <CoverImage
+                    src={journeyImg}
+                    alt=""
+                    loading="lazy"
+                    className={`aspect-[4/3] ${journeysLayout.image}`}
+                    imgClassName="transition-transform duration-500 group-hover:scale-[1.03]"
+                  />
                   <div className={`flex flex-1 flex-col p-6 ${journeysLayout.body}`}>
                     <p className="eyebrow text-sm tracking-widest">
                       {t(j.days)} ／ {t(j.theme)}

@@ -421,9 +421,17 @@ checkFalse(
   '大圖沒有 loading="lazy"（它通常是 LCP 候選，lazy 會延後它）',
   /loading=/.test(coverImg ?? ""),
 );
+// 大圖：原比例完整顯示（封面常是有字的海報，裁切會切掉標題）。不能回到
+// aspect-[21/9] + object-cover 的通欄橫幅，也不寫死 width/height 比例佔位。
 checkTrue(
-  "大圖有 width/height（21:9 佔位；容器的 aspect-[21/9] 已經定版面，這裡是保險）",
-  /width=\{1260\}/.test(coverImg ?? "") && /height=\{540\}/.test(coverImg ?? ""),
+  "大圖照原比例完整顯示（h-auto + object-contain + max-h-[80vh]）",
+  /h-auto/.test(coverImg ?? "") &&
+    /object-contain/.test(coverImg ?? "") &&
+    /max-h-\[80vh\]/.test(coverImg ?? ""),
+);
+checkFalse(
+  "大圖不再用 object-cover，頁面也沒有 aspect-[21/9] 裁切框",
+  /object-cover/.test(coverImg ?? "") || detailCode.includes("aspect-[21/9]"),
 );
 
 // 講者照與相簿：頁面下半部，補 lazy 是零風險、見效最快的一刀。
