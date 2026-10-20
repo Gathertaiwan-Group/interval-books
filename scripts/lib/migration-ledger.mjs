@@ -252,6 +252,14 @@ export const AREAS = Object.freeze({
     label: "沙龍席位回覆",
     identifiers: ["salon_rsvps"],
   },
+  // 遠端 MCP server 的寫入稽核（0039）。獨立一區，理由與 salon_rsvp 相同：這張表跟
+  // 任何既有區域都沒有關係（沒有外鍵、不被任何函式讀），掛進別區只會把不相干的自檢
+  // 叫回來；反過來，日後動到它的 migration 會被路由回 mcp-selftest。
+  mcp_audit: {
+    witness: "0039_mcp_audit_log.sql",
+    label: "MCP 寫入稽核",
+    identifiers: ["mcp_audit_log"],
+  },
 });
 
 /**
@@ -675,6 +683,13 @@ export const MIGRATION_LEDGER = Object.freeze([
     // 這一區的 witness 仍然是 0037——witness 要的是「毫無疑問屬於這一區」的檔案，
     // 建表那一支比刪表這一支更適合當守門人，而且它還在磁碟上。
     touches: ["salon_rsvp"],
+  },
+  {
+    file: "0039_mcp_audit_log.sql",
+    note: "遠端 MCP server（/api/mcp）的寫入稽核：public.mcp_audit_log（identity id、tool／entity／entity_id／action／changes jsonb，actor_role CHECK 釘死 'mcp'、沒有 actor_id 也沒有外鍵）。RLS 開著零 policy、anon/authenticated 全收回、service_role 只有 select/insert（append-only）。不碰任何既有表、函式或約束",
+    // touches 是實際掃過剝掉註解的 SQL 算出來的（同 0037 的做法）：只有 mcp_audit_log
+    // 這個識別字。comment on 的字串刻意只寫不含其他區域識別字的敘述。
+    touches: ["mcp_audit"],
   },
 ]);
 

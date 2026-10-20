@@ -171,6 +171,49 @@ export async function upsertProduct(input: ProductUpsertInput): Promise<ProductR
   return data as ProductRow;
 }
 
+/**
+ * 只改「門面」欄位的更新：title / summary / description / image_key / price /
+ * compare_at_price / status。給 MCP（src/server/mcp/tools.ts）用。
+ *
+ * ⚠️ 刻意不是 upsertProduct()：那一支是 upsert，會把 stock、slug、product_type、
+ *    source_* 用呼叫端讀到的舊值整列寫回 —— 讀到寫之間若有一筆訂單扣了庫存
+ *    （atomic_deduct_stock），upsert 會把庫存蓋回去。這裡是 `.update()` 只帶這七欄，
+ *    其他欄位一個都不碰。
+ */
+export type ProductContentPatch = {
+  title: Localized;
+  summary: Localized;
+  description: Localized;
+  image_key: string | null;
+  price: number;
+  compare_at_price: number | null;
+  status: ProductStatus;
+};
+
+export async function updateProductContent(
+  id: string,
+  patch: ProductContentPatch,
+): Promise<ProductRow> {
+  const { data, error } = await supabaseAdmin()
+    .from("products")
+    .update({
+      title: patch.title,
+      summary: patch.summary,
+      description: patch.description,
+      image_key: patch.image_key,
+      price: patch.price,
+      compare_at_price: patch.compare_at_price,
+      status: patch.status,
+    })
+    .eq("id", id)
+    .select(COLUMNS)
+    .maybeSingle();
+
+  if (error) throw new Error(`[repo/products] updateContent 失敗：${error.message}`);
+  if (!data) throw new Error(`[repo/products] updateContent 失敗：找不到商品 ${id}`);
+  return data as ProductRow;
+}
+
 export async function removeProduct(id: string): Promise<void> {
   const { error } = await supabaseAdmin().from("products").delete().eq("id", id);
   if (error) throw new Error(`[repo/products] remove 失敗：${error.message}`);

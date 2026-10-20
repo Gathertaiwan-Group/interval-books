@@ -929,20 +929,27 @@ const paths = [
   "INVOICE_TASK_PATH",
   "PURGE_SCANS_TASK_PATH",
   "NOTIFY_TASK_PATH",
+  // 遠端 MCP server（/api/mcp）。呼叫者是 AI 客戶端，說 MCP 的 JSON-RPC、帶 Bearer
+  // token 不帶 cookie —— 一樣是「沒有瀏覽器 session 的呼叫者」，createServerFn 表達不了。
+  "MCP_PATH",
 ];
 for (const p of paths) {
   checkTrue(`${p} 有被攔`, new RegExp(`pathname === ${p}`).test(serverCode));
 }
 check(
-  "路徑表恰好六條（多一條就要回來寫進上面那張表）",
+  "路徑表恰好七條（多一條就要回來寫進上面那張表）",
   (serverCode.match(/pathname === [A-Z_]+/g) ?? []).length,
   paths.length,
 );
 // 比對的是「路徑條數」而不是一個寫死的數字：這樣下次加路徑時，這一條會跟著
 // 上面那張表一起走，紅的只會是「表沒更新」那一條，不會多紅一條不相干的。
+// 除了上面那張表，還有一條不是「pathname === 常數」的攔截：/.well-known/oauth-*
+// （isOAuthDiscoveryPath，MCP 沒有 authorization server，一律 404）。它也是 dynamic
+// import，所以 dynamic import 的條數是「表的條數 + 1」。
+checkTrue("OAuth discovery 路徑有被攔", /if \(isOAuthDiscoveryPath\(pathname\)\)/.test(serverCode));
 checkTrue(
   "每條路徑都用 dynamic import（service_role 不在模組載入時被拉進來）",
-  (serverCode.match(/await import\("@\/server\//g) ?? []).length === paths.length,
+  (serverCode.match(/await import\("@\/server\//g) ?? []).length === paths.length + 1,
 );
 // 檔頭那張表要說明為什麼它不能用 createServerFn 表達（src/server.ts L21-24 的規矩）。
 checkTrue(

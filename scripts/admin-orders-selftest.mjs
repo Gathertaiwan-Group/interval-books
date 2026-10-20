@@ -507,9 +507,11 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
 
   const migFiles = readdirSync(MIG_DIR).filter((f) => f.endsWith(".sql"));
   check(
-    "supabase/migrations 剛好 38 個 .sql 檔（0001–0037 原封不動 + 0038 新增）",
+    // 0039（MCP 寫入稽核表 mcp_audit_log）是一張獨立的新表，不碰訂單、付款或報名的任何
+    // 一張表與函式（帳本 touches 只有 mcp_audit），這一支守的訂單不變式不受影響。
+    "supabase/migrations 剛好 39 個 .sql 檔（0001–0038 原封不動 + 0039 新增）",
     migFiles.length,
-    38,
+    39,
   );
 }
 

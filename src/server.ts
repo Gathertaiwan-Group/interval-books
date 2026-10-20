@@ -21,7 +21,7 @@
  *     載入時就被拉進來。
  *   * 要再加路徑時，先確認它真的不能用 createServerFn 表達。
  *
- * 目前掛在這裡的六條，理由各自不同：
+ * 目前掛在這裡的八條，理由各自不同：
  *   BLACKCAT_APN_PATH      黑貓 PAY（統一客樂得 COCS）的 APN 主動通知。**這是這家店
  *                          實際在跑的那條刷卡路線。** 金流商的伺服器對我們指定的網址送
  *                          application/json POST，同樣打不到框架的 RPC 協定。
@@ -44,10 +44,17 @@
  *                          而排程沒有 cookie，它帶的是共享密鑰。這四條路徑全都是
  *                          「沒有瀏覽器 session 的呼叫者」，那正是它們不能走
  *                          createServerFn 的共同原因。
+ *   MCP_PATH               遠端 MCP server（/api/mcp，src/server/mcp/）。呼叫者是 AI 客戶端
+ *                          （Claude Code／claude.ai），說的是 MCP 的 JSON-RPC over HTTP，
+ *                          帶的是 Bearer token 不是 cookie —— 同樣是「沒有瀏覽器 session 的
+ *                          呼叫者」。沒設 MCP_TOKEN 時回 404（整支關閉）。
+ *   /.well-known/oauth-*   一律 404。MCP 走靜態 token、沒有 authorization server；有客戶端
+ *                          看到 OAuth discovery 就會忽略設定的 header 硬走 OAuth。
  */
 import { createStartHandler, defaultStreamHandler } from "@tanstack/react-start/server";
 import { BLACKCAT_APN_PATH, BLACKCAT_RETURN_PATH } from "@/server/blackcat";
 import { cacheControlFor } from "@/server/cache-policy";
+import { isOAuthDiscoveryPath, MCP_PATH } from "@/server/mcp/core";
 import { PAYUNI_WEBHOOK_PATH } from "@/server/payuni";
 import {
   INVOICE_TASK_PATH,
@@ -89,6 +96,16 @@ export default {
     if (pathname === PURGE_SCANS_TASK_PATH) {
       const { handlePurgeScansTask } = await import("@/server/task-endpoints");
       return handlePurgeScansTask(request);
+    }
+
+    if (pathname === MCP_PATH) {
+      const { handleMcpRequest } = await import("@/server/mcp/http");
+      return handleMcpRequest(request);
+    }
+
+    if (isOAuthDiscoveryPath(pathname)) {
+      const { handleOAuthDiscovery } = await import("@/server/mcp/http");
+      return handleOAuthDiscovery();
     }
 
     if (pathname === NOTIFY_TASK_PATH) {

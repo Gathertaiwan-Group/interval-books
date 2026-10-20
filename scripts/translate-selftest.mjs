@@ -446,10 +446,15 @@ const translateImporters = srcFiles
   .filter((p) => /["']@\/server\/translate["']/.test(stripTs(readFile(p))))
   .map(rel)
   .sort();
-check("只有 fns/translate.ts 與一頁新增活動的寫入端匯入 @/server/translate", translateImporters, [
-  "src/lib/admin/fns/translate.ts",
-  "src/server/event-quick-create.ts",
-]);
+// 第二個例外是遠端 MCP server 的寫入工具 src/server/mcp/tools.ts（三語欄位只給中文時
+// 自動補英日文）。同樣 server-only；能呼叫它的只有通過 MCP_TOKEN 閘門的請求
+// （src/server/mcp/core.ts#gateMcpRequest，沒設 token 整支 404）—— 那把 token 由老闆
+// 自己設、自己持有，等同後台 admin，額度的決定權沒有交給任何新的人。
+check(
+  "只有 fns/translate.ts、一頁新增活動、MCP 寫入工具匯入 @/server/translate",
+  translateImporters,
+  ["src/lib/admin/fns/translate.ts", "src/server/event-quick-create.ts", "src/server/mcp/tools.ts"],
+);
 {
   const quickSrc = readFile(join(ROOT, "src/server/event-quick-create.ts"));
   checkTrue(
