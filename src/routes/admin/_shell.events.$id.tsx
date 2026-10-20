@@ -94,6 +94,7 @@ import { GalleryField } from "@/components/admin/GalleryField";
 import { ImageField } from "@/components/admin/ImageField";
 import { MirrorNote } from "@/components/admin/MirrorNote";
 import { EventBlockEditor, type EventBlockItem } from "@/components/admin/EventBlockEditor";
+import { EventQuickCreate } from "@/components/admin/EventQuickCreate";
 import { eventReading } from "@/lib/images";
 import { formatTaipeiDateTime } from "@/lib/taipei-time";
 import { EVENT_BLOCK_KINDS, EVENT_LIST_FIELDS, type EventBlockKind } from "@/lib/event-blocks";
@@ -378,8 +379,22 @@ export const Route = createFileRoute("/admin/_shell/events/$id")({
       },
     ],
   }),
-  component: AdminEventAssemblerPage,
+  component: AdminEventRoutePage,
 });
+
+/**
+ * /admin/events/new → 「一頁新增活動」（src/components/admin/EventQuickCreate.tsx）；
+ * /admin/events/<id> → 組裝器。
+ *
+ * 新增改成一張短表單，是因為原本「讓一場活動看得到、買得到」要走組裝器＋商品開關＋
+ * /admin/registrations 新增場次＋再打開場次加票種，四個地方。組裝器本身沒有變：
+ * 建好之後的細修照舊在這裡做。分支放在最外層，兩邊各自的 hooks 不會互相干擾。
+ */
+function AdminEventRoutePage() {
+  const { isNew, categories, artists } = Route.useLoaderData();
+  if (isNew) return <EventQuickCreate categories={categories} artists={artists} />;
+  return <AdminEventAssemblerPage />;
+}
 
 /* ------------------------------------------------------------------ *
  * 段落外框

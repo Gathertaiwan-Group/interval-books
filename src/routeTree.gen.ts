@@ -70,6 +70,7 @@ import { Route as AdminShellStringsRouteImport } from './routes/admin/_shell.str
 import { Route as VendorShellIndexRouteImport } from './routes/vendor/_shell.index'
 import { Route as VendorShellProductsRouteImport } from './routes/vendor/_shell.products'
 import { Route as AdminShellEventsIdRouteImport } from './routes/admin/_shell.events.$id'
+import { Route as AdminShellJourneysNewRouteImport } from './routes/admin/_shell.journeys_.new'
 import { Route as AdminShellPagesSlugRouteImport } from './routes/admin/_shell.pages.$slug'
 
 const IndexRoute = IndexRouteImport.update({
@@ -385,6 +386,11 @@ const AdminShellEventsIdRoute = AdminShellEventsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AdminShellEventsRoute,
 } as any)
+const AdminShellJourneysNewRoute = AdminShellJourneysNewRouteImport.update({
+  id: '/journeys_/new',
+  path: '/journeys/new',
+  getParentRoute: () => AdminShellRoute,
+} as any)
 const AdminShellPagesSlugRoute = AdminShellPagesSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
@@ -453,6 +459,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminShellIndexRoute
   '/vendor/': typeof VendorShellIndexRoute
   '/admin/events/$id': typeof AdminShellEventsIdRoute
+  '/admin/journeys/new': typeof AdminShellJourneysNewRoute
   '/admin/pages/$slug': typeof AdminShellPagesSlugRoute
 }
 export interface FileRoutesByTo {
@@ -515,6 +522,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminShellIndexRoute
   '/vendor': typeof VendorShellIndexRoute
   '/admin/events/$id': typeof AdminShellEventsIdRoute
+  '/admin/journeys/new': typeof AdminShellJourneysNewRoute
   '/admin/pages/$slug': typeof AdminShellPagesSlugRoute
 }
 export interface FileRoutesById {
@@ -580,6 +588,7 @@ export interface FileRoutesById {
   '/admin/_shell/': typeof AdminShellIndexRoute
   '/vendor/_shell/': typeof VendorShellIndexRoute
   '/admin/_shell/events/$id': typeof AdminShellEventsIdRoute
+  '/admin/_shell/journeys_/new': typeof AdminShellJourneysNewRoute
   '/admin/_shell/pages/$slug': typeof AdminShellPagesSlugRoute
 }
 export interface FileRouteTypes {
@@ -646,6 +655,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/vendor/'
     | '/admin/events/$id'
+    | '/admin/journeys/new'
     | '/admin/pages/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -708,6 +718,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/vendor'
     | '/admin/events/$id'
+    | '/admin/journeys/new'
     | '/admin/pages/$slug'
   id:
     | '__root__'
@@ -772,6 +783,7 @@ export interface FileRouteTypes {
     | '/admin/_shell/'
     | '/vendor/_shell/'
     | '/admin/_shell/events/$id'
+    | '/admin/_shell/journeys_/new'
     | '/admin/_shell/pages/$slug'
   fileRoutesById: FileRoutesById
 }
@@ -1238,6 +1250,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminShellEventsIdRouteImport
       parentRoute: typeof AdminShellEventsRoute
     }
+    '/admin/_shell/journeys_/new': {
+      id: '/admin/_shell/journeys_/new'
+      path: '/journeys/new'
+      fullPath: '/admin/journeys/new'
+      preLoaderRoute: typeof AdminShellJourneysNewRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
     '/admin/_shell/pages/$slug': {
       id: '/admin/_shell/pages/$slug'
       path: '/$slug'
@@ -1299,6 +1318,7 @@ interface AdminShellRouteChildren {
   AdminShellStockAlertsRoute: typeof AdminShellStockAlertsRoute
   AdminShellStringsRoute: typeof AdminShellStringsRoute
   AdminShellIndexRoute: typeof AdminShellIndexRoute
+  AdminShellJourneysNewRoute: typeof AdminShellJourneysNewRoute
 }
 
 const AdminShellRouteChildren: AdminShellRouteChildren = {
@@ -1329,6 +1349,7 @@ const AdminShellRouteChildren: AdminShellRouteChildren = {
   AdminShellStockAlertsRoute: AdminShellStockAlertsRoute,
   AdminShellStringsRoute: AdminShellStringsRoute,
   AdminShellIndexRoute: AdminShellIndexRoute,
+  AdminShellJourneysNewRoute: AdminShellJourneysNewRoute,
 }
 
 const AdminShellRouteWithChildren = AdminShellRoute._addFileChildren(

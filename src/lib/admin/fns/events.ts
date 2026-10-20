@@ -7,7 +7,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { adminFnMiddleware } from "@/lib/admin/middleware";
-import { eventSchema, eventWithProductSchema } from "@/lib/admin/schemas";
+import { eventQuickCreateSchema, eventSchema, eventWithProductSchema } from "@/lib/admin/schemas";
 
 export const listEvents = createServerFn({ method: "GET" })
   .middleware([adminFnMiddleware])
@@ -59,6 +59,20 @@ export const upsertEventWithProduct = createServerFn({ method: "POST" })
     );
     const event = { ...rest, lists };
     return await upsertEventWithProduct(event, product ?? null);
+  });
+
+/**
+ * 「一頁新增活動」：活動＋商品＋場次＋票種，一顆按鈕。
+ *
+ * 只組裝既有的三支 repo 寫入（見 src/server/event-quick-create.ts 的檔頭），先存草稿、
+ * 最後才發布；任何一步失敗就把這一次建立的列刪掉。
+ */
+export const createEventQuick = createServerFn({ method: "POST" })
+  .middleware([adminFnMiddleware])
+  .inputValidator(eventQuickCreateSchema)
+  .handler(async ({ data }) => {
+    const { createEventQuick } = await import("@/server/event-quick-create");
+    return await createEventQuick(data);
   });
 
 /**

@@ -369,6 +369,40 @@ export const eventWithProductSchema = eventSchema.extend({
 export type EventWithProductFormValues = z.infer<typeof eventWithProductSchema>;
 
 /**
+ * 「一頁新增活動」送進 server fn 的形狀（src/lib/admin/event-quick-create.ts 的
+ * QuickCreateInput）。
+ *
+ * ⚠️ 這裡只守**形狀與上限**。內容規則（結束晚於開始、站內報名至少一場、付費至少一個
+ *    票種…）只有一個家：validateQuickCreate()，server 寫入前會再跑一次。在這裡再寫
+ *    一份 superRefine 就是兩份會分岔的規則。
+ */
+export const eventQuickCreateSchema = z.object({
+  kind: z.enum(["event", "journey"]),
+  title: z.string().max(500),
+  category: z.string().max(200),
+  speaker_id: z.string().max(200).nullable(),
+  image_key: z.string().max(500).nullable(),
+  description: z.string().max(4000),
+  sessions: z
+    .array(
+      z.object({
+        date: z.string().max(10),
+        start: z.string().max(5),
+        end: z.string().max(5),
+        end_date: z.string().max(10),
+        location: z.string().max(500),
+        capacity: z.number().int(),
+      }),
+    )
+    .max(20),
+  mode: z.enum(["free", "paid", "external"]),
+  plans: z.array(z.object({ name: z.string().max(200), price: z.number().int() })).max(10),
+  external_url: z.string().max(2000),
+  publish: z.boolean(),
+  theme: z.string().max(500),
+});
+
+/**
  * 一列 event_blocks（0027）。三種 kind 共用這一支，因為它們的形狀**完全相同**。
  *
  * 🔴 `kind` 的名單來自 EVENT_BLOCK_KINDS，不是在這裡再打一次三個字串 —— 那三個字要

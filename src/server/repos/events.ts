@@ -481,6 +481,32 @@ export async function listEventProducts(): Promise<Record<string, EventProductRo
   return byEventId;
 }
 
+/**
+ * 以 `prefix` 開頭、已經被用掉的代稱（活動的 slug，加上商品那一側 `event-` 之後的
+ * 部分），給「一頁新增活動」挑一個不撞號的代稱用。
+ *
+ * 兩邊都查：events.slug 有唯一約束，products.slug 也有，而商品代稱是
+ * `event-<活動代稱>` —— 只查活動那一側，撞到的會是一句看不懂的 23505。
+ *
+ * ⚠️ prefix 由呼叫端產生（YYYYMMDD），只含數字；這裡仍然把 LIKE 的萬用字元跳脫掉。
+ */
+export async function listTakenEventSlugs(prefix: string): Promise<string[]> {
+  const like = `${prefix.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  const [events, products] = await Promise.all([
+    supabaseAdmin().from("events").select("slug").ilike("slug", like),
+    supabaseAdmin().from("products").select("slug").ilike("slug", `event-${like}`),
+  ]);
+  if (events.error)
+    throw new Error(`[repo/events] listTakenEventSlugs 失敗：${events.error.message}`);
+  if (products.error) {
+    throw new Error(`[repo/events] listTakenEventSlugs 查商品失敗：${products.error.message}`);
+  }
+  return [
+    ...((events.data ?? []) as { slug: string }[]).map((r) => r.slug),
+    ...((products.data ?? []) as { slug: string }[]).map((r) => r.slug.replace(/^event-/, "")),
+  ];
+}
+
 export async function removeEvent(id: string): Promise<void> {
   const { error } = await supabaseAdmin().from("events").delete().eq("id", id);
   if (error) throw new Error(`[repo/events] remove 失敗：${error.message}`);

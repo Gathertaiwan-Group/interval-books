@@ -437,14 +437,39 @@ const vitePrefixed = srcFiles.filter((p) => /VITE_[A-Z_]*GEMINI/.test(readFile(p
 check("沒有任何 VITE_ 前綴的 Gemini 變數", vitePrefixed, []);
 
 // 除了 server fn 那一支，沒有別人 import 得到 src/server/translate.ts。
+//
+// 唯一的例外是「一頁新增活動」的寫入端 src/server/event-quick-create.ts：它也是
+// server-only，而且唯一的呼叫端 fns/events.ts#createEventQuick 掛的是同一支
+// adminFnMiddleware —— 「誰可以燒站台的 AI 額度」一個字都沒有放寬。下面另外守這兩件事。
 const translateImporters = srcFiles
   .filter((p) => rel(p) !== "src/server/translate.ts")
   .filter((p) => /["']@\/server\/translate["']/.test(stripTs(readFile(p))))
   .map(rel)
   .sort();
-check("只有 fns/translate.ts 匯入 @/server/translate", translateImporters, [
+check("只有 fns/translate.ts 與一頁新增活動的寫入端匯入 @/server/translate", translateImporters, [
   "src/lib/admin/fns/translate.ts",
+  "src/server/event-quick-create.ts",
 ]);
+{
+  const quickSrc = readFile(join(ROOT, "src/server/event-quick-create.ts"));
+  checkTrue(
+    "event-quick-create.ts 有 server-only 標記",
+    quickSrc.includes('import "@tanstack/react-start/server-only"'),
+  );
+  const fnsEvents = stripTs(readFile(join(ROOT, "src/lib/admin/fns/events.ts")));
+  checkTrue(
+    "它唯一的呼叫端 createEventQuick 掛 adminFnMiddleware",
+    /createEventQuick = createServerFn\(\{ method: "POST" \}\)\s*\.middleware\(\[adminFnMiddleware\]\)/.test(
+      fnsEvents,
+    ),
+  );
+  const quickImporters = srcFiles
+    .filter((p) => /["']@\/server\/event-quick-create["']/.test(stripTs(readFile(p))))
+    .map(rel);
+  check("只有 fns/events.ts 匯入 event-quick-create", quickImporters, [
+    "src/lib/admin/fns/events.ts",
+  ]);
+}
 
 const translateSrc = readFile(SERVER_TRANSLATE);
 checkTrue(

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -103,12 +103,6 @@ function AdminJourneysPage() {
   const [deleteTarget, setDeleteTarget] = useState<JourneyRow | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  function openCreate() {
-    setEditing(null);
-    setFormKey((k) => k + 1);
-    setDialogOpen(true);
-  }
-
   function openEdit(row: JourneyRow) {
     setEditing(row);
     setFormKey((k) => k + 1);
@@ -170,9 +164,13 @@ function AdminJourneysPage() {
           <h1 className="text-2xl font-medium">策旅</h1>
           <p className="mt-1 text-sm text-muted-foreground">共 {journeys.length} 檔</p>
         </div>
-        <Button onClick={openCreate} className="gap-1.5">
-          <Plus className="h-4 w-4" />
-          新增策旅
+        {/* 新增走「一頁新增策旅」（_shell.journeys_.new.tsx）：卡片＋報名頁＋梯次＋票種一次建好。
+            下面的 Dialog 仍然負責「編輯」既有卡片的文字。 */}
+        <Button asChild className="gap-1.5">
+          <Link to="/admin/journeys/new">
+            <Plus className="h-4 w-4" />
+            新增策旅
+          </Link>
         </Button>
       </div>
 
