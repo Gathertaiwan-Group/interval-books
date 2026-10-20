@@ -378,7 +378,14 @@ assertMigrationDependencies(check, MIG_DIR, {
   //    的地方全部在會被 stripTs() 剝掉的註解裡，程式碼本體一次都沒有寫這個表名
   //    字面值（只呼叫 RPC），所以**不會**落進這條掃描的範圍——[7] 段的
   //    rosterTouchers 清單因此沒有變長。原樣成立（實跑驗證見交付回報）。
-  reviewedThrough: "0036_event_session_plans.sql",
+  // 0040_referral_program.sql（推薦碼與分潤）對 orders 只做了三件事：加三個 nullable
+  // 欄位 referrer_id／referral_code／referral_discount_percent（舊訂單全是 NULL）、
+  // 一個部分索引、一個指向新表 referrers 的 FK（on delete restrict，限制的是刪推廣者，
+  // 不是刪訂單）。既有欄位、CHECK、函式、policy、grant 一個字都沒改。唯一的語意變化
+  // 是 orders.discount 從恆為 0 變成「推薦折扣」（只對選品／書籍、最多 50%），而
+  // total = subtotal + shipping_fee − discount 仍是金流、信件、發票唯一使用的金額
+  // （發票本來就把 discount 開成負數列）。這支自檢的斷言重讀過，原樣成立。
+  reviewedThrough: "0040_referral_program.sql",
 });
 // 這一期不准動到既有的 0001–0020，所以它們也必須都還在。
 for (let n = 1; n <= 20; n += 1) {

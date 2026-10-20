@@ -229,7 +229,8 @@ export type CheckoutErrorCode =
   | "shipping_address_required"
   | "order_failed"
   | "payment_unavailable"
-  | "payment_already_settled";
+  | "payment_already_settled"
+  | "referral_invalid";
 
 export class CheckoutError extends Error {
   readonly code: CheckoutErrorCode;
@@ -280,6 +281,13 @@ export const CHECKOUT_ERROR_COPY: Record<CheckoutErrorCode, Localized> = {
     zh: "這筆訂單已經不需要再付款了。",
     en: "This order no longer needs to be paid.",
     ja: "このご注文は、これ以上のお支払いは不要です。",
+  },
+  // 0040：客人**自己打的**推薦碼無效或已停用。訂單沒有成立 —— 照原價成立會讓客人
+  // 付的錢比畫面上看到的多。cookie 帶來的碼無效則靜默忽略（客人沒看過它）。
+  referral_invalid: {
+    zh: "推薦碼無效或已停用，訂單沒有成立。請修改或清空推薦碼後再送出。",
+    en: "That referral code is not valid, so no order was created. Please correct or clear it and try again.",
+    ja: "紹介コードが無効のため、ご注文は成立していません。修正するか空欄にしてから再度お進みください。",
   },
 };
 
@@ -776,6 +784,15 @@ export const checkoutPayloadSchema = checkoutFormSchema({
    * send it behaves exactly as it did before.
    */
   paymentMethod: z.enum(PAYMENT_METHODS).default("offline"),
+  /**
+   * 推薦碼（0040）。**只是一個碼，不是金額** —— 折扣%由伺服器用這個碼向
+   * public.referrers 查出來、折扣金額由 computeReferralDiscount() 算，與上面每一個
+   * 金額同一個立場。
+   *
+   * undefined（舊版前台沒送）→ 伺服器退回 ib_ref cookie；空字串 → 客人清掉了，不用碼。
+   * 見 src/lib/referral.ts resolveReferralCode()。
+   */
+  referralCode: z.string().trim().max(40).optional(),
 });
 
 export type CheckoutPayload = z.infer<typeof checkoutPayloadSchema>;
@@ -822,6 +839,8 @@ export type OrderConfirmation = {
   shippingFee: number;
   discount: number;
   total: number;
+  /** 這張訂單用的推薦碼（0040）。只有碼，不含推廣者是誰。 */
+  referralCode: string | null;
   shippingMethod: ShippingMethod;
   createdAt: string;
   items: {

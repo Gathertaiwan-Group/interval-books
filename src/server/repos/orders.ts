@@ -139,6 +139,8 @@ import {
 } from "@/lib/checkout";
 import { normalizeInvoiceChoice } from "@/lib/invoice-format";
 import { getRemittanceAccount } from "@/server/repos/site-settings";
+import { computeReferralDiscount, resolveReferralCode } from "@/lib/referral";
+import { findReferrerForCheckout } from "@/server/repos/referrals";
 
 /** Columns checkout needs from public.products. Price is re-read, never trusted. */
 const PRODUCT_COLUMNS =
@@ -947,7 +949,13 @@ export async function reissuePayment(token: string): Promise<PaymentHandoff | nu
  * "this order was sent to a gateway" is visible in the row itself rather than
  * having to be inferred from the payments table.
  */
-export async function createOrder(payload: CheckoutPayload): Promise<PlacedOrder> {
+export async function createOrder(
+  payload: CheckoutPayload,
+  opts: {
+    /** ib_ref cookie 的值（0040）。只有 payload 沒帶 referralCode（舊前台）時才用。 */
+    cookieReferralCode?: string | null;
+  } = {},
+): Promise<PlacedOrder> {
   const db = supabaseAdmin();
   const wantsCard = payload.paymentMethod === "card";
   /**
@@ -989,7 +997,30 @@ export async function createOrder(payload: CheckoutPayload): Promise<PlacedOrder
 
   const subtotal = lines.reduce((sum, l) => sum + l.subtotal, 0);
   const shippingFee = computeShippingFee({ needsShipping, method: shippingMethod, subtotal });
-  const discount = 0; // no coupon mechanism yet; the column exists for one
+
+  // ---- 推薦碼（0040）---------------------------------------------------------
+  // 打的碼優先，沒送欄位才退回 cookie（resolveReferralCode）。折扣%從 public.referrers
+  // 重新查、折扣金額由 computeReferralDiscount() 只對選品／書籍那幾行算 —— 瀏覽器
+  // 送不了任何一個數字。免運門檻仍用折扣前的 subtotal（computeShippingFee 不動）。
+  //
+  // 客人自己打的碼無效 → 整筆拒絕（referral_invalid）：照原價成立會讓他付的比畫面上
+  // 看到的多。cookie 帶來的碼無效 → 當作沒有。
+  const resolved = resolveReferralCode({
+    typed: payload.referralCode,
+    cookie: opts.cookieReferralCode ?? null,
+  });
+  let referral: { id: string; code: string; discountPercent: number } | null = null;
+  if (resolved) {
+    const found = await findReferrerForCheckout(resolved.code);
+    if (found) referral = found;
+    else if (resolved.source === "typed") throw new CheckoutError("referral_invalid");
+  }
+  const discount = referral
+    ? computeReferralDiscount(
+        lines.map((l) => ({ productType: l.productType, subtotal: l.subtotal })),
+        referral.discountPercent,
+      )
+    : 0;
   const total = subtotal + shippingFee - discount;
 
   // ---- step 2: orders -------------------------------------------------------
@@ -1018,6 +1049,14 @@ export async function createOrder(payload: CheckoutPayload): Promise<PlacedOrder
       idempotency_key: payload.idempotencyKey,
       locale: payload.locale,
       note: payload.note ?? null,
+      // 0040：只有真的套用了推薦碼才帶這三欄（沒有推薦的訂單形狀與 0040 之前逐字相同）。
+      ...(referral
+        ? {
+            referrer_id: referral.id,
+            referral_code: referral.code,
+            referral_discount_percent: referral.discountPercent,
+          }
+        : {}),
     })
     .select("id, order_no, public_token, total")
     .single();
@@ -1473,7 +1512,7 @@ export async function getOrderByToken(token: string): Promise<OrderSummary | nul
   const { data, error } = await db
     .from("orders")
     .select(
-      "id, order_no, status, payment_status, payment_method, subtotal, shipping_fee, discount, total, shipping_method, created_at, remittance_last5, remittance_reported_at",
+      "id, order_no, status, payment_status, payment_method, subtotal, shipping_fee, discount, total, shipping_method, created_at, remittance_last5, remittance_reported_at, referral_code",
     )
     .eq("public_token", token)
     .maybeSingle();
@@ -1493,6 +1532,7 @@ export async function getOrderByToken(token: string): Promise<OrderSummary | nul
     created_at: string;
     remittance_last5: string | null;
     remittance_reported_at: string | null;
+    referral_code: string | null;
   };
 
   /**
@@ -1573,6 +1613,7 @@ export async function getOrderByToken(token: string): Promise<OrderSummary | nul
     shippingFee: o.shipping_fee,
     discount: o.discount,
     total: o.total,
+    referralCode: o.referral_code ?? null,
     remittance,
     shippingMethod: o.shipping_method,
     createdAt: o.created_at,

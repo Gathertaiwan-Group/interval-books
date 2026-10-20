@@ -351,7 +351,14 @@ assertMigrationDependencies(check, MIG_DIR, {
   //     email_outbox，也不改變 on_roster 的定義（那個定義完全在 0021 §3 的 view
   //     裡，0035 沒有 create or replace 那個 view）。
   // 原樣成立。
-  reviewedThrough: "0036_event_session_plans.sql",
+  // 0040_referral_program.sql（推薦碼與分潤）對 orders 只做了三件事：加三個 nullable
+  // 欄位 referrer_id／referral_code／referral_discount_percent（舊訂單全是 NULL）、
+  // 一個部分索引、一個指向新表 referrers 的 FK（on delete restrict，限制的是刪推廣者，
+  // 不是刪訂單）。既有欄位、CHECK、函式、policy、grant 一個字都沒改。唯一的語意變化
+  // 是 orders.discount 從恆為 0 變成「推薦折扣」（只對選品／書籍、最多 50%），而
+  // total = subtotal + shipping_fee − discount 仍是金流、信件、發票唯一使用的金額
+  // （發票本來就把 discount 開成負數列）。這支自檢的斷言重讀過，原樣成立。
+  reviewedThrough: "0040_referral_program.sql",
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -59,3 +59,55 @@ export function formatTaipeiDate(iso: string | null | undefined): string {
   const s = formatTaipeiDateTime(iso);
   return /^\d{4}\/\d{2}\/\d{2} /.test(s) ? s.slice(0, 10) : s;
 }
+
+// ---------------------------------------------------------------------------
+// 月份（推薦分潤的月結用，src/lib/referral.ts）
+// ---------------------------------------------------------------------------
+//
+// 台北是 UTC+8、沒有日光節約，所以「台北某月 1 日 00:00」= 前一天 UTC 16:00。
+// 月界一律用這裡算，不要在別處自己加減 8 小時。
+
+/** "YYYY-MM"，月份 01–12。 */
+export const PERIOD_RE = /^(\d{4})-(0[1-9]|1[0-2])$/;
+
+export function isValidPeriod(period: string): boolean {
+  return PERIOD_RE.test(period);
+}
+
+/** timestamptz → 台北的月份 "YYYY-MM"。解不開回 null。 */
+export function taipeiMonthOf(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const p: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {};
+  for (const part of TAIPEI_PARTS.formatToParts(d)) p[part.type] = part.value;
+  return `${p.year}-${(p.month ?? "").padStart(2, "0")}`;
+}
+
+/** 現在是台北的哪一個月。 */
+export function currentTaipeiMonth(now: Date = new Date()): string {
+  return taipeiMonthOf(now.toISOString()) as string;
+}
+
+/** 月份加減。shiftPeriod("2026-01", -1) = "2025-12"。 */
+export function shiftPeriod(period: string, delta: number): string {
+  const m = PERIOD_RE.exec(period);
+  if (!m) throw new Error(`bad period: ${period}`);
+  const idx = Number(m[1]) * 12 + (Number(m[2]) - 1) + delta;
+  const y = Math.floor(idx / 12);
+  const mo = (idx % 12) + 1;
+  return `${y}-${String(mo).padStart(2, "0")}`;
+}
+
+/**
+ * 台北某月的起訖（UTC ISO）。end 是**不含**的下個月 1 日 00:00（台北）。
+ * 查詢用 `paid_at >= start and paid_at < end`。
+ */
+export function taipeiMonthBounds(period: string): { startIso: string; endIso: string } {
+  const m = PERIOD_RE.exec(period);
+  if (!m) throw new Error(`bad period: ${period}`);
+  const start = Date.UTC(Number(m[1]), Number(m[2]) - 1, 1) - 8 * 3600 * 1000;
+  const next = PERIOD_RE.exec(shiftPeriod(period, 1)) as RegExpExecArray;
+  const end = Date.UTC(Number(next[1]), Number(next[2]) - 1, 1) - 8 * 3600 * 1000;
+  return { startIso: new Date(start).toISOString(), endIso: new Date(end).toISOString() };
+}

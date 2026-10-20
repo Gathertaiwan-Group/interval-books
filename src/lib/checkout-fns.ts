@@ -108,7 +108,17 @@ export const placeOrder = createServerFn({ method: "POST" })
     const { createOrder } = await import("@/server/repos/orders");
     const { CheckoutError } = await import("@/lib/checkout");
     try {
-      const order = await createOrder(data);
+      // 0040：ib_ref cookie 只在 payload 沒帶 referralCode（舊前台）時才用，見
+      // resolveReferralCode()。讀 cookie 失敗不影響下單。
+      let cookieReferralCode: string | null = null;
+      try {
+        const { getCookie } = await import("@tanstack/react-start/server");
+        const { REFERRAL_COOKIE } = await import("@/lib/referral");
+        cookieReferralCode = getCookie(REFERRAL_COOKIE) ?? null;
+      } catch {
+        cookieReferralCode = null;
+      }
+      const order = await createOrder(data, { cookieReferralCode });
       return { ok: true, ...order };
     } catch (err) {
       if (err instanceof CheckoutError) return { ok: false, code: err.code };
@@ -214,5 +224,36 @@ export const reportRemittance = createServerFn({ method: "POST" })
     } catch (err) {
       console.error("[checkout] reportRemittance failed", err);
       return { ok: false, reason: "not_found" };
+    }
+  });
+
+export type ReferralPreviewResult =
+  | { ok: true; code: string; discountPercent: number }
+  | { ok: false; reason: "invalid" };
+
+/**
+ * 結帳頁的推薦碼即時檢查（0040）。
+ *
+ * 公開的 server fn（客人不用登入），所以只回「這個碼有效嗎、打幾折」：
+ * **不回推廣者的姓名、聯絡方式或 id**。格式錯、不存在、已停用一律回同一個
+ * `invalid`，不分辨。分享出去的碼本來就是公開的，所以這裡不怕被列舉出「碼」，
+ * 只怕被列舉出「人」。
+ *
+ * 這裡算出來的折扣只是給畫面看；真正的折扣在 createOrder() 裡重算一次。
+ */
+export const previewReferralCode = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ code: z.string().trim().max(40) }))
+  .handler(async ({ data }): Promise<ReferralPreviewResult> => {
+    try {
+      const { normalizeReferralCode, isValidReferralCode } = await import("@/lib/referral");
+      const code = normalizeReferralCode(data.code);
+      if (!isValidReferralCode(code)) return { ok: false, reason: "invalid" };
+      const { findReferrerForCheckout } = await import("@/server/repos/referrals");
+      const found = await findReferrerForCheckout(code);
+      if (!found) return { ok: false, reason: "invalid" };
+      return { ok: true, code: found.code, discountPercent: found.discountPercent };
+    } catch (err) {
+      console.error("[checkout] previewReferralCode failed", err);
+      return { ok: false, reason: "invalid" };
     }
   });

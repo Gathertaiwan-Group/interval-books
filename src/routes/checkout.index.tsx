@@ -52,7 +52,8 @@ import {
   type OfferedShippingMethod,
   type PaymentMethodChoice,
 } from "@/lib/checkout";
-import { fetchPaymentOptions, placeOrder } from "@/lib/checkout-fns";
+import { fetchPaymentOptions, placeOrder, previewReferralCode } from "@/lib/checkout-fns";
+import { computeReferralDiscount, normalizeReferralCode, readReferralCookie } from "@/lib/referral";
 import {
   parseDirectCheckoutSearch,
   rememberCartKept,
@@ -134,6 +135,28 @@ const PAGE = {
   subtotal: { zh: "小計", en: "Subtotal", ja: "小計" },
   shipping: { zh: "運費", en: "Shipping", ja: "送料" },
   total: { zh: "應付總額", en: "Total", ja: "合計" },
+  // 0040 推薦碼
+  referralSection: { zh: "推薦碼", en: "Referral code", ja: "紹介コード" },
+  referralLabel: { zh: "推薦碼（選填）", en: "Referral code (optional)", ja: "紹介コード（任意）" },
+  referralHint: {
+    zh: "有推薦碼可享選品與書籍折扣；活動、策旅票券不適用。",
+    en: "A referral code gives a discount on books and goods; event and journey tickets are not included.",
+    ja: "紹介コードで書籍・雑貨が割引になります。イベント・旅のチケットは対象外です。",
+  },
+  referralApply: { zh: "套用", en: "Apply", ja: "適用" },
+  referralChecking: { zh: "確認中…", en: "Checking…", ja: "確認中…" },
+  referralOk: {
+    zh: "已套用推薦碼，選品享",
+    en: "Referral code applied:",
+    ja: "紹介コードを適用しました：",
+  },
+  referralOkTail: { zh: "% 折扣", en: "% off books and goods", ja: "% 割引（書籍・雑貨）" },
+  referralInvalid: {
+    zh: "這個推薦碼無效或已停用。請確認後重新輸入，或清空這一欄。",
+    en: "This referral code is not valid. Please check it, or clear the field.",
+    ja: "この紹介コードは無効です。ご確認いただくか、空欄にしてください。",
+  },
+  referralDiscount: { zh: "推薦折扣", en: "Referral discount", ja: "紹介割引" },
   submit: { zh: "送出訂單", en: "Place order", ja: "注文を確定する" },
   submitPay: { zh: "前往付款", en: "Continue to payment", ja: "お支払いへ進む" },
   submitting: { zh: "訂單建立中…", en: "Creating your order…", ja: "ご注文を作成中…" },
@@ -483,7 +506,52 @@ function Checkout() {
   const subtotal = useMemo(() => buyable.reduce((sum, l) => sum + l.price * l.qty, 0), [buyable]);
   const effectiveMethod = needsShipping ? method : "none";
   const shippingFee = computeShippingFee({ needsShipping, method: effectiveMethod, subtotal });
-  const total = subtotal + shippingFee;
+
+  /**
+   * 推薦碼（0040）。刻意**不放進 react-hook-form**（理由同 sameAsBuyer）：它在送出時
+   * 明確加進 payload。預填 ib_ref cookie（?ref= 連結寫的）；客人清空就是不用。
+   * 畫面上的折扣只是預覽 —— 伺服器用同一支 computeReferralDiscount() 重算。
+   */
+  const [referralInput, setReferralInput] = useState("");
+  const [referral, setReferral] = useState<
+    | { state: "idle" }
+    | { state: "checking" }
+    | { state: "ok"; code: string; percent: number }
+    | { state: "invalid" }
+  >({ state: "idle" });
+  async function checkReferral(raw: string) {
+    const code = normalizeReferralCode(raw);
+    if (!code) {
+      setReferral({ state: "idle" });
+      return;
+    }
+    setReferral({ state: "checking" });
+    try {
+      const res = await previewReferralCode({ data: { code } });
+      setReferral(
+        res.ok
+          ? { state: "ok", code: res.code, percent: res.discountPercent }
+          : { state: "invalid" },
+      );
+    } catch {
+      setReferral({ state: "invalid" });
+    }
+  }
+  useEffect(() => {
+    const fromCookie = readReferralCookie(typeof document === "undefined" ? "" : document.cookie);
+    if (!fromCookie) return;
+    setReferralInput(fromCookie);
+    void checkReferral(fromCookie);
+    // 只在進頁面時預填一次。
+  }, []);
+  const referralDiscount =
+    referral.state === "ok" && normalizeReferralCode(referralInput) === referral.code
+      ? computeReferralDiscount(
+          buyable.map((l) => ({ productType: l.productType, subtotal: l.price * l.qty })),
+          referral.percent,
+        )
+      : 0;
+  const total = subtotal + shippingFee - referralDiscount;
   const freeGap = amountToFreeShipping({ needsShipping, method: effectiveMethod, subtotal });
 
   const requireAddress = needsShipping && method === "home";
@@ -616,6 +684,15 @@ function Checkout() {
       toast.error(t(PAGE.unavailableWarning));
       return;
     }
+    const typedReferral = normalizeReferralCode(referralInput);
+    if (typedReferral && !(referral.state === "ok" && referral.code === typedReferral)) {
+      // 還沒確認過（打完直接按送出）或確認失敗：不送出。先確認一次並把折扣顯示出來，
+      // 讓客人看到折後總額再按一次 —— 不可以在他沒看過金額的情況下就送出。
+      // 結果（有效／無效）顯示在推薦碼欄位底下。
+      await checkReferral(typedReferral);
+      document.getElementById("referral-code")?.focus();
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -663,6 +740,8 @@ function Checkout() {
           //    methodOptions 那一段的註解——舊的那一行會把一個選了匯款的客人
           //    靜靜改成 offline。
           paymentMethod: methodOptions.includes(payWith) ? payWith : "offline",
+          // 0040：只送碼，不送折扣。空字串＝不用推薦碼（伺服器不會再退回 cookie）。
+          referralCode: typedReferral,
         },
       });
 
@@ -1256,6 +1335,59 @@ function Checkout() {
                 )}
               </fieldset>
 
+              <fieldset className="space-y-3">
+                <legend className="eyebrow text-xl">{t(PAGE.referralSection)}</legend>
+                <label htmlFor="referral-code" className="block text-sm font-medium">
+                  {t(PAGE.referralLabel)}
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    id="referral-code"
+                    value={referralInput}
+                    maxLength={20}
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    className="max-w-[14rem] uppercase"
+                    aria-invalid={referral.state === "invalid"}
+                    aria-describedby="referral-status"
+                    onChange={(e) => {
+                      setReferralInput(e.target.value);
+                      if (referral.state !== "idle") setReferral({ state: "idle" });
+                    }}
+                    onBlur={() => void checkReferral(referralInput)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void checkReferral(referralInput);
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void checkReferral(referralInput)}
+                    disabled={referral.state === "checking" || !referralInput.trim()}
+                  >
+                    {t(PAGE.referralApply)}
+                  </Button>
+                </div>
+                <p id="referral-status" className="text-xs leading-relaxed" aria-live="polite">
+                  {referral.state === "checking" ? (
+                    <span className="text-muted-foreground">{t(PAGE.referralChecking)}</span>
+                  ) : referral.state === "ok" ? (
+                    <span className="text-emerald-700 dark:text-emerald-400">
+                      {t(PAGE.referralOk)} {referral.percent}
+                      {t(PAGE.referralOkTail)}
+                    </span>
+                  ) : referral.state === "invalid" ? (
+                    <span className="text-destructive">{t(PAGE.referralInvalid)}</span>
+                  ) : (
+                    <span className="text-muted-foreground">{t(PAGE.referralHint)}</span>
+                  )}
+                </p>
+              </fieldset>
+
               <fieldset className="space-y-5">
                 <legend className="eyebrow text-xl">{t(PAGE.noteSection)}</legend>
                 <FormField
@@ -1347,6 +1479,14 @@ function Checkout() {
                   {shippingFee === 0 ? t(PAGE.methodFree) : formatPrice(shippingFee)}
                 </dd>
               </div>
+              {referralDiscount > 0 && (
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">
+                    {t(PAGE.referralDiscount)}（{referral.state === "ok" ? referral.code : ""}）
+                  </dt>
+                  <dd className="tabular-nums">−{formatPrice(referralDiscount)}</dd>
+                </div>
+              )}
             </dl>
 
             {freeGap !== null && (
