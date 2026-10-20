@@ -16,6 +16,7 @@
 import { supabase } from "@/lib/supabase";
 import type { Localized } from "@/i18n/types";
 import { EVENT_LIST_FIELDS, type EventListField } from "@/lib/event-blocks";
+import { excludeJourneyEvents } from "@/lib/journey-events";
 import {
   UI,
   SITE_INFO,
@@ -727,7 +728,26 @@ export function eyebrowOf(page: PageContent | null, prefix: string, suffix: stri
 // Collections
 // -----------------------------------------------------------------------------
 
+/**
+ * /events 列表與首頁「精選活動」用的活動清單 —— **已經拿掉策旅**。
+ *
+ * 🔴 策旅的報名掛在一場活動上（events 一列＋journeys 一張卡片連過去），所以 events 表
+ *    裡混著策旅。它們只該出現在 /journeys 與首頁策旅區；判準與理由見
+ *    src/lib/journey-events.ts。在資料層濾掉（不是在某一頁 filter），兩個呼叫端
+ *    因此不會一個記得、一個忘記。/events/<slug> 詳情頁走 fetchEventBySlug，不受影響。
+ */
 export async function fetchEvents(): Promise<EventEntry[]> {
+  const [events, journeyRows] = await Promise.all([
+    fetchAllEventRows(),
+    select("journeys", "external_url"),
+  ]);
+  const journeyUrls = journeyRows
+    ? journeyRows.map((r) => str(r.external_url))
+    : FALLBACK_JOURNEYS.map((j) => j.externalUrl);
+  return excludeJourneyEvents(events, journeyUrls);
+}
+
+async function fetchAllEventRows(): Promise<EventEntry[]> {
   const rows = await select(
     "events",
     "id,slug,title,summary,description,display_date,iso_date,category,external_url,image_key,sort_order",
