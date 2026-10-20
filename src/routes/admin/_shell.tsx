@@ -7,7 +7,6 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import {
-  BookOpen,
   Boxes,
   Building2,
   CalendarDays,
@@ -29,7 +28,6 @@ import {
   SlidersHorizontal,
   TruckIcon,
   Settings,
-  ShoppingBag,
   Tags,
   Tent,
   TriangleAlert,
@@ -128,6 +126,9 @@ const NAV_GROUPS = [
     // group 的排列順序，換位置不會動到它們的斷言。
     label: "電商",
     items: [
+      // 2026-10-20 起「商品」是單一頁：一般商品、地方刊物、選品、活動票券都在這裡，
+      // 用頁內分頁切換（src/routes/admin/_shell.products.tsx）。原本「內容管理」組裡
+      // 的「地方刊物展」與「選品」兩項因此拿掉，舊網址轉址到對應分頁。
       { to: "/admin/products", label: "商品", icon: Package, staff: false },
       // 訂單列表／詳情／標記已收款／刪除／封存（0034 的匯款付款方式；0035 加刪除
       // 與封存）。staff: false——這一頁看得到客人的姓名與遮罩後的聯絡方式，而且
@@ -164,10 +165,8 @@ const NAV_GROUPS = [
       // 資料 —— 同一張表的 vendor_id 那一半（統編、匯款）在「廠商」頁，
       // 那是另一個授權面，見 src/server/repos/artists.ts 檔頭。
       { to: "/admin/artists", label: "講者", icon: Mic, staff: false },
-      { to: "/admin/publications", label: "地方刊物展", icon: BookOpen, staff: false },
       // lucide's `Route` icon would collide with this file's `export const Route`.
       { to: "/admin/journeys", label: "策旅", icon: Tent, staff: false },
-      { to: "/admin/curated", label: "選品", icon: ShoppingBag, staff: false },
       { to: "/admin/collaborations", label: "合作", icon: Handshake, staff: false },
       { to: "/admin/categories", label: "活動分類", icon: Tags, staff: false },
       { to: "/admin/pages", label: "頁面文案", icon: FileText, staff: false },

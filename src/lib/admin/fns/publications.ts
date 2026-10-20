@@ -17,6 +17,18 @@ export const listPublications = createServerFn({ method: "GET" })
     return await listPublications();
   });
 
+/**
+ * 單一本刊物。後台「商品」頁的上下架開關先用它讀最新的那一列、只改 is_published
+ * 再寫回，而不是拿畫面上幾分鐘前的快照整列寫回去（那會蓋掉別人剛存的校稿）。
+ */
+export const getPublicationById = createServerFn({ method: "GET" })
+  .middleware([adminFnMiddleware])
+  .inputValidator(z.object({ id: z.string().trim().min(1) }))
+  .handler(async ({ data }) => {
+    const { getPublicationById } = await import("@/server/repos/publications");
+    return await getPublicationById(data.id);
+  });
+
 /** 同名的進銷存品項，用來把連結對話框裡最可能的選項排到最前面。 */
 export const listPublicationNameMatches = createServerFn({ method: "GET" })
   .middleware([adminFnMiddleware])
