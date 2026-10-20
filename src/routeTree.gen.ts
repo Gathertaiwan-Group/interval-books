@@ -9,116 +9,72 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VisitRouteImport } from './routes/visit'
-import { Route as PublicationsRouteImport } from './routes/publications'
-import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as NewsRouteImport } from './routes/news'
-import { Route as JourneysRouteImport } from './routes/journeys'
-import { Route as CurationRouteImport } from './routes/curation'
-import { Route as CuratedRouteImport } from './routes/curated'
-import { Route as ContactRouteImport } from './routes/contact'
-import { Route as CartRouteImport } from './routes/cart'
-import { Route as AccountRouteImport } from './routes/account'
-import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ShopIndexRouteImport } from './routes/shop.index'
-import { Route as EventsIndexRouteImport } from './routes/events.index'
-import { Route as CheckoutIndexRouteImport } from './routes/checkout.index'
-import { Route as VendorPendingRouteImport } from './routes/vendor/pending'
-import { Route as VendorLoginRouteImport } from './routes/vendor/login'
-import { Route as VendorShellRouteImport } from './routes/vendor/_shell'
-import { Route as ShopSlugRouteImport } from './routes/shop.$slug'
-import { Route as EventsCitySalon0922RouteImport } from './routes/events.city-salon-0922'
-import { Route as EventsSlugRouteImport } from './routes/events.$slug'
-import { Route as CheckoutCompleteRouteImport } from './routes/checkout.complete'
-import { Route as AuthConfirmRouteImport } from './routes/auth.confirm'
-import { Route as AdminPendingRouteImport } from './routes/admin/pending'
-import { Route as AdminLoginRouteImport } from './routes/admin/login'
-import { Route as AdminShellRouteImport } from './routes/admin/_shell'
-import { Route as AccountResetRouteImport } from './routes/account_.reset'
-import { Route as AccountRegisterRouteImport } from './routes/account_.register'
-import { Route as AccountLoginRouteImport } from './routes/account_.login'
+import { Route as AboutRouteImport } from './routes/about'
+import { Route as AccountRouteImport } from './routes/account'
+import { Route as CartRouteImport } from './routes/cart'
+import { Route as ContactRouteImport } from './routes/contact'
+import { Route as CuratedRouteImport } from './routes/curated'
+import { Route as CurationRouteImport } from './routes/curation'
+import { Route as JourneysRouteImport } from './routes/journeys'
+import { Route as NewsRouteImport } from './routes/news'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as PublicationsRouteImport } from './routes/publications'
+import { Route as VisitRouteImport } from './routes/visit'
 import { Route as AccountForgotRouteImport } from './routes/account_.forgot'
-import { Route as VendorShellIndexRouteImport } from './routes/vendor/_shell.index'
+import { Route as AccountLoginRouteImport } from './routes/account_.login'
+import { Route as AccountRegisterRouteImport } from './routes/account_.register'
+import { Route as AccountResetRouteImport } from './routes/account_.reset'
+import { Route as AdminShellRouteImport } from './routes/admin/_shell'
+import { Route as AdminLoginRouteImport } from './routes/admin/login'
+import { Route as AdminPendingRouteImport } from './routes/admin/pending'
+import { Route as AuthConfirmRouteImport } from './routes/auth.confirm'
+import { Route as CheckoutIndexRouteImport } from './routes/checkout.index'
+import { Route as CheckoutCompleteRouteImport } from './routes/checkout.complete'
+import { Route as EventsIndexRouteImport } from './routes/events.index'
+import { Route as EventsSlugRouteImport } from './routes/events.$slug'
+import { Route as EventsCitySalon0922RouteImport } from './routes/events.city-salon-0922'
+import { Route as EventsSoundOfTheSeaRouteImport } from './routes/events.sound-of-the-sea'
+import { Route as ShopIndexRouteImport } from './routes/shop.index'
+import { Route as ShopSlugRouteImport } from './routes/shop.$slug'
+import { Route as VendorShellRouteImport } from './routes/vendor/_shell'
+import { Route as VendorLoginRouteImport } from './routes/vendor/login'
+import { Route as VendorPendingRouteImport } from './routes/vendor/pending'
 import { Route as AdminShellIndexRouteImport } from './routes/admin/_shell.index'
-import { Route as VendorShellProductsRouteImport } from './routes/vendor/_shell.products'
-import { Route as AdminShellStringsRouteImport } from './routes/admin/_shell.strings'
-import { Route as AdminShellStockAlertsRouteImport } from './routes/admin/_shell.stock-alerts'
-import { Route as AdminShellStaffRouteImport } from './routes/admin/_shell.staff'
-import { Route as AdminShellSettingsRouteImport } from './routes/admin/_shell.settings'
-import { Route as AdminShellSalesRouteImport } from './routes/admin/_shell.sales'
-import { Route as AdminShellRegistrationsRouteImport } from './routes/admin/_shell.registrations'
-import { Route as AdminShellPublicationsRouteImport } from './routes/admin/_shell.publications'
-import { Route as AdminShellProductsRouteImport } from './routes/admin/_shell.products'
-import { Route as AdminShellPosRouteImport } from './routes/admin/_shell.pos'
-import { Route as AdminShellPhonesRouteImport } from './routes/admin/_shell.phones'
-import { Route as AdminShellPagesRouteImport } from './routes/admin/_shell.pages'
-import { Route as AdminShellOrdersRouteImport } from './routes/admin/_shell.orders'
-import { Route as AdminShellNewsRouteImport } from './routes/admin/_shell.news'
-import { Route as AdminShellJourneysRouteImport } from './routes/admin/_shell.journeys'
-import { Route as AdminShellInventoryVendorsRouteImport } from './routes/admin/_shell.inventory-vendors'
-import { Route as AdminShellInventoryPurchasesRouteImport } from './routes/admin/_shell.inventory-purchases'
-import { Route as AdminShellInventoryProductsRouteImport } from './routes/admin/_shell.inventory-products'
-import { Route as AdminShellInventoryListingRouteImport } from './routes/admin/_shell.inventory-listing'
-import { Route as AdminShellInventoryCountRouteImport } from './routes/admin/_shell.inventory-count'
-import { Route as AdminShellInventoryCombosRouteImport } from './routes/admin/_shell.inventory-combos'
-import { Route as AdminShellInventoryAdjustmentsRouteImport } from './routes/admin/_shell.inventory-adjustments'
-import { Route as AdminShellEventsRouteImport } from './routes/admin/_shell.events'
-import { Route as AdminShellCuratedRouteImport } from './routes/admin/_shell.curated'
-import { Route as AdminShellCollaborationsRouteImport } from './routes/admin/_shell.collaborations'
-import { Route as AdminShellCategoriesRouteImport } from './routes/admin/_shell.categories'
 import { Route as AdminShellArtistsRouteImport } from './routes/admin/_shell.artists'
-import { Route as AdminShellPagesSlugRouteImport } from './routes/admin/_shell.pages.$slug'
+import { Route as AdminShellCategoriesRouteImport } from './routes/admin/_shell.categories'
+import { Route as AdminShellCollaborationsRouteImport } from './routes/admin/_shell.collaborations'
+import { Route as AdminShellCuratedRouteImport } from './routes/admin/_shell.curated'
+import { Route as AdminShellEventsRouteImport } from './routes/admin/_shell.events'
+import { Route as AdminShellInventoryAdjustmentsRouteImport } from './routes/admin/_shell.inventory-adjustments'
+import { Route as AdminShellInventoryCombosRouteImport } from './routes/admin/_shell.inventory-combos'
+import { Route as AdminShellInventoryCountRouteImport } from './routes/admin/_shell.inventory-count'
+import { Route as AdminShellInventoryListingRouteImport } from './routes/admin/_shell.inventory-listing'
+import { Route as AdminShellInventoryProductsRouteImport } from './routes/admin/_shell.inventory-products'
+import { Route as AdminShellInventoryPurchasesRouteImport } from './routes/admin/_shell.inventory-purchases'
+import { Route as AdminShellInventoryVendorsRouteImport } from './routes/admin/_shell.inventory-vendors'
+import { Route as AdminShellJourneysRouteImport } from './routes/admin/_shell.journeys'
+import { Route as AdminShellNewsRouteImport } from './routes/admin/_shell.news'
+import { Route as AdminShellOrdersRouteImport } from './routes/admin/_shell.orders'
+import { Route as AdminShellPagesRouteImport } from './routes/admin/_shell.pages'
+import { Route as AdminShellPhonesRouteImport } from './routes/admin/_shell.phones'
+import { Route as AdminShellPosRouteImport } from './routes/admin/_shell.pos'
+import { Route as AdminShellProductsRouteImport } from './routes/admin/_shell.products'
+import { Route as AdminShellPublicationsRouteImport } from './routes/admin/_shell.publications'
+import { Route as AdminShellRegistrationsRouteImport } from './routes/admin/_shell.registrations'
+import { Route as AdminShellSalesRouteImport } from './routes/admin/_shell.sales'
+import { Route as AdminShellSettingsRouteImport } from './routes/admin/_shell.settings'
+import { Route as AdminShellStaffRouteImport } from './routes/admin/_shell.staff'
+import { Route as AdminShellStockAlertsRouteImport } from './routes/admin/_shell.stock-alerts'
+import { Route as AdminShellStringsRouteImport } from './routes/admin/_shell.strings'
+import { Route as VendorShellIndexRouteImport } from './routes/vendor/_shell.index'
+import { Route as VendorShellProductsRouteImport } from './routes/vendor/_shell.products'
 import { Route as AdminShellEventsIdRouteImport } from './routes/admin/_shell.events.$id'
+import { Route as AdminShellPagesSlugRouteImport } from './routes/admin/_shell.pages.$slug'
 
-const VisitRoute = VisitRouteImport.update({
-  id: '/visit',
-  path: '/visit',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PublicationsRoute = PublicationsRouteImport.update({
-  id: '/publications',
-  path: '/publications',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NewsRoute = NewsRouteImport.update({
-  id: '/news',
-  path: '/news',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const JourneysRoute = JourneysRouteImport.update({
-  id: '/journeys',
-  path: '/journeys',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CurationRoute = CurationRouteImport.update({
-  id: '/curation',
-  path: '/curation',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CuratedRoute = CuratedRouteImport.update({
-  id: '/curated',
-  path: '/curated',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ContactRoute = ContactRouteImport.update({
-  id: '/contact',
-  path: '/contact',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CartRoute = CartRouteImport.update({
-  id: '/cart',
-  path: '/cart',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AccountRoute = AccountRouteImport.update({
-  id: '/account',
-  path: '/account',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AboutRoute = AboutRouteImport.update({
@@ -126,94 +82,54 @@ const AboutRoute = AboutRouteImport.update({
   path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ShopIndexRoute = ShopIndexRouteImport.update({
-  id: '/shop/',
-  path: '/shop/',
+const CartRoute = CartRouteImport.update({
+  id: '/cart',
+  path: '/cart',
   getParentRoute: () => rootRouteImport,
 } as any)
-const EventsIndexRoute = EventsIndexRouteImport.update({
-  id: '/events/',
-  path: '/events/',
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CheckoutIndexRoute = CheckoutIndexRouteImport.update({
-  id: '/checkout/',
-  path: '/checkout/',
+const CuratedRoute = CuratedRouteImport.update({
+  id: '/curated',
+  path: '/curated',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VendorPendingRoute = VendorPendingRouteImport.update({
-  id: '/vendor/pending',
-  path: '/vendor/pending',
+const CurationRoute = CurationRouteImport.update({
+  id: '/curation',
+  path: '/curation',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VendorLoginRoute = VendorLoginRouteImport.update({
-  id: '/vendor/login',
-  path: '/vendor/login',
+const JourneysRoute = JourneysRouteImport.update({
+  id: '/journeys',
+  path: '/journeys',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VendorShellRoute = VendorShellRouteImport.update({
-  id: '/vendor/_shell',
-  path: '/vendor',
+const NewsRoute = NewsRouteImport.update({
+  id: '/news',
+  path: '/news',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ShopSlugRoute = ShopSlugRouteImport.update({
-  id: '/shop/$slug',
-  path: '/shop/$slug',
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
-const EventsCitySalon0922Route = EventsCitySalon0922RouteImport.update({
-  id: '/events/city-salon-0922',
-  path: '/events/city-salon-0922',
+const PublicationsRoute = PublicationsRouteImport.update({
+  id: '/publications',
+  path: '/publications',
   getParentRoute: () => rootRouteImport,
 } as any)
-const EventsSlugRoute = EventsSlugRouteImport.update({
-  id: '/events/$slug',
-  path: '/events/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CheckoutCompleteRoute = CheckoutCompleteRouteImport.update({
-  id: '/checkout/complete',
-  path: '/checkout/complete',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthConfirmRoute = AuthConfirmRouteImport.update({
-  id: '/auth/confirm',
-  path: '/auth/confirm',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminPendingRoute = AdminPendingRouteImport.update({
-  id: '/admin/pending',
-  path: '/admin/pending',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminLoginRoute = AdminLoginRouteImport.update({
-  id: '/admin/login',
-  path: '/admin/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminShellRoute = AdminShellRouteImport.update({
-  id: '/admin/_shell',
-  path: '/admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AccountResetRoute = AccountResetRouteImport.update({
-  id: '/account_/reset',
-  path: '/account/reset',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AccountRegisterRoute = AccountRegisterRouteImport.update({
-  id: '/account_/register',
-  path: '/account/register',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AccountLoginRoute = AccountLoginRouteImport.update({
-  id: '/account_/login',
-  path: '/account/login',
+const VisitRoute = VisitRouteImport.update({
+  id: '/visit',
+  path: '/visit',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountForgotRoute = AccountForgotRouteImport.update({
@@ -221,141 +137,109 @@ const AccountForgotRoute = AccountForgotRouteImport.update({
   path: '/account/forgot',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VendorShellIndexRoute = VendorShellIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => VendorShellRoute,
+const AccountLoginRoute = AccountLoginRouteImport.update({
+  id: '/account_/login',
+  path: '/account/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountRegisterRoute = AccountRegisterRouteImport.update({
+  id: '/account_/register',
+  path: '/account/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountResetRoute = AccountResetRouteImport.update({
+  id: '/account_/reset',
+  path: '/account/reset',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminShellRoute = AdminShellRouteImport.update({
+  id: '/admin/_shell',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin/login',
+  path: '/admin/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminPendingRoute = AdminPendingRouteImport.update({
+  id: '/admin/pending',
+  path: '/admin/pending',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthConfirmRoute = AuthConfirmRouteImport.update({
+  id: '/auth/confirm',
+  path: '/auth/confirm',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutIndexRoute = CheckoutIndexRouteImport.update({
+  id: '/checkout/',
+  path: '/checkout/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutCompleteRoute = CheckoutCompleteRouteImport.update({
+  id: '/checkout/complete',
+  path: '/checkout/complete',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsIndexRoute = EventsIndexRouteImport.update({
+  id: '/events/',
+  path: '/events/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsSlugRoute = EventsSlugRouteImport.update({
+  id: '/events/$slug',
+  path: '/events/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsCitySalon0922Route = EventsCitySalon0922RouteImport.update({
+  id: '/events/city-salon-0922',
+  path: '/events/city-salon-0922',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsSoundOfTheSeaRoute = EventsSoundOfTheSeaRouteImport.update({
+  id: '/events/sound-of-the-sea',
+  path: '/events/sound-of-the-sea',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShopIndexRoute = ShopIndexRouteImport.update({
+  id: '/shop/',
+  path: '/shop/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShopSlugRoute = ShopSlugRouteImport.update({
+  id: '/shop/$slug',
+  path: '/shop/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorShellRoute = VendorShellRouteImport.update({
+  id: '/vendor/_shell',
+  path: '/vendor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorLoginRoute = VendorLoginRouteImport.update({
+  id: '/vendor/login',
+  path: '/vendor/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorPendingRoute = VendorPendingRouteImport.update({
+  id: '/vendor/pending',
+  path: '/vendor/pending',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminShellIndexRoute = AdminShellIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminShellRoute,
 } as any)
-const VendorShellProductsRoute = VendorShellProductsRouteImport.update({
-  id: '/products',
-  path: '/products',
-  getParentRoute: () => VendorShellRoute,
-} as any)
-const AdminShellStringsRoute = AdminShellStringsRouteImport.update({
-  id: '/strings',
-  path: '/strings',
+const AdminShellArtistsRoute = AdminShellArtistsRouteImport.update({
+  id: '/artists',
+  path: '/artists',
   getParentRoute: () => AdminShellRoute,
 } as any)
-const AdminShellStockAlertsRoute = AdminShellStockAlertsRouteImport.update({
-  id: '/stock-alerts',
-  path: '/stock-alerts',
-  getParentRoute: () => AdminShellRoute,
-} as any)
-const AdminShellStaffRoute = AdminShellStaffRouteImport.update({
-  id: '/staff',
-  path: '/staff',
-  getParentRoute: () => AdminShellRoute,
-} as any)
-const AdminShellSettingsRoute = AdminShellSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AdminShellRoute,
-} as any)
-const AdminShellSalesRoute = AdminShellSalesRouteImport.update({
-  id: '/sales',
-  path: '/sales',
-  getParentRoute: () => AdminShellRoute,
-} as any)
-const AdminShellRegistrationsRoute = AdminShellRegistrationsRouteImport.update({
-  id: '/registrations',
-  path: '/registrations',
-  getParentRoute: () => AdminShellRoute,
-} as any)
-const AdminShellPublicationsRoute = AdminShellPublicationsRouteImport.update({
-  id: '/publications',
-  path: '/publications',
-  getParentRoute: () => AdminShellRoute,
-} as any)
-const AdminShellProductsRoute = AdminShellProductsRouteImport.update({
-  id: '/products',
-  path: '/products',
-  getParentRoute: () => AdminShellRoute,
-} as any)
-const AdminShellPosRoute = AdminShellPosRouteImport.update({
-  id: '/pos',
-  path: '/pos',
-  getParentRoute: () => AdminShellRoute,
-} as any)
-const AdminShellPhonesRoute = AdminShellPhonesRouteImport.update({
-  id: '/phones',
-  path: '/phones',
-  getParentRoute: () => AdminShellRoute,
-} as any)
-const AdminShellPagesRoute = AdminShellPagesRouteImport.update({
-  id: '/pages',
-  path: '/pages',
-  getParentRoute: () => AdminShellRoute,
-} as any)
-const AdminShellOrdersRoute = AdminShellOrdersRouteImport.update({
-  id: '/orders',
-  path: '/orders',
-  getParentRoute: () => AdminShellRoute,
-} as any)
-const AdminShellNewsRoute = AdminShellNewsRouteImport.update({
-  id: '/news',
-  path: '/news',
-  getParentRoute: () => AdminShellRoute,
-} as any)
-const AdminShellJourneysRoute = AdminShellJourneysRouteImport.update({
-  id: '/journeys',
-  path: '/journeys',
-  getParentRoute: () => AdminShellRoute,
-} as any)
-const AdminShellInventoryVendorsRoute =
-  AdminShellInventoryVendorsRouteImport.update({
-    id: '/inventory-vendors',
-    path: '/inventory-vendors',
-    getParentRoute: () => AdminShellRoute,
-  } as any)
-const AdminShellInventoryPurchasesRoute =
-  AdminShellInventoryPurchasesRouteImport.update({
-    id: '/inventory-purchases',
-    path: '/inventory-purchases',
-    getParentRoute: () => AdminShellRoute,
-  } as any)
-const AdminShellInventoryProductsRoute =
-  AdminShellInventoryProductsRouteImport.update({
-    id: '/inventory-products',
-    path: '/inventory-products',
-    getParentRoute: () => AdminShellRoute,
-  } as any)
-const AdminShellInventoryListingRoute =
-  AdminShellInventoryListingRouteImport.update({
-    id: '/inventory-listing',
-    path: '/inventory-listing',
-    getParentRoute: () => AdminShellRoute,
-  } as any)
-const AdminShellInventoryCountRoute =
-  AdminShellInventoryCountRouteImport.update({
-    id: '/inventory-count',
-    path: '/inventory-count',
-    getParentRoute: () => AdminShellRoute,
-  } as any)
-const AdminShellInventoryCombosRoute =
-  AdminShellInventoryCombosRouteImport.update({
-    id: '/inventory-combos',
-    path: '/inventory-combos',
-    getParentRoute: () => AdminShellRoute,
-  } as any)
-const AdminShellInventoryAdjustmentsRoute =
-  AdminShellInventoryAdjustmentsRouteImport.update({
-    id: '/inventory-adjustments',
-    path: '/inventory-adjustments',
-    getParentRoute: () => AdminShellRoute,
-  } as any)
-const AdminShellEventsRoute = AdminShellEventsRouteImport.update({
-  id: '/events',
-  path: '/events',
-  getParentRoute: () => AdminShellRoute,
-} as any)
-const AdminShellCuratedRoute = AdminShellCuratedRouteImport.update({
-  id: '/curated',
-  path: '/curated',
+const AdminShellCategoriesRoute = AdminShellCategoriesRouteImport.update({
+  id: '/categories',
+  path: '/categories',
   getParentRoute: () => AdminShellRoute,
 } as any)
 const AdminShellCollaborationsRoute =
@@ -364,25 +248,147 @@ const AdminShellCollaborationsRoute =
     path: '/collaborations',
     getParentRoute: () => AdminShellRoute,
   } as any)
-const AdminShellCategoriesRoute = AdminShellCategoriesRouteImport.update({
-  id: '/categories',
-  path: '/categories',
+const AdminShellCuratedRoute = AdminShellCuratedRouteImport.update({
+  id: '/curated',
+  path: '/curated',
   getParentRoute: () => AdminShellRoute,
 } as any)
-const AdminShellArtistsRoute = AdminShellArtistsRouteImport.update({
-  id: '/artists',
-  path: '/artists',
+const AdminShellEventsRoute = AdminShellEventsRouteImport.update({
+  id: '/events',
+  path: '/events',
   getParentRoute: () => AdminShellRoute,
 } as any)
-const AdminShellPagesSlugRoute = AdminShellPagesSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => AdminShellPagesRoute,
+const AdminShellInventoryAdjustmentsRoute =
+  AdminShellInventoryAdjustmentsRouteImport.update({
+    id: '/inventory-adjustments',
+    path: '/inventory-adjustments',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
+const AdminShellInventoryCombosRoute =
+  AdminShellInventoryCombosRouteImport.update({
+    id: '/inventory-combos',
+    path: '/inventory-combos',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
+const AdminShellInventoryCountRoute =
+  AdminShellInventoryCountRouteImport.update({
+    id: '/inventory-count',
+    path: '/inventory-count',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
+const AdminShellInventoryListingRoute =
+  AdminShellInventoryListingRouteImport.update({
+    id: '/inventory-listing',
+    path: '/inventory-listing',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
+const AdminShellInventoryProductsRoute =
+  AdminShellInventoryProductsRouteImport.update({
+    id: '/inventory-products',
+    path: '/inventory-products',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
+const AdminShellInventoryPurchasesRoute =
+  AdminShellInventoryPurchasesRouteImport.update({
+    id: '/inventory-purchases',
+    path: '/inventory-purchases',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
+const AdminShellInventoryVendorsRoute =
+  AdminShellInventoryVendorsRouteImport.update({
+    id: '/inventory-vendors',
+    path: '/inventory-vendors',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
+const AdminShellJourneysRoute = AdminShellJourneysRouteImport.update({
+  id: '/journeys',
+  path: '/journeys',
+  getParentRoute: () => AdminShellRoute,
+} as any)
+const AdminShellNewsRoute = AdminShellNewsRouteImport.update({
+  id: '/news',
+  path: '/news',
+  getParentRoute: () => AdminShellRoute,
+} as any)
+const AdminShellOrdersRoute = AdminShellOrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
+  getParentRoute: () => AdminShellRoute,
+} as any)
+const AdminShellPagesRoute = AdminShellPagesRouteImport.update({
+  id: '/pages',
+  path: '/pages',
+  getParentRoute: () => AdminShellRoute,
+} as any)
+const AdminShellPhonesRoute = AdminShellPhonesRouteImport.update({
+  id: '/phones',
+  path: '/phones',
+  getParentRoute: () => AdminShellRoute,
+} as any)
+const AdminShellPosRoute = AdminShellPosRouteImport.update({
+  id: '/pos',
+  path: '/pos',
+  getParentRoute: () => AdminShellRoute,
+} as any)
+const AdminShellProductsRoute = AdminShellProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => AdminShellRoute,
+} as any)
+const AdminShellPublicationsRoute = AdminShellPublicationsRouteImport.update({
+  id: '/publications',
+  path: '/publications',
+  getParentRoute: () => AdminShellRoute,
+} as any)
+const AdminShellRegistrationsRoute = AdminShellRegistrationsRouteImport.update({
+  id: '/registrations',
+  path: '/registrations',
+  getParentRoute: () => AdminShellRoute,
+} as any)
+const AdminShellSalesRoute = AdminShellSalesRouteImport.update({
+  id: '/sales',
+  path: '/sales',
+  getParentRoute: () => AdminShellRoute,
+} as any)
+const AdminShellSettingsRoute = AdminShellSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminShellRoute,
+} as any)
+const AdminShellStaffRoute = AdminShellStaffRouteImport.update({
+  id: '/staff',
+  path: '/staff',
+  getParentRoute: () => AdminShellRoute,
+} as any)
+const AdminShellStockAlertsRoute = AdminShellStockAlertsRouteImport.update({
+  id: '/stock-alerts',
+  path: '/stock-alerts',
+  getParentRoute: () => AdminShellRoute,
+} as any)
+const AdminShellStringsRoute = AdminShellStringsRouteImport.update({
+  id: '/strings',
+  path: '/strings',
+  getParentRoute: () => AdminShellRoute,
+} as any)
+const VendorShellIndexRoute = VendorShellIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => VendorShellRoute,
+} as any)
+const VendorShellProductsRoute = VendorShellProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => VendorShellRoute,
 } as any)
 const AdminShellEventsIdRoute = AdminShellEventsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => AdminShellEventsRoute,
+} as any)
+const AdminShellPagesSlugRoute = AdminShellPagesSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => AdminShellPagesRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -409,6 +415,7 @@ export interface FileRoutesByFullPath {
   '/checkout/complete': typeof CheckoutCompleteRoute
   '/events/$slug': typeof EventsSlugRoute
   '/events/city-salon-0922': typeof EventsCitySalon0922Route
+  '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
   '/shop/$slug': typeof ShopSlugRoute
   '/vendor': typeof VendorShellRouteWithChildren
   '/vendor/login': typeof VendorLoginRoute
@@ -471,6 +478,7 @@ export interface FileRoutesByTo {
   '/checkout/complete': typeof CheckoutCompleteRoute
   '/events/$slug': typeof EventsSlugRoute
   '/events/city-salon-0922': typeof EventsCitySalon0922Route
+  '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
   '/shop/$slug': typeof ShopSlugRoute
   '/vendor/login': typeof VendorLoginRoute
   '/vendor/pending': typeof VendorPendingRoute
@@ -534,6 +542,7 @@ export interface FileRoutesById {
   '/checkout/complete': typeof CheckoutCompleteRoute
   '/events/$slug': typeof EventsSlugRoute
   '/events/city-salon-0922': typeof EventsCitySalon0922Route
+  '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
   '/shop/$slug': typeof ShopSlugRoute
   '/vendor/_shell': typeof VendorShellRouteWithChildren
   '/vendor/login': typeof VendorLoginRoute
@@ -599,6 +608,7 @@ export interface FileRouteTypes {
     | '/checkout/complete'
     | '/events/$slug'
     | '/events/city-salon-0922'
+    | '/events/sound-of-the-sea'
     | '/shop/$slug'
     | '/vendor'
     | '/vendor/login'
@@ -661,6 +671,7 @@ export interface FileRouteTypes {
     | '/checkout/complete'
     | '/events/$slug'
     | '/events/city-salon-0922'
+    | '/events/sound-of-the-sea'
     | '/shop/$slug'
     | '/vendor/login'
     | '/vendor/pending'
@@ -723,6 +734,7 @@ export interface FileRouteTypes {
     | '/checkout/complete'
     | '/events/$slug'
     | '/events/city-salon-0922'
+    | '/events/sound-of-the-sea'
     | '/shop/$slug'
     | '/vendor/_shell'
     | '/vendor/login'
@@ -787,6 +799,7 @@ export interface RootRouteChildren {
   CheckoutCompleteRoute: typeof CheckoutCompleteRoute
   EventsSlugRoute: typeof EventsSlugRoute
   EventsCitySalon0922Route: typeof EventsCitySalon0922Route
+  EventsSoundOfTheSeaRoute: typeof EventsSoundOfTheSeaRoute
   ShopSlugRoute: typeof ShopSlugRoute
   VendorShellRoute: typeof VendorShellRouteWithChildren
   VendorLoginRoute: typeof VendorLoginRoute
@@ -798,74 +811,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/visit': {
-      id: '/visit'
-      path: '/visit'
-      fullPath: '/visit'
-      preLoaderRoute: typeof VisitRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/publications': {
-      id: '/publications'
-      path: '/publications'
-      fullPath: '/publications'
-      preLoaderRoute: typeof PublicationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/news': {
-      id: '/news'
-      path: '/news'
-      fullPath: '/news'
-      preLoaderRoute: typeof NewsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/journeys': {
-      id: '/journeys'
-      path: '/journeys'
-      fullPath: '/journeys'
-      preLoaderRoute: typeof JourneysRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/curation': {
-      id: '/curation'
-      path: '/curation'
-      fullPath: '/curation'
-      preLoaderRoute: typeof CurationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/curated': {
-      id: '/curated'
-      path: '/curated'
-      fullPath: '/curated'
-      preLoaderRoute: typeof CuratedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/contact': {
-      id: '/contact'
-      path: '/contact'
-      fullPath: '/contact'
-      preLoaderRoute: typeof ContactRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cart': {
-      id: '/cart'
-      path: '/cart'
-      fullPath: '/cart'
-      preLoaderRoute: typeof CartRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/account': {
-      id: '/account'
-      path: '/account'
-      fullPath: '/account'
-      preLoaderRoute: typeof AccountRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/about': {
@@ -875,130 +825,74 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/shop/': {
-      id: '/shop/'
-      path: '/shop'
-      fullPath: '/shop/'
-      preLoaderRoute: typeof ShopIndexRouteImport
+    '/cart': {
+      id: '/cart'
+      path: '/cart'
+      fullPath: '/cart'
+      preLoaderRoute: typeof CartRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/events/': {
-      id: '/events/'
-      path: '/events'
-      fullPath: '/events/'
-      preLoaderRoute: typeof EventsIndexRouteImport
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/checkout/': {
-      id: '/checkout/'
-      path: '/checkout'
-      fullPath: '/checkout/'
-      preLoaderRoute: typeof CheckoutIndexRouteImport
+    '/curated': {
+      id: '/curated'
+      path: '/curated'
+      fullPath: '/curated'
+      preLoaderRoute: typeof CuratedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/vendor/pending': {
-      id: '/vendor/pending'
-      path: '/vendor/pending'
-      fullPath: '/vendor/pending'
-      preLoaderRoute: typeof VendorPendingRouteImport
+    '/curation': {
+      id: '/curation'
+      path: '/curation'
+      fullPath: '/curation'
+      preLoaderRoute: typeof CurationRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/vendor/login': {
-      id: '/vendor/login'
-      path: '/vendor/login'
-      fullPath: '/vendor/login'
-      preLoaderRoute: typeof VendorLoginRouteImport
+    '/journeys': {
+      id: '/journeys'
+      path: '/journeys'
+      fullPath: '/journeys'
+      preLoaderRoute: typeof JourneysRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/vendor/_shell': {
-      id: '/vendor/_shell'
-      path: '/vendor'
-      fullPath: '/vendor'
-      preLoaderRoute: typeof VendorShellRouteImport
+    '/news': {
+      id: '/news'
+      path: '/news'
+      fullPath: '/news'
+      preLoaderRoute: typeof NewsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/shop/$slug': {
-      id: '/shop/$slug'
-      path: '/shop/$slug'
-      fullPath: '/shop/$slug'
-      preLoaderRoute: typeof ShopSlugRouteImport
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/events/city-salon-0922': {
-      id: '/events/city-salon-0922'
-      path: '/events/city-salon-0922'
-      fullPath: '/events/city-salon-0922'
-      preLoaderRoute: typeof EventsCitySalon0922RouteImport
+    '/publications': {
+      id: '/publications'
+      path: '/publications'
+      fullPath: '/publications'
+      preLoaderRoute: typeof PublicationsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/events/$slug': {
-      id: '/events/$slug'
-      path: '/events/$slug'
-      fullPath: '/events/$slug'
-      preLoaderRoute: typeof EventsSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/checkout/complete': {
-      id: '/checkout/complete'
-      path: '/checkout/complete'
-      fullPath: '/checkout/complete'
-      preLoaderRoute: typeof CheckoutCompleteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/confirm': {
-      id: '/auth/confirm'
-      path: '/auth/confirm'
-      fullPath: '/auth/confirm'
-      preLoaderRoute: typeof AuthConfirmRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/pending': {
-      id: '/admin/pending'
-      path: '/admin/pending'
-      fullPath: '/admin/pending'
-      preLoaderRoute: typeof AdminPendingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/login': {
-      id: '/admin/login'
-      path: '/admin/login'
-      fullPath: '/admin/login'
-      preLoaderRoute: typeof AdminLoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/_shell': {
-      id: '/admin/_shell'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminShellRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/account_/reset': {
-      id: '/account_/reset'
-      path: '/account/reset'
-      fullPath: '/account/reset'
-      preLoaderRoute: typeof AccountResetRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/account_/register': {
-      id: '/account_/register'
-      path: '/account/register'
-      fullPath: '/account/register'
-      preLoaderRoute: typeof AccountRegisterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/account_/login': {
-      id: '/account_/login'
-      path: '/account/login'
-      fullPath: '/account/login'
-      preLoaderRoute: typeof AccountLoginRouteImport
+    '/visit': {
+      id: '/visit'
+      path: '/visit'
+      fullPath: '/visit'
+      preLoaderRoute: typeof VisitRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/account_/forgot': {
@@ -1008,200 +902,137 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountForgotRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/vendor/_shell/': {
-      id: '/vendor/_shell/'
-      path: '/'
-      fullPath: '/vendor/'
-      preLoaderRoute: typeof VendorShellIndexRouteImport
-      parentRoute: typeof VendorShellRoute
+    '/account_/login': {
+      id: '/account_/login'
+      path: '/account/login'
+      fullPath: '/account/login'
+      preLoaderRoute: typeof AccountLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account_/register': {
+      id: '/account_/register'
+      path: '/account/register'
+      fullPath: '/account/register'
+      preLoaderRoute: typeof AccountRegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account_/reset': {
+      id: '/account_/reset'
+      path: '/account/reset'
+      fullPath: '/account/reset'
+      preLoaderRoute: typeof AccountResetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/_shell': {
+      id: '/admin/_shell'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminShellRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/login': {
+      id: '/admin/login'
+      path: '/admin/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/pending': {
+      id: '/admin/pending'
+      path: '/admin/pending'
+      fullPath: '/admin/pending'
+      preLoaderRoute: typeof AdminPendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/confirm': {
+      id: '/auth/confirm'
+      path: '/auth/confirm'
+      fullPath: '/auth/confirm'
+      preLoaderRoute: typeof AuthConfirmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout/': {
+      id: '/checkout/'
+      path: '/checkout'
+      fullPath: '/checkout/'
+      preLoaderRoute: typeof CheckoutIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout/complete': {
+      id: '/checkout/complete'
+      path: '/checkout/complete'
+      fullPath: '/checkout/complete'
+      preLoaderRoute: typeof CheckoutCompleteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/': {
+      id: '/events/'
+      path: '/events'
+      fullPath: '/events/'
+      preLoaderRoute: typeof EventsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/$slug': {
+      id: '/events/$slug'
+      path: '/events/$slug'
+      fullPath: '/events/$slug'
+      preLoaderRoute: typeof EventsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/city-salon-0922': {
+      id: '/events/city-salon-0922'
+      path: '/events/city-salon-0922'
+      fullPath: '/events/city-salon-0922'
+      preLoaderRoute: typeof EventsCitySalon0922RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/sound-of-the-sea': {
+      id: '/events/sound-of-the-sea'
+      path: '/events/sound-of-the-sea'
+      fullPath: '/events/sound-of-the-sea'
+      preLoaderRoute: typeof EventsSoundOfTheSeaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shop/': {
+      id: '/shop/'
+      path: '/shop'
+      fullPath: '/shop/'
+      preLoaderRoute: typeof ShopIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shop/$slug': {
+      id: '/shop/$slug'
+      path: '/shop/$slug'
+      fullPath: '/shop/$slug'
+      preLoaderRoute: typeof ShopSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/_shell': {
+      id: '/vendor/_shell'
+      path: '/vendor'
+      fullPath: '/vendor'
+      preLoaderRoute: typeof VendorShellRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/login': {
+      id: '/vendor/login'
+      path: '/vendor/login'
+      fullPath: '/vendor/login'
+      preLoaderRoute: typeof VendorLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/pending': {
+      id: '/vendor/pending'
+      path: '/vendor/pending'
+      fullPath: '/vendor/pending'
+      preLoaderRoute: typeof VendorPendingRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/admin/_shell/': {
       id: '/admin/_shell/'
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminShellIndexRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/vendor/_shell/products': {
-      id: '/vendor/_shell/products'
-      path: '/products'
-      fullPath: '/vendor/products'
-      preLoaderRoute: typeof VendorShellProductsRouteImport
-      parentRoute: typeof VendorShellRoute
-    }
-    '/admin/_shell/strings': {
-      id: '/admin/_shell/strings'
-      path: '/strings'
-      fullPath: '/admin/strings'
-      preLoaderRoute: typeof AdminShellStringsRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/stock-alerts': {
-      id: '/admin/_shell/stock-alerts'
-      path: '/stock-alerts'
-      fullPath: '/admin/stock-alerts'
-      preLoaderRoute: typeof AdminShellStockAlertsRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/staff': {
-      id: '/admin/_shell/staff'
-      path: '/staff'
-      fullPath: '/admin/staff'
-      preLoaderRoute: typeof AdminShellStaffRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/settings': {
-      id: '/admin/_shell/settings'
-      path: '/settings'
-      fullPath: '/admin/settings'
-      preLoaderRoute: typeof AdminShellSettingsRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/sales': {
-      id: '/admin/_shell/sales'
-      path: '/sales'
-      fullPath: '/admin/sales'
-      preLoaderRoute: typeof AdminShellSalesRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/registrations': {
-      id: '/admin/_shell/registrations'
-      path: '/registrations'
-      fullPath: '/admin/registrations'
-      preLoaderRoute: typeof AdminShellRegistrationsRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/publications': {
-      id: '/admin/_shell/publications'
-      path: '/publications'
-      fullPath: '/admin/publications'
-      preLoaderRoute: typeof AdminShellPublicationsRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/products': {
-      id: '/admin/_shell/products'
-      path: '/products'
-      fullPath: '/admin/products'
-      preLoaderRoute: typeof AdminShellProductsRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/pos': {
-      id: '/admin/_shell/pos'
-      path: '/pos'
-      fullPath: '/admin/pos'
-      preLoaderRoute: typeof AdminShellPosRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/phones': {
-      id: '/admin/_shell/phones'
-      path: '/phones'
-      fullPath: '/admin/phones'
-      preLoaderRoute: typeof AdminShellPhonesRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/pages': {
-      id: '/admin/_shell/pages'
-      path: '/pages'
-      fullPath: '/admin/pages'
-      preLoaderRoute: typeof AdminShellPagesRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/orders': {
-      id: '/admin/_shell/orders'
-      path: '/orders'
-      fullPath: '/admin/orders'
-      preLoaderRoute: typeof AdminShellOrdersRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/news': {
-      id: '/admin/_shell/news'
-      path: '/news'
-      fullPath: '/admin/news'
-      preLoaderRoute: typeof AdminShellNewsRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/journeys': {
-      id: '/admin/_shell/journeys'
-      path: '/journeys'
-      fullPath: '/admin/journeys'
-      preLoaderRoute: typeof AdminShellJourneysRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/inventory-vendors': {
-      id: '/admin/_shell/inventory-vendors'
-      path: '/inventory-vendors'
-      fullPath: '/admin/inventory-vendors'
-      preLoaderRoute: typeof AdminShellInventoryVendorsRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/inventory-purchases': {
-      id: '/admin/_shell/inventory-purchases'
-      path: '/inventory-purchases'
-      fullPath: '/admin/inventory-purchases'
-      preLoaderRoute: typeof AdminShellInventoryPurchasesRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/inventory-products': {
-      id: '/admin/_shell/inventory-products'
-      path: '/inventory-products'
-      fullPath: '/admin/inventory-products'
-      preLoaderRoute: typeof AdminShellInventoryProductsRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/inventory-listing': {
-      id: '/admin/_shell/inventory-listing'
-      path: '/inventory-listing'
-      fullPath: '/admin/inventory-listing'
-      preLoaderRoute: typeof AdminShellInventoryListingRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/inventory-count': {
-      id: '/admin/_shell/inventory-count'
-      path: '/inventory-count'
-      fullPath: '/admin/inventory-count'
-      preLoaderRoute: typeof AdminShellInventoryCountRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/inventory-combos': {
-      id: '/admin/_shell/inventory-combos'
-      path: '/inventory-combos'
-      fullPath: '/admin/inventory-combos'
-      preLoaderRoute: typeof AdminShellInventoryCombosRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/inventory-adjustments': {
-      id: '/admin/_shell/inventory-adjustments'
-      path: '/inventory-adjustments'
-      fullPath: '/admin/inventory-adjustments'
-      preLoaderRoute: typeof AdminShellInventoryAdjustmentsRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/events': {
-      id: '/admin/_shell/events'
-      path: '/events'
-      fullPath: '/admin/events'
-      preLoaderRoute: typeof AdminShellEventsRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/curated': {
-      id: '/admin/_shell/curated'
-      path: '/curated'
-      fullPath: '/admin/curated'
-      preLoaderRoute: typeof AdminShellCuratedRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/collaborations': {
-      id: '/admin/_shell/collaborations'
-      path: '/collaborations'
-      fullPath: '/admin/collaborations'
-      preLoaderRoute: typeof AdminShellCollaborationsRouteImport
-      parentRoute: typeof AdminShellRoute
-    }
-    '/admin/_shell/categories': {
-      id: '/admin/_shell/categories'
-      path: '/categories'
-      fullPath: '/admin/categories'
-      preLoaderRoute: typeof AdminShellCategoriesRouteImport
       parentRoute: typeof AdminShellRoute
     }
     '/admin/_shell/artists': {
@@ -1211,12 +1042,194 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminShellArtistsRouteImport
       parentRoute: typeof AdminShellRoute
     }
-    '/admin/_shell/pages/$slug': {
-      id: '/admin/_shell/pages/$slug'
-      path: '/$slug'
-      fullPath: '/admin/pages/$slug'
-      preLoaderRoute: typeof AdminShellPagesSlugRouteImport
-      parentRoute: typeof AdminShellPagesRoute
+    '/admin/_shell/categories': {
+      id: '/admin/_shell/categories'
+      path: '/categories'
+      fullPath: '/admin/categories'
+      preLoaderRoute: typeof AdminShellCategoriesRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/collaborations': {
+      id: '/admin/_shell/collaborations'
+      path: '/collaborations'
+      fullPath: '/admin/collaborations'
+      preLoaderRoute: typeof AdminShellCollaborationsRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/curated': {
+      id: '/admin/_shell/curated'
+      path: '/curated'
+      fullPath: '/admin/curated'
+      preLoaderRoute: typeof AdminShellCuratedRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/events': {
+      id: '/admin/_shell/events'
+      path: '/events'
+      fullPath: '/admin/events'
+      preLoaderRoute: typeof AdminShellEventsRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/inventory-adjustments': {
+      id: '/admin/_shell/inventory-adjustments'
+      path: '/inventory-adjustments'
+      fullPath: '/admin/inventory-adjustments'
+      preLoaderRoute: typeof AdminShellInventoryAdjustmentsRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/inventory-combos': {
+      id: '/admin/_shell/inventory-combos'
+      path: '/inventory-combos'
+      fullPath: '/admin/inventory-combos'
+      preLoaderRoute: typeof AdminShellInventoryCombosRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/inventory-count': {
+      id: '/admin/_shell/inventory-count'
+      path: '/inventory-count'
+      fullPath: '/admin/inventory-count'
+      preLoaderRoute: typeof AdminShellInventoryCountRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/inventory-listing': {
+      id: '/admin/_shell/inventory-listing'
+      path: '/inventory-listing'
+      fullPath: '/admin/inventory-listing'
+      preLoaderRoute: typeof AdminShellInventoryListingRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/inventory-products': {
+      id: '/admin/_shell/inventory-products'
+      path: '/inventory-products'
+      fullPath: '/admin/inventory-products'
+      preLoaderRoute: typeof AdminShellInventoryProductsRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/inventory-purchases': {
+      id: '/admin/_shell/inventory-purchases'
+      path: '/inventory-purchases'
+      fullPath: '/admin/inventory-purchases'
+      preLoaderRoute: typeof AdminShellInventoryPurchasesRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/inventory-vendors': {
+      id: '/admin/_shell/inventory-vendors'
+      path: '/inventory-vendors'
+      fullPath: '/admin/inventory-vendors'
+      preLoaderRoute: typeof AdminShellInventoryVendorsRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/journeys': {
+      id: '/admin/_shell/journeys'
+      path: '/journeys'
+      fullPath: '/admin/journeys'
+      preLoaderRoute: typeof AdminShellJourneysRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/news': {
+      id: '/admin/_shell/news'
+      path: '/news'
+      fullPath: '/admin/news'
+      preLoaderRoute: typeof AdminShellNewsRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/orders': {
+      id: '/admin/_shell/orders'
+      path: '/orders'
+      fullPath: '/admin/orders'
+      preLoaderRoute: typeof AdminShellOrdersRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/pages': {
+      id: '/admin/_shell/pages'
+      path: '/pages'
+      fullPath: '/admin/pages'
+      preLoaderRoute: typeof AdminShellPagesRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/phones': {
+      id: '/admin/_shell/phones'
+      path: '/phones'
+      fullPath: '/admin/phones'
+      preLoaderRoute: typeof AdminShellPhonesRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/pos': {
+      id: '/admin/_shell/pos'
+      path: '/pos'
+      fullPath: '/admin/pos'
+      preLoaderRoute: typeof AdminShellPosRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/products': {
+      id: '/admin/_shell/products'
+      path: '/products'
+      fullPath: '/admin/products'
+      preLoaderRoute: typeof AdminShellProductsRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/publications': {
+      id: '/admin/_shell/publications'
+      path: '/publications'
+      fullPath: '/admin/publications'
+      preLoaderRoute: typeof AdminShellPublicationsRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/registrations': {
+      id: '/admin/_shell/registrations'
+      path: '/registrations'
+      fullPath: '/admin/registrations'
+      preLoaderRoute: typeof AdminShellRegistrationsRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/sales': {
+      id: '/admin/_shell/sales'
+      path: '/sales'
+      fullPath: '/admin/sales'
+      preLoaderRoute: typeof AdminShellSalesRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/settings': {
+      id: '/admin/_shell/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminShellSettingsRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/staff': {
+      id: '/admin/_shell/staff'
+      path: '/staff'
+      fullPath: '/admin/staff'
+      preLoaderRoute: typeof AdminShellStaffRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/stock-alerts': {
+      id: '/admin/_shell/stock-alerts'
+      path: '/stock-alerts'
+      fullPath: '/admin/stock-alerts'
+      preLoaderRoute: typeof AdminShellStockAlertsRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/strings': {
+      id: '/admin/_shell/strings'
+      path: '/strings'
+      fullPath: '/admin/strings'
+      preLoaderRoute: typeof AdminShellStringsRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/vendor/_shell/': {
+      id: '/vendor/_shell/'
+      path: '/'
+      fullPath: '/vendor/'
+      preLoaderRoute: typeof VendorShellIndexRouteImport
+      parentRoute: typeof VendorShellRoute
+    }
+    '/vendor/_shell/products': {
+      id: '/vendor/_shell/products'
+      path: '/products'
+      fullPath: '/vendor/products'
+      preLoaderRoute: typeof VendorShellProductsRouteImport
+      parentRoute: typeof VendorShellRoute
     }
     '/admin/_shell/events/$id': {
       id: '/admin/_shell/events/$id'
@@ -1224,6 +1237,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/events/$id'
       preLoaderRoute: typeof AdminShellEventsIdRouteImport
       parentRoute: typeof AdminShellEventsRoute
+    }
+    '/admin/_shell/pages/$slug': {
+      id: '/admin/_shell/pages/$slug'
+      path: '/$slug'
+      fullPath: '/admin/pages/$slug'
+      preLoaderRoute: typeof AdminShellPagesSlugRouteImport
+      parentRoute: typeof AdminShellPagesRoute
     }
   }
 }
@@ -1353,6 +1373,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutCompleteRoute: CheckoutCompleteRoute,
   EventsSlugRoute: EventsSlugRoute,
   EventsCitySalon0922Route: EventsCitySalon0922Route,
+  EventsSoundOfTheSeaRoute: EventsSoundOfTheSeaRoute,
   ShopSlugRoute: ShopSlugRoute,
   VendorShellRoute: VendorShellRouteWithChildren,
   VendorLoginRoute: VendorLoginRoute,

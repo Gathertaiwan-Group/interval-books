@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-09-09T04:49:41.730Z",
+  "generatedAt": "2026-10-20T10:09:08.281Z",
   "summary": {
-    "routesAudited": 24,
+    "routesAudited": 25,
     "redirectRoutes": 4,
     "redirectRouteList": [
       "/contact",
@@ -9,7 +9,7 @@
       "/publications",
       "/visit"
     ],
-    "metaAudited": 20,
+    "metaAudited": 21,
     "languages": [
       "zh",
       "en",
@@ -31,7 +31,7 @@
         "ogTitle",
         "ogDescription"
       ],
-      "approxChecks": 240
+      "approxChecks": 252
     }
   },
   "routes": {
@@ -127,6 +127,12 @@
     },
     "/events.index": {
       "file": "src/routes/events.index.tsx",
+      "ok": true,
+      "redirect": false,
+      "issues": []
+    },
+    "/events.sound-of-the-sea": {
+      "file": "src/routes/events.sound-of-the-sea.tsx",
       "ok": true,
       "redirect": false,
       "issues": []
