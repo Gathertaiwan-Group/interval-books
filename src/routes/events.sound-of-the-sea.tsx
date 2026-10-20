@@ -41,7 +41,7 @@ import laiChunchun from "@/assets/sound-of-the-sea/lai-chunchun.jpg";
  *   - 稿上的「圖片待替換」佔位框：書店空間改用站上既有的書店實景照；范毅舜那一張
  *     沒有照片，改成不假裝是照片的文字區塊。
  *   - 「場次名稱與日期：待主辦補充」與頁尾的「主辦方後台」連結拿掉。
- *   - 「付款」那一列寫的是站上真的有的付款方式（信用卡線上付款／銀行匯款）。
+ *   - 「付款」那一列寫的是站上真的有的付款方式（信用卡線上付款／銀行匯款／由店家聯繫付款，與 /checkout 一致）。
  *
  * ⚠️ 內容寫死在這個檔案，後台改不到——/admin/events 改這一場只影響活動列表的卡片。
  * ⚠️ 內文只有中文（對象是台灣讀者），meta 三語（scripts/check-meta.mjs 要求）。
@@ -422,7 +422,8 @@ function EventInfo() {
             },
             {
               label: "付款",
-              value: "線上報名即付款：信用卡線上付款，或銀行匯款（下單後 3 天內完成）",
+              value:
+                "線上報名時選擇：信用卡線上付款、銀行匯款（下單後 3 天內完成），或由我們與你聯繫付款",
             },
           ]}
         />
@@ -709,11 +710,11 @@ function Booking({ product }: { product: ShopProduct }) {
       </div>
 
       <p className="text-sm leading-relaxed">
-        下一步填寫參加者姓名、電話與電子郵件並完成付款。個人資料僅用於本次活動之報名聯繫、人數統計與書籍準備，不作其他用途。
+        下一步填寫參加者姓名、電話與電子郵件，並選擇付款方式。個人資料僅用於本次活動之報名聯繫、人數統計與書籍準備，不作其他用途。
       </p>
       <p className="rounded-md border-l-2 border-accent bg-card px-4 py-3 text-sm text-muted-foreground">
-        付款方式於下一步選擇：信用卡線上付款，或銀行匯款（下單後 3
-        天內完成，逾期名額將釋出）。完成付款即完成報名。
+        付款方式於下一步選擇：信用卡線上付款、銀行匯款（下單後 3
+        天內完成，逾期名額將釋出），或由我們與你聯繫付款。
       </p>
 
       {readyToBook && selectedSession ? (
