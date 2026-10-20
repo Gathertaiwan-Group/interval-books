@@ -1,7 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createRouter, useRouter, type ErrorComponentProps } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { routeTree } from "./routeTree.gen";
+import {
+  canReloadForNewDeploy,
+  claimReloadForNewDeploy,
+  errorMessage,
+  isStaleDeployError,
+  preloadErrorAction,
+} from "@/lib/stale-deploy";
 
 /**
  * 部署之後還開著的分頁會壞：頁面記得的是上一版的程式檔名，而 Vercel 每次部署都是一整組新的
@@ -9,25 +16,34 @@ import { routeTree } from "./routeTree.gen";
  * 2026-10-09 後台按「新增活動」就是這樣掉進錯誤頁，按「Try again」也沒用。
  *
  * 兩種情況分開處理：
- * - **換頁**（loader／route 元件）：錯誤會掉進下面的 DefaultErrorComponent，那裡自動整頁重載一次。
- *   換頁本來就要離開這一頁，沒有東西會不見；10 秒內不重複，真的壞掉時才不會無限重整。
+ * - **換頁**（loader／route 元件）：vite:preloadError 發生時 router 正在換頁 → 當場整頁重載一次；
+ *   萬一錯誤還是掉進下面的 DefaultErrorComponent，那裡也會自動重載，重載前只畫中性的載入畫面。
+ *   換頁本來就要離開這一頁，沒有東西會不見；10 秒內不重複，真的壞掉時才不會無限重整（那時才畫錯誤頁）。
+ *   2026-10-20 店主回報《海的聲音》按「立即報名」會先閃錯誤訊息再進結帳頁：就是舊分頁換頁時先跳
+ *   「網站剛更新了／剛剛的動作沒有送出」提示、接著閃「Something went wrong」、然後才重載。
  * - **按鈕、表單送出、開對話框**（後台約 130 處在事件裡才 `await import()`）：**不能**自動重載——
  *   表單裡打的字、POS 購物車會全部不見。這時動作在送到伺服器之前就失敗了（沒有寫入任何資料），
  *   錯誤照常交給呼叫端的 catch，另外跳一個不會自己消失的提示，請使用者先保留內容再重新整理。
  *   所以 vite:preloadError 監聽器**不** preventDefault：攔下來的話那次 import 會回傳 undefined，
  *   呼叫端只會看到一個莫名其妙的 TypeError。
  */
-const STALE_DEPLOY_ERROR =
-  /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Unable to preload CSS|Loading chunk .+ failed/i;
-const RELOAD_KEY = "ib:stale-deploy-reload-at";
+/** 只需要知道「是不是正在換頁」，不綁 router 的泛型。 */
+let currentRouter: { state: { status: string } } | null = null;
+/** 已經呼叫過 location.reload()、頁面正在卸載：錯誤頁不要再畫出「Something went wrong」。 */
+let reloadInFlight = false;
+
+function sessionStore(): Storage | null {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
 
 function reloadOnceForNewDeploy(): boolean {
-  try {
-    if (Date.now() - Number(sessionStorage.getItem(RELOAD_KEY) || 0) < 10_000) return false;
-    sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
-  } catch {
-    return false; // 沒有 sessionStorage 就記不住重載過沒——寧可停在錯誤頁，也不要冒無限重整的險
-  }
+  if (reloadInFlight) return true;
+  if (!claimReloadForNewDeploy(sessionStore(), Date.now())) return false;
+  reloadInFlight = true;
   window.location.reload();
   return true;
 }
@@ -42,21 +58,51 @@ function announceNewDeploy() {
 }
 
 if (typeof window !== "undefined") {
-  // Vite 載入程式檔失敗時發的事件（Vite 文件「Load Error Handling」）。換頁的情況錯誤頁會自動重載，
-  // 提示只是一閃；按鈕的情況就靠這則提示。
-  window.addEventListener("vite:preloadError", announceNewDeploy);
+  // Vite 載入程式檔失敗時發的事件（Vite 文件「Load Error Handling」）。
+  // 換頁中（點了 <Link>、網址已經換成下一頁）→ 當場重載到新網址，不跳提示、不等 loader 跑完再掉進
+  // 錯誤頁；按鈕／表單的情況才跳提示（見 src/lib/stale-deploy.ts 的 preloadErrorAction）。
+  window.addEventListener("vite:preloadError", () => {
+    if (reloadInFlight) return;
+    const navigating = currentRouter?.state.status === "pending";
+    const action = preloadErrorAction(
+      navigating,
+      canReloadForNewDeploy(sessionStore(), Date.now()),
+    );
+    if (action === "reload" && reloadOnceForNewDeploy()) return;
+    announceNewDeploy();
+  });
 }
 
 function DefaultErrorComponent({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   // @tanstack/react-router 1.170 起 error 的型別是 unknown（被 throw 的不一定是 Error 物件）
-  const message = error instanceof Error ? error.message : error == null ? "" : String(error);
-  const staleDeploy = STALE_DEPLOY_ERROR.test(message);
+  const message = errorMessage(error);
+  const staleDeploy = isStaleDeployError(error);
+  // 程式檔過期且會自動重載：重載前那一兩秒畫中性的載入畫面，不要閃一下「Something went wrong」
+  const [reloading, setReloading] = useState(
+    () =>
+      staleDeploy &&
+      typeof window !== "undefined" &&
+      (reloadInFlight || canReloadForNewDeploy(sessionStore(), Date.now())),
+  );
 
-  // 換頁時載不到程式檔：自動重載一次就會拿到新版（見檔頭）
+  // 換頁時載不到程式檔：自動重載一次就會拿到新版（見檔頭）。重載被冷卻擋下 → 改畫錯誤頁。
   useEffect(() => {
-    if (staleDeploy) reloadOnceForNewDeploy();
+    if (staleDeploy && !reloadOnceForNewDeploy()) setReloading(false);
   }, [staleDeploy]);
+
+  if (reloading) {
+    return (
+      <div
+        className="flex min-h-screen items-center justify-center bg-background"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
+        <span className="sr-only">Loading…</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -121,6 +167,7 @@ export const getRouter = () => {
     defaultPreloadStaleTime: 0,
     defaultErrorComponent: DefaultErrorComponent,
   });
+  if (typeof window !== "undefined") currentRouter = router;
 
   return router;
 };
