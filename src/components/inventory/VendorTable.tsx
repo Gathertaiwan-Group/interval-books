@@ -45,6 +45,7 @@ import {
   VENDOR_STATUS_LABELS,
 } from "@/lib/admin/schemas";
 import type { AdminVendorRow } from "@/server/repos/inv-vendors";
+import { needsPermissionHint } from "@/lib/admin/permission-labels";
 
 // view 回傳的是 text，schemas 那邊的 enum 才是值域。認不出來的值原樣印出去 ——
 // 與 ApprovalStatusBadge 同一條規矩：看到奇怪的字會有人來問，看不到東西不會。
@@ -239,7 +240,7 @@ export function VendorTable({
                       title={
                         canReadPii
                           ? "查看完整號碼（會留下查閱紀錄）"
-                          : "需要「inv.vendor.pii.read」權限"
+                          : needsPermissionHint("inv.vendor.pii.read")
                       }
                       onClick={() => onReadSensitive(row)}
                     >

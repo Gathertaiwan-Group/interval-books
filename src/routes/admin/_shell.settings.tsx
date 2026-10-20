@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { LocalizedField } from "@/components/admin/LocalizedField";
+import { AdvancedSection } from "@/components/admin/AdvancedSection";
 import { siteSettingsSchema, type SiteSettingsFormValues } from "@/lib/admin/schemas";
 import type { getSiteSettings } from "@/lib/admin/fns/site-settings";
 
@@ -85,6 +86,7 @@ function AdminSettingsPage() {
   }
 
   const submitting = form.formState.isSubmitting;
+  const errors = form.formState.errors;
 
   return (
     <div className="space-y-6">
@@ -223,25 +225,11 @@ function AdminSettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>地圖</CardTitle>
-              <CardDescription>來店資訊頁使用的地圖嵌入與導航連結。</CardDescription>
+              <CardDescription>
+                來店資訊頁的導航連結。嵌入地圖用的網址在最下方「進階」。
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="map_embed"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>地圖嵌入網址</FormLabel>
-                    <FormControl>
-                      <Textarea rows={2} {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      Google 地圖 embed 用網址，貼在頁面中顯示地圖。
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
@@ -293,45 +281,6 @@ function AdminSettingsPage() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="meta_author"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>作者（meta）</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="meta_twitter_card"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Twitter Card 類型</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="meta_og_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Open Graph 類型</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
               <FormField
                 control={form.control}
@@ -361,6 +310,73 @@ function AdminSettingsPage() {
               />
             </CardContent>
           </Card>
+
+          <AdvancedSection
+            title="進階（通常不用改）"
+            hint="地圖嵌入網址、分享卡片類型、作者"
+            forceOpen={Boolean(
+              errors.map_embed ||
+              errors.meta_author ||
+              errors.meta_twitter_card ||
+              errors.meta_og_type,
+            )}
+          >
+            <FormField
+              control={form.control}
+              name="map_embed"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>地圖嵌入網址</FormLabel>
+                  <FormControl>
+                    <Textarea rows={2} {...field} />
+                  </FormControl>
+                  <FormDescription>Google 地圖 embed 用網址，貼在頁面中顯示地圖。</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="meta_author"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>作者（meta）</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="meta_twitter_card"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Twitter Card 類型</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="meta_og_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Open Graph 類型</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </AdvancedSection>
 
           <div className="flex justify-end">
             <Button type="submit" disabled={submitting}>

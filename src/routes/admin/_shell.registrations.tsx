@@ -425,21 +425,8 @@ function AdminRegistrationsPage() {
         </Button>
       </div>
 
-      {schemaMissing && (
-        <p className="rounded-md border border-destructive/40 p-4 text-sm text-destructive">
-          活動場次的資料表還沒建立。這一頁要等 migration 0020_event_sessions_registrations.sql
-          套用到資料庫之後才會有內容——程式碼會 先上線，資料庫是另一個步驟。
-        </p>
-      )}
-
-      {!schemaMissing && !rosterReady && (
-        <p className="rounded-md border border-amber-500/40 bg-amber-500/5 p-4 text-sm">
-          名單功能還沒開通：migration 0021_roster_pii.sql 尚未套用到資料庫。場次可以
-          照常維護（名額、時間、開關），但「報名人數」、名單與匯出要等那一支套用之後
-          才會出現——遮罩與稽核紀錄都做在資料庫裡，沒有它就沒有安全的明文出口。
-        </p>
-      )}
-
+      {/* 0020／0021 早已套用到正式庫，「migration 尚未套用」的兩段工程說明已拿掉。
+          loader 的 schemaMissing／rosterReady 退化邏輯仍保留（表不存在時頁面不會整頁掛掉）。 */}
       {!schemaMissing && products.length === 0 && (
         <p className="rounded-md border border-border p-4 text-sm text-muted-foreground">
           目前沒有活動或策旅類型的商品。請先到「商品」新增一件 event／journey

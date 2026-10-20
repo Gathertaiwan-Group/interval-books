@@ -1203,9 +1203,11 @@ checkTrue(
   "0020 與 0021 是兩個旗標（0021 沒套時場次照樣維護得動）",
   /schemaMissing/.test(routeTs) && /rosterReady/.test(routeTs),
 );
+// 2026-10-20：0020／0021 早已套用到正式庫，畫面上「migration 尚未套用」的兩段工程說明
+// 已拿掉（店長看不懂、也永遠不會再出現）。旗標與退化邏輯照舊保留（上一條）。
 checkTrue(
-  "兩個旗標各有一段說明文字",
-  /0020_event_sessions_registrations\.sql/.test(routeTs) && /0021_roster_pii\.sql/.test(routeTs),
+  "畫面上不再有「migration 尚未套用」的工程說明",
+  !/尚未套用到資料庫/.test(stripTs(routeTs)) && !/這一頁要等 migration/.test(stripTs(routeTs)),
 );
 check(
   // 0036：從 2 次變 3 次——loader 多了一段「方案表還沒套 migration 就退化」的

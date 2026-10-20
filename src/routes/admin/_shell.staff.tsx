@@ -59,10 +59,10 @@ import {
 } from "@/lib/admin/schemas";
 import type { listStaffAccounts } from "@/lib/admin/fns/staff-accounts";
 import { formatUpdatedAt } from "@/lib/admin/format";
+import { HIDDEN_PERMISSIONS, PERMISSION_LABELS } from "@/lib/admin/permission-labels";
 
 type StaffAccountRow = Awaited<ReturnType<typeof listStaffAccounts>>[number];
 type CreatableRole = (typeof CREATABLE_BACKOFFICE_ROLES)[number];
-type PermissionValue = (typeof STAFF_PERMISSIONS)[number];
 
 /**
  * 這一頁只有 admin 能進——但守門的不是這裡，是 fns/staff-accounts.ts 每一支都
@@ -95,25 +95,10 @@ const ROLE_DESCRIPTION: Record<CreatableRole, string> = {
   pending: "已登入但尚未開通任何模組，看到的是待開通說明頁",
 };
 
-/**
- * 九個 staff_permissions 值的中文說明。approve_inventory_adjustments 刻意
- * 標成「目前未啟用」——這是核對過的事實，不是不確定的猜測：全 repo 除了
- * src/server/auth.ts 的常數定義與 0010/0021 的 CHECK 之外，沒有任何一支
- * 前台或 server fn 檢查這個字串（在庫異動頁 _shell.inventory-adjustments.tsx
- * 與賣超告警頁 _shell.stock-alerts.tsx 檢查的都是 approve_stock_adjustments）。
- * 勾了它不會出錯，只是目前沒有任何畫面會讀它。
- */
-const PERMISSION_LABELS: Record<PermissionValue, string> = {
-  approve_products: "審核商品",
-  approve_purchases: "審核進貨",
-  approve_price_changes: "審核調價",
-  approve_vendors: "審核廠商",
-  approve_combo_sets: "審核套餐",
-  approve_stock_adjustments: "審核在庫異動／處理賣超告警",
-  approve_inventory_adjustments: "審核庫存調整（目前未啟用：沒有畫面在檢查這個權限）",
-  "inv.vendor.pii.read": "查看廠商完整身分資料（統編、身分證、匯款帳戶）",
-  "event.roster.read": "查看活動報名名單",
-};
+// 九個細權限的中文名稱搬到 src/lib/admin/permission-labels.ts，與各頁「需要店長開通
+// 『○○』權限」的提示共用。approve_inventory_adjustments 在那裡標成 HIDDEN_PERMISSIONS：
+// 沒有任何程式在檢查它，所以這一頁不再列出來（帳號身上既有的值照樣保留，不會被清掉）。
+const VISIBLE_PERMISSIONS = STAFF_PERMISSIONS.filter((p) => !HIDDEN_PERMISSIONS.has(p));
 
 function AdminStaffPage() {
   const { accounts } = Route.useLoaderData();
@@ -516,7 +501,7 @@ function EditAccountDialog({
                       只勾選的項目會生效；管理員一律視為全有，不受這裡影響。
                     </FormDescription>
                     <div className="space-y-2 rounded-md border border-border p-3">
-                      {STAFF_PERMISSIONS.map((permission) => (
+                      {VISIBLE_PERMISSIONS.map((permission) => (
                         <FormField
                           key={permission}
                           control={form.control}

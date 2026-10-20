@@ -46,6 +46,7 @@ import { LocalizedField } from "@/components/admin/LocalizedField";
 import { collaborationSchema, type CollaborationFormValues } from "@/lib/admin/schemas";
 import type { listCollaborations } from "@/lib/admin/fns/collaborations";
 import { formatUpdatedAt } from "@/lib/admin/format";
+import { newFirstSortOrder } from "@/lib/admin/sort-order";
 
 type CollaborationRow = Awaited<ReturnType<typeof listCollaborations>>[number];
 
@@ -127,7 +128,8 @@ function AdminCollaborationsPage() {
     }
   }
 
-  const nextSortOrder = collaborations.reduce((max, c) => Math.max(max, c.sort_order), 0) + 1;
+  // 新的合作案例排最前面（前台 /curation 由小到大排）。見 lib/admin/sort-order.ts。
+  const nextSortOrder = newFirstSortOrder(collaborations);
 
   const defaultValues: CollaborationFormValues = editing
     ? toFormValues(editing)

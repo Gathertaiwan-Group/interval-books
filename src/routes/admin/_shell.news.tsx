@@ -47,6 +47,8 @@ import { LocalizedField } from "@/components/admin/LocalizedField";
 import { newsSchema, type NewsFormValues } from "@/lib/admin/schemas";
 import type { listNews } from "@/lib/admin/fns/news";
 import { formatUpdatedAt } from "@/lib/admin/format";
+import { newFirstSortOrder } from "@/lib/admin/sort-order";
+import { AdvancedSection } from "@/components/admin/AdvancedSection";
 
 type NewsRow = Awaited<ReturnType<typeof listNews>>[number];
 
@@ -130,7 +132,8 @@ function AdminNewsPage() {
     }
   }
 
-  const nextSortOrder = news.reduce((max, n) => Math.max(max, n.sort_order), 0) + 1;
+  // 新的一則排最前面（前台由小到大排）。見 lib/admin/sort-order.ts。
+  const nextSortOrder = newFirstSortOrder(news);
 
   const defaultValues: NewsFormValues = editing
     ? toFormValues(editing)
@@ -294,7 +297,29 @@ function NewsForm({ defaultValues, onSubmit, submitting, submitLabel }: NewsForm
           )}
         />
 
-        <div className="grid grid-cols-2 gap-4">
+        <FormField
+          control={form.control}
+          name="is_published"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>發布狀態</FormLabel>
+              <div className="flex h-9 items-center gap-2">
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+                <span className="text-sm text-muted-foreground">
+                  {field.value ? "已發布" : "草稿"}
+                </span>
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <AdvancedSection
+          hint="排序（通常不用改，新的一則會自動排在最前面）"
+          forceOpen={Boolean(form.formState.errors.sort_order)}
+        >
           <FormField
             control={form.control}
             name="sort_order"
@@ -317,26 +342,7 @@ function NewsForm({ defaultValues, onSubmit, submitting, submitLabel }: NewsForm
               </FormItem>
             )}
           />
-
-          <FormField
-            control={form.control}
-            name="is_published"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>發布狀態</FormLabel>
-                <div className="flex h-9 items-center gap-2">
-                  <FormControl>
-                    <Switch checked={field.value} onCheckedChange={field.onChange} />
-                  </FormControl>
-                  <span className="text-sm text-muted-foreground">
-                    {field.value ? "已發布" : "草稿"}
-                  </span>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+        </AdvancedSection>
 
         <DialogFooter>
           <Button type="submit" disabled={submitting}>

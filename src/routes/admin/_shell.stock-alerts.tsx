@@ -35,6 +35,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { StockAlertRow } from "@/server/repos/inv-sales";
 import { formatTaipeiDateTime } from "@/lib/taipei-time";
+import { needsPermissionHint } from "@/lib/admin/permission-labels";
 
 type Status = "open" | "resolved" | "all";
 
@@ -212,7 +213,9 @@ function StockAlertsPage() {
                       setNote("");
                     }}
                     disabled={!canResolve}
-                    title={canResolve ? undefined : "需要 approve_stock_adjustments 權限"}
+                    title={
+                      canResolve ? undefined : needsPermissionHint("approve_stock_adjustments")
+                    }
                   >
                     標記已處理
                   </Button>

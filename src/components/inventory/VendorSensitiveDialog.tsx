@@ -54,6 +54,7 @@ import {
   VENDOR_SENSITIVE_FIELD_LABELS,
 } from "@/lib/admin/schemas";
 import type { AdminVendorRow, VendorSensitiveResult } from "@/server/repos/inv-vendors";
+import { PERMISSION_LABELS, needsPermissionHint } from "@/lib/admin/permission-labels";
 
 type SensitiveField = (typeof VENDOR_SENSITIVE_FIELDS)[number];
 type AccessReason = (typeof PII_ACCESS_REASONS)[number];
@@ -249,7 +250,7 @@ export function VendorSensitiveDialog({ open, onOpenChange, vendor, canReadPii }
             className="gap-1.5"
             // ⚠️ disabled 只是畫面。擋住直接呼叫的是 server fn 那一次 requirePermission()。
             disabled={loading || !canReadPii || fields.length === 0}
-            title={canReadPii ? undefined : "需要「inv.vendor.pii.read」權限"}
+            title={canReadPii ? undefined : needsPermissionHint("inv.vendor.pii.read")}
             onClick={() => void read()}
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
@@ -259,9 +260,9 @@ export function VendorSensitiveDialog({ open, onOpenChange, vendor, canReadPii }
 
         {!canReadPii ? (
           <p className="text-xs text-muted-foreground">
-            你沒有「inv.vendor.pii.read」權限，所以看不到完整號碼。請找管理員授權 —— 這個權限與各種
-            approve_* 是不同維度的東西：一個管收貨的店員有理由簽核進貨，
-            沒有理由看到廠商的身分證字號。
+            你還沒有「{PERMISSION_LABELS["inv.vendor.pii.read"]}」權限，所以看不到完整號碼，
+            請找店長開通。這一項和「審核進貨」這類簽核權限是分開的：管收貨的店員有理由簽核
+            進貨，不一定有理由看到廠商的身分證字號。
           </p>
         ) : null}
       </DialogContent>

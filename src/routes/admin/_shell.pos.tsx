@@ -30,7 +30,6 @@
 import { useState } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { BookMarked, ScanLine } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ComboCheckoutTab } from "@/components/pos/ComboCheckoutTab";
@@ -87,9 +86,6 @@ function PosPage() {
           <ScanLine className="h-5 w-5" aria-hidden="true" />
           櫃檯結帳
         </h1>
-        <Badge variant="secondary" className="font-normal">
-          門市銷售會寫進 inv.sales（channel=pos），與網站扣同一份庫存
-        </Badge>
         <Button
           type="button"
           variant="outline"
