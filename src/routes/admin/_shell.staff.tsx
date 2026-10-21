@@ -367,11 +367,11 @@ function CreateAccountDialog({
                   <FormLabel>角色</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-auto min-h-9 min-w-0 whitespace-normal text-left [&>span]:line-clamp-none [&>span]:break-words">
                         <SelectValue placeholder="請選擇角色" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="max-w-[var(--radix-select-trigger-width)]">
                       {CREATABLE_BACKOFFICE_ROLES.map((role) => (
                         <SelectItem key={role} value={role}>
                           {ROLE_LABEL[role]}——{ROLE_DESCRIPTION[role]}
@@ -458,85 +458,93 @@ function EditAccountDialog({
 
   return (
     <Dialog open={account !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
-        <DialogHeader>
+      {/* 角色說明文字很長：內文區自己捲動、按鈕列固定在底部，避免「儲存變更」被擠出框外 */}
+      <DialogContent className="flex max-h-[90vh] max-w-lg flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle>編輯後台身分</DialogTitle>
-          <DialogDescription>{account?.email ?? account?.id}</DialogDescription>
+          <DialogDescription className="break-words">
+            {account?.email ?? account?.id}
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-5">
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>角色</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="請選擇角色" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {CREATABLE_BACKOFFICE_ROLES.map((role) => (
-                        <SelectItem key={role} value={role}>
-                          {ROLE_LABEL[role]}——{ROLE_DESCRIPTION[role]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {selectedRole === "staff" && (
+          <form
+            onSubmit={form.handleSubmit(handleSubmit)}
+            className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+          >
+            <div className="-mx-1 min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto px-1 pb-1">
               <FormField
                 control={form.control}
-                name="permissions"
-                render={() => (
+                name="role"
+                render={({ field }) => (
                   <FormItem>
-                    <FormLabel>細權限</FormLabel>
-                    <FormDescription>
-                      只勾選的項目會生效；管理員一律視為全有，不受這裡影響。
-                    </FormDescription>
-                    <div className="space-y-2 rounded-md border border-border p-3">
-                      {VISIBLE_PERMISSIONS.map((permission) => (
-                        <FormField
-                          key={permission}
-                          control={form.control}
-                          name="permissions"
-                          render={({ field }) => {
-                            const checked = field.value.includes(permission);
-                            return (
-                              <FormItem className="flex flex-row items-start space-x-2 space-y-0">
-                                <FormControl>
-                                  <Checkbox
-                                    checked={checked}
-                                    onCheckedChange={(next) => {
-                                      field.onChange(
-                                        next
-                                          ? [...field.value, permission]
-                                          : field.value.filter((p) => p !== permission),
-                                      );
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormLabel className="text-sm font-normal leading-tight">
-                                  {PERMISSION_LABELS[permission]}
-                                </FormLabel>
-                              </FormItem>
-                            );
-                          }}
-                        />
-                      ))}
-                    </div>
+                    <FormLabel>角色</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="h-auto min-h-9 min-w-0 whitespace-normal text-left [&>span]:line-clamp-none [&>span]:break-words">
+                          <SelectValue placeholder="請選擇角色" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="max-w-[var(--radix-select-trigger-width)]">
+                        {CREATABLE_BACKOFFICE_ROLES.map((role) => (
+                          <SelectItem key={role} value={role}>
+                            {ROLE_LABEL[role]}——{ROLE_DESCRIPTION[role]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
-            )}
 
-            <DialogFooter>
+              {selectedRole === "staff" && (
+                <FormField
+                  control={form.control}
+                  name="permissions"
+                  render={() => (
+                    <FormItem>
+                      <FormLabel>細權限</FormLabel>
+                      <FormDescription>
+                        只勾選的項目會生效；管理員一律視為全有，不受這裡影響。
+                      </FormDescription>
+                      <div className="space-y-2 rounded-md border border-border p-3">
+                        {VISIBLE_PERMISSIONS.map((permission) => (
+                          <FormField
+                            key={permission}
+                            control={form.control}
+                            name="permissions"
+                            render={({ field }) => {
+                              const checked = field.value.includes(permission);
+                              return (
+                                <FormItem className="flex flex-row items-start space-x-2 space-y-0">
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={checked}
+                                      onCheckedChange={(next) => {
+                                        field.onChange(
+                                          next
+                                            ? [...field.value, permission]
+                                            : field.value.filter((p) => p !== permission),
+                                        );
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormLabel className="text-sm font-normal leading-tight">
+                                    {PERMISSION_LABELS[permission]}
+                                  </FormLabel>
+                                </FormItem>
+                              );
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
+
+            <DialogFooter className="shrink-0">
               <Button type="submit" disabled={submitting}>
                 {submitting ? "儲存中…" : "儲存變更"}
               </Button>
