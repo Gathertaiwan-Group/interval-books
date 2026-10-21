@@ -110,37 +110,49 @@ function TodoCardLink({ card }: { card: TodoCard }) {
   const failed = card.count === null;
   const active = failed || (card.count ?? 0) > 0;
 
+  const body = (
+    <Card
+      className={
+        active
+          ? "h-full border-amber-500/50 transition-colors hover:border-amber-600"
+          : "h-full transition-colors hover:border-foreground/40"
+      }
+    >
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
+        {active ? (
+          <AlertTriangle className="h-4 w-4 text-amber-600" aria-hidden="true" />
+        ) : (
+          <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        )}
+      </CardHeader>
+      <CardContent>
+        {failed ? (
+          <p className="text-sm text-destructive">讀取失敗，點進去查看</p>
+        ) : card.count === 0 ? (
+          <p className="text-sm text-muted-foreground">{card.emptyText}</p>
+        ) : (
+          <>
+            <div className="text-2xl font-semibold">{card.count}</div>
+            <p className="text-sm text-muted-foreground">{card.unit}</p>
+            {card.hint ? <p className="mt-1 text-xs text-muted-foreground">{card.hint}</p> : null}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  // 「待出貨」要帶 ?scope=to_ship 才會落在那個分頁；其餘卡片照舊只連到頁面本身。
+  if (card.search) {
+    return (
+      <Link to="/admin/orders" search={card.search} className="block">
+        {body}
+      </Link>
+    );
+  }
   return (
     <Link to={card.href} className="block">
-      <Card
-        className={
-          active
-            ? "h-full border-amber-500/50 transition-colors hover:border-amber-600"
-            : "h-full transition-colors hover:border-foreground/40"
-        }
-      >
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-          {active ? (
-            <AlertTriangle className="h-4 w-4 text-amber-600" aria-hidden="true" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-          )}
-        </CardHeader>
-        <CardContent>
-          {failed ? (
-            <p className="text-sm text-destructive">讀取失敗，點進去查看</p>
-          ) : card.count === 0 ? (
-            <p className="text-sm text-muted-foreground">{card.emptyText}</p>
-          ) : (
-            <>
-              <div className="text-2xl font-semibold">{card.count}</div>
-              <p className="text-sm text-muted-foreground">{card.unit}</p>
-              {card.hint ? <p className="mt-1 text-xs text-muted-foreground">{card.hint}</p> : null}
-            </>
-          )}
-        </CardContent>
-      </Card>
+      {body}
     </Link>
   );
 }

@@ -227,10 +227,13 @@ console.log("\n[2] 🔴 fns/orders.ts 的每一支 server fn 都掛 adminFnMiddl
   }
 
   // 0035 加了兩支：deleteAdminOrder／archiveAdminOrder（刪除／封存）。
+  // 出貨那一期加了 advanceOrderFulfillmentAdmin（標記已出貨／已取貨／已完成，
+  // 條件與寫入的自檢在 scripts/order-fulfillment-selftest.mjs）。
   check(
-    "剛好 5 支 server fn（listAdminOrders／getAdminOrderDetail／markOrderPaidAdmin／deleteAdminOrder／archiveAdminOrder，0035 加了後兩支）",
+    "剛好 6 支 server fn（listAdminOrders／getAdminOrderDetail／markOrderPaidAdmin／deleteAdminOrder／archiveAdminOrder／advanceOrderFulfillmentAdmin）",
     exported.map((e) => e.name).sort(),
     [
+      "advanceOrderFulfillmentAdmin",
       "archiveAdminOrder",
       "deleteAdminOrder",
       "getAdminOrderDetail",

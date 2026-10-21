@@ -1,5 +1,5 @@
 /**
- * orders server functions —— 後台訂單列表／詳情／標記已收款
+ * orders server functions —— 後台訂單列表／詳情／標記已收款／標記已出貨
  * （src/routes/admin/_shell.orders.tsx）。
  *
  * 🔴 每一支都掛 adminFnMiddleware。這一頁看得到客人的姓名與遮罩後的聯絡方式，而
@@ -19,7 +19,7 @@ export const listAdminOrders = createServerFn({ method: "GET" })
   .middleware([adminFnMiddleware])
   .inputValidator(
     z.object({
-      scope: z.enum(["transfer_pending", "all"]),
+      scope: z.enum(["transfer_pending", "to_ship", "all"]),
       includeArchived: z.boolean().optional(),
     }),
   )
@@ -101,5 +101,32 @@ export const archiveAdminOrder = createServerFn({ method: "POST" })
       orderId: data.orderId,
       actorId: context.admin.userId,
       archived: data.archived,
+    });
+  });
+
+/**
+ * 標記已出貨（ship）／已取貨（pickup）／已完成（complete）。
+ *
+ * 與上面幾支同一個立場：adminFnMiddleware、actorId 只認 context.admin.userId。
+ * 條件與狀態轉換在 src/lib/admin/order-fulfillment.ts，寫入是
+ * src/server/repos/order-fulfillment.ts 的一句 conditional update。
+ *
+ * 🔴 這一支刻意**不**呼叫任何通知／發票（不像 markOrderPaidAdmin 會觸發付款通知）：
+ *    出貨通知信還沒有被核准，這一期只改狀態。
+ */
+export const advanceOrderFulfillmentAdmin = createServerFn({ method: "POST" })
+  .middleware([adminFnMiddleware])
+  .inputValidator(
+    z.object({
+      orderId: z.string().trim().uuid(),
+      action: z.enum(["ship", "pickup", "complete"]),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    const { advanceOrderFulfillment } = await import("@/server/repos/order-fulfillment");
+    return await advanceOrderFulfillment({
+      orderId: data.orderId,
+      actorId: context.admin.userId,
+      action: data.action,
     });
   });

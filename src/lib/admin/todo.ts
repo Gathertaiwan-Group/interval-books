@@ -12,6 +12,8 @@
 export type AdminTodoCounts = {
   /** 匯款、還沒收到錢、未封存（與 /admin/orders 預設分頁同一個條件）。 */
   transferPending: number | null;
+  /** 已付款、處理中、宅配或超商、未封存（與 /admin/orders?scope=to_ship 同一個條件）。 */
+  toShip: number | null;
   /** 還沒標記處理的賣超告警（與 /admin/stock-alerts 預設分頁同一個條件）。 */
   stockAlertsOpen: number | null;
   /** 待審核的商品。 */
@@ -31,6 +33,8 @@ export type TodoCard = {
     | "/admin/stock-alerts"
     | "/admin/inventory-products"
     | "/admin/inventory-purchases";
+  /** 點下去要帶的 search（目前只有「待出貨」用：/admin/orders?scope=to_ship）。 */
+  search?: { scope: "to_ship" };
   count: number | null;
   /** 有幾筆時的說明，例如「筆訂單等你對帳」。 */
   unit: string;
@@ -49,6 +53,15 @@ export function buildTodoCards(c: AdminTodoCounts): TodoCard[] {
       count: c.transferPending,
       unit: "筆訂單等你核對匯款",
       emptyText: "沒有待收款的匯款訂單",
+    },
+    {
+      key: "toShip",
+      title: "待出貨",
+      href: "/admin/orders",
+      search: { scope: "to_ship" },
+      count: c.toShip,
+      unit: "筆已付款訂單等你出貨",
+      emptyText: "沒有待出貨的訂單",
     },
     {
       key: "stockAlertsOpen",

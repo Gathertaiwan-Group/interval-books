@@ -84,6 +84,7 @@ check("單筆 [10] → 9", newFirstSortOrder([{ sort_order: 10 }]), 9);
 console.log("\n[2] 今日待辦卡片");
 const counts = {
   transferPending: 0,
+  toShip: 3,
   stockAlertsOpen: 2,
   productsPending: null,
   priceChangesPending: 0,
@@ -91,10 +92,11 @@ const counts = {
 };
 const cards = T.buildTodoCards(counts);
 check(
-  "五張卡片、各自連到對的頁",
+  "六張卡片、各自連到對的頁",
   cards.map((c) => [c.key, c.href]),
   [
     ["transferPending", "/admin/orders"],
+    ["toShip", "/admin/orders"],
     ["stockAlertsOpen", "/admin/stock-alerts"],
     ["productsPending", "/admin/inventory-products"],
     ["priceChangesPending", "/admin/inventory-products"],
@@ -102,14 +104,20 @@ check(
   ],
 );
 check(
+  "「待出貨」卡片帶 ?scope=to_ship（點進去落在待出貨分頁），其餘卡片不帶 search",
+  cards.map((c) => c.search ?? null),
+  [null, { scope: "to_ship" }, null, null, null, null],
+);
+check(
   "count 原樣帶過去（null 不被改成 0）",
   cards.map((c) => c.count),
-  [0, 2, null, 0, 1],
+  [0, 3, 2, null, 0, 1],
 );
 check(
   "有事要做（>0 或讀取失敗）的排前面，其餘維持原順序",
   T.sortTodoCards(cards).map((c) => c.key),
   [
+    "toShip",
     "stockAlertsOpen",
     "productsPending",
     "purchasesPending",

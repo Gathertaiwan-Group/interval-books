@@ -67,12 +67,13 @@ import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
 import { maskEmail, maskTail } from "@/lib/admin/pii-mask";
 import type { Localized } from "@/i18n/types";
+import { TO_SHIP_FILTER } from "@/lib/admin/order-fulfillment";
 
 // ---------------------------------------------------------------------------
 // 列表
 // ---------------------------------------------------------------------------
 
-export type AdminOrderListScope = "transfer_pending" | "all";
+export type AdminOrderListScope = "transfer_pending" | "to_ship" | "all";
 
 export type AdminOrderListFilter = {
   scope: AdminOrderListScope;
@@ -93,7 +94,7 @@ export type AdminOrderListFilter = {
  * 不准出現 'email' 或 'phone'，也不准查詢 order_addresses。
  */
 const LIST_COLUMNS =
-  "id, order_no, created_at, total, payment_method, payment_status, status, remittance_last5, customer_name, archived_at";
+  "id, order_no, created_at, total, payment_method, payment_status, status, shipping_method, remittance_last5, customer_name, archived_at";
 
 export type AdminOrderListRow = {
   id: string;
@@ -103,6 +104,8 @@ export type AdminOrderListRow = {
   payment_method: string | null;
   payment_status: string;
   status: string;
+  /** home／cvs／pickup／none（0005 CHECK）。 */
+  shipping_method: string;
   remittance_last5: string | null;
   /** 全名，不遮罩 —— 見檔頭。 */
   customer_name: string;
@@ -135,6 +138,14 @@ export async function listAdminOrders(filter: AdminOrderListFilter): Promise<Adm
 
   if (filter.scope === "transfer_pending") {
     query = query.eq("payment_method", "transfer").neq("payment_status", "paid");
+  } else if (filter.scope === "to_ship") {
+    // 待出貨：與 admin-todo.ts 的 toShip 計數、src/lib/admin/order-fulfillment.ts 的
+    // canApply("ship") 同一組條件（TO_SHIP_FILTER）。
+    query = query
+      .eq("status", TO_SHIP_FILTER.status)
+      .eq("payment_status", TO_SHIP_FILTER.payment_status)
+      .not("paid_at", "is", null)
+      .in("shipping_method", [...TO_SHIP_FILTER.shipping_methods]);
   }
   if (!filter.includeArchived) {
     query = query.is("archived_at", null);
@@ -156,7 +167,7 @@ export async function listAdminOrders(filter: AdminOrderListFilter): Promise<Adm
 // ---------------------------------------------------------------------------
 
 const DETAIL_COLUMNS =
-  "id, order_no, created_at, paid_at, status, payment_status, payment_method, " +
+  "id, order_no, created_at, paid_at, shipped_at, completed_at, status, payment_status, payment_method, " +
   "subtotal, shipping_fee, discount, total, shipping_method, " +
   "remittance_last5, remittance_reported_at, customer_name, customer_email, customer_phone, archived_at, " +
   // 0040：推薦碼與當時的折扣%。⚠️ 這兩欄要等 0040 套上正式庫之後才存在。
@@ -167,6 +178,8 @@ type OrderDetailRawRow = {
   order_no: string;
   created_at: string;
   paid_at: string | null;
+  shipped_at: string | null;
+  completed_at: string | null;
   status: string;
   payment_status: string;
   payment_method: string | null;
@@ -221,6 +234,10 @@ export type AdminOrderDetail = {
   order_no: string;
   created_at: string;
   paid_at: string | null;
+  /** 標記已出貨的時間（_shell.orders.tsx 的「標記已出貨」寫入）。 */
+  shipped_at: string | null;
+  /** 標記已取貨／已完成的時間。 */
+  completed_at: string | null;
   status: string;
   payment_status: string;
   payment_method: string | null;
@@ -361,6 +378,8 @@ export async function getAdminOrderDetail(orderId: string): Promise<AdminOrderDe
     order_no: o.order_no,
     created_at: o.created_at,
     paid_at: o.paid_at,
+    shipped_at: o.shipped_at,
+    completed_at: o.completed_at,
     status: o.status,
     payment_status: o.payment_status,
     payment_method: o.payment_method,

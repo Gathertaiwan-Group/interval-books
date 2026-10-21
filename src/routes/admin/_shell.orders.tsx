@@ -43,10 +43,20 @@
  * 兩者的分界是 payment_status，不是 status——與資料庫那兩支函式的閘門一致
  * （admin_delete_order() 用同一個條件擋已付款訂單），UI 這裡的判斷只是不要讓
  * 使用者點出一個注定會被資料庫拒絕的按鈕，真正的邊界仍然在資料庫那一層。
+ *
+ * ── 出貨／取貨／完成 ─────────────────────────────────────────────────────
+ * 已付款、處理中的訂單：宅配／超商 →「標記已出貨」（processing → shipped）、門市
+ * 自取 →「標記已取貨」（processing → completed）；已出貨 →「標記已完成」。純活動
+ * 票券（shipping_method = 'none'）沒有按鈕。條件只定義一次，在
+ * src/lib/admin/order-fulfillment.ts；寫入是一句 conditional update
+ * （src/server/repos/order-fulfillment.ts）。🔴 這條路徑不寄任何信給客人。
+ *
+ * 「待出貨」分頁（?scope=to_ship）與首頁「今日待辦」的「待出貨」卡片用同一組條件
+ * （TO_SHIP_FILTER）。
  */
 import { useCallback, useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Archive, ArchiveRestore, Landmark, Loader2, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Landmark, Loader2, PackageCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -82,11 +92,17 @@ import {
 // 時間一律走這一支，不要再寫 toLocaleString：就算帶了 timeZone，Node 與 Chrome 的
 // ICU 印出來的字也不一樣（空白字元），SSR 會 React #418。見該檔檔頭。
 import { formatTaipeiDateTime } from "@/lib/taipei-time";
+import {
+  ACTION_BUTTON_LABEL,
+  availableFulfillmentAction,
+  confirmDescription,
+  type FulfillmentAction,
+} from "@/lib/admin/order-fulfillment";
 // ⚠️ type-only：編譯後整行消失，不會把 server-only 的 repo 模組拉進瀏覽器
 // bundle（同 _shell.sales.tsx 對 src/server/repos/inv-sales.ts 的做法）。
 import type { AdminOrderDetail, AdminOrderListRow } from "@/server/repos/orders-admin";
 
-type Scope = "transfer_pending" | "all";
+type Scope = "transfer_pending" | "to_ship" | "all";
 
 /**
  * 這一頁不是報表，單次讀取有上限 —— 必須與
@@ -163,20 +179,36 @@ function money(n: number): string {
 }
 
 export const Route = createFileRoute("/admin/_shell/orders")({
-  loader: async () => {
+  // ?scope=to_ship 讓首頁「待出貨」卡片可以直接落在那個分頁；不帶就是預設分頁。
+  validateSearch: (search: Record<string, unknown>): { scope?: "to_ship" | "all" } => {
+    const v = search.scope;
+    return v === "to_ship" || v === "all" ? { scope: v } : {};
+  },
+  loaderDeps: ({ search }) => ({ scope: search.scope }),
+  loader: async ({ deps }) => {
     const { listAdminOrders } = await import("@/lib/admin/fns/orders");
     // 預設分頁就是「待收款的匯款訂單」——這一頁存在的理由，見檔頭。
-    const orders = await listAdminOrders({ data: { scope: "transfer_pending" } });
-    return { orders };
+    const scope: Scope = deps.scope ?? "transfer_pending";
+    const orders = await listAdminOrders({ data: { scope } });
+    return { orders, scope };
   },
   head: () => ({ meta: [{ title: "訂單｜小時光書店後台" }] }),
-  component: AdminOrdersPage,
+  component: AdminOrdersRoute,
 });
 
-function AdminOrdersPage() {
-  const { orders: initial } = Route.useLoaderData();
+/** 分頁就是網址（?scope=…）：換分頁＝換網址＝重新掛載，狀態不會跨分頁殘留。 */
+function AdminOrdersRoute() {
+  const { scope } = Route.useLoaderData();
+  return <AdminOrdersPage key={scope} />;
+}
 
-  const [scope, setScope] = useState<Scope>("transfer_pending");
+function AdminOrdersPage() {
+  const { orders: initial, scope } = Route.useLoaderData();
+  const navigate = Route.useNavigate();
+  const setScope = (next: Scope) => {
+    void navigate({ search: next === "transfer_pending" ? {} : { scope: next }, replace: true });
+  };
+
   const [includeArchived, setIncludeArchived] = useState(false);
   const [orders, setOrders] = useState<AdminOrderListRow[]>(initial);
   const [loading, setLoading] = useState(false);
@@ -196,6 +228,10 @@ function AdminOrdersPage() {
   const [deleting, setDeleting] = useState(false);
   const [archiving, setArchiving] = useState(false);
 
+  // 出貨／取貨／完成。同上，獨立的二次確認與 loading 旗標。
+  const [fulfillAction, setFulfillAction] = useState<FulfillmentAction | null>(null);
+  const [fulfilling, setFulfilling] = useState(false);
+
   const load = useCallback(async (next: Scope, archived: boolean) => {
     setLoading(true);
     try {
@@ -208,9 +244,9 @@ function AdminOrdersPage() {
     }
   }, []);
 
-  // 第一次不重打：loader 已經用預設 scope／includeArchived=false 抓過了（同
-  // _shell.sales.tsx 的做法）。
-  const isInitial = scope === "transfer_pending" && !includeArchived && orders === initial;
+  // 第一次不重打：loader 已經用這個 scope／includeArchived=false 抓過了（同
+  // _shell.sales.tsx 的做法）。scope 換了會整個重新掛載（見 AdminOrdersRoute）。
+  const isInitial = !includeArchived && orders === initial;
   useEffect(() => {
     if (isInitial) return;
     void load(scope, includeArchived);
@@ -246,6 +282,52 @@ function AdminOrdersPage() {
     setNote("");
     setConfirmOpen(false);
     setDeleteConfirmOpen(false);
+    setFulfillAction(null);
+  }
+
+  /**
+   * 標記已出貨／已取貨／已完成。與 submitMarkPaid 同一個「動作結果與畫面刷新分兩段
+   * try」的立場。already_done 是冪等成功（toast.info），不是錯誤。
+   */
+  async function submitFulfillment(action: FulfillmentAction) {
+    if (!detail) return;
+    setFulfilling(true);
+    try {
+      const { advanceOrderFulfillmentAdmin } = await import("@/lib/admin/fns/orders");
+      const result = await advanceOrderFulfillmentAdmin({
+        data: { orderId: detail.id, action },
+      });
+      const doneLabel = ACTION_BUTTON_LABEL[action].replace("標記", "");
+
+      if (result.reason === "updated") {
+        toast.success(`訂單 ${result.order_no} 已標記為${doneLabel}`);
+      } else if (result.reason === "already_done") {
+        toast.info(`訂單 ${result.order_no} 已經是${doneLabel}狀態，沒有重複處理`);
+      } else if (result.reason === "ineligible") {
+        toast.error(
+          `訂單 ${result.order_no ?? ""} 目前不符合條件（狀態：${
+            STATUS_LABEL[result.status ?? ""] ?? result.status ?? "—"
+          }），無法${ACTION_BUTTON_LABEL[action]}`,
+        );
+      } else {
+        toast.error("找不到這張訂單，可能已被刪除");
+      }
+      setFulfillAction(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "更新失敗，請稍後再試");
+      return;
+    } finally {
+      setFulfilling(false);
+    }
+
+    try {
+      const { getAdminOrderDetail } = await import("@/lib/admin/fns/orders");
+      const fresh = await getAdminOrderDetail({ data: { orderId: detail.id } });
+      if (fresh) setDetail(fresh);
+      await load(scope, includeArchived);
+    } catch {
+      toast.error("已處理，但畫面更新失敗，請重新整理頁面確認最新狀態");
+    }
   }
 
   /**
@@ -394,6 +476,7 @@ function AdminOrdersPage() {
         <Tabs value={scope} onValueChange={(v) => setScope(v as Scope)}>
           <TabsList>
             <TabsTrigger value="transfer_pending">待收款的匯款訂單</TabsTrigger>
+            <TabsTrigger value="to_ship">待出貨</TabsTrigger>
             <TabsTrigger value="all">全部訂單</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -413,20 +496,25 @@ function AdminOrdersPage() {
               <TableHead className="text-right">金額</TableHead>
               <TableHead>付款方式</TableHead>
               <TableHead>付款狀態</TableHead>
+              <TableHead>訂單狀態</TableHead>
               <TableHead>末五碼</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center">
+                <TableCell colSpan={8} className="h-32 text-center">
                   <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
                 </TableCell>
               </TableRow>
             ) : orders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-sm text-muted-foreground">
-                  {scope === "transfer_pending" ? "目前沒有待收款的匯款訂單" : "目前沒有訂單"}
+                <TableCell colSpan={8} className="h-32 text-center text-sm text-muted-foreground">
+                  {scope === "transfer_pending"
+                    ? "目前沒有待收款的匯款訂單"
+                    : scope === "to_ship"
+                      ? "目前沒有待出貨的訂單"
+                      : "目前沒有訂單"}
                 </TableCell>
               </TableRow>
             ) : (
@@ -467,6 +555,11 @@ function AdminOrdersPage() {
                       {PAYMENT_STATUS_LABEL[o.payment_status] ?? o.payment_status}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    <Badge variant={statusBadgeVariant(o.status)} className="font-normal">
+                      {STATUS_LABEL[o.status] ?? o.status}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="font-mono text-xs">{o.remittance_last5 ?? "—"}</TableCell>
                 </TableRow>
               ))
@@ -504,6 +597,10 @@ function AdminOrdersPage() {
                 <span className="text-sm text-muted-foreground">
                   下單於 {formatTaipeiDateTime(detail.created_at)}
                   {detail.paid_at ? `・付款於 ${formatTaipeiDateTime(detail.paid_at)}` : ""}
+                  {detail.shipped_at ? `・出貨於 ${formatTaipeiDateTime(detail.shipped_at)}` : ""}
+                  {detail.completed_at
+                    ? `・完成於 ${formatTaipeiDateTime(detail.completed_at)}`
+                    : ""}
                 </span>
               </div>
 
@@ -659,6 +756,12 @@ function AdminOrdersPage() {
                 </p>
               )}
 
+              <FulfillmentSection
+                detail={detail}
+                busy={fulfilling}
+                onRequest={(action) => setFulfillAction(action)}
+              />
+
               {/* 刪除／封存（0035）。分界是 payment_status，與 admin_delete_order()
                   在資料庫那一層擋已付款訂單的條件一致——這裡只是不要讓使用者點出一個
                   注定會被拒絕的按鈕，真正的邊界仍在資料庫。 */}
@@ -739,6 +842,40 @@ function AdminOrdersPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog
+        open={fulfillAction !== null}
+        onOpenChange={(open) => {
+          if (!open && !fulfilling) setFulfillAction(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {fulfillAction ? `確定要${ACTION_BUTTON_LABEL[fulfillAction]}？` : ""}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {detail && fulfillAction ? confirmDescription(fulfillAction, detail.order_no) : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={fulfilling}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={fulfilling}
+              onClick={(e) => {
+                e.preventDefault();
+                if (fulfillAction) void submitFulfillment(fulfillAction);
+              }}
+            >
+              {fulfilling
+                ? "處理中…"
+                : fulfillAction
+                  ? `確定${ACTION_BUTTON_LABEL[fulfillAction]}`
+                  : ""}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -765,5 +902,39 @@ function AdminOrdersPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+const FULFILLMENT_HINT: Record<FulfillmentAction, string> = {
+  ship: "包裹交給物流或超商之後再按。只會改訂單狀態並記下出貨時間，不會寄信通知客人。",
+  pickup: "客人到門市取走之後再按。訂單會直接變成「已完成」，不會寄信通知客人。",
+  complete: "確認客人已經收到包裹之後再按。不會寄信通知客人。",
+};
+
+/**
+ * 出貨／取貨／完成的區塊。只在 availableFulfillmentAction() 有答案時出現——
+ * 未付款、純票券、已完成、已取消都不顯示（同一個判斷，伺服器那句 conditional
+ * update 會再擋一次）。
+ */
+function FulfillmentSection({
+  detail,
+  busy,
+  onRequest,
+}: {
+  detail: AdminOrderDetail;
+  busy: boolean;
+  onRequest: (action: FulfillmentAction) => void;
+}) {
+  const action = availableFulfillmentAction(detail);
+  if (!action) return null;
+  return (
+    <section className="space-y-2 rounded-md border border-border p-3">
+      <h3 className="text-sm font-medium">{ACTION_BUTTON_LABEL[action]}</h3>
+      <p className="text-xs text-muted-foreground">{FULFILLMENT_HINT[action]}</p>
+      <Button className="gap-1.5" disabled={busy} onClick={() => onRequest(action)}>
+        <PackageCheck className="h-4 w-4" />
+        {ACTION_BUTTON_LABEL[action]}
+      </Button>
+    </section>
   );
 }

@@ -7,6 +7,9 @@
  *   transferPending     ↔ repos/orders-admin.ts listAdminOrders({ scope: "transfer_pending" })
  *                          payment_method = 'transfer' and payment_status <> 'paid'
  *                          and archived_at is null
+ *   toShip              ↔ repos/orders-admin.ts listAdminOrders({ scope: "to_ship" })
+ *                          TO_SHIP_FILTER（lib/admin/order-fulfillment.ts）：processing、
+ *                          paid、paid_at is not null、home／cvs、archived_at is null
  *   stockAlertsOpen     ↔ repos/inv-sales.ts listStockAlerts("open")：resolved_at is null
  *   productsPending     ↔ repos/inv-products.ts approvalStatus = 'pending'
  *   priceChangesPending ↔ repos/inv-products.ts priceChange = 'pending'
@@ -22,6 +25,7 @@ import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
 import type { AdminTodoCounts } from "@/lib/admin/todo";
 import type { Localized } from "@/i18n/types";
+import { TO_SHIP_FILTER } from "@/lib/admin/order-fulfillment";
 
 type CountResult = PromiseLike<{
   count: number | null;
@@ -46,37 +50,55 @@ export async function getAdminTodoCounts(): Promise<AdminTodoCounts> {
   const db = supabaseAdmin();
   const head = { count: "exact" as const, head: true };
 
-  const [transferPending, stockAlertsOpen, productsPending, priceChangesPending, purchasesPending] =
-    await Promise.all([
-      safeCount(
-        "transferPending",
-        db
-          .from("orders")
-          .select("id", head)
-          .eq("payment_method", "transfer")
-          .neq("payment_status", "paid")
-          .is("archived_at", null),
-      ),
-      safeCount(
-        "stockAlertsOpen",
-        db.from("inv_stock_alerts").select("*", head).is("resolved_at", null),
-      ),
-      safeCount(
-        "productsPending",
-        db.from("inv_admin_products").select("*", head).eq("approval_status", "pending"),
-      ),
-      safeCount(
-        "priceChangesPending",
-        db.from("inv_admin_products").select("*", head).eq("price_change_status", "pending"),
-      ),
-      safeCount(
-        "purchasesPending",
-        db.from("inv_admin_purchases").select("*", head).eq("approval_status", "pending"),
-      ),
-    ]);
+  const [
+    transferPending,
+    toShip,
+    stockAlertsOpen,
+    productsPending,
+    priceChangesPending,
+    purchasesPending,
+  ] = await Promise.all([
+    safeCount(
+      "transferPending",
+      db
+        .from("orders")
+        .select("id", head)
+        .eq("payment_method", "transfer")
+        .neq("payment_status", "paid")
+        .is("archived_at", null),
+    ),
+    safeCount(
+      "toShip",
+      db
+        .from("orders")
+        .select("id", head)
+        .eq("status", TO_SHIP_FILTER.status)
+        .eq("payment_status", TO_SHIP_FILTER.payment_status)
+        .not("paid_at", "is", null)
+        .in("shipping_method", [...TO_SHIP_FILTER.shipping_methods])
+        .is("archived_at", null),
+    ),
+    safeCount(
+      "stockAlertsOpen",
+      db.from("inv_stock_alerts").select("*", head).is("resolved_at", null),
+    ),
+    safeCount(
+      "productsPending",
+      db.from("inv_admin_products").select("*", head).eq("approval_status", "pending"),
+    ),
+    safeCount(
+      "priceChangesPending",
+      db.from("inv_admin_products").select("*", head).eq("price_change_status", "pending"),
+    ),
+    safeCount(
+      "purchasesPending",
+      db.from("inv_admin_purchases").select("*", head).eq("approval_status", "pending"),
+    ),
+  ]);
 
   return {
     transferPending,
+    toShip,
     stockAlertsOpen,
     productsPending,
     priceChangesPending,
