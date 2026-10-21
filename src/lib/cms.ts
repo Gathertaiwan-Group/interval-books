@@ -17,6 +17,8 @@ import { supabase } from "@/lib/supabase";
 import type { Localized } from "@/i18n/types";
 import { EVENT_LIST_FIELDS, type EventListField } from "@/lib/event-blocks";
 import { excludeJourneyEvents } from "@/lib/journey-events";
+import { latestSessionEndDate } from "@/lib/event-status";
+import { eventProductSlug } from "@/lib/shop";
 import {
   UI,
   SITE_INFO,
@@ -127,6 +129,14 @@ export type EventEntry = {
    *    這種範圍。兩者不可以互換。
    */
   isoDate: string | null;
+  /**
+   * 這場活動售票商品（products.slug = `event-<slug>`）上，最晚那一場**開放中**場次的
+   * 結束日（台北 YYYY-MM-DD）。null = 沒有場次／讀不到。
+   *
+   * 只給 isEventPast() 用：還有今天或之後的場次，iso_date 填錯了也不算已結束
+   * （見 src/lib/event-status.ts）。只有 fetchEvents() 會填；其他來源一律 null。
+   */
+  lastSessionDate: string | null;
   date: string;
   category: string;
   externalUrl: string;
@@ -286,6 +296,7 @@ export const FALLBACK_EVENTS: EventEntry[] = staticEvents.map((e) => ({
   imageKey: null,
   // bundled 種子沒有 iso_date —— 判不出結束與否，一律留在進行中。
   isoDate: null,
+  lastSessionDate: null,
   title: e.title,
   summary: e.summary,
   description: e.description,
@@ -774,9 +785,36 @@ async function fetchAllEventRows(): Promise<EventEntry[]> {
       externalUrl: str(r.external_url),
       imageKey: nullableStr(r.image_key),
       isoDate: nullableStr(r.iso_date),
+      lastSessionDate: null,
     });
   }
-  return mapped.length ? mapped : FALLBACK_EVENTS;
+  if (!mapped.length) return FALLBACK_EVENTS;
+  return await attachLastSessionDates(mapped);
+}
+
+/**
+ * 替每場活動補上 lastSessionDate —— 一次查詢：售票商品（`event-<slug>`）連同它的
+ * 場次一起 embed 回來（event_sessions.product_id → products.id 的外鍵）。
+ *
+ * anon 讀得到的只有 active 商品的 open 場次（0020 的 RLS），這正是「還在賣」的意思。
+ * 讀取失敗 → 原樣回傳（lastSessionDate 全是 null），也就是退回 iso_date 的舊規則：
+ * 這一步只能讓活動**多留**在報名中，所以失敗不需要比舊行為更保守。
+ */
+async function attachLastSessionDates(events: EventEntry[]): Promise<EventEntry[]> {
+  const bySlug = new Map(events.map((e) => [eventProductSlug(e.slug), e]));
+  const rows = await select("products", "slug,event_sessions(starts_at,ends_at)", {
+    in: ["slug", [...bySlug.keys()]],
+  });
+  if (!rows) return events;
+  for (const r of rows) {
+    const event = bySlug.get(str(r.slug));
+    const sessions = Array.isArray(r.event_sessions) ? (r.event_sessions as Row[]) : [];
+    if (!event) continue;
+    event.lastSessionDate = latestSessionEndDate(
+      sessions.map((s) => ({ startsAt: nullableStr(s.starts_at), endsAt: nullableStr(s.ends_at) })),
+    );
+  }
+  return events;
 }
 
 /**
@@ -935,6 +973,7 @@ export async function fetchEventBySlug(slug: string): Promise<EventDetailResult>
         imageKey: nullableStr(r.image_key),
         // 詳情頁不做「已結束」的判斷（直接連過來的人本來就該看得到內容）。
         isoDate: null,
+        lastSessionDate: null,
         registrationType: r.registration_type === "internal" ? "internal" : "external",
         galleryKeys,
         speaker,

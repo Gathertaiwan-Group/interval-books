@@ -651,6 +651,39 @@ const root = read("src/routes/__root.tsx");
 checkTrue("__root 掛了 ReferralCapture", root.includes("<ReferralCapture"));
 
 // -----------------------------------------------------------------------------
+console.log("\n[8b] 只有票券時不顯示推薦碼欄位（2026-10-21《海的聲音》立即報名）");
+// -----------------------------------------------------------------------------
+check("只有活動票 → 不顯示", R.hasReferralEligibleLine([{ productType: "event" }]), false);
+check(
+  "活動＋策旅 → 不顯示",
+  R.hasReferralEligibleLine([{ productType: "event" }, { productType: "journey" }]),
+  false,
+);
+check("空車 → 不顯示", R.hasReferralEligibleLine([]), false);
+check("一本書 → 顯示", R.hasReferralEligibleLine([{ productType: "book" }]), true);
+check(
+  "票券＋選品混買 → 顯示",
+  R.hasReferralEligibleLine([{ productType: "event" }, { productType: "goods" }]),
+  true,
+);
+const checkoutPage = read("src/routes/checkout.index.tsx");
+checkTrue(
+  "結帳頁用 hasReferralEligibleLine(buyable) 決定顯示",
+  checkoutPage.includes("const showReferral = hasReferralEligibleLine(buyable)"),
+);
+checkTrue(
+  "推薦碼 fieldset 包在 showReferral 裡",
+  /\{showReferral && \(\s*<fieldset[^>]*>\s*<legend[^>]*>\{t\(PAGE\.referralSection\)\}/.test(
+    checkoutPage,
+  ),
+);
+checkTrue(
+  "欄位隱藏時不拿推薦碼擋送出（showReferral && typedReferral && …）",
+  /showReferral\s*&&\s*typedReferral\s*&&/.test(checkoutPage),
+);
+check("隱藏時不清 ib_ref cookie", /document\.cookie\s*=/.test(checkoutPage), false);
+
+// -----------------------------------------------------------------------------
 console.log("\n[9] migration 帳本");
 // -----------------------------------------------------------------------------
 assertLedgerMatchesDisk(check, MIG_DIR);

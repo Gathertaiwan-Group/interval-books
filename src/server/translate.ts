@@ -98,7 +98,37 @@ const TRANSLATE_SYSTEM = [
   "   不要自己發明意譯。",
   "5. 原文若已經是英文或日文，仍然要給出另外兩種語言各自自然的說法，不要原封不動照抄。",
   "6. 兩個欄位都一定要有內容，不可以留空。",
+  "7. 原文的【】是中文標題的強調括號：日文照用【】；英文不要用任何括號或引號包起來，",
+  "   把括號裡的字當成主標，後面接「 — 」再接副標（例：【海的聲音】分享會 → The Voice of the Sea — A Talk）。",
 ].join("\n");
+
+/**
+ * 英文譯文裡被模型當成 JSON 陣列寫出來的【】：`["主標"] 副標` → `主標 — 副標`。
+ *
+ * 2026-10-21《海的聲音》的英文標題就是這樣上站的：`["Have You Heard the Voice of the
+ * Sea?"] Hu Hai-Yin ...`。prompt 第 7 條叫模型別這樣寫，這裡是它不聽話時的保險 ——
+ * 只認「方括號＋引號」與英文裡殘留的【】這兩種形狀，其他方括號（例如 `[Online]`）原樣保留。
+ */
+export function cleanEnglishBrackets(en: string): string {
+  const BRACKET = /\[\s*["\u201c\u201d]([^"\u201c\u201d\]]+)["\u201c\u201d]\s*\]|【([^】]+)】/g;
+  return en
+    .split("\n")
+    .map((line) => {
+      const lead = line.match(/^\s*/)?.[0] ?? "";
+      const body = line.slice(lead.length);
+      const out = body.replace(
+        BRACKET,
+        (m, a: string | undefined, b: string | undefined, offset: number) => {
+          const inner = (a ?? b ?? "").trim();
+          const rest = body.slice(offset + m.length).trim();
+          // 開頭的那一組是主標：後面還有字就接「 — 」。中間的就只拿掉括號。
+          return offset === 0 && rest ? `${inner} — ` : inner;
+        },
+      );
+      return lead + out.replace(/ — \s+/g, " — ").replace(/\s+$/, "");
+    })
+    .join("\n");
+}
 
 /**
  * 真正送出去的 request body。**抽成函式是為了讓自檢驗得到「production 真的送了什麼」**，
@@ -248,7 +278,7 @@ async function callGemini(zh: string): Promise<unknown> {
  */
 export function normaliseTranslation(raw: unknown): TranslateResult {
   const obj = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
-  const en = typeof obj.en === "string" ? obj.en.trim() : "";
+  const en = typeof obj.en === "string" ? cleanEnglishBrackets(obj.en.trim()).trim() : "";
   const ja = typeof obj.ja === "string" ? obj.ja.trim() : "";
 
   if (!en || !ja) {

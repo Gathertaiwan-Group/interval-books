@@ -335,6 +335,47 @@ checkTrue(
 const capped = normaliseTranslation({ en: "a".repeat(20000), ja: "あ".repeat(20000) });
 check("超長輸出被截到上限", [capped.en.length, capped.ja.length], [6000, 6000]);
 
+// 2026-10-21《海的聲音》：模型把【】寫成 JSON 陣列 `["..."]` 上了站。
+console.log("\n[3b] 英文譯文的【】殘留");
+const { cleanEnglishBrackets } = mod;
+check(
+  '正式庫實例：開頭 ["主標"] → 主標 — 副標',
+  normaliseTranslation({
+    en: '["Have You Heard the Voice of the Sea?"] Hu Hai-Yin Handmade Picture Book Talk',
+    ja: "【海の声】トーク",
+  }),
+  {
+    en: "Have You Heard the Voice of the Sea? — Hu Hai-Yin Handmade Picture Book Talk",
+    ja: "【海の声】トーク",
+  },
+);
+check(
+  "全形引號 [“…”] 也認",
+  cleanEnglishBrackets("[“Quiet Hours”] A Reading Night"),
+  "Quiet Hours — A Reading Night",
+);
+check(
+  "英文裡殘留的【】",
+  cleanEnglishBrackets("【Quiet Hours】 A Reading Night"),
+  "Quiet Hours — A Reading Night",
+);
+check("整句只有括號 → 只拿掉括號", cleanEnglishBrackets('["Quiet Hours"]'), "Quiet Hours");
+check(
+  '句中的 ["…"] 只拿掉括號',
+  cleanEnglishBrackets('Talk on ["Quiet Hours"] tonight'),
+  "Talk on Quiet Hours tonight",
+);
+check(
+  "一般方括號 [Online] 原樣保留",
+  cleanEnglishBrackets("[Online] Workshop"),
+  "[Online] Workshop",
+);
+check("多行逐行處理、保留換行", cleanEnglishBrackets('["A"] b\nline two'), "A — b\nline two");
+checkTrue(
+  "prompt 有教模型英文不要用括號包【】",
+  JSON.stringify(buildTranslateRequest("x")).includes("英文不要用任何括號或引號包起來"),
+);
+
 // =============================================================================
 // [4] 中文是空的就不打 API
 // =============================================================================

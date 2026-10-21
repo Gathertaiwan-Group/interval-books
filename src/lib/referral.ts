@@ -116,6 +116,16 @@ export function isShopGoods(productType: string): boolean {
   return (SHOP_GOODS_TYPES as readonly string[]).includes(productType);
 }
 
+/**
+ * 結帳頁要不要顯示推薦碼欄位：至少有一行選品／書籍才顯示。
+ *
+ * 只有活動、策旅票券時，推薦碼什麼都折不到（computeReferralDiscount 只算選品），
+ * 欄位底下那句「享 5% 折扣」只會讓人以為報名費會打折（2026-10-21《海的聲音》立即報名）。
+ */
+export function hasReferralEligibleLine(lines: readonly { productType: string }[]): boolean {
+  return lines.some((l) => isShopGoods(l.productType));
+}
+
 /** 百分比轉成以萬分之一為單位的整數，避開 0.1+0.2 這類浮點誤差。 */
 function basisPoints(percent: number): number {
   if (!Number.isFinite(percent) || percent <= 0) return 0;

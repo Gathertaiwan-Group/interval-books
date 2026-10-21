@@ -53,7 +53,12 @@ import {
   type PaymentMethodChoice,
 } from "@/lib/checkout";
 import { fetchPaymentOptions, placeOrder, previewReferralCode } from "@/lib/checkout-fns";
-import { computeReferralDiscount, normalizeReferralCode, readReferralCookie } from "@/lib/referral";
+import {
+  computeReferralDiscount,
+  hasReferralEligibleLine,
+  normalizeReferralCode,
+  readReferralCookie,
+} from "@/lib/referral";
 import {
   parseDirectCheckoutSearch,
   rememberCartKept,
@@ -544,6 +549,11 @@ function Checkout() {
     void checkReferral(fromCookie);
     // 只在進頁面時預填一次。
   }, []);
+  /**
+   * 只有票券（活動／策旅）時整個推薦碼欄位不顯示 —— 折不到任何東西。ib_ref cookie
+   * 不動（下次買選品時照樣預填）。
+   */
+  const showReferral = hasReferralEligibleLine(buyable);
   const referralDiscount =
     referral.state === "ok" && normalizeReferralCode(referralInput) === referral.code
       ? computeReferralDiscount(
@@ -684,8 +694,18 @@ function Checkout() {
       toast.error(t(PAGE.unavailableWarning));
       return;
     }
-    const typedReferral = normalizeReferralCode(referralInput);
-    if (typedReferral && !(referral.state === "ok" && referral.code === typedReferral)) {
+    // 欄位沒顯示（只有票券）時：客人看不到、也改不了這一欄，所以不可以拿它擋送出。
+    // cookie 的碼確認有效就照送（歸屬與以前一樣），否則當作沒用推薦碼。
+    const typedReferral = showReferral
+      ? normalizeReferralCode(referralInput)
+      : referral.state === "ok"
+        ? referral.code
+        : "";
+    if (
+      showReferral &&
+      typedReferral &&
+      !(referral.state === "ok" && referral.code === typedReferral)
+    ) {
       // 還沒確認過（打完直接按送出）或確認失敗：不送出。先確認一次並把折扣顯示出來，
       // 讓客人看到折後總額再按一次 —— 不可以在他沒看過金額的情況下就送出。
       // 結果（有效／無效）顯示在推薦碼欄位底下。
@@ -1335,58 +1355,60 @@ function Checkout() {
                 )}
               </fieldset>
 
-              <fieldset className="space-y-3">
-                <legend className="eyebrow text-xl">{t(PAGE.referralSection)}</legend>
-                <label htmlFor="referral-code" className="block text-sm font-medium">
-                  {t(PAGE.referralLabel)}
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    id="referral-code"
-                    value={referralInput}
-                    maxLength={20}
-                    autoComplete="off"
-                    autoCapitalize="characters"
-                    spellCheck={false}
-                    className="max-w-[14rem] uppercase"
-                    aria-invalid={referral.state === "invalid"}
-                    aria-describedby="referral-status"
-                    onChange={(e) => {
-                      setReferralInput(e.target.value);
-                      if (referral.state !== "idle") setReferral({ state: "idle" });
-                    }}
-                    onBlur={() => void checkReferral(referralInput)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void checkReferral(referralInput);
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => void checkReferral(referralInput)}
-                    disabled={referral.state === "checking" || !referralInput.trim()}
-                  >
-                    {t(PAGE.referralApply)}
-                  </Button>
-                </div>
-                <p id="referral-status" className="text-xs leading-relaxed" aria-live="polite">
-                  {referral.state === "checking" ? (
-                    <span className="text-muted-foreground">{t(PAGE.referralChecking)}</span>
-                  ) : referral.state === "ok" ? (
-                    <span className="text-emerald-700 dark:text-emerald-400">
-                      {t(PAGE.referralOk)} {referral.percent}
-                      {t(PAGE.referralOkTail)}
-                    </span>
-                  ) : referral.state === "invalid" ? (
-                    <span className="text-destructive">{t(PAGE.referralInvalid)}</span>
-                  ) : (
-                    <span className="text-muted-foreground">{t(PAGE.referralHint)}</span>
-                  )}
-                </p>
-              </fieldset>
+              {showReferral && (
+                <fieldset className="space-y-3">
+                  <legend className="eyebrow text-xl">{t(PAGE.referralSection)}</legend>
+                  <label htmlFor="referral-code" className="block text-sm font-medium">
+                    {t(PAGE.referralLabel)}
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="referral-code"
+                      value={referralInput}
+                      maxLength={20}
+                      autoComplete="off"
+                      autoCapitalize="characters"
+                      spellCheck={false}
+                      className="max-w-[14rem] uppercase"
+                      aria-invalid={referral.state === "invalid"}
+                      aria-describedby="referral-status"
+                      onChange={(e) => {
+                        setReferralInput(e.target.value);
+                        if (referral.state !== "idle") setReferral({ state: "idle" });
+                      }}
+                      onBlur={() => void checkReferral(referralInput)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void checkReferral(referralInput);
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void checkReferral(referralInput)}
+                      disabled={referral.state === "checking" || !referralInput.trim()}
+                    >
+                      {t(PAGE.referralApply)}
+                    </Button>
+                  </div>
+                  <p id="referral-status" className="text-xs leading-relaxed" aria-live="polite">
+                    {referral.state === "checking" ? (
+                      <span className="text-muted-foreground">{t(PAGE.referralChecking)}</span>
+                    ) : referral.state === "ok" ? (
+                      <span className="text-emerald-700 dark:text-emerald-400">
+                        {t(PAGE.referralOk)} {referral.percent}
+                        {t(PAGE.referralOkTail)}
+                      </span>
+                    ) : referral.state === "invalid" ? (
+                      <span className="text-destructive">{t(PAGE.referralInvalid)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">{t(PAGE.referralHint)}</span>
+                    )}
+                  </p>
+                </fieldset>
+              )}
 
               <fieldset className="space-y-5">
                 <legend className="eyebrow text-xl">{t(PAGE.noteSection)}</legend>

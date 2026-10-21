@@ -5,7 +5,7 @@ import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fetchEvents, fetchJourneys, fetchNews, fetchPage, pageText } from "@/lib/cms";
 import { useSiteContent } from "@/lib/site-content";
-import { isPastEvent } from "@/lib/event-status";
+import { isEventPast } from "@/lib/event-status";
 import { CARD, featureLayout } from "@/lib/feature-layout";
 import { imageFor } from "@/lib/images";
 import heroImg from "@/assets/hero-mountain.jpg";
@@ -130,7 +130,7 @@ function Index() {
   //    所以這裡的 events 只有一般活動，同一趟旅程不會在首頁出現兩次。
   // 首頁不放已結束的活動 —— 「本月精選」印一場去年辦完的講座沒有意義。
   // 已結束的活動只在 /events 的「已結束」那一格找得到。
-  const featuredEvents = events.filter((e) => !isPastEvent(e.isoDate)).slice(0, 3);
+  const featuredEvents = events.filter((e) => !isEventPast(e)).slice(0, 3);
   const eventsLayout = featureLayout(featuredEvents.length);
   const journeysLayout = featureLayout(featuredJourneys.length);
   const latestNews = news.slice(0, 3);

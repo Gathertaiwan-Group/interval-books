@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { isPastEvent } from "@/lib/event-status";
+import { isEventPast } from "@/lib/event-status";
 import { PageShell, PageHeader } from "@/components/PageShell";
 import { CoverImage } from "@/components/CoverImage";
 import { useT } from "@/i18n/LanguageContext";
@@ -153,8 +153,8 @@ function Events() {
 
   // 🔴 已結束的活動**只有在「已結束」那一格才找得到**。辦過的活動留在站上是為了
   //    讓人看得到我們辦過什麼，不是為了讓人以為還能報名。
-  const upcoming = events.filter((e) => !isPastEvent(e.isoDate));
-  const past = events.filter((e) => isPastEvent(e.isoDate));
+  const upcoming = events.filter((e) => !isEventPast(e));
+  const past = events.filter((e) => isEventPast(e));
   const list = filter === PAST_FILTER ? past : upcoming;
   // 卡片排法跟首頁同一套（src/lib/feature-layout.ts）：1 場＝橫版左圖右字佔滿寬，
   // 2 場兩欄，3 場以上 md 兩欄／lg 三欄。算的是「目前這一格」的筆數，切到
@@ -257,7 +257,7 @@ function Events() {
                   </p>
                   {/* 已結束要在卡片上看得出來 —— 只靠「它在另一個分頁底下」不夠：
                     分享出去的連結、從搜尋進來的人都不會看到那個分頁。 */}
-                  {isPastEvent(e.isoDate) ? (
+                  {isEventPast(e) ? (
                     <span className="border border-border px-2 py-0.5 text-xs tracking-widest text-muted-foreground">
                       {t(p.block("filters.pastBadge", PAST_BADGE))}
                     </span>

@@ -40,3 +40,47 @@ export function isPastEvent(isoDate: string | null | undefined, today = todayInT
   if (!isoDate) return false;
   return isoDate < today;
 }
+
+/**
+ * 一場活動的場次裡，最晚那一場的「結束日」（台北 YYYY-MM-DD）。沒有場次 → null。
+ *
+ * 每一場取 `endsAt`，沒填就退回 `startsAt`。時間字串讀不懂的那一場略過（不是拋錯：
+ * 這個值只用來**延後**「已結束」，略過頂多退回 iso_date 的舊規則）。
+ */
+export function latestSessionEndDate(
+  sessions: ReadonlyArray<{ startsAt?: string | null; endsAt?: string | null }>,
+): string | null {
+  let latest: string | null = null;
+  for (const s of sessions) {
+    const raw = s.endsAt || s.startsAt;
+    if (!raw) continue;
+    const t = Date.parse(raw);
+    if (Number.isNaN(t)) continue;
+    const ymd = todayInTaipei(new Date(t));
+    if (latest === null || ymd > latest) latest = ymd;
+  }
+  return latest;
+}
+
+/**
+ * 活動列表用的「已結束」：**還有今天或之後的場次就不算結束。**
+ *
+ * ── 為什麼不能只看 iso_date ───────────────────────────────────────────────
+ * 2026-10-21《海的聲音》從 /events「報名中」消失：它的 iso_date 是 2026-10-20 ——
+ * 顯示日期「2026.10.20~11.7」的**開頭**——但唯一的場次在 11/6，票還在賣。
+ * iso_date 是人手填的，填成區間開頭的人不會是最後一個。場次時間是報名本來就要
+ * 的資料，所以拿它來兜底：
+ *
+ *   · iso_date 為 null → 不算結束（理由見 isPastEvent；場次只能**延後**、不會提早）
+ *   · 否則取 max(iso_date, 最晚場次結束日)，早於今天才算結束
+ *   · 沒有場次（外部報名、場次讀不到）→ 等同 isPastEvent(iso_date) 的舊規則
+ */
+export function isEventPast(
+  event: { isoDate: string | null | undefined; lastSessionDate?: string | null },
+  today = todayInTaipei(),
+): boolean {
+  if (!event.isoDate) return false;
+  const last = event.lastSessionDate;
+  const effective = last && last > event.isoDate ? last : event.isoDate;
+  return isPastEvent(effective, today);
+}
