@@ -527,7 +527,7 @@ function layout(input: {
   const row = (r: Row) =>
     `<tr>` +
     `<td style="padding:4px 12px 4px 0;color:#6b6257;white-space:nowrap;vertical-align:top">${escapeHtml(r.label)}</td>` +
-    `<td style="padding:4px 0;color:#2b2621">${escapeHtml(r.value)}</td>` +
+    `<td style="padding:4px 0;color:#2b2621;white-space:pre-line">${escapeHtml(r.value)}</td>` +
     `</tr>`;
 
   const table = (rows: Row[]) =>
@@ -858,4 +858,147 @@ export function renderAdminOrderNotificationEmail(
   });
 
   return { subject, text, html };
+}
+
+// -----------------------------------------------------------------------------
+// 出貨通知（寄給訂購人，後台按下「標記已出貨」那一刻）
+// -----------------------------------------------------------------------------
+
+/**
+ * renderOrderShippedEmail 的輸入。
+ *
+ * ⚠️ 沒有物流單號：orders 沒有那一欄（這一期不加 DDL），所以信裡只說「包裹已經
+ *    寄出」，不假裝有一個可以查件的號碼。
+ *
+ * 收件資訊是**客人自己填的、寄給客人自己**，所以這裡印完整地址／門市（不遮罩）
+ * ——那正是這封信要讓他核對的東西。電話刻意不印：核對寄送不需要它，少一份副本。
+ */
+export type OrderShippedInput = {
+  orderNo: string;
+  customerName: string;
+  /** 只會是 'home' 或 'cvs'（出貨這個動作只對這兩種成立）。 */
+  shippingMethod: string;
+  items: { name: Localized; quantity: number; subtotal: number }[];
+  /** order_addresses 的 shipping 那一列。讀不到就是 null，信裡整區不印。 */
+  address: {
+    recipient: string;
+    postalCode: string;
+    city: string;
+    district: string;
+    street: string;
+    cvsStoreName: string;
+    cvsStoreId: string;
+    cvsAddress: string;
+  } | null;
+  /** 回到訂單頁的完整網址（/checkout/complete?token=…）。組不出來就是 null，不印連結。 */
+  orderUrl: string | null;
+  /** site_settings.contact_email。空的就不印「聯絡我們」那一列。 */
+  contactEmail: string | null;
+};
+
+/**
+ * 出貨通知信的句子。**刻意不進 email_copy CMS**：DEFAULT_EMAIL_COPY 的每一把 key
+ * 必須與 migration 的 seed 逐字一致（scripts/notify-selftest.mjs 守著），而這一期
+ * 不加 migration。署名與頁尾仍然走 CMS（common.signature／common.footerNote），
+ * 與其他交易信一致。
+ */
+export const ORDER_SHIPPED_TEXT = {
+  subject: {
+    zh: "【小時光書店】訂單 {orderNo} 已出貨",
+    en: "Interval Books: your order {orderNo} has shipped",
+    ja: "【小時光書店】ご注文 {orderNo} を発送しました",
+  },
+  heading: {
+    zh: "你的訂單已經出貨了",
+    en: "Your order is on its way",
+    ja: "ご注文の商品を発送しました",
+  },
+  introHome: {
+    zh: "{customerName} 你好，你在小時光書店訂購的商品已經交給宅配寄出，將送到下方地址，請留意收件。",
+    en: "Hi {customerName}, your Interval Books order has been handed to the courier and is on its way to the address below.",
+    ja: "{customerName} 様、小時光書店でご注文の商品を宅配便で発送しました。下記のご住所へお届けしますので、お受け取りをお願いいたします。",
+  },
+  introCvs: {
+    zh: "{customerName} 你好，你在小時光書店訂購的商品已經寄往下方的超商門市。包裹到店後會再通知你取貨，請於期限內前往取件。",
+    en: "Hi {customerName}, your Interval Books order has been sent to the convenience store below. You will be notified when it arrives — please pick it up before the deadline.",
+    ja: "{customerName} 様、小時光書店でご注文の商品を下記のコンビニ店舗へ発送しました。到着後にお知らせが届きますので、期限内にお受け取りください。",
+  },
+  outro: {
+    zh: "收到商品後若有任何問題，歡迎與我們聯繫。",
+    en: "If anything is wrong with your parcel, please get in touch with us.",
+    ja: "商品について何かございましたら、お気軽にお問い合わせください。",
+  },
+  shippingBlock: { zh: "寄送資訊", en: "Delivery", ja: "お届け先" },
+  recipient: { zh: "收件人", en: "Recipient", ja: "お受取人" },
+  address: { zh: "地址", en: "Address", ja: "ご住所" },
+  store: { zh: "取貨門市", en: "Pick-up store", ja: "受取店舗" },
+  storeAddress: { zh: "門市地址", en: "Store address", ja: "店舗住所" },
+  methodHome: { zh: "宅配到府", en: "Home delivery", ja: "宅配" },
+  methodCvs: { zh: "超商取貨", en: "Convenience store pick-up", ja: "コンビニ受取" },
+  contact: { zh: "聯絡我們", en: "Contact us", ja: "お問い合わせ" },
+  orderLink: { zh: "查看訂單明細", en: "View your order", ja: "ご注文内容を確認する" },
+} satisfies Record<string, Localized>;
+
+/**
+ * 出貨通知（寄給訂購人）。dedupe_key = `order_shipped:<order_id>`。
+ *
+ * 宅配與超商兩種寫法不同：宅配講「送到下方地址」，超商講「到店後超商會再通知取貨」。
+ */
+export function renderOrderShippedEmail(
+  input: OrderShippedInput,
+  copy: EmailCopy | undefined,
+  lang: Lang,
+): RenderedEmail {
+  const T = ORDER_SHIPPED_TEXT;
+  const isCvs = input.shippingMethod === "cvs";
+  const vars = { orderNo: input.orderNo, customerName: input.customerName };
+
+  const itemLines = input.items.map((it) => `${pick(it.name, lang)} × ${it.quantity}`).join("\n");
+
+  const rows: Row[] = [
+    { label: pick(LABELS.orderNo, lang), value: input.orderNo },
+    {
+      label: pick(LABELS.shippingMethod, lang),
+      value: pick(isCvs ? T.methodCvs : T.methodHome, lang),
+    },
+  ];
+  if (itemLines) rows.push({ label: pick(LABELS.items, lang), value: itemLines });
+
+  const a = input.address;
+  const shipRows: Row[] = [];
+  if (a) {
+    if (a.recipient) shipRows.push({ label: pick(T.recipient, lang), value: a.recipient });
+    if (isCvs) {
+      const store = [a.cvsStoreName, a.cvsStoreId ? `(${a.cvsStoreId})` : ""]
+        .filter(Boolean)
+        .join(" ");
+      if (store) shipRows.push({ label: pick(T.store, lang), value: store });
+      if (a.cvsAddress) shipRows.push({ label: pick(T.storeAddress, lang), value: a.cvsAddress });
+    } else {
+      const line = [a.postalCode, `${a.city}${a.district}${a.street}`].filter(Boolean).join(" ");
+      if (line.trim()) shipRows.push({ label: pick(T.address, lang), value: line.trim() });
+    }
+  }
+
+  const blocks: { title: string; rows: Row[] }[] = [];
+  if (shipRows.length > 0) blocks.push({ title: pick(T.shippingBlock, lang), rows: shipRows });
+  if (input.contactEmail) {
+    blocks.push({
+      title: pick(T.contact, lang),
+      rows: [{ label: "Email", value: input.contactEmail }],
+    });
+  }
+
+  const { text, html } = layout({
+    heading: fill(pick(T.heading, lang), vars),
+    intro: fill(pick(isCvs ? T.introCvs : T.introHome, lang), vars),
+    rows,
+    blocks,
+    ...(input.orderUrl ? { link: { label: pick(T.orderLink, lang), url: input.orderUrl } } : {}),
+    outro: pick(T.outro, lang),
+    signature: copyText(copy, "common.signature", lang),
+    footerNote: copyText(copy, "common.footerNote", lang),
+  });
+
+  return { subject: fill(pick(T.subject, lang), vars), text, html };
 }

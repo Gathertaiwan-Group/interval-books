@@ -111,8 +111,16 @@ export const archiveAdminOrder = createServerFn({ method: "POST" })
  * 條件與狀態轉換在 src/lib/admin/order-fulfillment.ts，寫入是
  * src/server/repos/order-fulfillment.ts 的一句 conditional update。
  *
- * 🔴 這一支刻意**不**呼叫任何通知／發票（不像 markOrderPaidAdmin 會觸發付款通知）：
- *    出貨通知信還沒有被核准，這一期只改狀態。
+ * ── 出貨通知信（業主 2026-10-22 核准）───────────────────────────────────────
+ * 只有 action === "ship" **且** 這一次真的寫入了（reason === "updated"，也就是
+ * processing → shipped 剛剛發生）才排出貨通知信給訂購人。冪等的 already_done、
+ * 門市自取（pickup）、已出貨 → 已完成（complete）都不寄。dedupe_key
+ * `order_shipped:<order_id>` 保證同一張單只會有一封。
+ *
+ * 🔴 排信失敗**不回滾、也不讓這次呼叫失敗**——狀態已經寫進去了。回傳值多一個
+ *    `notify_warning` 讓後台顯示「狀態已更新，但通知信排入失敗」。
+ *
+ * 仍然不開發票、不動庫存與名額。
  */
 export const advanceOrderFulfillmentAdmin = createServerFn({ method: "POST" })
   .middleware([adminFnMiddleware])
@@ -124,9 +132,20 @@ export const advanceOrderFulfillmentAdmin = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { advanceOrderFulfillment } = await import("@/server/repos/order-fulfillment");
-    return await advanceOrderFulfillment({
-      orderId: data.orderId,
-      actorId: context.admin.userId,
-      action: data.action,
+    const { runFulfillmentWithNotify } = await import("@/lib/admin/order-fulfillment");
+    return await runFulfillmentWithNotify(data.action, {
+      advance: () =>
+        advanceOrderFulfillment({
+          orderId: data.orderId,
+          actorId: context.admin.userId,
+          action: data.action,
+        }),
+      // 只有 processing → shipped 這一次真的發生才會被叫到（見 runFulfillmentWithNotify）。
+      notifyShipped: async () => {
+        const { triggerNotifyAfterShipped } = await import("@/server/notify");
+        return await triggerNotifyAfterShipped(data.orderId);
+      },
+      onNotifyError: (message) =>
+        console.error(`[admin/orders] 出貨通知信例外 order=${data.orderId}：${message}`),
     });
   });

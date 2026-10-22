@@ -100,6 +100,25 @@ export async function enqueueOrderEmail(input: {
   text: string;
   html: string;
 }): Promise<boolean> {
+  return (await enqueueOrderEmailResult(input)) === "queued";
+}
+
+/**
+ * 同 enqueueOrderEmail，但**分得出「沒排」與「排失敗」**：
+ *   queued     —— 這一次真的新增了一列
+ *   not_queued —— dedupe_key 已存在，或這張訂單沒有信箱（同上，刻意不再細分）
+ *   error      —— RPC 本身失敗（資料庫錯誤）
+ *
+ * 出貨通知信（後台「標記已出貨」）需要這個區分：排失敗要回一句警告給後台人員，
+ * 而「之前排過了」不是失敗。既有呼叫端只要 boolean，所以 enqueueOrderEmail 照舊。
+ */
+export async function enqueueOrderEmailResult(input: {
+  orderId: string;
+  dedupeKey: string;
+  subject: string;
+  text: string;
+  html: string;
+}): Promise<"queued" | "not_queued" | "error"> {
   const { data, error } = await supabaseAdmin().rpc("enqueue_order_email", {
     p_order_id: input.orderId,
     p_dedupe_key: input.dedupeKey,
@@ -112,9 +131,9 @@ export async function enqueueOrderEmail(input: {
     console.error(
       `[repo/email-outbox] enqueue_order_email 失敗 key=${input.dedupeKey}：${error.code} ${error.message}`,
     );
-    return false;
+    return "error";
   }
-  return data === true;
+  return data === true ? "queued" : "not_queued";
 }
 
 /**
@@ -598,4 +617,126 @@ export async function getOrderPublicToken(orderId: string): Promise<string | nul
   }
   const token = (data as { public_token?: unknown } | null)?.public_token;
   return typeof token === "string" && token !== "" ? token : null;
+}
+
+// -----------------------------------------------------------------------------
+// 出貨通知信要用的訂單資料
+// -----------------------------------------------------------------------------
+
+export type ShippedOrderAddress = {
+  recipient: string;
+  postalCode: string;
+  city: string;
+  district: string;
+  street: string;
+  cvsStoreName: string;
+  cvsStoreId: string;
+  cvsAddress: string;
+};
+
+/**
+ * 出貨通知信（客人）要的資料：訂單基本欄位、明細、shipping 地址那一列。
+ *
+ * ⚠️ 與 getOrderForNotify() 一樣**不 select customer_email**（地址由
+ *    enqueue_order_email() 自己 join）。order_addresses 的 phone 也不選——信裡
+ *    不印電話。地址本身會進這封信（寄給填它的那個人自己），30 天後隨內文被
+ *    purge_sent_email_bodies() 清掉。
+ *
+ * 讀不到訂單回 null；讀不到地址只讓 address 是 null（信照寄，少一區）。
+ */
+export async function getOrderForShippedEmail(orderId: string): Promise<{
+  order: { orderNo: string; customerName: string; locale: Lang; shippingMethod: string };
+  items: { name: Localized; quantity: number; subtotal: number }[];
+  address: ShippedOrderAddress | null;
+} | null> {
+  const db = supabaseAdmin();
+  const [orderRes, itemsRes, addrRes] = await Promise.all([
+    db
+      .from("orders")
+      .select("id, order_no, customer_name, locale, shipping_method")
+      .eq("id", orderId)
+      .maybeSingle(),
+    db
+      .from("order_items")
+      .select("name, quantity, subtotal")
+      .eq("order_id", orderId)
+      .order("id", { ascending: true }),
+    db
+      .from("order_addresses")
+      .select(
+        "recipient, postal_code, city, district, street, cvs_store_id, cvs_store_name, cvs_address",
+      )
+      .eq("order_id", orderId)
+      .eq("type", "shipping")
+      .maybeSingle(),
+  ]);
+
+  if (orderRes.error) {
+    console.error(
+      `[repo/email-outbox] 出貨信讀訂單失敗 order=${orderId}：${orderRes.error.code} ${orderRes.error.message}`,
+    );
+    return null;
+  }
+  if (!orderRes.data) return null;
+  if (itemsRes.error) {
+    console.error(
+      `[repo/email-outbox] 出貨信讀明細失敗 order=${orderId}：${itemsRes.error.code} ${itemsRes.error.message}`,
+    );
+    return null;
+  }
+  if (addrRes.error) {
+    console.error(
+      `[repo/email-outbox] 出貨信讀地址失敗 order=${orderId}：${addrRes.error.code} ${addrRes.error.message}`,
+    );
+  }
+
+  const o = orderRes.data as Record<string, unknown>;
+  const rawLocale = String(o.locale ?? "zh");
+  const locale: Lang = rawLocale === "en" || rawLocale === "ja" ? rawLocale : "zh";
+  const a = (addrRes.error ? null : addrRes.data) as Record<string, unknown> | null;
+  const str = (v: unknown) => (v == null ? "" : String(v).trim());
+
+  return {
+    order: {
+      orderNo: String(o.order_no ?? ""),
+      customerName: String(o.customer_name ?? ""),
+      locale,
+      shippingMethod: String(o.shipping_method ?? "none"),
+    },
+    items: ((itemsRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
+      name: (r.name ?? {}) as Localized,
+      quantity: Number(r.quantity ?? 0),
+      subtotal: Number(r.subtotal ?? 0),
+    })),
+    address: a
+      ? {
+          recipient: str(a.recipient),
+          postalCode: str(a.postal_code),
+          city: str(a.city),
+          district: str(a.district),
+          street: str(a.street),
+          cvsStoreName: str(a.cvs_store_name),
+          cvsStoreId: str(a.cvs_store_id),
+          cvsAddress: str(a.cvs_address),
+        }
+      : null,
+  };
+}
+
+/**
+ * site_settings.contact_email（給出貨通知信的「聯絡我們」）。**不 throw**，讀不到回
+ * null——那只讓信裡少一列，不該讓信排不進去。
+ */
+export async function getShopContactEmail(): Promise<string | null> {
+  const { data, error } = await supabaseAdmin()
+    .from("site_settings")
+    .select("contact_email")
+    .eq("id", 1)
+    .maybeSingle();
+  if (error) {
+    console.error(`[repo/email-outbox] 讀 contact_email 失敗：${error.code} ${error.message}`);
+    return null;
+  }
+  const v = (data as { contact_email?: unknown } | null)?.contact_email;
+  return typeof v === "string" && v.trim() !== "" ? v.trim() : null;
 }

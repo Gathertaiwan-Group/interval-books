@@ -301,6 +301,8 @@ function AdminOrdersPage() {
 
       if (result.reason === "updated") {
         toast.success(`訂單 ${result.order_no} 已標記為${doneLabel}`);
+        // 排信失敗不影響狀態（已經寫進去了），只提示。
+        if (result.notify_warning) toast.warning(result.notify_warning);
       } else if (result.reason === "already_done") {
         toast.info(`訂單 ${result.order_no} 已經是${doneLabel}狀態，沒有重複處理`);
       } else if (result.reason === "ineligible") {
@@ -854,7 +856,9 @@ function AdminOrdersPage() {
               {fulfillAction ? `確定要${ACTION_BUTTON_LABEL[fulfillAction]}？` : ""}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {detail && fulfillAction ? confirmDescription(fulfillAction, detail.order_no) : ""}
+              {detail && fulfillAction
+                ? confirmDescription(fulfillAction, detail.order_no, detail.customer_email_masked)
+                : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -906,7 +910,7 @@ function AdminOrdersPage() {
 }
 
 const FULFILLMENT_HINT: Record<FulfillmentAction, string> = {
-  ship: "包裹交給物流或超商之後再按。只會改訂單狀態並記下出貨時間，不會寄信通知客人。",
+  ship: "包裹交給物流或超商之後再按。會改訂單狀態、記下出貨時間，並自動寄出貨通知信給客人。",
   pickup: "客人到門市取走之後再按。訂單會直接變成「已完成」，不會寄信通知客人。",
   complete: "確認客人已經收到包裹之後再按。不會寄信通知客人。",
 };

@@ -42,13 +42,16 @@ import {
   claimOrderNotify,
   enqueueAdminOrderEmail,
   enqueueOrderEmail,
+  enqueueOrderEmailResult,
   enqueueRegistrationEmails,
   failEmail,
   failOrderNotify,
   finishEmail,
   finishOrderNotify,
   getOrderForNotify,
+  getOrderForShippedEmail,
   getOrderPublicToken,
+  getShopContactEmail,
   loadEmailCopy,
   loadOrderLocales,
   notifyBacklog,
@@ -67,6 +70,7 @@ import {
   renderAdminOrderNotificationEmail,
   renderOrderPaidEmail,
   renderRegistrationTicketEmail,
+  renderOrderShippedEmail,
   renderRemittanceEmail,
   renderSessionReminderEmail,
   type SessionBrief,
@@ -99,6 +103,11 @@ export const dedupeKeys = {
    *    scripts/notify-selftest.mjs 對真的 email_outbox 跑過這一條。
    */
   orderPlacedAdmin: (orderId: string) => `order_placed_admin:${orderId}`,
+  /**
+   * 出貨通知信（客人），後台「標記已出貨」（processing → shipped）**真的發生**的那
+   * 一次才排。一張訂單一封：重按、重試、兩個分頁同時按，都撞這把 key 變成 no-op。
+   */
+  orderShipped: (orderId: string) => `order_shipped:${orderId}`,
 };
 
 // -----------------------------------------------------------------------------
@@ -534,6 +543,104 @@ export async function triggerNotifyAfterPayment(
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[notify] triggerNotifyAfterPayment 例外 ${message}`);
     return { ok: false, reason: "unexpected_error" };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 出貨通知（後台「標記已出貨」）
+// -----------------------------------------------------------------------------
+
+/**
+ * 出貨通知信排入的結果。
+ *   queued     —— 這一次新增了一列（會被下面的 flush 或 /api/tasks/notify 寄出）
+ *   duplicate  —— dedupe_key 已存在（之前排過了），或訂單沒有信箱：不需要做任何事
+ *   failed     —— 排不進去（讀不到訂單、資料庫錯誤、未預期例外）——後台要提示
+ */
+export type ShippedNotifyOutcome =
+  | { status: "queued" }
+  | { status: "duplicate" }
+  | { status: "failed"; reason: string };
+
+/**
+ * 把出貨通知信排給訂購人。**永不 throw。**
+ *
+ * 🔴 呼叫端（src/lib/admin/fns/orders.ts）只在 advanceOrderFulfillment() 回
+ *    reason === "updated" 且 action === "ship" 時呼叫——也就是 processing → shipped
+ *    **這一次真的發生了**。冪等的 already_done、門市自取的 pickup、已出貨 → 已完成
+ *    的 complete 都不會走到這裡。就算有人誤叫，dedupe_key 也只讓它排一次。
+ */
+export async function queueOrderShippedEmail(orderId: string): Promise<ShippedNotifyOutcome> {
+  try {
+    const loaded = await getOrderForShippedEmail(orderId);
+    if (!loaded) return { status: "failed", reason: "order_not_found" };
+    const { order, items, address } = loaded;
+
+    const [token, contactEmail, copy] = await Promise.all([
+      getOrderPublicToken(orderId),
+      getShopContactEmail(),
+      loadEmailCopy(),
+    ]);
+    // 連結是加分項，不是必要條件（與匯款信不同：那封信的存在意義一半是回填末五碼）。
+    // 組不出可用的公開網址就不印連結，信照寄。
+    const orderUrl = token ? publicUrlFor("/checkout/complete", { token }) : null;
+
+    const mail = renderOrderShippedEmail(
+      {
+        orderNo: order.orderNo,
+        customerName: order.customerName,
+        shippingMethod: order.shippingMethod,
+        items,
+        address,
+        orderUrl,
+        contactEmail,
+      },
+      copy,
+      order.locale,
+    );
+
+    const result = await enqueueOrderEmailResult({
+      orderId,
+      dedupeKey: dedupeKeys.orderShipped(orderId),
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html,
+    });
+    if (result === "error") return { status: "failed", reason: "enqueue_error" };
+    console.info(`[notify] 出貨通知信 order=${order.orderNo} result=${result}`);
+    return result === "queued" ? { status: "queued" } : { status: "duplicate" };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[notify] 出貨通知信排入發生未預期例外 order=${orderId} ${message}`);
+    return { status: "failed", reason: "unexpected_error" };
+  }
+}
+
+/**
+ * 排出貨通知信並順手沖一次 outbox。**永不 throw**，有逾時保護。
+ *
+ * 狀態早就寫進資料庫了，這裡回什麼都不會讓它倒回去；後台人員只會多看到一句提示。
+ * 逾時時信可能已經排進去、也可能還沒——回 failed 讓後台提示去看一下，而 dedupe_key
+ * 保證之後任何重試都不會多寄一封。排進去但沒來得及寄的，由 /api/tasks/notify 的
+ * 下一輪 flush 寄出。
+ */
+export async function triggerNotifyAfterShipped(
+  orderId: string,
+  timeoutMs = 8_000,
+): Promise<ShippedNotifyOutcome> {
+  const timeout = new Promise<ShippedNotifyOutcome>((resolve) =>
+    setTimeout(() => resolve({ status: "failed", reason: "notify_timeout" }), timeoutMs).unref?.(),
+  );
+  try {
+    const work = (async (): Promise<ShippedNotifyOutcome> => {
+      const outcome = await queueOrderShippedEmail(orderId);
+      if (outcome.status === "queued") await flushEmailOutbox(EMAIL_FLUSH_BATCH);
+      return outcome;
+    })();
+    return await Promise.race([work, timeout]);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[notify] triggerNotifyAfterShipped 例外 ${message}`);
+    return { status: "failed", reason: "unexpected_error" };
   }
 }
 
