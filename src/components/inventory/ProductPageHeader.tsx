@@ -6,6 +6,7 @@
  * 來源系統把那個判斷放在瀏覽器算完再連同 insert 送出去，於是設定還沒載完時
  * 「關掉審核」有時有效有時沒效。
  */
+import { Link } from "@tanstack/react-router";
 import { FileSpreadsheet, ListChecks, Package, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,6 @@ type Props = {
   priceApprovalOn: boolean;
   onToggleSelectMode: () => void;
   onOpenImport: () => void;
-  onCreate: () => void;
 };
 
 export function ProductPageHeader({
@@ -27,7 +27,6 @@ export function ProductPageHeader({
   priceApprovalOn,
   onToggleSelectMode,
   onOpenImport,
-  onCreate,
 }: Props) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -60,9 +59,12 @@ export function ProductPageHeader({
           <FileSpreadsheet className="h-4 w-4" />
           Excel 匯入
         </Button>
-        <Button size="sm" className="gap-1.5" onClick={onCreate}>
-          <Plus className="h-4 w-4" />
-          新增商品
+        {/* 新增是內頁（2026-10-25 起不再是彈窗）。 */}
+        <Button asChild size="sm" className="gap-1.5">
+          <Link to="/admin/inventory-products/new" preload="intent">
+            <Plus className="h-4 w-4" />
+            新增商品
+          </Link>
         </Button>
       </div>
     </div>

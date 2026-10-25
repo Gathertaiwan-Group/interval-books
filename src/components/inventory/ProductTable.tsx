@@ -10,6 +10,7 @@
  * 由 0014 那條同樣的規則負責（POS 那一側才是真的要算得準的地方）。這一頁顯示
  * 「來源：某某」而不是自己除一次，因為除錯的兩個數字要在同一個地方算。
  */
+import { Link } from "@tanstack/react-router";
 import { AlertTriangle, Eye, PowerOff, Pencil, Tag, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import {
 import { ApprovalActions } from "@/components/inventory/ApprovalActions";
 import { ApprovalStatusBadge, PriceChangeBadge } from "@/components/inventory/ApprovalStatusBadge";
 import { INV_PRODUCT_TYPE_LABELS } from "@/lib/admin/schemas";
+import { rememberAdminPeek } from "@/lib/admin/list-memory";
 import type { AdminProductRow } from "@/server/repos/inv-products";
 
 type Props = {
@@ -35,8 +37,6 @@ type Props = {
   onToggleSelectAll: () => void;
   busyId: string | null;
   canApproveProducts: boolean;
-  onView: (row: AdminProductRow) => void;
-  onEdit: (row: AdminProductRow) => void;
   onPrice: (row: AdminProductRow) => void;
   onToggleActive: (row: AdminProductRow) => void;
   onDelete: (row: AdminProductRow) => void;
@@ -57,8 +57,6 @@ export function ProductTable({
   onToggleSelectAll,
   busyId,
   canApproveProducts,
-  onView,
-  onEdit,
   onPrice,
   onToggleActive,
   onDelete,
@@ -209,15 +207,18 @@ export function ProductTable({
                       onReject={() => onApprove(row, false)}
                       onResubmit={() => onResubmit(row)}
                     />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8"
-                      title="查看詳細"
-                      onClick={() => onView(row)}
-                    >
-                      <Eye className="h-4 w-4" />
-                      <span className="sr-only">查看詳細</span>
+                    {/* 詳細／編輯是內頁（2026-10-25 起不再是彈窗）。滑過就預載。 */}
+                    <Button asChild size="icon" variant="ghost" className="h-8 w-8">
+                      <Link
+                        to="/admin/inventory-products/$id"
+                        params={{ id: row.inv_product_id }}
+                        preload="intent"
+                        title="查看詳細"
+                        onClick={() => rememberAdminPeek("inv-product", row.inv_product_id, row)}
+                      >
+                        <Eye className="h-4 w-4" />
+                        <span className="sr-only">查看詳細</span>
+                      </Link>
                     </Button>
                     <Button
                       size="icon"
@@ -230,16 +231,19 @@ export function ProductTable({
                       <Tag className="h-4 w-4" />
                       <span className="sr-only">調價</span>
                     </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8"
-                      title="編輯"
-                      disabled={busy}
-                      onClick={() => onEdit(row)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                      <span className="sr-only">編輯</span>
+                    <Button asChild size="icon" variant="ghost" className="h-8 w-8">
+                      <Link
+                        to="/admin/inventory-products/$id/edit"
+                        params={{ id: row.inv_product_id }}
+                        preload="intent"
+                        title="編輯"
+                        aria-disabled={busy || undefined}
+                        className={busy ? "pointer-events-none opacity-50" : undefined}
+                        onClick={() => rememberAdminPeek("inv-product", row.inv_product_id, row)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                        <span className="sr-only">編輯</span>
+                      </Link>
                     </Button>
                     <Button
                       size="icon"

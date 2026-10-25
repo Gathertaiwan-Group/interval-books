@@ -404,6 +404,12 @@ checkTrue(
 console.log("\n[6] 前端：SSR、toast、LocalizedField、supabase");
 const FRONT = [
   "src/routes/admin/_shell.inventory-products.tsx",
+  // 2026-10-25 詳細／新增／編輯從彈窗改成內頁：route 與本體一樣守 300 行與 [6] 的硬規矩。
+  "src/routes/admin/_shell.inventory-products_.$id.tsx",
+  "src/routes/admin/_shell.inventory-products_.$id.index.tsx",
+  "src/routes/admin/_shell.inventory-products_.$id.edit.tsx",
+  "src/routes/admin/_shell.inventory-products_.new.tsx",
+  "src/lib/admin/useProductListState.ts",
   "src/lib/admin/useProductActions.ts",
   "src/lib/admin/excel-import.ts",
   "src/lib/admin/inv-product-utils.ts",
@@ -418,10 +424,11 @@ const FRONT = [
   "src/components/inventory/InitialPurchaseFields.tsx",
   "src/components/inventory/PriceChangeDialog.tsx",
   "src/components/inventory/PriceChangeQueue.tsx",
-  "src/components/inventory/ProductDetailDialog.tsx",
+  "src/components/inventory/ProductDetailView.tsx",
+  "src/components/inventory/ProductMovementList.tsx",
   "src/components/inventory/ProductDialogs.tsx",
   "src/components/inventory/ProductFilterBar.tsx",
-  "src/components/inventory/ProductFormDialog.tsx",
+  "src/components/inventory/ProductForm.tsx",
   "src/components/inventory/ProductFormFields.tsx",
   "src/components/inventory/ProductPageHeader.tsx",
   "src/components/inventory/ProductPagination.tsx",

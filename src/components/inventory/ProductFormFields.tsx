@@ -1,11 +1,11 @@
 /**
  * 商品表單的欄位群。
  *
- * 從 ProductFormDialog 抽出來，因為那個檔案原本是「對話框外殼 + 提交邏輯 + 15 個
+ * 從 ProductFormDialog（2026-10-25 起是內頁 ProductForm）抽出來，因為那個檔案原本是「對話框外殼 + 提交邏輯 + 15 個
  * 欄位 + 進貨區塊」四件事擠在一起。欄位長什麼樣與「送出之後會發生什麼」是兩種
  * 會各自變動的東西，混在一個檔案裡改一個就要重讀另一個。
  *
- * ⚠️ 這裡**沒有**庫存欄位、沒有審核狀態欄位。不是漏了，見 ProductFormDialog 檔頭。
+ * ⚠️ 這裡**沒有**庫存欄位、沒有審核狀態欄位。不是漏了，見 ProductForm 檔頭。
  */
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

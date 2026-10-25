@@ -1,9 +1,12 @@
 /**
- * 這一頁的五個對話框 + 刪除確認。
+ * 這一頁留成對話框的三個（調價、Excel 匯入、批次修改）+ 刪除確認。
  *
  * 全部收在一起，是因為它們對 route 來說是同一件事：「某個 state 不是 null 的時候
  * 蓋一層東西上去」。route 檔留著它們只會讓真正的版面（工具列、篩選、表格、分頁）
  * 被推到 400 行以外。
+ *
+ * 2026-10-25 起「詳細」與「新增／編輯」不再是對話框，是內頁：
+ * /admin/inventory-products/$id、/$id/edit、/new（_shell.inventory-products_.*.tsx）。
  */
 import {
   AlertDialog,
@@ -18,25 +21,14 @@ import {
 import { BatchUpdateDialog } from "@/components/inventory/BatchUpdateDialog";
 import { ExcelImportDialog } from "@/components/inventory/ExcelImportDialog";
 import { PriceChangeDialog } from "@/components/inventory/PriceChangeDialog";
-import { ProductDetailDialog } from "@/components/inventory/ProductDetailDialog";
-import { ProductFormDialog } from "@/components/inventory/ProductFormDialog";
 import type { AdminCategory, AdminProductRow, AdminVendor } from "@/server/repos/inv-products";
 
 type Props = {
   categories: AdminCategory[];
   vendors: AdminVendor[];
-  baseProducts: { inv_product_id: string; name: string; issue_number: string | null }[];
   productApprovalOn: boolean;
   priceApprovalOn: boolean;
   refresh: () => Promise<void>;
-
-  formOpen: boolean;
-  setFormOpen: (v: boolean) => void;
-  editing: AdminProductRow | null;
-  setEditing: (v: AdminProductRow | null) => void;
-
-  detail: AdminProductRow | null;
-  setDetail: (v: AdminProductRow | null) => void;
 
   pricing: AdminProductRow | null;
   setPricing: (v: AdminProductRow | null) => void;
@@ -58,16 +50,9 @@ export function ProductDialogs(props: Props) {
   const {
     categories,
     vendors,
-    baseProducts,
     productApprovalOn,
     priceApprovalOn,
     refresh,
-    formOpen,
-    setFormOpen,
-    editing,
-    setEditing,
-    detail,
-    setDetail,
     pricing,
     setPricing,
     deleting,
@@ -83,28 +68,6 @@ export function ProductDialogs(props: Props) {
 
   return (
     <>
-      <ProductFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        product={editing}
-        categories={categories}
-        vendors={vendors}
-        baseProducts={baseProducts}
-        productApprovalOn={productApprovalOn}
-        priceApprovalOn={priceApprovalOn}
-        onSaved={refresh}
-      />
-
-      <ProductDetailDialog
-        open={detail !== null}
-        onOpenChange={(o) => !o && setDetail(null)}
-        product={detail}
-        onEdit={(row) => {
-          setEditing(row);
-          setFormOpen(true);
-        }}
-      />
-
       <PriceChangeDialog
         open={pricing !== null}
         onOpenChange={(o) => !o && setPricing(null)}

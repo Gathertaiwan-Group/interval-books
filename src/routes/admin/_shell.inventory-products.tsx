@@ -21,16 +21,21 @@
  * 私有 bucket 的 storage key，金鑰留在 src/server/env.ts。
  * ⚠️ 辨識結果是**建議**，不會自己寫入 —— 店員在確認畫面改完才走 inv_save_product()。
  *
+ * ── 內頁（2026-10-25 起）──────────────────────────────────────────────────
+ * 詳細／新增／編輯不再是彈窗：/admin/inventory-products/$id（含異動紀錄）、/$id/edit、/new
+ * （_shell.inventory-products_.*.tsx）。這一頁的篩選與頁碼記在 list-memory，從內頁
+ * 「← 回到列表」回來原樣還原；畫面上的清單取 loader 與自己抓的兩份裡比較新的
+ * （useProductListState → useLoaderBackedList）。調價、Excel 匯入、批次修改、刪除確認
+ * 仍是對話框（ProductDialogs）。這一頁沒有會打開彈窗的網址參數，所以沒有舊深連結要轉。
+ *
  * ── 沒有搬過來的東西（4b 交接）────────────────────────────────────────────
  * · **盤點與在庫異動**（來源 InventoryAdjustmentDialog / BatchInventoryAdjustmentDialog）
  *   —— 它們寫 inv.stock_adjustments 與 inv.inventory_adjustments，那是 4b。
  *   0016 的 inv_approve_record() 已經先把這兩個 module 的審核路徑接好了。
  */
-import { useCallback, useMemo, useState } from "react";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Loader2, Package } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { BatchActionBar } from "@/components/inventory/BatchActionBar";
 import { ProductFilterBar } from "@/components/inventory/ProductFilterBar";
 import { ProductDialogs } from "@/components/inventory/ProductDialogs";
@@ -71,9 +76,10 @@ export const Route = createFileRoute("/admin/_shell/inventory-products")({
 });
 
 function InventoryProductsPage() {
-  const { page: initialPage, options } = Route.useLoaderData();
+  const { page: loaderPage, options } = Route.useLoaderData();
+  const loaderUpdatedAt = Route.useMatch({ select: (m) => m.updatedAt });
   const { user } = Route.useRouteContext();
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const {
     filter,
@@ -87,13 +93,10 @@ function InventoryProductsPage() {
     rowsById,
     selectedPending,
     totalPages,
-  } = useProductListState(initialPage, DEFAULT_FILTER);
+  } = useProductListState({ loaderPage, loaderUpdatedAt, defaultFilter: DEFAULT_FILTER });
 
   const [selectMode, setSelectMode] = useState(false);
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<AdminProductRow | null>(null);
-  const [detail, setDetail] = useState<AdminProductRow | null>(null);
   const [pricing, setPricing] = useState<AdminProductRow | null>(null);
   const [deleting, setDeleting] = useState<AdminProductRow | null>(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -127,10 +130,6 @@ function InventoryProductsPage() {
           setSelectedIds([]);
         }}
         onOpenImport={() => setImportOpen(true)}
-        onCreate={() => {
-          setEditing(null);
-          setFormOpen(true);
-        }}
       />
 
       <p className="max-w-3xl text-sm text-muted-foreground">
@@ -143,10 +142,8 @@ function InventoryProductsPage() {
         vendors={options.vendors}
         productApprovalOn={productApprovalOn}
         onSaved={refresh}
-        onManualEntry={() => {
-          setEditing(null);
-          setFormOpen(true);
-        }}
+        // 辨識失敗的退路：導到新增內頁。辨識對話框在這之前已經 reset，沒有草稿要帶。
+        onManualEntry={() => void navigate({ to: "/admin/inventory-products/new" })}
       />
 
       <ProductFilterBar
@@ -198,11 +195,6 @@ function InventoryProductsPage() {
           }
           busyId={busyId}
           canApproveProducts={canApproveProducts}
-          onView={setDetail}
-          onEdit={(row) => {
-            setEditing(row);
-            setFormOpen(true);
-          }}
           onPrice={setPricing}
           onToggleActive={handleToggleActive}
           onDelete={setDeleting}
@@ -233,16 +225,9 @@ function InventoryProductsPage() {
       <ProductDialogs
         categories={options.categories}
         vendors={options.vendors}
-        baseProducts={options.baseProducts}
         productApprovalOn={productApprovalOn}
         priceApprovalOn={priceApprovalOn}
         refresh={refresh}
-        formOpen={formOpen}
-        setFormOpen={setFormOpen}
-        editing={editing}
-        setEditing={setEditing}
-        detail={detail}
-        setDetail={setDetail}
         pricing={pricing}
         setPricing={setPricing}
         deleting={deleting}

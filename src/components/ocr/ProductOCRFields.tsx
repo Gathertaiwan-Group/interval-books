@@ -9,7 +9,7 @@
  * 分類、類型、售價、成本，再加上「一併建立第一筆進貨」。送出走的仍然是同一支
  * saveProduct()，同一個 invProductSchema。
  *
- * ⚠️ 沒有庫存欄位。庫存只能由進貨與盤點改（見 ProductFormDialog 檔頭）。
+ * ⚠️ 沒有庫存欄位。庫存只能由進貨與盤點改（見 ProductForm 檔頭）。
  */
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";

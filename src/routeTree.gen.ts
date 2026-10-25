@@ -73,6 +73,8 @@ import { Route as VendorShellProductsRouteImport } from './routes/vendor/_shell.
 import { Route as AdminShellEventsIdRouteImport } from './routes/admin/_shell.events.$id'
 import { Route as AdminShellInventoryCombosIdRouteImport } from './routes/admin/_shell.inventory-combos_.$id'
 import { Route as AdminShellInventoryCombosNewRouteImport } from './routes/admin/_shell.inventory-combos_.new'
+import { Route as AdminShellInventoryProductsIdRouteImport } from './routes/admin/_shell.inventory-products_.$id'
+import { Route as AdminShellInventoryProductsNewRouteImport } from './routes/admin/_shell.inventory-products_.new'
 import { Route as AdminShellInventoryVendorsIdRouteImport } from './routes/admin/_shell.inventory-vendors_.$id'
 import { Route as AdminShellInventoryVendorsNewRouteImport } from './routes/admin/_shell.inventory-vendors_.new'
 import { Route as AdminShellJourneysNewRouteImport } from './routes/admin/_shell.journeys_.new'
@@ -83,6 +85,8 @@ import { Route as AdminShellRegistrationsSessionIdRouteImport } from './routes/a
 import { Route as AdminShellRegistrationsNewRouteImport } from './routes/admin/_shell.registrations_.new'
 import { Route as AdminShellInventoryCombosIdIndexRouteImport } from './routes/admin/_shell.inventory-combos_.$id.index'
 import { Route as AdminShellInventoryCombosIdEditRouteImport } from './routes/admin/_shell.inventory-combos_.$id.edit'
+import { Route as AdminShellInventoryProductsIdIndexRouteImport } from './routes/admin/_shell.inventory-products_.$id.index'
+import { Route as AdminShellInventoryProductsIdEditRouteImport } from './routes/admin/_shell.inventory-products_.$id.edit'
 import { Route as AdminShellInventoryVendorsIdIndexRouteImport } from './routes/admin/_shell.inventory-vendors_.$id.index'
 import { Route as AdminShellInventoryVendorsIdEditRouteImport } from './routes/admin/_shell.inventory-vendors_.$id.edit'
 import { Route as AdminShellRegistrationsSessionIdIndexRouteImport } from './routes/admin/_shell.registrations_.$sessionId.index'
@@ -418,6 +422,18 @@ const AdminShellInventoryCombosNewRoute =
     path: '/inventory-combos/new',
     getParentRoute: () => AdminShellRoute,
   } as any)
+const AdminShellInventoryProductsIdRoute =
+  AdminShellInventoryProductsIdRouteImport.update({
+    id: '/inventory-products_/$id',
+    path: '/inventory-products/$id',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
+const AdminShellInventoryProductsNewRoute =
+  AdminShellInventoryProductsNewRouteImport.update({
+    id: '/inventory-products_/new',
+    path: '/inventory-products/new',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
 const AdminShellInventoryVendorsIdRoute =
   AdminShellInventoryVendorsIdRouteImport.update({
     id: '/inventory-vendors_/$id',
@@ -474,6 +490,18 @@ const AdminShellInventoryCombosIdEditRoute =
     id: '/edit',
     path: '/edit',
     getParentRoute: () => AdminShellInventoryCombosIdRoute,
+  } as any)
+const AdminShellInventoryProductsIdIndexRoute =
+  AdminShellInventoryProductsIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AdminShellInventoryProductsIdRoute,
+  } as any)
+const AdminShellInventoryProductsIdEditRoute =
+  AdminShellInventoryProductsIdEditRouteImport.update({
+    id: '/edit',
+    path: '/edit',
+    getParentRoute: () => AdminShellInventoryProductsIdRoute,
   } as any)
 const AdminShellInventoryVendorsIdIndexRoute =
   AdminShellInventoryVendorsIdIndexRouteImport.update({
@@ -565,6 +593,8 @@ export interface FileRoutesByFullPath {
   '/admin/events/$id': typeof AdminShellEventsIdRoute
   '/admin/inventory-combos/$id': typeof AdminShellInventoryCombosIdRouteWithChildren
   '/admin/inventory-combos/new': typeof AdminShellInventoryCombosNewRoute
+  '/admin/inventory-products/$id': typeof AdminShellInventoryProductsIdRouteWithChildren
+  '/admin/inventory-products/new': typeof AdminShellInventoryProductsNewRoute
   '/admin/inventory-vendors/$id': typeof AdminShellInventoryVendorsIdRouteWithChildren
   '/admin/inventory-vendors/new': typeof AdminShellInventoryVendorsNewRoute
   '/admin/journeys/new': typeof AdminShellJourneysNewRoute
@@ -574,9 +604,11 @@ export interface FileRoutesByFullPath {
   '/admin/registrations/$sessionId': typeof AdminShellRegistrationsSessionIdRouteWithChildren
   '/admin/registrations/new': typeof AdminShellRegistrationsNewRoute
   '/admin/inventory-combos/$id/edit': typeof AdminShellInventoryCombosIdEditRoute
+  '/admin/inventory-products/$id/edit': typeof AdminShellInventoryProductsIdEditRoute
   '/admin/inventory-vendors/$id/edit': typeof AdminShellInventoryVendorsIdEditRoute
   '/admin/registrations/$sessionId/edit': typeof AdminShellRegistrationsSessionIdEditRoute
   '/admin/inventory-combos/$id/': typeof AdminShellInventoryCombosIdIndexRoute
+  '/admin/inventory-products/$id/': typeof AdminShellInventoryProductsIdIndexRoute
   '/admin/inventory-vendors/$id/': typeof AdminShellInventoryVendorsIdIndexRoute
   '/admin/registrations/$sessionId/': typeof AdminShellRegistrationsSessionIdIndexRoute
 }
@@ -642,6 +674,7 @@ export interface FileRoutesByTo {
   '/vendor': typeof VendorShellIndexRoute
   '/admin/events/$id': typeof AdminShellEventsIdRoute
   '/admin/inventory-combos/new': typeof AdminShellInventoryCombosNewRoute
+  '/admin/inventory-products/new': typeof AdminShellInventoryProductsNewRoute
   '/admin/inventory-vendors/new': typeof AdminShellInventoryVendorsNewRoute
   '/admin/journeys/new': typeof AdminShellJourneysNewRoute
   '/admin/orders/$id': typeof AdminShellOrdersIdRoute
@@ -649,9 +682,11 @@ export interface FileRoutesByTo {
   '/admin/products/curated-themes': typeof AdminShellProductsCuratedThemesRoute
   '/admin/registrations/new': typeof AdminShellRegistrationsNewRoute
   '/admin/inventory-combos/$id/edit': typeof AdminShellInventoryCombosIdEditRoute
+  '/admin/inventory-products/$id/edit': typeof AdminShellInventoryProductsIdEditRoute
   '/admin/inventory-vendors/$id/edit': typeof AdminShellInventoryVendorsIdEditRoute
   '/admin/registrations/$sessionId/edit': typeof AdminShellRegistrationsSessionIdEditRoute
   '/admin/inventory-combos/$id': typeof AdminShellInventoryCombosIdIndexRoute
+  '/admin/inventory-products/$id': typeof AdminShellInventoryProductsIdIndexRoute
   '/admin/inventory-vendors/$id': typeof AdminShellInventoryVendorsIdIndexRoute
   '/admin/registrations/$sessionId': typeof AdminShellRegistrationsSessionIdIndexRoute
 }
@@ -721,6 +756,8 @@ export interface FileRoutesById {
   '/admin/_shell/events/$id': typeof AdminShellEventsIdRoute
   '/admin/_shell/inventory-combos_/$id': typeof AdminShellInventoryCombosIdRouteWithChildren
   '/admin/_shell/inventory-combos_/new': typeof AdminShellInventoryCombosNewRoute
+  '/admin/_shell/inventory-products_/$id': typeof AdminShellInventoryProductsIdRouteWithChildren
+  '/admin/_shell/inventory-products_/new': typeof AdminShellInventoryProductsNewRoute
   '/admin/_shell/inventory-vendors_/$id': typeof AdminShellInventoryVendorsIdRouteWithChildren
   '/admin/_shell/inventory-vendors_/new': typeof AdminShellInventoryVendorsNewRoute
   '/admin/_shell/journeys_/new': typeof AdminShellJourneysNewRoute
@@ -730,9 +767,11 @@ export interface FileRoutesById {
   '/admin/_shell/registrations_/$sessionId': typeof AdminShellRegistrationsSessionIdRouteWithChildren
   '/admin/_shell/registrations_/new': typeof AdminShellRegistrationsNewRoute
   '/admin/_shell/inventory-combos_/$id/edit': typeof AdminShellInventoryCombosIdEditRoute
+  '/admin/_shell/inventory-products_/$id/edit': typeof AdminShellInventoryProductsIdEditRoute
   '/admin/_shell/inventory-vendors_/$id/edit': typeof AdminShellInventoryVendorsIdEditRoute
   '/admin/_shell/registrations_/$sessionId/edit': typeof AdminShellRegistrationsSessionIdEditRoute
   '/admin/_shell/inventory-combos_/$id/': typeof AdminShellInventoryCombosIdIndexRoute
+  '/admin/_shell/inventory-products_/$id/': typeof AdminShellInventoryProductsIdIndexRoute
   '/admin/_shell/inventory-vendors_/$id/': typeof AdminShellInventoryVendorsIdIndexRoute
   '/admin/_shell/registrations_/$sessionId/': typeof AdminShellRegistrationsSessionIdIndexRoute
 }
@@ -803,6 +842,8 @@ export interface FileRouteTypes {
     | '/admin/events/$id'
     | '/admin/inventory-combos/$id'
     | '/admin/inventory-combos/new'
+    | '/admin/inventory-products/$id'
+    | '/admin/inventory-products/new'
     | '/admin/inventory-vendors/$id'
     | '/admin/inventory-vendors/new'
     | '/admin/journeys/new'
@@ -812,9 +853,11 @@ export interface FileRouteTypes {
     | '/admin/registrations/$sessionId'
     | '/admin/registrations/new'
     | '/admin/inventory-combos/$id/edit'
+    | '/admin/inventory-products/$id/edit'
     | '/admin/inventory-vendors/$id/edit'
     | '/admin/registrations/$sessionId/edit'
     | '/admin/inventory-combos/$id/'
+    | '/admin/inventory-products/$id/'
     | '/admin/inventory-vendors/$id/'
     | '/admin/registrations/$sessionId/'
   fileRoutesByTo: FileRoutesByTo
@@ -880,6 +923,7 @@ export interface FileRouteTypes {
     | '/vendor'
     | '/admin/events/$id'
     | '/admin/inventory-combos/new'
+    | '/admin/inventory-products/new'
     | '/admin/inventory-vendors/new'
     | '/admin/journeys/new'
     | '/admin/orders/$id'
@@ -887,9 +931,11 @@ export interface FileRouteTypes {
     | '/admin/products/curated-themes'
     | '/admin/registrations/new'
     | '/admin/inventory-combos/$id/edit'
+    | '/admin/inventory-products/$id/edit'
     | '/admin/inventory-vendors/$id/edit'
     | '/admin/registrations/$sessionId/edit'
     | '/admin/inventory-combos/$id'
+    | '/admin/inventory-products/$id'
     | '/admin/inventory-vendors/$id'
     | '/admin/registrations/$sessionId'
   id:
@@ -958,6 +1004,8 @@ export interface FileRouteTypes {
     | '/admin/_shell/events/$id'
     | '/admin/_shell/inventory-combos_/$id'
     | '/admin/_shell/inventory-combos_/new'
+    | '/admin/_shell/inventory-products_/$id'
+    | '/admin/_shell/inventory-products_/new'
     | '/admin/_shell/inventory-vendors_/$id'
     | '/admin/_shell/inventory-vendors_/new'
     | '/admin/_shell/journeys_/new'
@@ -967,9 +1015,11 @@ export interface FileRouteTypes {
     | '/admin/_shell/registrations_/$sessionId'
     | '/admin/_shell/registrations_/new'
     | '/admin/_shell/inventory-combos_/$id/edit'
+    | '/admin/_shell/inventory-products_/$id/edit'
     | '/admin/_shell/inventory-vendors_/$id/edit'
     | '/admin/_shell/registrations_/$sessionId/edit'
     | '/admin/_shell/inventory-combos_/$id/'
+    | '/admin/_shell/inventory-products_/$id/'
     | '/admin/_shell/inventory-vendors_/$id/'
     | '/admin/_shell/registrations_/$sessionId/'
   fileRoutesById: FileRoutesById
@@ -1458,6 +1508,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminShellInventoryCombosNewRouteImport
       parentRoute: typeof AdminShellRoute
     }
+    '/admin/_shell/inventory-products_/$id': {
+      id: '/admin/_shell/inventory-products_/$id'
+      path: '/inventory-products/$id'
+      fullPath: '/admin/inventory-products/$id'
+      preLoaderRoute: typeof AdminShellInventoryProductsIdRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/inventory-products_/new': {
+      id: '/admin/_shell/inventory-products_/new'
+      path: '/inventory-products/new'
+      fullPath: '/admin/inventory-products/new'
+      preLoaderRoute: typeof AdminShellInventoryProductsNewRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
     '/admin/_shell/inventory-vendors_/$id': {
       id: '/admin/_shell/inventory-vendors_/$id'
       path: '/inventory-vendors/$id'
@@ -1527,6 +1591,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/inventory-combos/$id/edit'
       preLoaderRoute: typeof AdminShellInventoryCombosIdEditRouteImport
       parentRoute: typeof AdminShellInventoryCombosIdRoute
+    }
+    '/admin/_shell/inventory-products_/$id/': {
+      id: '/admin/_shell/inventory-products_/$id/'
+      path: '/'
+      fullPath: '/admin/inventory-products/$id/'
+      preLoaderRoute: typeof AdminShellInventoryProductsIdIndexRouteImport
+      parentRoute: typeof AdminShellInventoryProductsIdRoute
+    }
+    '/admin/_shell/inventory-products_/$id/edit': {
+      id: '/admin/_shell/inventory-products_/$id/edit'
+      path: '/edit'
+      fullPath: '/admin/inventory-products/$id/edit'
+      preLoaderRoute: typeof AdminShellInventoryProductsIdEditRouteImport
+      parentRoute: typeof AdminShellInventoryProductsIdRoute
     }
     '/admin/_shell/inventory-vendors_/$id/': {
       id: '/admin/_shell/inventory-vendors_/$id/'
@@ -1599,6 +1677,24 @@ const AdminShellInventoryCombosIdRouteWithChildren =
     AdminShellInventoryCombosIdRouteChildren,
   )
 
+interface AdminShellInventoryProductsIdRouteChildren {
+  AdminShellInventoryProductsIdEditRoute: typeof AdminShellInventoryProductsIdEditRoute
+  AdminShellInventoryProductsIdIndexRoute: typeof AdminShellInventoryProductsIdIndexRoute
+}
+
+const AdminShellInventoryProductsIdRouteChildren: AdminShellInventoryProductsIdRouteChildren =
+  {
+    AdminShellInventoryProductsIdEditRoute:
+      AdminShellInventoryProductsIdEditRoute,
+    AdminShellInventoryProductsIdIndexRoute:
+      AdminShellInventoryProductsIdIndexRoute,
+  }
+
+const AdminShellInventoryProductsIdRouteWithChildren =
+  AdminShellInventoryProductsIdRoute._addFileChildren(
+    AdminShellInventoryProductsIdRouteChildren,
+  )
+
 interface AdminShellInventoryVendorsIdRouteChildren {
   AdminShellInventoryVendorsIdEditRoute: typeof AdminShellInventoryVendorsIdEditRoute
   AdminShellInventoryVendorsIdIndexRoute: typeof AdminShellInventoryVendorsIdIndexRoute
@@ -1666,6 +1762,8 @@ interface AdminShellRouteChildren {
   AdminShellIndexRoute: typeof AdminShellIndexRoute
   AdminShellInventoryCombosIdRoute: typeof AdminShellInventoryCombosIdRouteWithChildren
   AdminShellInventoryCombosNewRoute: typeof AdminShellInventoryCombosNewRoute
+  AdminShellInventoryProductsIdRoute: typeof AdminShellInventoryProductsIdRouteWithChildren
+  AdminShellInventoryProductsNewRoute: typeof AdminShellInventoryProductsNewRoute
   AdminShellInventoryVendorsIdRoute: typeof AdminShellInventoryVendorsIdRouteWithChildren
   AdminShellInventoryVendorsNewRoute: typeof AdminShellInventoryVendorsNewRoute
   AdminShellJourneysNewRoute: typeof AdminShellJourneysNewRoute
@@ -1707,6 +1805,9 @@ const AdminShellRouteChildren: AdminShellRouteChildren = {
   AdminShellInventoryCombosIdRoute:
     AdminShellInventoryCombosIdRouteWithChildren,
   AdminShellInventoryCombosNewRoute: AdminShellInventoryCombosNewRoute,
+  AdminShellInventoryProductsIdRoute:
+    AdminShellInventoryProductsIdRouteWithChildren,
+  AdminShellInventoryProductsNewRoute: AdminShellInventoryProductsNewRoute,
   AdminShellInventoryVendorsIdRoute:
     AdminShellInventoryVendorsIdRouteWithChildren,
   AdminShellInventoryVendorsNewRoute: AdminShellInventoryVendorsNewRoute,

@@ -243,3 +243,26 @@ export const getInventoryProductsPageData = createServerFn({ method: "GET" })
     ]);
     return { page, options };
   });
+
+/**
+ * /admin/inventory-products/$id（詳情與編輯共用的 layout loader）一支拿齊：商品那一列、
+ * 最近 50 筆異動紀錄、表單選項（分類／供應商／審核設定／母品項候選）。
+ *
+ * 2026-10-25 後台第 2 批（彈窗改內頁）：詳情與編輯兩頁共用這一個 loader，「詳情 → 編輯」
+ * 不重抓。權限與原本的 getAdminProduct／listProductMovements（fns/inv-adjustments.ts）／
+ * listProductFormOptions **完全一樣**：三支都是 staffFnMiddleware()，不帶細權限。
+ * 異動紀錄讀的是 union view（inv_admin_product_movements），新舊兩張表都在裡面。
+ */
+export const getInventoryProductPageData = createServerFn({ method: "GET" })
+  .middleware([staffFnMiddleware()])
+  .inputValidator(z.object({ productId: z.string().trim().uuid() }))
+  .handler(async ({ data }) => {
+    const { getAdminProduct } = await import("@/server/repos/inv-products");
+    const { listProductMovements } = await import("@/server/repos/inv-adjustments");
+    const [product, movements, options] = await Promise.all([
+      getAdminProduct(data.productId),
+      listProductMovements(data.productId, 50),
+      loadProductFormOptions(),
+    ]);
+    return { product, movements, options };
+  });

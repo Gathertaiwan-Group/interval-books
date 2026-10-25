@@ -305,6 +305,12 @@ console.log("\n[3] 整頁 fn：GET、middleware 跟原本那幾支一樣、route
       "_shell.inventory-products.tsx",
     ],
     [
+      "src/lib/admin/fns/inv-products.ts",
+      "getInventoryProductPageData",
+      "staffFnMiddleware()",
+      "_shell.inventory-products_.$id.tsx",
+    ],
+    [
       "src/lib/admin/fns/inv-vendors.ts",
       "getInventoryVendorsPageData",
       "staffFnMiddleware()",
