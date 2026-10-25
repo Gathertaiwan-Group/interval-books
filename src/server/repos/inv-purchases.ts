@@ -295,6 +295,44 @@ export async function listProductPickerRows(): Promise<ProductPickerRow[]> {
   return out;
 }
 
+/** searchProductPickerRows 一次最多回幾列（與原本表單裡 matches.slice(0, 30) 相同）。 */
+export const PRODUCT_PICKER_SEARCH_LIMIT = 30;
+
+/**
+ * 新增進貨表單的商品選擇器（2026-10-26 後台第 3 批瘦身）：依關鍵字在資料庫端找，最多回 30 列。
+ *
+ * 原本表單拿到的是整份清單（listProductPickerRows，約 3,000 列、385 KB），再在瀏覽器裡
+ * `name issue_number series barcode` 串起來 includes 比對、取前 30 筆。這裡做同一件事，只是搬到
+ * 資料庫：四個欄位任一個 ilike 命中就算、依名稱排序。空字串＝依名稱排序的前 30 筆（與原本一樣）。
+ *
+ * ⚠️ Excel 匯入與拍照辨識的比對仍然要對著**完整清單**（「這一列是不是既有商品」不能只看 30 筆），
+ *    那兩個入口打開時才另外抓 listProductPickerRows，見 _shell.inventory-purchases.tsx。
+ */
+export async function searchProductPickerRows(keyword: string): Promise<ProductPickerRow[]> {
+  let query = supabaseAdmin()
+    .from("inv_admin_products")
+    .select(
+      "inv_product_id, name, issue_number, series, barcode, cost_price, stock_quantity, product_type, category_id",
+    )
+    .eq("is_active", true)
+    .order("name", { ascending: true })
+    .order("inv_product_id", { ascending: true })
+    .limit(PRODUCT_PICKER_SEARCH_LIMIT);
+
+  // PostgREST 的 or() 語法：逗號與括號會壞掉，先剝掉（同 listAdminPurchases）。% 與 _ 是 ilike 的
+  // 萬用字元，原本的 includes 比對是字面比對，所以也一起剝掉，不讓它們變成「任意字元」。
+  const safe = keyword.replace(/[(),%_*\\]/g, " ").trim();
+  if (safe) {
+    query = query.or(
+      `name.ilike.%${safe}%,issue_number.ilike.%${safe}%,series.ilike.%${safe}%,barcode.ilike.%${safe}%`,
+    );
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(`[repo/inv-purchases] 商品搜尋失敗：${error.message}`);
+  return (data ?? []) as unknown as ProductPickerRow[];
+}
+
 // ---------------------------------------------------------------------------
 // 寫入 —— 全部走 0017 的 SECURITY DEFINER 函式
 // ---------------------------------------------------------------------------

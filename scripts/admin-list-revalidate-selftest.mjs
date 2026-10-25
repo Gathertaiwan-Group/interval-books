@@ -103,9 +103,14 @@ console.log("\n[2] 進行中的編輯留在頁面自己的 state");
     "進貨：換篩選才清勾選（與原本一致）",
     /function changeFilter[\s\S]{0,120}setSelectedIds\(\[\]\);\s*list\.setFilter\(next\)/.test(pur),
   );
+  // 2026-10-26 第 3 批：編輯不再是對話框（內頁 /admin/inventory-purchases/$id 自己的 loader 抓那一筆），
+  // 所以「背景重抓把正在編輯的副本換掉」這件事在列表上已經不存在。
   checkTrue(
-    "進貨：編輯中的那一筆是副本（setEditing(row)），不從清單反查",
-    /setEditing\(row\)/.test(pur),
+    "進貨：編輯是內頁連結，列表上沒有編輯中的副本（setEditing）",
+    !/setEditing\(/.test(pur) &&
+      /to="\/admin\/inventory-purchases\/\$id"/.test(
+        stripComments(read("src/components/inventory/PurchaseTable.tsx")),
+      ),
   );
 
   const cnt = stripComments(read("src/routes/admin/_shell.inventory-count.tsx"));
@@ -126,14 +131,17 @@ console.log("\n[2] 進行中的編輯留在頁面自己的 state");
 
   const adj = stripComments(read("src/routes/admin/_shell.inventory-adjustments.tsx"));
   checkTrue(
-    "異動：詳情是點開那一刻的副本",
-    /useState<AdminAdjustmentRow \| null>\(null\)/.test(adj) && /onView=\{setDetail\}/.test(adj),
+    "異動：詳情是內頁（/admin/inventory-adjustments/$id），列表上沒有詳情副本",
+    !/setDetail/.test(adj) &&
+      /to="\/admin\/inventory-adjustments\/\$id"/.test(
+        stripComments(read("src/components/inventory/AdjustmentTable.tsx")),
+      ),
   );
 
   const sales = stripComments(read("src/routes/admin/_shell.sales.tsx"));
   checkTrue(
-    "銷售：明細對話框留著，看的是點開那一刻的副本",
-    /SaleDetailDialog sale=\{selected\}/.test(sales) && /setSelected\(row\)/.test(sales),
+    "銷售：明細是內頁（/admin/sales/$saleId），不再是點開那一刻的副本",
+    !/SaleDetailDialog|setSelected/.test(sales) && /to="\/admin\/sales\/\$saleId"/.test(sales),
   );
   checkTrue(
     "銷售：換頁用目前篩選組下一份（hook 的 setFilter 不收 updater）",

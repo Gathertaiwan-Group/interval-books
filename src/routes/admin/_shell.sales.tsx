@@ -16,9 +16,12 @@
  * · 套餐分頁：inv.sales 有 combo_set_id / combo_sale_group，資料也在，但套餐的
  *   金額分攤規則（第一件吃全額、其餘記 0）需要一頁自己的 UI 才講得清楚。
  * · 月結對帳的「標記已對帳」寫入：這一頁看得到 is_reconciled，但還不能改它。
+ *
+ * 2026-10-26 起點一列不再開彈窗（後台第 3 批；業主：「不要用彈窗，直接顯示內頁＆回到上一頁」）：
+ * 每一列連到 /admin/sales/$saleId（唯讀明細）。列表只帶畫面用到的欄位（PosSaleListRow），
+ * 明細內頁自己依 sale_id 抓完整的一筆。
  */
-import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight, Loader2, Receipt } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,11 +33,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { SaleDetailDialog } from "@/components/pos/SaleDetailDialog";
 import { SalesFilterBar } from "@/components/pos/SalesFilterBar";
-import type { PosSaleRow } from "@/server/repos/inv-sales";
 import type { SalesFilterValues } from "@/lib/admin/schemas";
 import { useLoaderBackedList } from "@/lib/admin/useLoaderBackedList";
+import { rememberAdminPeek } from "@/lib/admin/list-memory";
 
 const PAGE_SIZE = 50;
 
@@ -85,9 +87,6 @@ function SalesPage() {
     },
   });
   const { filter, setFilter, data, loading } = list;
-
-  // 明細對話框看的是點開那一刻那一列的副本，背景重抓不會把它關掉或換掉（第 3 批再改內頁）。
-  const [selected, setSelected] = useState<PosSaleRow | null>(null);
 
   const { rows, total, summary } = data;
   const lastPage = Math.max(0, Math.ceil(total / filter.pageSize) - 1);
@@ -146,23 +145,20 @@ function SalesPage() {
               </TableRow>
             ) : (
               rows.map((row) => (
-                <TableRow
-                  key={row.sale_id}
-                  onClick={() => setSelected(row)}
-                  className="cursor-pointer"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setSelected(row);
-                    }
-                  }}
-                >
+                <TableRow key={row.sale_id} className="relative hover:bg-muted/50">
                   <TableCell className="tabular-nums">{row.sale_date}</TableCell>
                   <TableCell>
-                    <span className="block max-w-[22rem] truncate">
+                    {/* 整列可點：連結的 ::after 蓋滿這一列（relative 在 TableRow 上）。
+                        鍵盤走這個連結本身（Tab → Enter），不是 tr 上的 tabIndex。 */}
+                    <Link
+                      to="/admin/sales/$saleId"
+                      params={{ saleId: row.sale_id }}
+                      preload="intent"
+                      className="block max-w-[22rem] truncate after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring"
+                      onClick={() => rememberAdminPeek("sale", row.sale_id, row)}
+                    >
                       {row.product_name ?? "（無品名）"}
-                    </span>
+                    </Link>
                     {row.override_reservation ? (
                       <Badge variant="destructive" className="mt-0.5 font-normal">
                         強制放行
@@ -219,8 +215,6 @@ function SalesPage() {
           </Button>
         </div>
       </div>
-
-      <SaleDetailDialog sale={selected} onOpenChange={(open) => !open && setSelected(null)} />
     </div>
   );
 }

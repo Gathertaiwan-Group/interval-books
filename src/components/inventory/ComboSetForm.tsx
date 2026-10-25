@@ -33,7 +33,7 @@ import { ComboSetItemEditor } from "@/components/inventory/ComboSetItemEditor";
 import { useFormDirty } from "@/lib/admin/form-dirty";
 import { comboSetSchema, type ComboItemValues } from "@/lib/admin/schemas";
 import type { AdminComboItemRow, AdminComboSetRow } from "@/server/repos/inv-combos";
-import type { PosProduct } from "@/server/repos/inv-sales";
+import type { ComboPickerProduct } from "@/server/repos/inv-sales";
 
 type Props = {
   approvalOn: boolean;
@@ -41,7 +41,7 @@ type Props = {
   editing: AdminComboSetRow | null;
   /** 編輯時既有的組成品項（新增時是空陣列）。 */
   initialItems: AdminComboItemRow[];
-  products: PosProduct[];
+  products: ComboPickerProduct[];
   /** 「← 回到…」：編輯回詳情頁、新增回列表。 */
   back: { to: string; label: string; also?: readonly string[] };
   /** 存檔成功（已經 allowLeave）：呼叫端負責換頁。 */

@@ -1,5 +1,9 @@
 /**
- * 這一頁的三個對話框 + 刪除確認。
+ * 這一頁的兩個對話框（Excel 匯入、批次修改）+ 刪除確認。
+ *
+ * 2026-10-26 起新增／編輯進貨不再是對話框，是內頁（/admin/inventory-purchases/new、/$id，
+ * PurchaseForm）。匯入要對著完整商品清單比對：清單由 route 在打開前抓好（usePickerProducts），
+ * 🔴 清單還沒到（null）就不打開——空清單比對會把每一列都當成新商品。
  *
  * 全部收在一起，是因為它們對 route 來說是同一件事：「某個 state 不是 null 的時候
  * 蓋一層東西上去」。route 檔留著它們只會讓真正的版面（統計卡、篩選、表格、分頁）
@@ -21,21 +25,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PurchaseBatchUpdateDialog } from "@/components/inventory/PurchaseBatchUpdateDialog";
-import { PurchaseFormDialog } from "@/components/inventory/PurchaseFormDialog";
 import { PurchaseImportDialog } from "@/components/inventory/PurchaseImportDialog";
 import type { VendorOption } from "@/components/inventory/VendorSelect";
 import type { AdminPurchaseRow, ProductPickerRow } from "@/server/repos/inv-purchases";
 
 type Props = {
-  products: ProductPickerRow[];
+  /** 完整商品清單（Excel 匯入比對用）。null＝還沒抓。 */
+  products: ProductPickerRow[] | null;
   vendors: VendorOption[];
   categories: { category_id: string; name: string }[];
   approvalOn: boolean;
   refresh: () => Promise<void>;
-
-  formOpen: boolean;
-  setFormOpen: (v: boolean) => void;
-  editing: AdminPurchaseRow | null;
 
   deleting: AdminPurchaseRow | null;
   setDeleting: (v: AdminPurchaseRow | null) => void;
@@ -57,9 +57,6 @@ export function PurchaseDialogs(props: Props) {
     categories,
     approvalOn,
     refresh,
-    formOpen,
-    setFormOpen,
-    editing,
     deleting,
     setDeleting,
     onConfirmDelete,
@@ -75,20 +72,10 @@ export function PurchaseDialogs(props: Props) {
 
   return (
     <>
-      <PurchaseFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        purchase={editing}
-        products={products}
-        vendors={vendors}
-        approvalOn={approvalOn}
-        onSaved={refresh}
-      />
-
       <PurchaseImportDialog
-        open={importOpen}
+        open={importOpen && products !== null}
         onOpenChange={setImportOpen}
-        products={products}
+        products={products ?? []}
         vendors={vendors}
         categories={categories}
         approvalOn={approvalOn}

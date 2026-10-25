@@ -207,13 +207,15 @@ export function ProductTable({
                       onReject={() => onApprove(row, false)}
                       onResubmit={() => onResubmit(row)}
                     />
-                    {/* 詳細／編輯是內頁（2026-10-25 起不再是彈窗）。滑過就預載。 */}
+                    {/* 詳細／編輯是內頁（2026-10-25 起不再是彈窗）。滑過就預載。列上的動作寫入中時停用
+                        （<Link disabled>：沒有 href、不預載、aria-disabled）。 */}
                     <Button asChild size="icon" variant="ghost" className="h-8 w-8">
                       <Link
                         to="/admin/inventory-products/$id"
                         params={{ id: row.inv_product_id }}
                         preload="intent"
                         title="查看詳細"
+                        disabled={busy}
                         onClick={() => rememberAdminPeek("inv-product", row.inv_product_id, row)}
                       >
                         <Eye className="h-4 w-4" />
@@ -237,8 +239,7 @@ export function ProductTable({
                         params={{ id: row.inv_product_id }}
                         preload="intent"
                         title="編輯"
-                        aria-disabled={busy || undefined}
-                        className={busy ? "pointer-events-none opacity-50" : undefined}
+                        disabled={busy}
                         onClick={() => rememberAdminPeek("inv-product", row.inv_product_id, row)}
                       >
                         <Pencil className="h-4 w-4" />

@@ -81,10 +81,12 @@ console.log("\n[1] loader 只叫一支 fn，授權不放寬");
     true,
   );
   // 原本詳情／編輯／異動紀錄用的三支：新的整頁 fn 必須與它們同級（或更嚴）。
+  // 2026-10-26 第 3 批：getAdminProduct 這支 server fn 已沒有呼叫端而移除（原本是
+  // staffFnMiddleware()＋只讀標記；整頁 fn 與它同級，直接叫同名 repo）。
   check(
-    "原本的 getAdminProduct 是 staffFnMiddleware()",
+    "第 3 批：沒人用的 getAdminProduct server fn 已移除",
     middlewareOf(fns, "getAdminProduct"),
-    "staffFnMiddleware(), readOnlyFnMiddleware",
+    null,
   );
   check(
     "原本的 listProductFormOptions 是 staffFnMiddleware()",

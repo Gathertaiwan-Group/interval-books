@@ -15,11 +15,15 @@
  *    recognize-purchase-order edge function（這個專案沒有 edge function），改走
  *    fns/ocr.ts 的 server fn 到 Gemini —— 瀏覽器只送壓縮過的圖與 storage key，辨識
  *    結果是**建議**，逐列改完才走既有的 importPurchases()。「匯出 Excel」還沒做。
+ *
+ * 2026-10-26 起新增／編輯不再是彈窗（後台第 3 批；業主：「不要用彈窗，直接顯示內頁＆回到上一頁」）：
+ * /admin/inventory-purchases/new、/$id（PurchaseForm）。審核、刪除（再確認一次）、批次修改、
+ * Excel 匯入、拍照辨識仍在這一頁。整份商品清單（約 385 KB）不再跟著 loader 載入，只有匯入與
+ * 拍照辨識打開時才抓（usePickerProducts）。
  */
 import { useCallback, useMemo, useState } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { FileSpreadsheet, Loader2, Plus, Truck } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Loader2, Truck } from "lucide-react";
 import { ProductPagination } from "@/components/inventory/ProductPagination";
 import { PurchaseBatchBar } from "@/components/inventory/PurchaseBatchBar";
 import { PurchaseDialogs } from "@/components/inventory/PurchaseDialogs";
@@ -28,6 +32,7 @@ import { PurchaseTable } from "@/components/inventory/PurchaseTable";
 import { PurchasePageHeader } from "@/components/inventory/PurchasePageHeader";
 import { isApprovalRequired } from "@/lib/admin/inv-product-utils";
 import { stableStringify } from "@/lib/admin/form-dirty";
+import { usePickerProducts } from "@/lib/admin/usePickerProducts";
 import { usePurchaseActions } from "@/lib/admin/usePurchaseActions";
 import { useLoaderBackedList } from "@/lib/admin/useLoaderBackedList";
 import { usePruneVanishedSelection } from "@/lib/admin/usePruneVanishedSelection";
@@ -53,7 +58,7 @@ export const Route = createFileRoute("/admin/_shell/inventory-purchases")({
   loader: async () => {
     const { getInventoryPurchasesPageData } = await import("@/lib/admin/fns/inv-purchases");
     // 一支 fn 拿齊，staffFnMiddleware 守的。擋人的是 middleware 重讀 profiles 那一下，
-    // 不是側欄。商品清單整份撈是刻意的 —— 表單與匯入比對都要對著完整清單。
+    // 不是側欄。整份商品清單不在這裡：匯入／拍照辨識打開時才抓（usePickerProducts）。
     return await getInventoryPurchasesPageData({ data: { filter: DEFAULT_FILTER } });
   },
   head: () => ({ meta: [{ title: "進貨｜小時光書店後台" }] }),
@@ -61,7 +66,7 @@ export const Route = createFileRoute("/admin/_shell/inventory-purchases")({
 });
 
 function InventoryPurchasesPage() {
-  const { page: loaderPage, summary: loaderSummary, options, products } = Route.useLoaderData();
+  const { page: loaderPage, summary: loaderSummary, options } = Route.useLoaderData();
   const loaderUpdatedAt = Route.useMatch({ select: (m) => m.updatedAt });
   const { user } = Route.useRouteContext();
   const router = useRouter();
@@ -98,8 +103,6 @@ function InventoryPurchasesPage() {
   const rowIds = useMemo(() => data.rows.map((r) => r.purchase_id), [data.rows]);
   usePruneVanishedSelection(rowIds, stableStringify(filter), loading, setSelectedIds);
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<AdminPurchaseRow | null>(null);
   const [deleting, setDeleting] = useState<AdminPurchaseRow | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [batchUpdateOpen, setBatchUpdateOpen] = useState(false);
@@ -133,15 +136,15 @@ function InventoryPurchasesPage() {
   const { busyId, batchBusy, handleApprove, handleDelete, handleBatchApprove } =
     usePurchaseActions(refresh);
 
+  // 🔴 Excel 匯入與拍照辨識要對著完整商品清單比對：抓到了才打開（見 usePickerProducts）。
+  const picker = usePickerProducts();
+  async function openImport() {
+    if (await picker.load()) setImportOpen(true);
+  }
+
   function toggleSelectMode() {
     setSelectMode((v) => !v);
     setSelectedIds([]);
-  }
-
-  /** 空白的新增進貨表單。拍照辨識失敗時的「改用手動輸入」也走這一支。 */
-  function openCreateForm() {
-    setEditing(null);
-    setFormOpen(true);
   }
 
   const cards = [
@@ -158,9 +161,10 @@ function InventoryPurchasesPage() {
         total={data.total}
         selectMode={selectMode}
         onToggleSelectMode={toggleSelectMode}
-        onOpenImport={() => setImportOpen(true)}
-        onCreate={openCreateForm}
-        products={products}
+        onOpenImport={() => void openImport()}
+        productsLoading={picker.loading}
+        products={picker.products}
+        loadProducts={picker.load}
         vendors={options.vendors}
         categories={options.categories}
         approvalOn={approvalOn}
@@ -229,10 +233,6 @@ function InventoryPurchasesPage() {
           }
           busyId={busyId}
           canApprove={canApprove}
-          onEdit={(row) => {
-            setEditing(row);
-            setFormOpen(true);
-          }}
           onDelete={setDeleting}
           onApprove={handleApprove}
         />
@@ -253,14 +253,11 @@ function InventoryPurchasesPage() {
       ) : null}
 
       <PurchaseDialogs
-        products={products}
+        products={picker.products}
         vendors={options.vendors}
         categories={options.categories}
         approvalOn={approvalOn}
         refresh={refresh}
-        formOpen={formOpen}
-        setFormOpen={setFormOpen}
-        editing={editing}
         deleting={deleting}
         setDeleting={setDeleting}
         onConfirmDelete={(row) => void handleDelete(row)}

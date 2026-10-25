@@ -217,12 +217,14 @@ export function VendorTable({
                       />
                     ) : null}
 
-                    {/* 詳情／編輯是內頁（2026-10-25 起不再是彈窗）。滑過就預載。 */}
-                    <Button asChild size="sm" variant="outline" className="gap-1.5" disabled={busy}>
+                    {/* 詳情／編輯是內頁（2026-10-25 起不再是彈窗）。滑過就預載。列上的動作寫入中時停用
+                        （<Link disabled>：沒有 href、不預載、aria-disabled）。 */}
+                    <Button asChild size="sm" variant="outline" className="gap-1.5">
                       <Link
                         to="/admin/inventory-vendors/$id"
                         params={{ id: row.vendor_id }}
                         preload="intent"
+                        disabled={busy}
                         onClick={() => rememberAdminPeek("vendor", row.vendor_id, row)}
                       >
                         <Eye className="h-3.5 w-3.5" />
@@ -248,11 +250,12 @@ export function VendorTable({
                       完整號碼
                     </Button>
 
-                    <Button asChild size="sm" variant="outline" className="gap-1.5" disabled={busy}>
+                    <Button asChild size="sm" variant="outline" className="gap-1.5">
                       <Link
                         to="/admin/inventory-vendors/$id/edit"
                         params={{ id: row.vendor_id }}
                         preload="intent"
+                        disabled={busy}
                         onClick={() => rememberAdminPeek("vendor", row.vendor_id, row)}
                       >
                         <Pencil className="h-3.5 w-3.5" />

@@ -147,15 +147,23 @@ check(
 
 // -----------------------------------------------------------------------------
 console.log("\n[3] 接線");
-const news = stripComments(read("src/routes/admin/_shell.news.tsx"));
-checkTrue("最新消息新增時用 newFirstSortOrder(news)", /newFirstSortOrder\(news\)/.test(news));
-checkTrue("最新消息不再用 max + 1", !/Math\.max\(max, n\.sort_order\)/.test(news));
+// 2026-10-26 第 3 批：新增／編輯從彈窗改成內頁 —— 排序數字在 /new 的 loader 算，表單在 NewsForm。
+const news = stripComments(read("src/routes/admin/_shell.news_.new.tsx"));
+const newsForm = stripComments(read("src/components/admin/NewsForm.tsx"));
+checkTrue(
+  "最新消息新增時用 newFirstSortOrder(listNews 的結果)",
+  /newFirstSortOrder\(await listNews\(\)\)/.test(news),
+);
+checkTrue("最新消息不再用 max + 1", !/Math\.max\(max, n\.sort_order\)/.test(news + newsForm));
 checkTrue(
   "排序欄位收進 <AdvancedSection>",
-  /<AdvancedSection[\s\S]*name="sort_order"[\s\S]*<\/AdvancedSection>/.test(news),
+  /<AdvancedSection[\s\S]*name="sort_order"[\s\S]*<\/AdvancedSection>/.test(newsForm),
 );
-const collab = stripComments(read("src/routes/admin/_shell.collaborations.tsx"));
-checkTrue("合作案例新增時用 newFirstSortOrder", /newFirstSortOrder\(collaborations\)/.test(collab));
+const collab = stripComments(read("src/routes/admin/_shell.collaborations_.new.tsx"));
+checkTrue(
+  "合作案例新增時用 newFirstSortOrder",
+  /newFirstSortOrder\(await listCollaborations\(\)\)/.test(collab),
+);
 
 const index = stripComments(read("src/routes/admin/_shell.index.tsx"));
 checkTrue(
@@ -213,10 +221,18 @@ checkTrue(
   "approve_inventory_adjustments 在隱藏清單",
   labels.HIDDEN_PERMISSIONS.has("approve_inventory_adjustments"),
 );
-const staff = stripComments(read("src/routes/admin/_shell.staff.tsx"));
+// 2026-10-26 第 3 批：編輯身分從彈窗改成內頁，勾選框搬到 StaffAccountForm；清單在 staff-roles.ts。
+const staff = stripComments(read("src/components/admin/StaffAccountForm.tsx"));
+const staffRoles = stripComments(read("src/lib/admin/staff-roles.ts"));
 checkTrue(
   "人員頁勾選框只列 VISIBLE_PERMISSIONS",
   /VISIBLE_PERMISSIONS\.map\(/.test(staff) && !/STAFF_PERMISSIONS\.map\(/.test(staff),
+);
+checkTrue(
+  "VISIBLE_PERMISSIONS ＝ STAFF_PERMISSIONS 扣掉 HIDDEN_PERMISSIONS",
+  /VISIBLE_PERMISSIONS = STAFF_PERMISSIONS\.filter\(\(p\) => !HIDDEN_PERMISSIONS\.has\(p\)\)/.test(
+    staffRoles,
+  ),
 );
 
 // -----------------------------------------------------------------------------

@@ -56,14 +56,6 @@ export const listProductFormOptions = createServerFn({ method: "GET" })
   .middleware([staffFnMiddleware()])
   .handler(async () => await loadProductFormOptions());
 
-export const getAdminProduct = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
-  .inputValidator(z.object({ id: z.string().trim().uuid() }))
-  .handler(async ({ data }) => {
-    const { getAdminProduct } = await import("@/server/repos/inv-products");
-    return await getAdminProduct(data.id);
-  });
-
 // ---------------------------------------------------------------------------
 // 寫 —— 日常作業（staff）
 // ---------------------------------------------------------------------------

@@ -62,23 +62,6 @@ export const listAdminVendors = createServerFn({ method: "POST" })
     return await listAdminVendors(data);
   });
 
-export const getAdminVendor = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
-  .inputValidator(z.object({ vendorId: uuid }))
-  .handler(async ({ data }) => {
-    const { getAdminVendor, listVendorContacts, listVendorBankAccounts, listVendorAttachments } =
-      await import("@/server/repos/inv-vendors");
-
-    const [vendor, contacts, bankAccounts, attachments] = await Promise.all([
-      getAdminVendor(data.vendorId),
-      listVendorContacts(data.vendorId),
-      listVendorBankAccounts(data.vendorId),
-      listVendorAttachments(data.vendorId),
-    ]);
-
-    return { vendor, contacts, bankAccounts, attachments };
-  });
-
 async function loadVendorFormOptions() {
   const { listVendorFormOptions } = await import("@/server/repos/inv-vendors");
   const { listApprovalSettings } = await import("@/server/repos/inv-products");

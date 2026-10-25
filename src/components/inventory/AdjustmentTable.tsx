@@ -10,7 +10,9 @@
  */
 import { Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { rememberAdminPeek } from "@/lib/admin/list-memory";
 import {
   Table,
   TableBody,
@@ -29,15 +31,13 @@ import type { AdminAdjustmentRow } from "@/server/repos/inv-adjustments";
 
 type Props = {
   rows: AdminAdjustmentRow[];
-  busyId: string | null;
-  onView: (row: AdminAdjustmentRow) => void;
 };
 
 function money(n: number | null) {
   return n === null || n === undefined ? "—" : `NT$ ${Number(n).toLocaleString("zh-TW")}`;
 }
 
-export function AdjustmentTable({ rows, busyId, onView }: Props) {
+export function AdjustmentTable({ rows }: Props) {
   return (
     <div className="overflow-x-auto rounded-md border border-border">
       <Table>
@@ -56,10 +56,7 @@ export function AdjustmentTable({ rows, busyId, onView }: Props) {
         </TableHeader>
         <TableBody>
           {rows.map((row) => (
-            <TableRow
-              key={row.adjustment_id}
-              className={busyId === row.adjustment_id ? "opacity-60" : undefined}
-            >
+            <TableRow key={row.adjustment_id}>
               <TableCell>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="font-mono text-xs">{row.adjustment_number ?? "—"}</span>
@@ -118,15 +115,17 @@ export function AdjustmentTable({ rows, busyId, onView }: Props) {
               <TableCell className="text-sm">{row.creator_name ?? "—"}</TableCell>
 
               <TableCell className="text-right">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8"
-                  title="查看詳細"
-                  onClick={() => onView(row)}
-                >
-                  <Eye className="h-4 w-4" />
-                  <span className="sr-only">查看詳細</span>
+                {/* 詳情是內頁（2026-10-26 起不再是彈窗）：送出／審核／沖帳都在那一頁。 */}
+                <Button asChild size="icon" variant="ghost" className="h-8 w-8" title="查看詳細">
+                  <Link
+                    to="/admin/inventory-adjustments/$id"
+                    params={{ id: row.adjustment_id }}
+                    preload="intent"
+                    onClick={() => rememberAdminPeek("adjustment", row.adjustment_id, row)}
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span className="sr-only">查看詳細</span>
+                  </Link>
                 </Button>
               </TableCell>
             </TableRow>

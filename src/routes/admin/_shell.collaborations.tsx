@@ -1,13 +1,16 @@
+/**
+ * /admin/collaborations —— 合作夥伴列表。
+ *
+ * 2026-10-26 起新增／編輯不再是彈窗（後台第 3 批；業主：「不要用彈窗，直接顯示內頁＆回到上一頁」）：
+ * 「新增合作」連到 /admin/collaborations/new、「編輯」連到 /admin/collaborations/$id（表單本體
+ * CollaborationForm）。刪除確認仍是 AlertDialog。這一頁沒有篩選，畫面直接讀 loader 資料。
+ */
 import { useState } from "react";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -16,14 +19,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,23 +29,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { LocalizedField } from "@/components/admin/LocalizedField";
-import { collaborationSchema, type CollaborationFormValues } from "@/lib/admin/schemas";
 import type { listCollaborations } from "@/lib/admin/fns/collaborations";
 import { formatUpdatedAt } from "@/lib/admin/format";
-import { newFirstSortOrder } from "@/lib/admin/sort-order";
+import { rememberAdminPeek } from "@/lib/admin/list-memory";
 
 type CollaborationRow = Awaited<ReturnType<typeof listCollaborations>>[number];
-
-const EMPTY_LOCALIZED = { zh: "", en: "", ja: "" };
 
 export const Route = createFileRoute("/admin/_shell/collaborations")({
   loader: async () => {
@@ -64,53 +47,12 @@ export const Route = createFileRoute("/admin/_shell/collaborations")({
   component: AdminCollaborationsPage,
 });
 
-function toFormValues(row: CollaborationRow): CollaborationFormValues {
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    is_published: row.is_published,
-    sort_order: row.sort_order,
-  };
-}
-
 function AdminCollaborationsPage() {
   const { collaborations } = Route.useLoaderData();
   const router = useRouter();
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<CollaborationRow | null>(null);
-  const [formKey, setFormKey] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CollaborationRow | null>(null);
   const [deleting, setDeleting] = useState(false);
-
-  function openCreate() {
-    setEditing(null);
-    setFormKey((k) => k + 1);
-    setDialogOpen(true);
-  }
-
-  function openEdit(row: CollaborationRow) {
-    setEditing(row);
-    setFormKey((k) => k + 1);
-    setDialogOpen(true);
-  }
-
-  async function handleSubmit(values: CollaborationFormValues) {
-    setSubmitting(true);
-    try {
-      const { upsertCollaboration } = await import("@/lib/admin/fns/collaborations");
-      await upsertCollaboration({ data: editing ? { ...values, id: editing.id } : values });
-      toast.success(editing ? "已更新合作夥伴" : "已新增合作夥伴");
-      setDialogOpen(false);
-      await router.invalidate();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "儲存失敗，請稍後再試");
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -128,18 +70,6 @@ function AdminCollaborationsPage() {
     }
   }
 
-  // 新的合作案例排最前面（前台 /curation 由小到大排）。見 lib/admin/sort-order.ts。
-  const nextSortOrder = newFirstSortOrder(collaborations);
-
-  const defaultValues: CollaborationFormValues = editing
-    ? toFormValues(editing)
-    : {
-        title: { ...EMPTY_LOCALIZED },
-        description: { ...EMPTY_LOCALIZED },
-        is_published: true,
-        sort_order: nextSortOrder,
-      };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
@@ -149,9 +79,11 @@ function AdminCollaborationsPage() {
             共 {collaborations.length} 個合作夥伴
           </p>
         </div>
-        <Button onClick={openCreate} className="gap-1.5">
-          <Plus className="h-4 w-4" />
-          新增合作
+        <Button asChild className="gap-1.5">
+          <Link preload="intent" to="/admin/collaborations/new">
+            <Plus className="h-4 w-4" />
+            新增合作
+          </Link>
         </Button>
       </div>
 
@@ -174,57 +106,51 @@ function AdminCollaborationsPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              collaborations.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="text-muted-foreground">{c.sort_order}</TableCell>
-                  <TableCell className="max-w-sm truncate font-medium">{c.title.zh}</TableCell>
-                  <TableCell>
-                    <Badge variant={c.is_published ? "default" : "secondary"}>
-                      {c.is_published ? "已發布" : "草稿"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-muted-foreground">
-                    {formatUpdatedAt(c.updated_at)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(c)}>
-                        編輯
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => setDeleteTarget(c)}
-                      >
-                        刪除
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+              collaborations.map((c) => {
+                const busy = deleting && deleteTarget?.id === c.id;
+                return (
+                  <TableRow key={c.id}>
+                    <TableCell className="text-muted-foreground">{c.sort_order}</TableCell>
+                    <TableCell className="max-w-sm truncate font-medium">{c.title.zh}</TableCell>
+                    <TableCell>
+                      <Badge variant={c.is_published ? "default" : "secondary"}>
+                        {c.is_published ? "已發布" : "草稿"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {formatUpdatedAt(c.updated_at)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button asChild variant="ghost" size="sm">
+                          <Link
+                            to="/admin/collaborations/$id"
+                            params={{ id: c.id }}
+                            preload="intent"
+                            disabled={busy}
+                            onClick={() => rememberAdminPeek("collaboration", c.id, c)}
+                          >
+                            編輯
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          disabled={busy}
+                          onClick={() => setDeleteTarget(c)}
+                        >
+                          刪除
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </div>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editing ? "編輯合作" : "新增合作"}</DialogTitle>
-            <DialogDescription>
-              中文、英文、日文皆為必填——資料庫要求三語齊備才能儲存。
-            </DialogDescription>
-          </DialogHeader>
-          <CollaborationForm
-            key={formKey}
-            defaultValues={defaultValues}
-            onSubmit={handleSubmit}
-            submitting={submitting}
-            submitLabel={editing ? "儲存變更" : "新增"}
-          />
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog
         open={deleteTarget !== null}
@@ -253,83 +179,5 @@ function AdminCollaborationsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-type CollaborationFormProps = {
-  defaultValues: CollaborationFormValues;
-  onSubmit: (values: CollaborationFormValues) => Promise<void>;
-  submitting: boolean;
-  submitLabel: string;
-};
-
-function CollaborationForm({
-  defaultValues,
-  onSubmit,
-  submitting,
-  submitLabel,
-}: CollaborationFormProps) {
-  const form = useForm<CollaborationFormValues>({
-    resolver: zodResolver(collaborationSchema),
-    defaultValues,
-  });
-
-  return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-        <LocalizedField name="title" label="名稱" />
-        <LocalizedField name="description" label="說明" multiline />
-
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="sort_order"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>排序（數字越小越前面）</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    name={field.name}
-                    ref={field.ref}
-                    onBlur={field.onBlur}
-                    value={field.value}
-                    onChange={(e) =>
-                      field.onChange(e.target.value === "" ? 0 : Number(e.target.value))
-                    }
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="is_published"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>發布狀態</FormLabel>
-                <div className="flex h-9 items-center gap-2">
-                  <FormControl>
-                    <Switch checked={field.value} onCheckedChange={field.onChange} />
-                  </FormControl>
-                  <span className="text-sm text-muted-foreground">
-                    {field.value ? "已發布" : "草稿"}
-                  </span>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <DialogFooter>
-          <Button type="submit" disabled={submitting}>
-            {submitting ? "儲存中…" : submitLabel}
-          </Button>
-        </DialogFooter>
-      </form>
-    </Form>
   );
 }

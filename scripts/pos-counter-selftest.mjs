@@ -314,9 +314,14 @@ checkTrue(
 );
 checkTrue("也沒有把 adminFnMiddleware import 進來", !/^import .*adminFnMiddleware/m.test(fnsPos));
 check(
-  "七支 POS server fn 全部都有 middleware",
+  "八支 POS server fn 全部都有 middleware（2026-10-26 加 getPosSale：銷售明細內頁）",
   (fnsPos.match(/\.middleware\(\[staffFnMiddleware/g) ?? []).length,
-  7,
+  8,
+);
+check(
+  "八支 POS server fn（createServerFn 的數量與上面一致）",
+  (fnsPos.match(/createServerFn\(/g) ?? []).length,
+  8,
 );
 checkTrue(
   "標記告警已處理需要 approve_stock_adjustments",
@@ -349,7 +354,8 @@ const posFiles = [
   "src/components/pos/CheckoutPanel.tsx",
   "src/components/pos/ProductLookup.tsx",
   "src/components/pos/SalesFilterBar.tsx",
-  "src/components/pos/SaleDetailDialog.tsx",
+  // 2026-10-26 第 3 批：銷售明細從對話框改成內頁（/admin/sales/$saleId），本體是 SaleDetailView。
+  "src/components/pos/SaleDetailView.tsx",
 ];
 for (const f of posFiles) check(`${f} 存在`, existsSync(join(ROOT, f)), true);
 const allPos = posFiles.map((f) => read(join(ROOT, f))).join("\n");

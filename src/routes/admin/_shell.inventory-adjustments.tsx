@@ -13,26 +13,24 @@
  * ⚠️ `canApprove` 只控制畫面。擋住直接 POST /_serverFn/… 的是
  *    fns/inv-adjustments.ts 裡 approveRecord 那一次權限檢查，而且它重讀
  *    staff_permissions，不信任前端送來的任何東西。
+ *
+ * 2026-10-26 起異動單詳情不再是彈窗（後台第 3 批；業主：「不要用彈窗，直接顯示內頁＆回到上一頁」）：
+ * 每一列的「查看詳細」連到 /admin/inventory-adjustments/$id，送出／審核／沖帳等動作都在那一頁。
+ * 「新增異動」仍是對話框（AdjustmentFormDialog）：它是一張小表單，存完就回到這張列表。
  */
 import { useCallback, useMemo, useState } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Loader2, Plus, SlidersHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  AdjustmentDialogs,
-  type ConfirmKind,
-  type PendingConfirm,
-} from "@/components/inventory/AdjustmentDialogs";
+import { AdjustmentFormDialog } from "@/components/inventory/AdjustmentFormDialog";
 import { AdjustmentFilterBar } from "@/components/inventory/AdjustmentFilterBar";
 import { AdjustmentTable } from "@/components/inventory/AdjustmentTable";
 import { ProductPagination } from "@/components/inventory/ProductPagination";
 import { ADJUSTMENT_CATEGORY_OPTIONS } from "@/lib/admin/inv-adjustment-labels";
 import { isApprovalRequired } from "@/lib/admin/inv-product-utils";
-import { useAdjustmentActions } from "@/lib/admin/useAdjustmentActions";
 import { useLoaderBackedList } from "@/lib/admin/useLoaderBackedList";
 import type { AdjustmentFilterValues } from "@/lib/admin/schemas";
-import type { AdminAdjustmentRow } from "@/server/repos/inv-adjustments";
 
 const DEFAULT_FILTER: AdjustmentFilterValues = {
   keyword: null,
@@ -93,10 +91,7 @@ function InventoryAdjustmentsPage() {
   const data = list.data.page;
   const summary = list.data.summary;
 
-  // 對話框看的是點開那一刻那一列的副本（留在這一頁的 state），背景重抓不會把它關掉或換掉。
   const [formOpen, setFormOpen] = useState(false);
-  const [detail, setDetail] = useState<AdminAdjustmentRow | null>(null);
-  const [confirming, setConfirming] = useState<PendingConfirm>(null);
 
   const canApprove = user.permissions.includes("approve_stock_adjustments");
   // 只拿來寫提示文字。真正的 status 是 inv.stock_adjustment_initial_status() 算的。
@@ -112,21 +107,6 @@ function InventoryAdjustmentsPage() {
     await reloadList();
     await router.invalidate();
   }, [reloadList, router]);
-
-  const { busyId, handleSubmit, handleDelete, handleResubmit, handleApprove, handleReverse } =
-    useAdjustmentActions(refresh);
-
-  /** 動作做完就把詳情關掉 —— 留著會顯示動作前的舊狀態。 */
-  function run(task: Promise<void>) {
-    setDetail(null);
-    void task;
-  }
-
-  function onConfirmed(kind: ConfirmKind, row: AdminAdjustmentRow) {
-    if (kind === "delete") run(handleDelete(row));
-    else if (kind === "reject") run(handleApprove(row, false));
-    else run(handleReverse(row));
-  }
 
   const totalPages = Math.max(1, Math.ceil(data.total / filter.pageSize));
 
@@ -186,7 +166,7 @@ function InventoryAdjustmentsPage() {
           沒有符合條件的異動紀錄
         </div>
       ) : (
-        <AdjustmentTable rows={data.rows} busyId={busyId} onView={setDetail} />
+        <AdjustmentTable rows={data.rows} />
       )}
 
       <ProductPagination
@@ -203,21 +183,11 @@ function InventoryAdjustmentsPage() {
         </p>
       ) : null}
 
-      <AdjustmentDialogs
+      <AdjustmentFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
         approvalOn={approvalOn}
-        canApprove={canApprove}
-        busyId={busyId}
-        refresh={refresh}
-        formOpen={formOpen}
-        setFormOpen={setFormOpen}
-        detail={detail}
-        setDetail={setDetail}
-        confirming={confirming}
-        setConfirming={setConfirming}
-        onSubmit={(row) => run(handleSubmit(row))}
-        onApprove={(row) => run(handleApprove(row, true))}
-        onResubmit={(row) => run(handleResubmit(row))}
-        onConfirmed={onConfirmed}
+        onSaved={refresh}
       />
     </div>
   );

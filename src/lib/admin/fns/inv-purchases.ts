@@ -44,19 +44,11 @@ export const getPurchaseSummary = createServerFn({ method: "POST" })
     return await getPurchaseSummary(data);
   });
 
-/** 分類／供應商／審核設定 —— 表單開一次要的三份參考資料。 */
-export const listPurchaseFormOptions = createServerFn({ method: "GET" })
-  .middleware([staffFnMiddleware()])
-  .handler(async () => {
-    const { listPurchaseFormOptions } = await import("@/server/repos/inv-purchases");
-    return await listPurchaseFormOptions();
-  });
-
 /**
- * 整份商品清單。只給進貨表單的商品選擇器與 Excel 匯入的比對用。
+ * 整份商品清單。只給 Excel 匯入與拍照辨識的比對用（「這一列是不是既有商品」要對著完整清單），
+ * 而且只在那兩個入口**打開時**才抓（2026-10-26 後台第 3 批：不再隨著列表頁一起載入，約 385 KB）。
  *
- * 清單頁**不要**呼叫這一支 —— 它會把上千列搬到瀏覽器。清單的篩選與分頁在
- * listAdminPurchases 那邊已經下推到資料庫了。
+ * 清單頁的 loader **不要**呼叫這一支。新增進貨表單的商品選擇器走 searchPurchaseProducts。
  */
 export const listProductPickerRows = createServerFn({ method: "GET" })
   .middleware([staffFnMiddleware()])
@@ -65,12 +57,16 @@ export const listProductPickerRows = createServerFn({ method: "GET" })
     return await listProductPickerRows();
   });
 
-export const getAdminPurchase = createServerFn({ method: "POST" })
+/**
+ * 新增進貨表單的商品選擇器：依關鍵字在資料庫端找，最多 30 列。POST＋只讀標記：關鍵字不放進
+ * 網址（同這個檔案其他篩選），也不清後台路由快取（見 read-only-fn.ts）。
+ */
+export const searchPurchaseProducts = createServerFn({ method: "POST" })
   .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
-  .inputValidator(z.object({ id: z.string().trim().uuid() }))
+  .inputValidator(z.object({ keyword: z.string().max(100) }))
   .handler(async ({ data }) => {
-    const { getAdminPurchase } = await import("@/server/repos/inv-purchases");
-    return await getAdminPurchase(data.id);
+    const { searchProductPickerRows } = await import("@/server/repos/inv-purchases");
+    return await searchProductPickerRows(data.keyword);
   });
 
 // ---------------------------------------------------------------------------
@@ -179,11 +175,29 @@ export const getInventoryPurchasesPageData = createServerFn({ method: "GET" })
   .inputValidator(z.object({ filter: purchaseFilterSchema }))
   .handler(async ({ data }) => {
     const repo = await import("@/server/repos/inv-purchases");
-    const [page, summary, options, products] = await Promise.all([
+    // 整份商品清單（約 385 KB）不再跟著列表一起載入：新增／編輯是內頁、自己搜尋；
+    // Excel 匯入與拍照辨識打開時才抓 listProductPickerRows。
+    const [page, summary, options] = await Promise.all([
       repo.listAdminPurchases(data.filter),
       repo.getPurchaseSummary(data.filter),
       repo.listPurchaseFormOptions(),
-      repo.listProductPickerRows(),
     ]);
-    return { page, summary, options, products };
+    return { page, summary, options };
+  });
+
+/**
+ * 新增（purchaseId = null）／編輯一筆進貨的內頁（/admin/inventory-purchases/new、/$id）。
+ * 同樣是 staffFnMiddleware()，與原本的 getAdminPurchase／listPurchaseFormOptions 相同。
+ * 不帶商品清單：編輯時商品鎖住不能換；新增時的選擇器走 searchPurchaseProducts。
+ */
+export const getInventoryPurchaseFormPageData = createServerFn({ method: "GET" })
+  .middleware([staffFnMiddleware()])
+  .inputValidator(z.object({ purchaseId: z.string().trim().uuid().nullable() }))
+  .handler(async ({ data }) => {
+    const repo = await import("@/server/repos/inv-purchases");
+    const [purchase, options] = await Promise.all([
+      data.purchaseId ? repo.getAdminPurchase(data.purchaseId) : Promise.resolve(null),
+      repo.listPurchaseFormOptions(),
+    ]);
+    return { purchase, options };
   });

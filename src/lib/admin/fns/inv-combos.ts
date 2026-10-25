@@ -39,48 +39,20 @@ export const listAdminComboSets = createServerFn({ method: "POST" })
     return { sets, items };
   });
 
-export const getAdminComboSet = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
-  .inputValidator(z.object({ id: z.string().trim().uuid() }))
-  .handler(async ({ data }) => {
-    const { getAdminComboSet, listComboItems } = await import("@/server/repos/inv-combos");
-    const [set, items] = await Promise.all([getAdminComboSet(data.id), listComboItems(data.id)]);
-    return { set, items };
-  });
-
-export const listComboSales = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
-  .inputValidator(
-    z.object({
-      comboSetId: z.string().trim().uuid().nullable(),
-      dateFrom: z
-        .string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/)
-        .nullable(),
-      dateTo: z
-        .string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/)
-        .nullable(),
-      limit: z.number().int().min(1).max(500),
-    }),
-  )
-  .handler(async ({ data }) => {
-    const { listComboSales } = await import("@/server/repos/inv-combos");
-    return await listComboSales(data);
-  });
-
 /**
- * 表單要的選項：審核設定（提示文字用）與可選的商品（沿用櫃檯那一支：已審核、上架、
- * 不是組合子品項）。新增頁的 loader 與詳情／編輯的整頁 fn 共用。
+ * 表單要的選項：審核設定（提示文字用）與可選的商品（與櫃檯同一個範圍：已審核、上架、
+ * 不是組合子品項）。新增頁與編輯頁的 loader 用。
  *
  * 2026-10-25：拿掉 paymentMethods —— 套餐頁從來沒有用到（結帳在 /admin/pos，自己抓）。
+ * 2026-10-26：可選商品只帶選擇器與分攤預覽用得到的七欄（listComboPickerProducts），
+ * 不再整份沿用櫃檯的 listPosProducts。
  */
 async function loadComboFormOptions() {
   const { listApprovalSettings } = await import("@/server/repos/inv-products");
-  const { listPosProducts } = await import("@/server/repos/inv-sales");
+  const { listComboPickerProducts } = await import("@/server/repos/inv-sales");
   const [approvalSettings, products] = await Promise.all([
     listApprovalSettings(),
-    listPosProducts(),
+    listComboPickerProducts(),
   ]);
   return { approvalSettings, products };
 }
@@ -119,7 +91,8 @@ export const getInventoryCombosPageData = createServerFn({ method: "GET" })
  * 身分），編輯彈窗又打一次 getAdminComboSet。現在兩頁共用這一個 loader，詳情 → 編輯不重抓套餐。
  * 可選商品清單（約 496 KB）只有編輯頁要用，由編輯頁自己的 loader 叫 listComboFormOptions——
  * 只看詳情的人不用等它。
- * 權限與 getAdminComboSet／listComboSales／listComboFormOptions 相同（staffFnMiddleware）。
+ * 權限與原本的 getAdminComboSet／listComboSales（2026-10-26 已移除）與 listComboFormOptions
+ * 相同（staffFnMiddleware）。
  */
 export const getInventoryComboPageData = createServerFn({ method: "GET" })
   .middleware([staffFnMiddleware()])

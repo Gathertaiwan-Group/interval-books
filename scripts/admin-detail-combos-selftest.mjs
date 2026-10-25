@@ -75,7 +75,15 @@ const fns = stripComments(read(FNS));
       ).test(fns),
     );
   }
-  for (const name of ["getAdminComboSet", "listComboSales", "listAdminComboSets"]) {
+  // 2026-10-26 第 3 批：getAdminComboSet／listComboSales 兩支 fn 已沒有呼叫端而移除（整頁 fn
+  // 直接叫同名的 repo）。剩下的 listAdminComboSets 仍是 staffFnMiddleware()。
+  for (const name of ["getAdminComboSet", "listComboSales"]) {
+    checkTrue(
+      `第 3 批：沒人用的 ${name} server fn 已移除`,
+      !new RegExp(`export const ${name} = createServerFn`).test(fns),
+    );
+  }
+  for (const name of ["listAdminComboSets"]) {
     checkTrue(
       `原本的 ${name} 仍是 staffFnMiddleware()（整頁 fn 與它同等）`,
       new RegExp(
@@ -100,7 +108,7 @@ const fns = stripComments(read(FNS));
   }
   checkTrue(
     "🔴 詳情的整頁 fn 不帶可選商品清單（約 496 KB，只有編輯頁要用）",
-    !/listPosProducts|loadComboFormOptions/.test(page),
+    !/listPosProducts|listComboPickerProducts|loadComboFormOptions/.test(page),
   );
   checkTrue("整頁 fn 用 Promise.all（不是一支接一支）", /Promise\.all\(\[/.test(page));
   checkTrue(
@@ -116,7 +124,7 @@ const fns = stripComments(read(FNS));
   checkTrue("列表整頁 fn 有審核設定（「需審核」提示）", /listApprovalSettings\(/.test(list));
   checkTrue(
     "🔴 列表整頁 fn 不帶可選商品清單（表單才要；約 496 KB）",
-    !/listPosProducts|loadComboFormOptions/.test(list),
+    !/listPosProducts|listComboPickerProducts|loadComboFormOptions/.test(list),
   );
 
   const decls = [...fns.matchAll(/export const (\w+) = createServerFn\([^)]*\)\s*(\.\w+)/g)];

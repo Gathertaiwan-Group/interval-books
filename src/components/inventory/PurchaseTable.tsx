@@ -11,6 +11,7 @@
  * remaining_quantity 由 FIFO trigger 維護，consumed_quantity 是 0017 的 view 直接
  * 給的。用 quantity - remaining 自己算會在批次被修改過數量之後對不上。
  */
+import { Link } from "@tanstack/react-router";
 import { AlertTriangle, CheckCircle2, Clock, Loader2, Pencil, Trash2, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { purchaseApprovalLabel, purchaseApprovalVariant } from "@/lib/admin/inv-adjustment-labels";
 import { todayInTaipei } from "@/lib/admin/inv-product-utils";
+import { rememberAdminPeek } from "@/lib/admin/list-memory";
 import type { AdminPurchaseRow } from "@/server/repos/inv-purchases";
 
 type Props = {
@@ -35,7 +37,6 @@ type Props = {
   onToggleSelectAll: () => void;
   busyId: string | null;
   canApprove: boolean;
-  onEdit: (row: AdminPurchaseRow) => void;
   onDelete: (row: AdminPurchaseRow) => void;
   onApprove: (row: AdminPurchaseRow, approved: boolean) => void;
 };
@@ -86,7 +87,6 @@ export function PurchaseTable({
   onToggleSelectAll,
   busyId,
   canApprove,
-  onEdit,
   onDelete,
   onApprove,
 }: Props) {
@@ -229,16 +229,19 @@ export function PurchaseTable({
                         </Button>
                       </>
                     ) : null}
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8"
-                      title="編輯"
-                      disabled={busy}
-                      onClick={() => onEdit(row)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                      <span className="sr-only">編輯</span>
+                    {/* 編輯是內頁（2026-10-26 起不再是彈窗）。列上的動作寫入中時先停著
+                        （disabled：沒有 href、不預載、aria-disabled）。 */}
+                    <Button asChild size="icon" variant="ghost" className="h-8 w-8" title="編輯">
+                      <Link
+                        to="/admin/inventory-purchases/$id"
+                        params={{ id: row.purchase_id }}
+                        preload="intent"
+                        disabled={busy}
+                        onClick={() => rememberAdminPeek("purchase", row.purchase_id, row)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                        <span className="sr-only">編輯</span>
+                      </Link>
                     </Button>
                     <Button
                       size="icon"

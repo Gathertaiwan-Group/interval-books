@@ -8,8 +8,22 @@
  *
  * ⚠️ 這支 middleware **沒有 server 那一半，也不是授權**。授權仍然是每一支 fn 自己的
  *    adminFnMiddleware／staffFnMiddleware／vendorFnMiddleware。
+ *
+ * ── CSRF（2026-10-26）────────────────────────────────────────────────────────
+ * 框架建議的 createCsrfMiddleware，只套在 server fn 請求上（handlerType === "serverFn"）：
+ * 瀏覽器帶的 Sec-Fetch-Site 必須是 same-origin（沒有這個標頭的舊瀏覽器退回比對 Origin，
+ * 再退回 Referer；三個都沒有就擋）。後台的 cookie 是 SameSite=Lax，跨站 POST 本來就不會帶，
+ * 這裡是框架層的第二道。
+ *
+ * 不受影響的路徑：金流與排程的 webhook（黑貓 APN／導回、PayUni、發票／通知／掃描圖排程、
+ * /api/mcp）全部在 src/server.ts 被攔下、**根本不會進到** startFetch，也就不經過這裡；
+ * 就算進來了，filter 也只認 server fn。一般頁面（handlerType === "router"）不檢查。
+ *
+ * 加這支之前，因為專案有自己的 createStart()，框架**不會**套用它內建的預設 CSRF（只有沒有
+ * start entry 時才會），dev 每次啟動都印「server functions are not protected by the CSRF
+ * middleware」。
  */
-import { createMiddleware, createStart } from "@tanstack/react-start";
+import { createCsrfMiddleware, createMiddleware, createStart } from "@tanstack/react-start";
 import { isReadOnlyServerFn, noteAdminMutation } from "@/lib/admin/route-cache";
 
 const adminCacheInvalidation = createMiddleware({ type: "function" }).client(
@@ -24,6 +38,11 @@ const adminCacheInvalidation = createMiddleware({ type: "function" }).client(
   },
 );
 
+const csrfMiddleware = createCsrfMiddleware({
+  filter: (ctx) => ctx.handlerType === "serverFn",
+});
+
 export const startInstance = createStart(() => ({
+  requestMiddleware: [csrfMiddleware],
   functionMiddleware: [adminCacheInvalidation],
 }));

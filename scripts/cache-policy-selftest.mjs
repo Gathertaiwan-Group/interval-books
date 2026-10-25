@@ -110,6 +110,7 @@ const WHITELISTED_GET_200 = [
   "/shop/some-product-slug",
   "/about",
   "/privacy",
+  "/news",
   "/journeys",
   "/journeys/some-journey-slug",
   "/publications",
@@ -228,9 +229,9 @@ for (const [arrName, arr] of Object.entries(whitelistArrays)) {
 
 // 白名單九條，逐字比對——多一條、少一條、或字面被改掉，都要能看出來。
 check(
-  "CACHEABLE_EXACT_PATHS 逐字等於需求文字列出的五條",
+  "CACHEABLE_EXACT_PATHS 逐字等於需求文字列出的五條＋/news（2026-10-26）",
   [...__TEST_ONLY__.CACHEABLE_EXACT_PATHS].sort(),
-  ["/", "/about", "/events", "/privacy", "/shop"].sort(),
+  ["/", "/about", "/events", "/news", "/privacy", "/shop"].sort(),
 );
 check(
   "CACHEABLE_SINGLE_SEGMENT_PREFIXES 逐字等於 /events/、/shop/",
@@ -253,7 +254,7 @@ check(
 // =============================================================================
 console.log("\n[4] 不認得的路徑——不動它，交回 Nitro/TanStack Start 的預設值");
 const UNLISTED_PATHS = [
-  "/news",
+  "/news/anything",
   "/cart",
   "/contact",
   "/curated",

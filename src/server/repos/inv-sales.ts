@@ -14,23 +14,44 @@
 import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
 
-/** 櫃檯賣得動的品項。available 已經是**銷售單位**，前端不要再乘 pack_size。 */
+/**
+ * 櫃檯賣得動的品項。available 已經是**銷售單位**，前端不要再乘 pack_size。
+ *
+ * 2026-10-26 後台第 3 批瘦身：拿掉櫃檯畫面從來沒讀過的 product_type、base_product_id、
+ * stock_target_id（view 上還在，只是不再帶回瀏覽器）。整份清單約 3,000 列，每列少兩個 UUID。
+ * 庫存扣在哪一件由 pos_checkout() 在資料庫裡決定，不靠前端送的任何東西。
+ */
 export type PosProduct = {
   inv_product_id: string;
   name: string;
   barcode: string | null;
   issue_number: string | null;
   series: string | null;
-  product_type: string;
   selling_price: number | null;
-  base_product_id: string | null;
-  stock_target_id: string;
   stock_target_name: string;
   units_per_item: number;
   stock_quantity: number;
   reserved: number;
   available: number;
 };
+
+const POS_PRODUCT_COLUMNS =
+  "inv_product_id, name, barcode, issue_number, series, selling_price, stock_target_name, units_per_item, stock_quantity, reserved, available";
+
+/**
+ * 套餐表單的商品選擇器要的欄位（2026-10-26 後台第 3 批瘦身）。原本套餐表單直接沿用櫃檯那一支
+ * listPosProducts（約 496 KB），選擇器與分攤預覽只用得到下面七欄。
+ */
+export type ComboPickerProduct = Pick<
+  PosProduct,
+  | "inv_product_id"
+  | "name"
+  | "barcode"
+  | "issue_number"
+  | "series"
+  | "selling_price"
+  | "stock_quantity"
+>;
 
 export type PosPaymentMethod = {
   payment_method_id: string;
@@ -69,6 +90,25 @@ export type PosSaleRow = {
   user_id: string;
   operator_name: string | null;
 };
+
+/**
+ * 銷售紀錄**列表**一列實際用到的欄位（2026-10-26 後台第 3 批瘦身）。列表原本 `select *`，一頁
+ * 50 列把備註、網站訂單編號、操作人員、對帳時間……全部帶回瀏覽器，畫面只用到下面這幾欄。
+ * 完整的一筆（明細內頁 /admin/sales/$saleId）另外用 getPosSale() 依 sale_id 抓。
+ */
+export const POS_SALE_LIST_COLUMNS = [
+  "sale_id",
+  "sale_date",
+  "channel",
+  "override_reservation",
+  "quantity",
+  "amount",
+  "gross_profit",
+  "product_name",
+  "payment_method_name",
+] as const;
+
+export type PosSaleListRow = Pick<PosSaleRow, (typeof POS_SALE_LIST_COLUMNS)[number]>;
 
 export type StockAlertRow = {
   alert_id: number;
@@ -112,14 +152,27 @@ export type PosCheckoutResult = {
 export async function listPosProducts(): Promise<PosProduct[]> {
   const { data, error } = await supabaseAdmin()
     .from("inv_pos_products")
-    .select(
-      "inv_product_id, name, barcode, issue_number, series, product_type, selling_price, base_product_id, stock_target_id, stock_target_name, units_per_item, stock_quantity, reserved, available",
-    )
+    .select(POS_PRODUCT_COLUMNS)
     .order("name", { ascending: true })
     .limit(5000);
 
   if (error) throw new Error(`[repo/inv-sales] 商品清單讀取失敗：${error.message}`);
   return (data ?? []) as unknown as PosProduct[];
+}
+
+/**
+ * 套餐表單的可選商品：與櫃檯同一個 view、同一個範圍（inv_pos_products：已審核、上架、不是組合
+ * 子品項），只帶 ComboPickerProduct 那七欄。
+ */
+export async function listComboPickerProducts(): Promise<ComboPickerProduct[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("inv_pos_products")
+    .select("inv_product_id, name, barcode, issue_number, series, selling_price, stock_quantity")
+    .order("name", { ascending: true })
+    .limit(5000);
+
+  if (error) throw new Error(`[repo/inv-sales] 套餐可選商品讀取失敗：${error.message}`);
+  return (data ?? []) as unknown as ComboPickerProduct[];
 }
 
 /**
@@ -131,9 +184,7 @@ export async function listPosProducts(): Promise<PosProduct[]> {
 export async function findPosProductByBarcode(barcode: string): Promise<PosProduct | null> {
   const { data, error } = await supabaseAdmin()
     .from("inv_pos_products")
-    .select(
-      "inv_product_id, name, barcode, issue_number, series, product_type, selling_price, base_product_id, stock_target_id, stock_target_name, units_per_item, stock_quantity, reserved, available",
-    )
+    .select(POS_PRODUCT_COLUMNS)
     .eq("barcode", barcode)
     .limit(1)
     .maybeSingle();
@@ -205,13 +256,13 @@ export type SalesFilter = {
  */
 export async function listPosSales(
   filter: SalesFilter,
-): Promise<{ rows: PosSaleRow[]; total: number }> {
+): Promise<{ rows: PosSaleListRow[]; total: number }> {
   const from = filter.page * filter.pageSize;
   const to = from + filter.pageSize - 1;
 
   let query = supabaseAdmin()
     .from("inv_pos_sales")
-    .select("*", { count: "exact" })
+    .select(POS_SALE_LIST_COLUMNS.join(", "), { count: "exact" })
     .order("sale_date", { ascending: false })
     .order("created_at", { ascending: false })
     .range(from, to);
@@ -233,7 +284,22 @@ export async function listPosSales(
 
   const { data, error, count } = await query;
   if (error) throw new Error(`[repo/inv-sales] 銷售紀錄讀取失敗：${error.message}`);
-  return { rows: (data ?? []) as unknown as PosSaleRow[], total: count ?? 0 };
+  return { rows: (data ?? []) as unknown as PosSaleListRow[], total: count ?? 0 };
+}
+
+/**
+ * 一筆銷售的完整明細（/admin/sales/$saleId）。列表只帶畫面用得到的欄位，明細內頁才要
+ * 備註、操作人員、成本這些。查不到回 null（內頁顯示「找不到」）。
+ */
+export async function getPosSale(saleId: string): Promise<PosSaleRow | null> {
+  const { data, error } = await supabaseAdmin()
+    .from("inv_pos_sales")
+    .select("*")
+    .eq("sale_id", saleId)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`[repo/inv-sales] 銷售明細讀取失敗：${error.message}`);
+  return (data ?? null) as unknown as PosSaleRow | null;
 }
 
 /** 篩選條件下的合計。分頁只影響看得到幾列，總數要算全部。 */

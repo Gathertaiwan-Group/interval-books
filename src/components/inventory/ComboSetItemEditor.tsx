@@ -5,7 +5,7 @@
  *    出原因，**但它不是防線** —— comboSetSchema 的 refine 擋一次，0018 的
  *    COMBO_DUP_ITEM 再擋一次，那兩層才是。
  *
- * ⚠️ 商品清單是 listComboFormOptions() 一次載進來的（櫃檯那支 inv_pos_products，
+ * ⚠️ 商品清單是 listComboFormOptions() 一次載進來的（與櫃檯同一個 inv_pos_products 範圍，
  *    已審核、上架、不是組合子品項）。這裡的搜尋只是在這份清單上過濾，最多畫 50 筆 ——
  *    Radix Select 一次塞一千個 item 會卡住整個對話框。
  */
@@ -24,13 +24,13 @@ import {
 } from "@/components/ui/select";
 import { money, productLabel } from "@/lib/admin/inv-combo-labels";
 import type { ComboItemValues } from "@/lib/admin/schemas";
-import type { PosProduct } from "@/server/repos/inv-sales";
+import type { ComboPickerProduct } from "@/server/repos/inv-sales";
 
 const MAX_OPTIONS = 50;
 
 type Props = {
   items: ComboItemValues[];
-  products: PosProduct[];
+  products: ComboPickerProduct[];
   disabled?: boolean;
   onChange: (next: ComboItemValues[]) => void;
 };

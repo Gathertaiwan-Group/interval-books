@@ -87,3 +87,11 @@ export function backIfPreviousIs(history: HistoryLike, pathnames: readonly strin
   history.back();
   return true;
 }
+
+/**
+ * text 主鍵（news／collaborations／artists／journeys 都是 `id text primary key`，0001／0019）
+ * 的網址參數形狀檢查：英數、底線、連字號、句點，1–128 字。後台建的是 randomUUID，但資料庫
+ * 不保證，所以不能用 isUuid 擋（那會把合法的舊 id 判成找不到）；只擋形狀明顯不對的字串，
+ * 其餘交給 get…ById 的 zod 與查詢（查不到 → null → 找不到）。
+ */
+export const TEXT_ROW_ID = /^[A-Za-z0-9._-]{1,128}$/;

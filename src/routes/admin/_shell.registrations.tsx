@@ -192,6 +192,8 @@ function AdminRegistrationsPage() {
             ) : (
               sessions.map((s) => {
                 const count = counts[s.id] ?? { total: 0, paid: 0 };
+                // 這一列正在刪除：名單／編輯連結與刪除鈕先停著。
+                const rowBusy = deleting && deleteTarget?.id === s.id;
                 // ⚠️ 三個數字，不是兩個。seats_taken 是「押住了幾個位子」，
                 //    count.total 是「有幾位登錄了姓名」。0020 §4.4 回填的舊場次
                 //    只補一位參加者（捏造另外兩位是說謊），所以那些場次上這兩個
@@ -241,6 +243,7 @@ function AdminRegistrationsPage() {
                               to="/admin/registrations/$sessionId"
                               params={{ sessionId: s.id }}
                               preload={false}
+                              disabled={rowBusy}
                               onClick={() => rememberAdminPeek("event-session", s.id, s)}
                             >
                               名單
@@ -256,6 +259,7 @@ function AdminRegistrationsPage() {
                             to="/admin/registrations/$sessionId/edit"
                             params={{ sessionId: s.id }}
                             preload="intent"
+                            disabled={rowBusy}
                             onClick={() => rememberAdminPeek("event-session", s.id, s)}
                           >
                             編輯
@@ -265,6 +269,7 @@ function AdminRegistrationsPage() {
                           variant="ghost"
                           size="sm"
                           className="text-destructive hover:text-destructive"
+                          disabled={rowBusy}
                           onClick={() => setDeleteTarget(s)}
                         >
                           刪除

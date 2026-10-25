@@ -1,14 +1,12 @@
-import { useMemo, useState } from "react";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { useState } from "react";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { toast } from "sonner";
 import { Plus, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -53,16 +51,15 @@ import {
 } from "@/components/ui/select";
 import {
   CREATABLE_BACKOFFICE_ROLES,
-  STAFF_PERMISSIONS,
   createStaffAccountSchema,
   type CreateStaffAccountValues,
 } from "@/lib/admin/schemas";
 import type { listStaffAccounts } from "@/lib/admin/fns/staff-accounts";
 import { formatUpdatedAt } from "@/lib/admin/format";
-import { HIDDEN_PERMISSIONS, PERMISSION_LABELS } from "@/lib/admin/permission-labels";
+import { rememberAdminPeek } from "@/lib/admin/list-memory";
+import { ROLE_DESCRIPTION, ROLE_LABEL, type CreatableRole } from "@/lib/admin/staff-roles";
 
 type StaffAccountRow = Awaited<ReturnType<typeof listStaffAccounts>>[number];
-type CreatableRole = (typeof CREATABLE_BACKOFFICE_ROLES)[number];
 
 /**
  * 這一頁只有 admin 能進——但守門的不是這裡，是 fns/staff-accounts.ts 每一支都
@@ -72,6 +69,10 @@ type CreatableRole = (typeof CREATABLE_BACKOFFICE_ROLES)[number];
  * 擋下來，看到一頁錯誤，而不是資料——跟這個後台其餘每一個 admin 專用頁面
  * （/admin/settings、/admin/strings……）行為一致。側欄用 `staff: false`
  * （見 _shell.tsx 的 NAV_GROUPS）讓店員連連結都看不到，但那只是畫面。
+ *
+ * 2026-10-26 起「編輯」不再是彈窗（後台第 3 批；業主：「不要用彈窗，直接顯示內頁＆回到上一頁」）：
+ * 連到 /admin/staff/$id（StaffAccountForm）。「新增後台帳號」仍是對話框——三個欄位、
+ * 含一組要當面交給對方的初始密碼，屬於快速動作；「移除」確認仍是 AlertDialog。
  */
 export const Route = createFileRoute("/admin/_shell/staff")({
   loader: async () => {
@@ -83,40 +84,16 @@ export const Route = createFileRoute("/admin/_shell/staff")({
   component: AdminStaffPage,
 });
 
-const ROLE_LABEL: Record<CreatableRole, string> = {
-  admin: "管理員",
-  staff: "門市人員",
-  pending: "待審核",
-};
-
-const ROLE_DESCRIPTION: Record<CreatableRole, string> = {
-  admin: "能進所有模組、能管理後台人員",
-  staff: "能進「門市」與勾選的細權限對應模組，看不到這一頁",
-  pending: "已登入但尚未開通任何模組，看到的是待開通說明頁",
-};
-
-// 九個細權限的中文名稱搬到 src/lib/admin/permission-labels.ts，與各頁「需要店長開通
-// 『○○』權限」的提示共用。approve_inventory_adjustments 在那裡標成 HIDDEN_PERMISSIONS：
-// 沒有任何程式在檢查它，所以這一頁不再列出來（帳號身上既有的值照樣保留，不會被清掉）。
-const VISIBLE_PERMISSIONS = STAFF_PERMISSIONS.filter((p) => !HIDDEN_PERMISSIONS.has(p));
-
 function AdminStaffPage() {
   const { accounts } = Route.useLoaderData();
   const { user } = Route.useRouteContext();
   const router = useRouter();
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<StaffAccountRow | null>(null);
-  const [editFormKey, setEditFormKey] = useState(0);
   const [removeTarget, setRemoveTarget] = useState<StaffAccountRow | null>(null);
   const [removing, setRemoving] = useState(false);
 
   const adminCount = accounts.filter((a) => a.role === "admin").length;
-
-  function openEdit(row: StaffAccountRow) {
-    setEditing(row);
-    setEditFormKey((k) => k + 1);
-  }
 
   async function handleRemove() {
     if (!removeTarget) return;
@@ -181,6 +158,7 @@ function AdminStaffPage() {
             ) : (
               accounts.map((row) => {
                 const isSelf = row.id === user.userId;
+                const busy = removing && removeTarget?.id === row.id;
                 return (
                   <TableRow key={row.id}>
                     <TableCell className="max-w-xs truncate font-medium">
@@ -208,13 +186,22 @@ function AdminStaffPage() {
                         <span className="text-xs text-muted-foreground">（這是你自己的帳號）</span>
                       ) : (
                         <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => openEdit(row)}>
-                            編輯
+                          <Button asChild variant="ghost" size="sm">
+                            <Link
+                              to="/admin/staff/$id"
+                              params={{ id: row.id }}
+                              preload="intent"
+                              disabled={busy}
+                              onClick={() => rememberAdminPeek("staff", row.id, row)}
+                            >
+                              編輯
+                            </Link>
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             className="text-destructive hover:text-destructive"
+                            disabled={busy}
                             onClick={() => setRemoveTarget(row)}
                           >
                             移除
@@ -234,16 +221,6 @@ function AdminStaffPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreated={() => router.invalidate()}
-      />
-
-      <EditAccountDialog
-        key={editFormKey}
-        account={editing}
-        onOpenChange={(open) => !open && setEditing(null)}
-        onSaved={() => {
-          setEditing(null);
-          void router.invalidate();
-        }}
       />
 
       <AlertDialog
@@ -386,167 +363,6 @@ function CreateAccountDialog({
             <DialogFooter>
               <Button type="submit" disabled={submitting}>
                 {submitting ? "建立中…" : "建立帳號"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 編輯：改角色＋（角色是 staff 時）細權限
-// ---------------------------------------------------------------------------
-// 兩件事包在同一個對話框、同一次送出，是為了操作方便——底層仍是兩支獨立的
-// server fn（updateStaffRole／setStaffPermissions），不是一支揉在一起的函式。
-// 角色不是 staff 時完全不呼叫 setStaffPermissions：既有的 staff_permissions
-// 列原樣保留，不會被清空——見 src/server/repos/staff-accounts.ts 的說明。
-
-function buildEditAccountFormSchema() {
-  return z.object({
-    role: z.enum(CREATABLE_BACKOFFICE_ROLES, { errorMap: () => ({ message: "請選擇角色" }) }),
-    permissions: z.array(z.enum(STAFF_PERMISSIONS)),
-  });
-}
-
-type EditAccountFormValues = z.infer<ReturnType<typeof buildEditAccountFormSchema>>;
-
-function EditAccountDialog({
-  account,
-  onOpenChange,
-  onSaved,
-}: {
-  account: StaffAccountRow | null;
-  onOpenChange: (open: boolean) => void;
-  onSaved: () => void;
-}) {
-  const editAccountFormSchema = useMemo(buildEditAccountFormSchema, []);
-  const [submitting, setSubmitting] = useState(false);
-  const form = useForm<EditAccountFormValues>({
-    resolver: zodResolver(editAccountFormSchema),
-    defaultValues: {
-      role: (account?.role as CreatableRole) ?? "staff",
-      permissions: account?.permissions ?? [],
-    },
-  });
-
-  const selectedRole = form.watch("role");
-
-  async function handleSubmit(values: EditAccountFormValues) {
-    if (!account) return;
-    setSubmitting(true);
-    try {
-      const { updateStaffRole, setStaffPermissions } =
-        await import("@/lib/admin/fns/staff-accounts");
-      if (values.role !== account.role) {
-        await updateStaffRole({ data: { userId: account.id, role: values.role } });
-      }
-      if (values.role === "staff") {
-        await setStaffPermissions({
-          data: { userId: account.id, permissions: values.permissions },
-        });
-      }
-      toast.success(`已更新 ${account.email ?? account.id}`);
-      onSaved();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "更新失敗，請稍後再試");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <Dialog open={account !== null} onOpenChange={onOpenChange}>
-      {/* 角色說明文字很長：內文區自己捲動、按鈕列固定在底部，避免「儲存變更」被擠出框外 */}
-      <DialogContent className="flex max-h-[90vh] max-w-lg flex-col overflow-hidden">
-        <DialogHeader className="shrink-0">
-          <DialogTitle>編輯後台身分</DialogTitle>
-          <DialogDescription className="break-words">
-            {account?.email ?? account?.id}
-          </DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(handleSubmit)}
-            className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
-          >
-            <div className="-mx-1 min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto px-1 pb-1">
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>角色</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="h-auto min-h-9 min-w-0 whitespace-normal text-left [&>span]:line-clamp-none [&>span]:break-words">
-                          <SelectValue placeholder="請選擇角色" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="max-w-[var(--radix-select-trigger-width)]">
-                        {CREATABLE_BACKOFFICE_ROLES.map((role) => (
-                          <SelectItem key={role} value={role}>
-                            {ROLE_LABEL[role]}——{ROLE_DESCRIPTION[role]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {selectedRole === "staff" && (
-                <FormField
-                  control={form.control}
-                  name="permissions"
-                  render={() => (
-                    <FormItem>
-                      <FormLabel>細權限</FormLabel>
-                      <FormDescription>
-                        只勾選的項目會生效；管理員一律視為全有，不受這裡影響。
-                      </FormDescription>
-                      <div className="space-y-2 rounded-md border border-border p-3">
-                        {VISIBLE_PERMISSIONS.map((permission) => (
-                          <FormField
-                            key={permission}
-                            control={form.control}
-                            name="permissions"
-                            render={({ field }) => {
-                              const checked = field.value.includes(permission);
-                              return (
-                                <FormItem className="flex flex-row items-start space-x-2 space-y-0">
-                                  <FormControl>
-                                    <Checkbox
-                                      checked={checked}
-                                      onCheckedChange={(next) => {
-                                        field.onChange(
-                                          next
-                                            ? [...field.value, permission]
-                                            : field.value.filter((p) => p !== permission),
-                                        );
-                                      }}
-                                    />
-                                  </FormControl>
-                                  <FormLabel className="text-sm font-normal leading-tight">
-                                    {PERMISSION_LABELS[permission]}
-                                  </FormLabel>
-                                </FormItem>
-                              );
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </FormItem>
-                  )}
-                />
-              )}
-            </div>
-
-            <DialogFooter className="shrink-0">
-              <Button type="submit" disabled={submitting}>
-                {submitting ? "儲存中…" : "儲存變更"}
               </Button>
             </DialogFooter>
           </form>

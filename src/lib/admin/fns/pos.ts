@@ -73,6 +73,15 @@ export const listPosSales = createServerFn({ method: "POST" })
     return { ...page, summary };
   });
 
+/** 一筆銷售的完整明細（/admin/sales/$saleId 的 loader）。與 listPosSales 同樣是 staffFnMiddleware()。 */
+export const getPosSale = createServerFn({ method: "GET" })
+  .middleware([staffFnMiddleware()])
+  .inputValidator(z.object({ saleId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const { getPosSale } = await import("@/server/repos/inv-sales");
+    return await getPosSale(data.saleId);
+  });
+
 export const listStockAlerts = createServerFn({ method: "POST" })
   .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(z.object({ status: z.enum(["all", "open", "resolved"]) }))

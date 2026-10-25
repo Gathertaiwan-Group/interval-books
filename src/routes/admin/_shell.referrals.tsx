@@ -5,23 +5,20 @@
  * CSV）、推廣者管理（新增／編輯／停用、複製連結）、全站預設（一張設定卡）。
  *
  * 所有數字由伺服器算（src/lib/referral.ts computeMonthlyReport，有自檢）；這一頁只負責
- * 顯示。授權：src/lib/admin/fns/referrals.ts 每一支都掛 adminFnMiddleware，側欄
+ * 顯示。
+ *
+ * 2026-10-26 起新增／編輯推廣者不再是彈窗（後台第 3 批；業主：「不要用彈窗，直接顯示內頁＆回到
+ * 上一頁」）：連到 /admin/referrals/new、/admin/referrals/$id（ReferrerForm）。月份的選擇與那個
+ * 月份的報表交給 useLoaderBackedList：背景重抓會反映在畫面上，從內頁回來月份原樣還原。
+ * 「標記已結算」的確認仍是 window.confirm（一句話的確認，不是表單）。授權：src/lib/admin/fns/referrals.ts 每一支都掛 adminFnMiddleware，側欄
  * staff: false 只是畫面。時間一律經 src/lib/taipei-time.ts。
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Copy, Download, Handshake, Loader2, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -35,13 +32,14 @@ import {
 } from "@/components/ui/table";
 import { toCsv } from "@/lib/csv";
 import {
-  parseCommissionTiers,
   referralLink,
-  type CommissionTier,
   type MonthlyReport,
   type ReferralSettings,
   type ReferrerResult,
 } from "@/lib/referral";
+import { rememberAdminPeek } from "@/lib/admin/list-memory";
+import { textToTiers, tiersLabel, tiersToText } from "@/lib/admin/referral-tiers";
+import { useLoaderBackedList } from "@/lib/admin/useLoaderBackedList";
 import { currentTaipeiMonth, formatTaipeiDateTime, shiftPeriod } from "@/lib/taipei-time";
 import type { ReferrerRow } from "@/server/repos/referrals";
 
@@ -65,40 +63,6 @@ function money(n: number) {
   return n < 0 ? `−NT$ ${s}` : `NT$ ${s}`;
 }
 
-/** 級距 ↔ 「10000:15, 30000:20, :25」。 */
-function tiersToText(t: CommissionTier[] | null): string {
-  if (!t) return "";
-  return t.map((x) => `${x.upTo ?? ""}:${x.rate}`).join(", ");
-}
-function textToTiers(s: string): CommissionTier[] | null {
-  const parts = s
-    .split(/[,，\n]/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-  if (parts.length === 0) return null;
-  const raw = parts.map((p) => {
-    const [a, b] = p.split(/[:：]/);
-    return {
-      upTo: a?.trim() ? Number(a.trim()) : null,
-      rate: Number((b ?? "").replace("%", "").trim()),
-    };
-  });
-  return parseCommissionTiers(raw);
-}
-function tiersLabel(t: CommissionTier[]): string {
-  let lower = 0;
-  return t
-    .map((x) => {
-      const s =
-        x.upTo === null
-          ? `${lower.toLocaleString("zh-TW")} 以上 ${x.rate}%`
-          : `${lower.toLocaleString("zh-TW")}–${x.upTo.toLocaleString("zh-TW")} ${x.rate}%`;
-      lower = x.upTo ?? lower;
-      return s;
-    })
-    .join("、");
-}
-
 async function copy(text: string) {
   try {
     await navigator.clipboard.writeText(text);
@@ -108,44 +72,48 @@ async function copy(text: string) {
   }
 }
 
+type ReferralsData = {
+  referrers: ReferrerRow[];
+  settings: ReferralSettings;
+  report: MonthlyReport;
+};
+
 function ReferralsPage() {
   const loaded = Route.useLoaderData();
-  const [referrers, setReferrers] = useState<ReferrerRow[]>(loaded.referrers);
-  const [settings, setSettings] = useState<ReferralSettings>(loaded.settings);
-  const [period, setPeriod] = useState(loaded.period);
-  const [report, setReport] = useState<MonthlyReport>(loaded.report);
-  const [loading, setLoading] = useState(false);
-  const [editing, setEditing] = useState<ReferrerRow | "new" | null>(null);
+  const loaderUpdatedAt = Route.useMatch({ select: (m) => m.updatedAt });
+
+  // 月份＝這張列表的「篩選」：換月份 → 重抓；背景重抓、寫入後重抓會反映在畫面上；
+  // 從推廣者內頁回來，月份原樣還原（lib/admin/useLoaderBackedList.ts）。
+  const loaderData = useMemo<ReferralsData>(
+    () => ({ referrers: loaded.referrers, settings: loaded.settings, report: loaded.report }),
+    [loaded.referrers, loaded.settings, loaded.report],
+  );
+  const list = useLoaderBackedList({
+    key: "referrals",
+    loaderFilter: loaded.period,
+    loaderData,
+    loaderUpdatedAt,
+    errorMessage: "讀取失敗",
+    fetcher: async (p: string): Promise<ReferralsData> => {
+      const fns = await import("@/lib/admin/fns/referrals");
+      const [l, report] = await Promise.all([
+        fns.listReferrersAdmin(),
+        fns.getReferralReportAdmin({ data: { period: p } }),
+      ]);
+      return { referrers: l.referrers, settings: l.settings, report };
+    },
+  });
+  const period = list.filter;
+  const setPeriod = list.setFilter;
+  const { referrers, settings, report } = list.data;
+  const loading = list.loading;
+  const reload = list.reload;
 
   const thisMonth = currentTaipeiMonth();
   const months = useMemo(
     () => Array.from({ length: 13 }, (_, i) => shiftPeriod(thisMonth, -i)),
     [thisMonth],
   );
-
-  const reload = useCallback(async (p: string) => {
-    setLoading(true);
-    try {
-      const fns = await import("@/lib/admin/fns/referrals");
-      const [list, rep] = await Promise.all([
-        fns.listReferrersAdmin(),
-        fns.getReferralReportAdmin({ data: { period: p } }),
-      ]);
-      setReferrers(list.referrers);
-      setSettings(list.settings);
-      setReport(rep);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "讀取失敗");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (period === loaded.period && report === loaded.report) return;
-    void reload(period);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period]);
 
   async function settle(r: ReferrerResult) {
     const ok = window.confirm(
@@ -166,7 +134,7 @@ function ReferralsPage() {
               ? "這個月已經結算過了"
               : "找不到這位推廣者",
         );
-      await reload(period);
+      await reload();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "結算失敗");
     }
@@ -319,9 +287,11 @@ function ReferralsPage() {
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-base font-medium">推廣者</h2>
-          <Button size="sm" onClick={() => setEditing("new")}>
-            <Plus className="mr-1 h-4 w-4" />
-            新增推廣者
+          <Button asChild size="sm">
+            <Link preload="intent" to="/admin/referrals/new">
+              <Plus className="mr-1 h-4 w-4" />
+              新增推廣者
+            </Link>
           </Button>
         </div>
         <div className="space-y-2">
@@ -360,9 +330,16 @@ function ReferralsPage() {
                   <Copy className="mr-1 h-4 w-4" />
                   複製連結
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setEditing(p)}>
-                  <Pencil className="mr-1 h-4 w-4" />
-                  編輯
+                <Button asChild variant="outline" size="sm">
+                  <Link
+                    to="/admin/referrals/$id"
+                    params={{ id: p.id }}
+                    preload="intent"
+                    onClick={() => rememberAdminPeek("referrer", p.id, p)}
+                  >
+                    <Pencil className="mr-1 h-4 w-4" />
+                    編輯
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -374,19 +351,7 @@ function ReferralsPage() {
       </section>
 
       {/* ── 全站預設 ───────────────────────────────────────────── */}
-      <SettingsCard settings={settings} onSaved={() => void reload(period)} />
-
-      {editing !== null ? (
-        <ReferrerDialog
-          referrer={editing === "new" ? null : editing}
-          defaultDiscount={settings.defaultDiscountPercent}
-          onClose={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            void reload(period);
-          }}
-        />
-      ) : null}
+      <SettingsCard settings={settings} onSaved={() => void reload()} />
     </div>
   );
 }
@@ -531,169 +496,6 @@ function ReferrerReportCard({
         </div>
       ) : null}
     </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// 推廣者表單
-// -----------------------------------------------------------------------------
-
-function ReferrerDialog({
-  referrer,
-  defaultDiscount,
-  onClose,
-  onSaved,
-}: {
-  referrer: ReferrerRow | null;
-  defaultDiscount: number;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [name, setName] = useState(referrer?.name ?? "");
-  const [code, setCode] = useState(referrer?.code ?? "");
-  const [kind, setKind] = useState<"team" | "external">(referrer?.kind ?? "external");
-  const [contact, setContact] = useState(referrer?.contact ?? "");
-  const [email, setEmail] = useState(referrer?.email ?? "");
-  const [phone, setPhone] = useState(referrer?.phone ?? "");
-  const [baseSalary, setBaseSalary] = useState(referrer?.base_salary?.toString() ?? "");
-  const [discount, setDiscount] = useState(referrer?.discount_percent?.toString() ?? "");
-  const [tiers, setTiers] = useState(tiersToText(referrer?.commission_tiers ?? null));
-  const [active, setActive] = useState(referrer?.active ?? true);
-  const [note, setNote] = useState(referrer?.note ?? "");
-  const [saving, setSaving] = useState(false);
-
-  async function save() {
-    const parsedTiers = tiers.trim() ? textToTiers(tiers) : null;
-    if (tiers.trim() && !parsedTiers) {
-      toast.error("個人級距格式不對，例如：10000:15, 30000:20, :25");
-      return;
-    }
-    const num = (s: string) => (s.trim() === "" ? null : Number(s));
-    const payload = {
-      name,
-      code,
-      kind,
-      contact: contact || null,
-      email: email || null,
-      phone: phone || null,
-      baseSalary: num(baseSalary),
-      discountPercent: num(discount),
-      commissionTiers: parsedTiers,
-      active,
-      note: note || null,
-    };
-    setSaving(true);
-    try {
-      const fns = await import("@/lib/admin/fns/referrals");
-      const res = referrer
-        ? await fns.updateReferrerAdmin({ data: { ...payload, id: referrer.id } })
-        : await fns.createReferrerAdmin({ data: payload });
-      if (!res.ok) {
-        toast.error("這個推薦碼已經有人用了，換一個");
-        return;
-      }
-      toast.success("已儲存");
-      onSaved();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "儲存失敗，請檢查欄位");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{referrer ? "編輯推廣者" : "新增推廣者"}</DialogTitle>
-          <DialogDescription>
-            推薦碼建立後就會印在分享連結上，之後盡量別改。不再合作請「停用」，不要刪除。
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="姓名">
-            <Input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
-          </Field>
-          <Field label="推薦碼（英數 2–20 碼）">
-            <Input
-              value={code}
-              maxLength={20}
-              className="uppercase"
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-            />
-          </Field>
-          <Field label="類型">
-            <select
-              className="block h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={kind}
-              onChange={(e) => setKind(e.target.value === "team" ? "team" : "external")}
-            >
-              <option value="external">外部推廣者（只有分潤）</option>
-              <option value="team">團隊成員（另分團隊獎金池）</option>
-            </select>
-          </Field>
-          <Field label="聯絡方式（備忘）">
-            <Input value={contact} maxLength={200} onChange={(e) => setContact(e.target.value)} />
-          </Field>
-          <Field label="Email（排除自購用）">
-            <Input
-              type="email"
-              value={email}
-              maxLength={120}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </Field>
-          <Field label="手機（排除自購用）">
-            <Input value={phone} maxLength={30} onChange={(e) => setPhone(e.target.value)} />
-          </Field>
-          <Field label={`客人折扣 %（空白＝預設 ${defaultDiscount}%）`}>
-            <Input
-              inputMode="decimal"
-              value={discount}
-              onChange={(e) => setDiscount(e.target.value)}
-            />
-          </Field>
-          {kind === "team" ? (
-            <Field label="底薪（只記錄，不參與計算）">
-              <Input
-                inputMode="numeric"
-                value={baseSalary}
-                onChange={(e) => setBaseSalary(e.target.value)}
-              />
-            </Field>
-          ) : null}
-          <div className="sm:col-span-2">
-            <Field label="個人分潤級距（空白＝用全站級距）">
-              <Input
-                value={tiers}
-                placeholder="10000:15, 30000:20, :25"
-                onChange={(e) => setTiers(e.target.value)}
-              />
-            </Field>
-            <p className="mt-1 text-xs text-muted-foreground">
-              格式「毛利上限:費率%」，最後一級上限留空。累進計算（像所得稅）。
-            </p>
-          </div>
-          <div className="sm:col-span-2">
-            <Field label="備註">
-              <Input value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} />
-            </Field>
-          </div>
-          <div className="flex items-center gap-2 sm:col-span-2">
-            <Switch id="ref-active" checked={active} onCheckedChange={setActive} />
-            <Label htmlFor="ref-active">啟用（停用後推薦碼在結帳頁無效，歷史訂單保留）</Label>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            取消
-          </Button>
-          <Button onClick={() => void save()} disabled={saving}>
-            {saving ? "儲存中…" : "儲存"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 

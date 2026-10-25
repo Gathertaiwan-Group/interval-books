@@ -11,6 +11,8 @@
  *
  * 詳情／編輯是內頁（2026-10-25 起不再是彈窗）：連結滑過就預載，點下去之前先把這一列
  * 記進 list-memory（rememberAdminPeek），內頁 loader 還在跑時標題列先畫得出來。
+ * 列上的動作寫入中（busy）時連結停用：TanStack <Link disabled> 拿掉 href、不預載、
+ * 標 aria-disabled（樣式在 Button 的 aria-disabled: 變體）。
  */
 import { Link } from "@tanstack/react-router";
 import { Eye, Loader2, Pencil, Power, PowerOff, Trash2 } from "lucide-react";
@@ -58,7 +60,7 @@ export function ComboSetRowActions({
           to="/admin/inventory-combos/$id"
           params={{ id: row.combo_set_id }}
           preload="intent"
-          aria-disabled={busy || undefined}
+          disabled={busy}
           onClick={() => rememberAdminPeek("combo", row.combo_set_id, row)}
         >
           <Eye className="h-4 w-4" />
@@ -71,7 +73,7 @@ export function ComboSetRowActions({
           to="/admin/inventory-combos/$id/edit"
           params={{ id: row.combo_set_id }}
           preload="intent"
-          aria-disabled={busy || undefined}
+          disabled={busy}
           onClick={() => rememberAdminPeek("combo", row.combo_set_id, row)}
         >
           <Pencil className="h-4 w-4" />

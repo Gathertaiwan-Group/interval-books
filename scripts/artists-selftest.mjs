@@ -325,7 +325,12 @@ const artistSchemaSrc = schemaBlock(schemasSrc, "artistSchema");
 const repoSrcRaw = readFile(join(ROOT, "src/server/repos/artists.ts"));
 const repoSrc = stripTs(repoSrcRaw);
 const fnsSrc = stripTs(readFile(join(ROOT, "src/lib/admin/fns/artists.ts")));
-const routeSrcRaw = readFile(join(ROOT, "src/routes/admin/_shell.artists.tsx"));
+// 2026-10-26 第 3 批：新增／編輯從彈窗改成內頁，表單本體搬到 src/components/admin/ArtistForm.tsx。
+// 「講者後台」＝列表＋表單兩個檔，下面每一條規矩兩邊都要守。
+const routeSrcRaw =
+  readFile(join(ROOT, "src/routes/admin/_shell.artists.tsx")) +
+  "\n" +
+  readFile(join(ROOT, "src/components/admin/ArtistForm.tsx"));
 const routeSrc = stripTs(routeSrcRaw);
 
 checkTrue("artistSchema 存在", artistSchemaSrc.length > 0);

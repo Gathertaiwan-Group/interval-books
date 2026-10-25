@@ -64,21 +64,6 @@ export const getAdjustmentSummary = createServerFn({ method: "POST" })
     return await getAdjustmentSummary(data);
   });
 
-export const getAdminAdjustment = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
-  .inputValidator(z.object({ id: z.string().trim().uuid() }))
-  .handler(async ({ data }) => {
-    const { getAdminAdjustment } = await import("@/server/repos/inv-adjustments");
-    return await getAdminAdjustment(data.id);
-  });
-
-export const listAdjustmentFormOptions = createServerFn({ method: "GET" })
-  .middleware([staffFnMiddleware()])
-  .handler(async () => {
-    const { listAdjustmentFormOptions } = await import("@/server/repos/inv-adjustments");
-    return await listAdjustmentFormOptions();
-  });
-
 export const listStockCountProducts = createServerFn({ method: "POST" })
   .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(stockCountFilterSchema)
@@ -252,4 +237,17 @@ export const getInventoryAdjustmentsPageData = createServerFn({ method: "GET" })
       repo.listAdjustmentFormOptions(),
     ]);
     return { page, summary, options };
+  });
+
+/**
+ * 一張異動單的內頁（/admin/inventory-adjustments/$id，2026-10-26 後台第 3 批：從詳情對話框改成
+ * 內頁）。staffFnMiddleware()，與原本的 getAdminAdjustment 相同；GET——內頁的 loader 用，id 在
+ * 網址上本來就看得到。查不到回 null。
+ */
+export const getInventoryAdjustmentPageData = createServerFn({ method: "GET" })
+  .middleware([staffFnMiddleware()])
+  .inputValidator(z.object({ adjustmentId: z.string().trim().uuid() }))
+  .handler(async ({ data }) => {
+    const { getAdminAdjustment } = await import("@/server/repos/inv-adjustments");
+    return { adjustment: await getAdminAdjustment(data.adjustmentId) };
   });

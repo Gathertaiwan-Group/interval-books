@@ -426,22 +426,19 @@ console.log("\n[3] 整頁 fn：GET、middleware 跟原本那幾支一樣、route
 console.log("\n[3b] 只讀的 POST fn 標記（readOnlyFnMiddleware）");
 {
   const READ_ONLY = {
-    "inv-products": ["listAdminProducts", "getAdminProduct"],
-    "inv-vendors": [
-      "listAdminVendors",
-      "getAdminVendor",
-      "listVendorSubmissions",
-      "listVendorPortalAccounts",
-    ],
+    // 2026-10-26 第 3 批：getAdminProduct／getAdminVendor／getAdminAdjustment／getAdminComboSet／
+    // listComboSales／getAdminPurchase 這幾支彈窗時代的單筆讀取已沒有呼叫端而移除（內頁改用
+    // GET 的整頁 fn，不需要只讀標記）；新增 searchPurchaseProducts（新增進貨的商品搜尋）。
+    "inv-products": ["listAdminProducts"],
+    "inv-vendors": ["listAdminVendors", "listVendorSubmissions", "listVendorPortalAccounts"],
     "inv-adjustments": [
       "listAdminAdjustments",
       "getAdjustmentSummary",
-      "getAdminAdjustment",
       "listStockCountProducts",
       "listProductMovements",
     ],
-    "inv-combos": ["listAdminComboSets", "getAdminComboSet", "listComboSales"],
-    "inv-purchases": ["listAdminPurchases", "getPurchaseSummary", "getAdminPurchase"],
+    "inv-combos": ["listAdminComboSets"],
+    "inv-purchases": ["listAdminPurchases", "getPurchaseSummary", "searchPurchaseProducts"],
     pos: ["findPosProductByBarcode", "listPosSales", "listStockAlerts"],
   };
   const all = [];
@@ -476,7 +473,7 @@ console.log("\n[3b] 只讀的 POST fn 標記（readOnlyFnMiddleware）");
   const expected = Object.entries(READ_ONLY)
     .flatMap(([f, ns]) => ns.map((n) => `${f}:${n}:POST:after-auth`))
     .sort();
-  check("🔴 只有這 20 支只讀 fn 掛了標記（放在授權 middleware 後面）", all.sort(), expected);
+  check("🔴 只有這 15 支只讀 fn 掛了標記（放在授權 middleware 後面）", all.sort(), expected);
   for (const n of ["listSessionRoster", "readVendorSensitive"]) {
     checkTrue(`🔴 ${n}（會寫查閱紀錄）沒有標成只讀`, !all.some((x) => x.includes(`:${n}:`)));
   }

@@ -116,3 +116,28 @@ export function purchaseApprovalLabel(code: string): string {
 export function purchaseApprovalVariant(code: string): BadgeVariant {
   return PURCHASE_APPROVAL_META[code]?.variant ?? "outline";
 }
+
+/** 已確認、不是沖帳單、也還沒被沖過的單才能沖帳（與 0017 的 inv_reverse_stock_adjustment 一致）。 */
+export function adjustmentIsReversible(row: {
+  status: string;
+  reversal_of: string | null;
+  reversed_by_id: string | null;
+}): boolean {
+  return row.status === "confirmed" && !row.reversal_of && !row.reversed_by_id;
+}
+
+/**
+ * 異動單內頁上這張單現在有沒有任何動作可按（沒有就不畫手機底部的動作列）。
+ * 條件與 AdjustmentActions 裡每一顆按鈕出現的條件相同。
+ */
+export function adjustmentHasActions(
+  row: { status: string; reversal_of: string | null; reversed_by_id: string | null },
+  canApprove: boolean,
+): boolean {
+  return (
+    row.status === "draft" ||
+    (row.status === "pending_approval" && canApprove) ||
+    row.status === "rejected" ||
+    adjustmentIsReversible(row)
+  );
+}

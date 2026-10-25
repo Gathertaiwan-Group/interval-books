@@ -115,47 +115,52 @@ function AdminJourneysPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              journeys.map((j) => (
-                <TableRow key={j.id}>
-                  <TableCell className="text-muted-foreground">{j.sort_order}</TableCell>
-                  <TableCell className="max-w-sm truncate font-medium">{j.title.zh}</TableCell>
-                  <TableCell className="text-muted-foreground">{j.days.zh}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {REGISTRATION_TYPE_LABEL[j.registration_type]}
-                    {j.payment_enabled ? "・線上付款" : ""}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={j.is_published ? "default" : "secondary"}>
-                      {j.is_published ? "已發布" : "草稿"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-muted-foreground">
-                    {formatUpdatedAt(j.updated_at)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button asChild variant="ghost" size="sm">
-                        <Link
-                          to="/admin/journeys/$id"
-                          params={{ id: j.id }}
-                          preload="intent"
-                          onClick={() => rememberAdminPeek("journey", j.id, j)}
+              journeys.map((j) => {
+                const busy = deleting && deleteTarget?.id === j.id;
+                return (
+                  <TableRow key={j.id}>
+                    <TableCell className="text-muted-foreground">{j.sort_order}</TableCell>
+                    <TableCell className="max-w-sm truncate font-medium">{j.title.zh}</TableCell>
+                    <TableCell className="text-muted-foreground">{j.days.zh}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {REGISTRATION_TYPE_LABEL[j.registration_type]}
+                      {j.payment_enabled ? "・線上付款" : ""}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={j.is_published ? "default" : "secondary"}>
+                        {j.is_published ? "已發布" : "草稿"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {formatUpdatedAt(j.updated_at)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button asChild variant="ghost" size="sm">
+                          <Link
+                            to="/admin/journeys/$id"
+                            params={{ id: j.id }}
+                            preload="intent"
+                            disabled={busy}
+                            onClick={() => rememberAdminPeek("journey", j.id, j)}
+                          >
+                            編輯
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          disabled={busy}
+                          onClick={() => setDeleteTarget(j)}
                         >
-                          編輯
-                        </Link>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => setDeleteTarget(j)}
-                      >
-                        刪除
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                          刪除
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
