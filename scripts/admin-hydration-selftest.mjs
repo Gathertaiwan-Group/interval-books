@@ -227,6 +227,9 @@ console.log(
 const TIME_PAGES = [
   "src/routes/admin/_shell.events.$id.tsx",
   "src/routes/admin/_shell.registrations.tsx",
+  // 2026-10-25 名單／場次編輯從對話框改成內頁，會被 SSR：名單頁標題的時間、票種表的販售期間。
+  "src/components/admin/SessionRosterPage.tsx",
+  "src/components/admin/SessionPlansEditor.tsx",
   "src/routes/admin/_shell.orders.tsx",
   "src/routes/checkout.complete.tsx", // 匯款期限
   "src/routes/account.tsx", // 訂單日期、報名場次時間
@@ -308,6 +311,11 @@ console.log("\n[5] 🔴 SSR 會畫的地方，<p> 裡沒有 <div>（含 render �
 const NESTING_FILES = [
   "src/routes/admin/_shell.events.$id.tsx",
   "src/routes/admin/_shell.registrations.tsx",
+  // 2026-10-25 從對話框改成內頁（現在會被 SSR）。
+  "src/components/admin/SessionRosterPage.tsx",
+  "src/components/admin/SessionRosterTable.tsx",
+  "src/components/admin/SessionForm.tsx",
+  "src/components/admin/SessionPlansEditor.tsx",
   "src/routes/admin/_shell.orders.tsx",
   "src/routes/admin/_shell.inventory-vendors.tsx",
   "src/components/inventory/VendorTable.tsx",

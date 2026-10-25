@@ -224,3 +224,55 @@ export const getAdminRegistrationsPageData = createServerFn({ method: "GET" })
       rosterReady: true,
     };
   });
+
+/**
+ * 場次內頁的資料，一支 fn（2026-10-25 後台第 2 批：名單／編輯從彈窗改成內頁）：
+ *
+ *   /admin/registrations/$sessionId（名單頁與 /edit 共用的 layout loader）→ sessionId
+ *   /admin/registrations/new                                               → sessionId: null
+ *
+ * 回傳場次本身、可選的活動商品（表單下拉選單＋名單頁標題的商品名）、這個場次的票種、
+ * 新場次的預設排序。
+ *
+ * 🔴 **這裡一個參加者的個資都沒有，也不可以加。** 名單（姓名、電話、信箱）只走
+ *    fns/event-registrations.ts 的 listSessionRoster()——那支每呼叫一次就先寫一筆
+ *    pii_access_log。route loader 會在滑過連結預載、30 秒過期重抓、每次 router.invalidate()
+ *    時重跑；把名單放進 loader 等於「沒看也留紀錄、看一次留好幾筆」。名單頁在元件掛載時
+ *    呼叫一次 listSessionRoster()（跟原本打開彈窗時一樣），見 SessionRosterPage.tsx。
+ *
+ * 權限與 getAdminRegistrationsPageData（原本彈窗的資料來源）**完全一樣**：
+ * staffFnMiddleware() ＋ requireRosterRead（event.roster.read）。存檔仍是 adminFnMiddleware
+ * 的 upsertEventSession／upsertEventSessionPlan，這支只讀。
+ */
+export const getEventSessionPageData = createServerFn({ method: "GET" })
+  .middleware([staffFnMiddleware()])
+  .inputValidator(z.object({ sessionId: z.string().trim().min(1).nullable() }))
+  .handler(async ({ data, context }) => {
+    await requireRosterRead(context.staff.permissions);
+    const repo = await import("@/server/repos/event-sessions");
+    if (data.sessionId === null) {
+      const [sessions, products] = await Promise.all([
+        repo.listEventSessions(),
+        repo.listBookableProducts(),
+      ]);
+      const nextSortOrder = sessions.reduce((max, s) => Math.max(max, s.sort_order), 0) + 1;
+      return {
+        session: null,
+        products,
+        plans: [] as Awaited<ReturnType<typeof repo.listEventSessionPlans>>,
+        nextSortOrder,
+      };
+    }
+    const sessionId = data.sessionId;
+    const [session, products, plans] = await Promise.all([
+      repo.getEventSessionById(sessionId),
+      repo.listBookableProducts(),
+      repo.listEventSessionPlans(),
+    ]);
+    return {
+      session,
+      products,
+      plans: session ? plans.filter((p) => p.session_id === sessionId) : [],
+      nextSortOrder: session?.sort_order ?? 0,
+    };
+  });

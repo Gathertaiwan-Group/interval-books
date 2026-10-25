@@ -285,6 +285,19 @@ console.log("\n[3] 整頁 fn：GET、middleware 跟原本那幾支一樣、route
       "staffFnMiddleware()",
       "_shell.registrations.tsx",
     ],
+    // 2026-10-25 名單／場次編輯改成內頁：layout（名單＋編輯共用）與新增頁各叫這一支。
+    [
+      "src/lib/admin/fns/event-sessions.ts",
+      "getEventSessionPageData",
+      "staffFnMiddleware()",
+      "_shell.registrations_.$sessionId.tsx",
+    ],
+    [
+      "src/lib/admin/fns/event-sessions.ts",
+      "getEventSessionPageData",
+      "staffFnMiddleware()",
+      "_shell.registrations_.new.tsx",
+    ],
     [
       "src/lib/admin/fns/inv-products.ts",
       "getInventoryProductsPageData",
@@ -347,6 +360,11 @@ console.log("\n[3] 整頁 fn：GET、middleware 跟原本那幾支一樣、route
   checkTrue(
     "🔴 報名整頁 fn 仍要 event.roster.read",
     /await requireRosterRead\(context\.staff\.permissions\);/.test(regFn),
+  );
+  const sessFn = reg.slice(reg.indexOf("export const getEventSessionPageData"));
+  checkTrue(
+    "🔴 場次內頁 fn 也要 event.roster.read",
+    sessFn.length > 0 && /await requireRosterRead\(context\.staff\.permissions\);/.test(sessFn),
   );
 
   // 每一支後台 fn 都要掛 middleware（新加的整頁 fn 不可以漏）。

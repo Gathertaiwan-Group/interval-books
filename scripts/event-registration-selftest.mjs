@@ -1071,6 +1071,15 @@ const piiSources = [
     "src/routes/admin/_shell.registrations.tsx",
     readFile(join(ROOT, "src/routes/admin/_shell.registrations.tsx")),
   ],
+  // 2026-10-25：名單從列表的彈窗改成內頁，讀名單／匯出／移除搬到這兩支。
+  [
+    "src/components/admin/SessionRosterPage.tsx",
+    readFile(join(ROOT, "src/components/admin/SessionRosterPage.tsx")),
+  ],
+  [
+    "src/components/admin/SessionRosterTable.tsx",
+    readFile(join(ROOT, "src/components/admin/SessionRosterTable.tsx")),
+  ],
 ];
 for (const [name, src] of piiSources) {
   // 抓 console.error(...) 的整段參數，看有沒有把 error / err **物件本身**當成

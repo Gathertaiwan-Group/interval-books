@@ -18,7 +18,9 @@
  * 資料庫的機器上也必須有意義。
  *
  *   [靜態]  讀 0035 的 SQL 原始碼、_shell.tsx（電商排在內容管理前面）、
- *           _shell.registrations.tsx（名單每一列的「移除」按鈕與確認對話框）、
+ *           名單頁（2026-10-25 從 _shell.registrations.tsx 的彈窗搬成內頁：
+ *           SessionRosterTable.tsx 的每一列「移除」與確認對話框、SessionRosterPage.tsx
+ *           移除成功後的本地過濾＋invalidate）、
  *           event-registrations.ts 的檔頭（指向合法的新刪除路徑）。**永遠會跑。**
  *
  *   [連線]  對一個真的 PostgreSQL 跑三支 SQL 函式本人（不經過 TypeScript），驗的是
@@ -61,7 +63,11 @@ const SELF = "scripts/admin-order-registration-cleanup-selftest.mjs";
 const MIG_DIR = join(ROOT, "supabase/migrations");
 const MIG_0035 = join(MIG_DIR, "0035_admin_order_registration_cleanup.sql");
 const SHELL_PATH = join(ROOT, "src/routes/admin/_shell.tsx");
-const REG_ROUTE_PATH = join(ROOT, "src/routes/admin/_shell.registrations.tsx");
+// 2026-10-25 後台第 2 批：名單從 _shell.registrations.tsx 的彈窗改成內頁
+// /admin/registrations/$sessionId。移除按鈕＋確認框在 SessionRosterTable.tsx，
+// 「成功後從本地名單濾掉＋invalidate」在 SessionRosterPage.tsx。守的不變量不變。
+const REG_ROUTE_PATH = join(ROOT, "src/components/admin/SessionRosterTable.tsx");
+const REG_PAGE_PATH = join(ROOT, "src/components/admin/SessionRosterPage.tsx");
 const REG_REPO_PATH = join(ROOT, "src/server/repos/event-registrations.ts");
 const REG_ADMIN_REPO_PATH = join(ROOT, "src/server/repos/event-registrations-admin.ts");
 const REG_FNS_PATH = join(ROOT, "src/lib/admin/fns/event-registrations.ts");
@@ -129,7 +135,8 @@ console.log("\n[1] 檔案盤點");
 for (const [label, p] of [
   ["migration 0035", MIG_0035],
   ["_shell.tsx", SHELL_PATH],
-  ["_shell.registrations.tsx", REG_ROUTE_PATH],
+  ["SessionRosterTable.tsx", REG_ROUTE_PATH],
+  ["SessionRosterPage.tsx", REG_PAGE_PATH],
   ["repo/event-registrations.ts", REG_REPO_PATH],
   ["repo/event-registrations-admin.ts", REG_ADMIN_REPO_PATH],
   ["fns/event-registrations.ts", REG_FNS_PATH],
@@ -139,17 +146,20 @@ for (const [label, p] of [
 const sql0035Raw = readFile(MIG_0035);
 const shellSrcRaw = readFile(SHELL_PATH);
 const regRouteSrcRaw = readFile(REG_ROUTE_PATH);
+const regPageSrcRaw = readFile(REG_PAGE_PATH);
 const regRepoSrcRaw = readFile(REG_REPO_PATH);
 const regAdminRepoSrcRaw = readFile(REG_ADMIN_REPO_PATH);
 const regFnsSrcRaw = readFile(REG_FNS_PATH);
 
 checkTrue("migration 0035 不是空檔", sql0035Raw.length > 3000);
-checkTrue("_shell.registrations.tsx 不是空檔", regRouteSrcRaw.length > 2000);
+checkTrue("SessionRosterTable.tsx 不是空檔", regRouteSrcRaw.length > 2000);
+checkTrue("SessionRosterPage.tsx 不是空檔", regPageSrcRaw.length > 2000);
 checkTrue("repo/event-registrations-admin.ts 不是空檔", regAdminRepoSrcRaw.length > 500);
 
 const sql0035 = stripTs(sql0035Raw);
 const shellSrc = stripTs(shellSrcRaw);
 const regRouteSrc = stripTs(regRouteSrcRaw);
+const regPageSrc = stripTs(regPageSrcRaw);
 const regRepoSrc = stripTs(regRepoSrcRaw);
 const regAdminRepoSrc = stripTs(regAdminRepoSrcRaw);
 const regFnsSrc = stripTs(regFnsSrcRaw);
@@ -542,18 +552,27 @@ console.log("\n[11] 🔴 名單頁的移除按鈕與確認對話框");
   const handlerSrc = sliceBetween(
     regRouteSrc,
     "async function handleRemoveRegistration",
-    "async function handleSubmit",
+    "return (",
   );
   checkTrue("抓得到 handleRemoveRegistration 的函式本體", handlerSrc.length > 100);
+  const deletedBranch = sliceBetween(handlerSrc, 'if (result.reason === "deleted")', "} else {");
   checkTrue(
-    "🔴 成功時把這一列從本地 roster state 濾掉（Dialog 不用整個重打）",
-    /prev\.filter\(\(r\) => r\.registration_id !== removeTarget\.registration_id\)/.test(
-      handlerSrc,
-    ),
+    "成功（reason === deleted）時才通知名單頁 onRemoved(這一列)",
+    /await onRemoved\(removeTarget\.registration_id\)/.test(deletedBranch),
+  );
+  const onRemovedSrc = sliceBetween(regPageSrc, "onRemoved={async (registrationId) => {", "}}");
+  checkTrue("抓得到名單頁的 onRemoved", onRemovedSrc.length > 30);
+  checkTrue(
+    "🔴 成功時把這一列從本地 roster state 濾掉（不整個重打 listSessionRoster）",
+    /prev\.filter\(\(r\) => r\.registration_id !== registrationId\)/.test(onRemovedSrc),
   );
   checkTrue(
     "🔴 成功時 router.invalidate()（外層場次表的名額／報名數要跟著換）",
-    /await router\.invalidate\(\)/.test(handlerSrc),
+    /await router\.invalidate\(\)/.test(onRemovedSrc),
+  );
+  checkTrue(
+    "🔴 移除後不重打 listSessionRoster（不多寫一筆查閱紀錄）",
+    !/listSessionRoster/.test(onRemovedSrc),
   );
 
   const alertSrc = sliceBetween(regRouteSrc, "open={removeTarget !== null}", "</AlertDialog>");

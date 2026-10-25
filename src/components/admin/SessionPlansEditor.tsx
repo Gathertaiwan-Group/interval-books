@@ -1,6 +1,7 @@
 /**
- * 一個場次底下的多個價格方案（票種，0036）——嵌在 /admin/registrations 的
- * `SessionForm` 對話框裡（capacity/status 那組欄位之後、sort_order 之前），
+ * 一個場次底下的多個價格方案（票種，0036）——嵌在 /admin/registrations/$sessionId/edit 的
+ * `SessionForm`（src/components/admin/SessionForm.tsx；2026-10-25 起是內頁不是對話框）裡
+ * （capacity/status 那組欄位之後、sort_order 之前），
  * 只在編輯既有場次時顯示：方案掛在 `event_sessions.id` 上，新建場次那一刻還沒有
  * id 可以掛，所以新增場次時這一整塊先不出現——存一次場次之後再回來編輯，才看得到
  * 「新增方案」。
@@ -30,7 +31,7 @@
  * 去拿 `eventSessionPlanSchema` 這個值；型別（`EventSessionPlanFormValues`）走
  * `import type`，編譯期就會被整段擦除，不產生執行期的 import 邊。
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -81,6 +82,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { LocalizedField } from "@/components/admin/LocalizedField";
+import { useFormDirty } from "@/lib/admin/form-dirty";
+import { formatTaipeiDateTime } from "@/lib/taipei-time";
 import type { EventSessionPlanFormValues } from "@/lib/admin/schemas";
 import type { listEventSessionPlans } from "@/lib/admin/fns/event-sessions";
 
@@ -109,19 +112,6 @@ function toIsoOrNull(local: string | null | undefined): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-function formatWhen(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("zh-TW", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function toFormValues(row: PlanRow): EventSessionPlanFormValues {
   return {
     id: row.id,
@@ -139,13 +129,19 @@ function toFormValues(row: PlanRow): EventSessionPlanFormValues {
 
 type EditorProps = {
   sessionId: string;
-  /** 已經按 session_id 篩過的方案清單，呼叫端（_shell.registrations.tsx）負責篩。 */
+  /** 已經按 session_id 篩過的方案清單（getEventSessionPageData 在伺服器上篩好）。 */
   plans: PlanRow[];
   /** 任何一次成功的新增／編輯／刪除之後呼叫——通常是 router.invalidate()。 */
   onChanged: () => void | Promise<void>;
+  /**
+   * 方案對話框開著、而且表單改過（比值，改回原樣不算）→ true。場次編輯頁把它併進
+   * 未存變更防呆（2026-10-25 後台第 2 批）：方案打到一半按瀏覽器上一頁，一樣要先問。
+   * 方案存檔成功或對話框關掉 → 表單卸載 → false。
+   */
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
-export function SessionPlansEditor({ sessionId, plans, onChanged }: EditorProps) {
+export function SessionPlansEditor({ sessionId, plans, onChanged, onDirtyChange }: EditorProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<PlanRow | null>(null);
   const [formKey, setFormKey] = useState(0);
@@ -259,8 +255,10 @@ export function SessionPlansEditor({ sessionId, plans, onChanged }: EditorProps)
                     {p.units_taken} / {p.capacity}
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                    {/* 2026-10-25 起這張表在場次編輯「內頁」上、會被 SSR（原本在對話框裡只在瀏覽器畫）。
+                        ⚠️ 不可以用 toLocaleString：伺服器是 UTC、瀏覽器是台北 → React #418。 */}
                     {p.sale_starts_at || p.sale_ends_at
-                      ? `${formatWhen(p.sale_starts_at)} ～ ${formatWhen(p.sale_ends_at)}`
+                      ? `${formatTaipeiDateTime(p.sale_starts_at)} ～ ${formatTaipeiDateTime(p.sale_ends_at)}`
                       : "不限"}
                   </TableCell>
                   <TableCell>
@@ -320,6 +318,7 @@ export function SessionPlansEditor({ sessionId, plans, onChanged }: EditorProps)
             onSubmit={handleSubmit}
             submitting={submitting}
             submitLabel={editing ? "儲存變更" : "新增"}
+            onDirtyChange={onDirtyChange}
           />
         </DialogContent>
       </Dialog>
@@ -362,6 +361,7 @@ type PlanFormDialogBodyProps = {
   onSubmit: (values: EventSessionPlanFormValues) => Promise<void>;
   submitting: boolean;
   submitLabel: string;
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
 /**
@@ -400,6 +400,7 @@ function PlanForm({
   onSubmit,
   submitting,
   submitLabel,
+  onDirtyChange,
 }: Omit<PlanFormDialogBodyProps, "open"> & {
   schema: typeof import("@/lib/admin/schemas").eventSessionPlanSchema;
 }) {
@@ -407,6 +408,15 @@ function PlanForm({
     resolver: zodResolver(schema),
     defaultValues,
   });
+
+  // 往上回報「方案表單改過沒」（見 EditorProps.onDirtyChange）。卸載（存檔成功、關掉）時歸零。
+  const { dirty } = useFormDirty(form.watch());
+  const reportRef = useRef(onDirtyChange);
+  reportRef.current = onDirtyChange;
+  useEffect(() => {
+    reportRef.current?.(dirty);
+  }, [dirty]);
+  useEffect(() => () => reportRef.current?.(false), []);
 
   return (
     <Form {...form}>

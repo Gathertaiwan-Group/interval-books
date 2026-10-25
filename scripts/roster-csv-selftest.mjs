@@ -1028,6 +1028,14 @@ console.log("\n[10] repo / fn / 畫面");
 const regRepoTs = readFile(join(ROOT, "src/server/repos/event-registrations.ts"));
 const regFnTs = readFile(join(ROOT, "src/lib/admin/fns/event-registrations.ts"));
 const routeTs = readFile(join(ROOT, "src/routes/admin/_shell.registrations.tsx"));
+// 2026-10-25 後台第 2 批：名單從列表的彈窗改成內頁 /admin/registrations/$sessionId。
+// 名單頁本體（標題、匯出、log_id）在 SessionRosterPage.tsx、表格在 SessionRosterTable.tsx、
+// 權限判斷在 route 檔。下面「畫面」那幾條守的不變量不變，只是換到新位置讀。
+const rosterPageTs = readFile(join(ROOT, "src/components/admin/SessionRosterPage.tsx"));
+const rosterTableTs = readFile(join(ROOT, "src/components/admin/SessionRosterTable.tsx"));
+const rosterRouteTs = readFile(
+  join(ROOT, "src/routes/admin/_shell.registrations_.$sessionId.index.tsx"),
+);
 const csvTs = readFile(join(ROOT, "src/lib/csv.ts"));
 const rosterCsvTs = readFile(join(ROOT, "src/lib/admin/roster-csv.ts"));
 
@@ -1037,6 +1045,8 @@ checkTrue(
   regRepoTs.length > 3000 &&
     regFnTs.length > 2000 &&
     routeTs.length > 5000 &&
+    rosterPageTs.length > 3000 &&
+    rosterTableTs.length > 3000 &&
     csvTs.length > 1000 &&
     rosterCsvTs.length > 1000,
 );
@@ -1207,16 +1217,18 @@ check("匯出的 fn 沒有 Content-Disposition", /Content-Disposition/i.test(reg
 // 前端用 Blob 下載。
 checkTrue(
   "畫面用 Blob + a.download 下載",
-  /new Blob\(\[csv\]/.test(routeTs) && /a\.download = filename/.test(routeTs),
+  /new Blob\(\[csv\]/.test(rosterPageTs) && /a\.download = filename/.test(rosterPageTs),
 );
 check(
   "Blob 沒有再加一次 BOM",
-  /\\uFEFF|﻿"/.test(routeTs.slice(routeTs.indexOf("new Blob"), routeTs.indexOf("new Blob") + 200)),
+  /\\uFEFF|﻿"/.test(
+    rosterPageTs.slice(rosterPageTs.indexOf("new Blob"), rosterPageTs.indexOf("new Blob") + 200),
+  ),
   false,
 );
 checkTrue(
   "下載後有 revokeObjectURL（不留著 blob URL）",
-  /URL\.revokeObjectURL\(url\)/.test(routeTs),
+  /URL\.revokeObjectURL\(url\)/.test(rosterPageTs),
 );
 
 // ── 畫面 ─────────────────────────────────────────────────────────────────
@@ -1265,19 +1277,24 @@ checkTrue("差額是 seats_taken - total", /s\.seats_taken - count\.total/.test(
 // 名單直接顯示明文（業主 2026-10-25），單筆揭露對話框已拿掉。
 checkTrue(
   "名單直接顯示明文信箱與電話",
-  /\{r\.email\}/.test(routeTs) && /\{r\.phone\}/.test(routeTs),
+  /\{r\.email\}/.test(rosterTableTs) && /\{r\.phone\}/.test(rosterTableTs),
 );
-check("不再有單筆揭露對話框", /RegistrationRevealDialog/.test(routeTs), false);
-checkTrue("名單說明告訴使用者會留下紀錄", /都會留下一筆刪不掉的存取紀錄/.test(routeTs));
+check(
+  "不再有單筆揭露對話框",
+  /RegistrationRevealDialog/.test(routeTs + rosterPageTs + rosterTableTs + rosterRouteTs),
+  false,
+);
+checkTrue("名單說明告訴使用者會留下紀錄", /都會留下一筆刪不掉的存取紀錄/.test(rosterPageTs));
 checkTrue(
   "名單把這次查閱的 log_id 印出來",
-  /這次查閱的紀錄編號/.test(routeTs) && /setRosterLogId\(log_id\)/.test(routeTs),
+  /這次查閱的紀錄編號/.test(rosterPageTs) && /setRosterLogId\(log_id\)/.test(rosterPageTs),
 );
-checkTrue("匯出成功的 toast 也印 log_id", /紀錄編號 \$\{log_id\}/.test(routeTs));
-checkTrue("沒有權限時匯出鈕 disabled", /!canReadRoster/.test(routeTs));
+checkTrue("匯出成功的 toast 也印 log_id", /紀錄編號 \$\{log_id\}/.test(rosterPageTs));
+checkTrue("沒有權限時匯出鈕 disabled", /!canReadRoster/.test(rosterPageTs));
 checkTrue(
   "權限來自 route context 而不是 loader 資料",
-  /user\.permissions\.includes\("event\.roster\.read"\)/.test(routeTs),
+  /user\.permissions\.includes\("event\.roster\.read"\)/.test(rosterRouteTs) &&
+    /const \{ user \} = layout\.useRouteContext\(\)/.test(rosterRouteTs),
 );
 // 側欄。
 const shellTs = readFile(join(ROOT, "src/routes/admin/_shell.tsx"));
