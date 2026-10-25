@@ -21,27 +21,26 @@
  *    上下架在活動頁改，這裡只顯示並連過去。在這裡改會跟活動頁互相覆蓋。
  *
  * 名額與日期不在商品上——由「活動報名」頁按場次維護（0020）。
+ *
+ * ── 內頁（2026-10-25 起，業主：「不要用彈窗，直接顯示內頁＆回到上一頁」）─────
+ * 編輯／新增不再是彈窗：
+ *   /admin/products/product/$id      一般商品／策旅票券（ProductForm）
+ *   /admin/products/product/new      新增一般商品（NewGoodsForm）
+ *   /admin/products/publication/$id  刊物校稿（PublicationForm）
+ *   /admin/products/curated/$id      選品一項（CuratedItemForm）
+ *   /admin/products/curated/new      新增選品
+ * 活動票券照舊連到 /admin/events/$id。各內頁的 loader 只抓那一筆（fns/products.ts 最後）。
+ * 留在這一頁的：改價、上下架、連到庫存／解除連結（上架動作）、刪除確認。
+ * 搜尋字、狀態、排序記在 list-memory，從內頁「← 回到列表」回來原樣還原；分頁籤本來就在網址
+ * （?type=）。這一頁的資料直接用 loader 的（沒有抄進 useState），存檔後 invalidate 就是新的。
  */
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useForm, useWatch } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import {
-  ExternalLink,
-  ImageOff,
-  Link2,
-  Link2Off,
-  ListOrdered,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-} from "lucide-react";
+import { ChevronDown, ExternalLink, Link2, ListOrdered, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -61,7 +60,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -76,32 +74,29 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { LocalizedField } from "@/components/admin/LocalizedField";
-import { ImageField } from "@/components/admin/ImageField";
-import { CuratedItemForm } from "@/components/admin/products/CuratedItemForm";
-import { NewGoodsForm, type NewGoodsValues } from "@/components/admin/products/NewGoodsForm";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { LinkForm, type Publication } from "@/components/admin/products/PublicationForms";
 import {
-  LinkForm,
-  PublicationForm,
-  type Publication,
-} from "@/components/admin/products/PublicationForms";
+  formatTWD,
+  NameCell,
+  PriceCell,
+  PublishCell,
+  RowActions,
+  StockCell,
+  Thumb,
+} from "@/components/admin/products/ProductRowCells";
 import {
-  productSchema,
-  type CuratedItemFormValues,
-  type ProductFormValues,
-  type PublicationFormValues,
-  type PublicationLinkFormValues,
-} from "@/lib/admin/schemas";
-import type { listProducts } from "@/lib/admin/fns/products";
-import type { listCuratedItems } from "@/lib/admin/fns/curated";
+  toCuratedValues,
+  toFormValues,
+  toPublicationValues,
+  type ProductRow,
+} from "@/components/admin/products/form-values";
+import type { ProductFormValues, PublicationLinkFormValues } from "@/lib/admin/schemas";
+import { readAdminListMemory, writeAdminListMemory } from "@/lib/admin/list-memory";
 import {
   CREATE_OPTIONS,
   KIND_LABEL,
@@ -109,15 +104,12 @@ import {
   SORT_LABEL,
   TAB_LABEL,
   UNIFIED_TABS,
-  buildNewGoodsPayload,
   buildUnifiedRows,
   countByTab,
   filterUnifiedRows,
-  nextCuratedSortOrder,
   nextProductStatus,
   parsePriceInput,
   parseUnifiedTab,
-  slugFromTitle,
   sortUnifiedRows,
   type SortKey,
   type StatusFilter,
@@ -125,52 +117,12 @@ import {
   type UnifiedRow,
   type UnifiedTab,
 } from "@/lib/admin/unified-products";
-import { imageFor, curatedObjects } from "@/lib/images";
 import { formatTaipeiDateTime } from "@/lib/taipei-time";
-import bookstoreImg from "@/assets/bookstore-interior.jpg";
 
-type ProductRow = Awaited<ReturnType<typeof listProducts>>[number];
-type CuratedItemRow = Awaited<ReturnType<typeof listCuratedItems>>[number];
-type ProductType = ProductFormValues["product_type"];
-type ProductStatus = ProductFormValues["status"];
-type ProductSourceType = NonNullable<ProductFormValues["source_type"]>;
-
-/** goods/book ship physically; event/journey are bookings with capacity —
- * mirrors the comment on products.product_type in
- * supabase/migrations/0004_commerce_products.sql. */
-const PRODUCT_TYPE_LABEL: Record<ProductType, string> = {
-  goods: "商品（實體）",
-  book: "書籍",
-  event: "活動",
-  journey: "策旅",
-};
-
-const PRODUCT_STATUS_LABEL: Record<ProductStatus, string> = {
-  draft: "草稿",
-  active: "上架",
-  archived: "下架封存",
-};
-
-const PRODUCT_SOURCE_TYPE_LABEL: Record<ProductSourceType, string> = {
-  event: "活動",
-  journey: "策旅",
-  curated_item: "選品",
-};
-
-/** Sentinel for the "不關聯" option — Radix <Select.Item> rejects an empty-string value. */
-const NONE_SOURCE_TYPE = "__none__";
-
-function isBookableType(type: ProductType): boolean {
-  return type === "event" || type === "journey";
-}
-
-function isShippableType(type: ProductType): boolean {
-  return type === "goods" || type === "book";
-}
-
-function formatTWD(n: number): string {
-  return `NT$${n.toLocaleString("zh-Hant-TW")}`;
-}
+/** 搜尋字、狀態、排序：記在分頁記憶體（list-memory），從內頁回來原樣還原。 */
+type ListPrefs = { query: string; status: StatusFilter; sort: SortKey };
+const LIST_PREFS_KEY = "products:list-prefs";
+const DEFAULT_PREFS: ListPrefs = { query: "", status: "all", sort: "default" };
 
 export const Route = createFileRoute("/admin/_shell/products")({
   // `type` 刻意 optional：活動編輯頁的 MirrorNote 等處 <Link to="/admin/products">
@@ -192,65 +144,6 @@ export const Route = createFileRoute("/admin/_shell/products")({
   component: AdminProductsPage,
 });
 
-function toFormValues(row: ProductRow): ProductFormValues {
-  return {
-    id: row.id,
-    slug: row.slug,
-    product_type: row.product_type,
-    source_type: row.source_type,
-    source_id: row.source_id,
-    title: row.title,
-    summary: row.summary,
-    description: row.description,
-    price: row.price,
-    compare_at_price: row.compare_at_price,
-    stock: row.stock,
-    image_key: row.image_key,
-    requires_shipping: row.requires_shipping,
-    status: row.status,
-    sort_order: row.sort_order,
-  };
-}
-
-function toPublicationValues(p: Publication): PublicationFormValues {
-  // 原樣帶回（null 保持 null），開關只改 is_published 一欄。
-  return {
-    id: p.id,
-    title: p.title,
-    publisher: p.publisher,
-    intro: p.intro,
-    region: p.region,
-    issues: p.issues,
-    external_url: p.external_url,
-    cover_image_key: p.cover_image_key,
-    is_published: p.is_published,
-    sort_order: p.sort_order,
-  };
-}
-
-function toCuratedValues(row: CuratedItemRow): CuratedItemFormValues {
-  return {
-    id: row.id,
-    theme_id: row.theme_id,
-    name: row.name,
-    note: row.note,
-    is_published: row.is_published,
-    sort_order: row.sort_order,
-  };
-}
-
-function rowImage(row: UnifiedRow): string | null {
-  if (row.kind === "curated") return null;
-  return imageFor(row.imageKey, row.kind === "publication" ? bookstoreImg : curatedObjects);
-}
-
-type EditTarget =
-  | { kind: "product"; row: ProductRow }
-  | { kind: "publication"; row: Publication }
-  | { kind: "curated"; row: CuratedItemRow };
-
-type CreateStep = null | "pick" | UnifiedKind;
-
 function AdminProductsPage() {
   const data = Route.useLoaderData();
   const { type } = Route.useSearch();
@@ -258,25 +151,26 @@ function AdminProductsPage() {
   const router = useRouter();
   const tab: UnifiedTab = type ?? "all";
 
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("all");
-  const [sort, setSort] = useState<SortKey>("default");
+  const [prefs, setPrefsState] = useState<ListPrefs>(
+    () => readAdminListMemory<ListPrefs>(LIST_PREFS_KEY) ?? DEFAULT_PREFS,
+  );
+  const { query, status, sort } = prefs;
+  function setPrefs(patch: Partial<ListPrefs>) {
+    setPrefsState((prev) => {
+      const next = { ...prev, ...patch };
+      writeAdminListMemory(LIST_PREFS_KEY, next);
+      return next;
+    });
+  }
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [edit, setEdit] = useState<EditTarget | null>(null);
   const [linkTarget, setLinkTarget] = useState<Publication | null>(null);
   const [unlinkTarget, setUnlinkTarget] = useState<Publication | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UnifiedRow | null>(null);
-  const [create, setCreate] = useState<CreateStep>(null);
 
-  const productById = useMemo(() => new Map(data.products.map((p) => [p.id, p])), [data.products]);
   const pubById = useMemo(
     () => new Map(data.publications.map((p) => [p.id, p])),
     [data.publications],
-  );
-  const curatedById = useMemo(
-    () => new Map(data.curatedItems.map((c) => [c.id, c])),
-    [data.curatedItems],
   );
   const nameMatches = data.nameMatches;
   const matchesByPublication = useMemo(() => {
@@ -386,26 +280,12 @@ function AdminProductsPage() {
     );
   }
 
-  function openEdit(row: UnifiedRow) {
-    if (row.kind === "publication") {
-      const pub = pubById.get(String(row.id));
-      if (pub) setEdit({ kind: "publication", row: pub });
-    } else if (row.kind === "curated") {
-      const item = curatedById.get(Number(row.id));
-      if (item) setEdit({ kind: "curated", row: item });
-    } else {
-      const p = productById.get(String(row.id));
-      if (p) setEdit({ kind: "product", row: p });
-    }
-  }
-
-  async function submitEdit(fn: () => Promise<unknown>, ok: string) {
+  /** 「連到庫存商品」對話框的送出（上架動作，照規格留在清單上的對話框）。 */
+  async function submitLink(fn: () => Promise<unknown>, ok: string) {
     setSubmitting(true);
     try {
       await fn();
       toast.success(ok);
-      setEdit(null);
-      setCreate(null);
       setLinkTarget(null);
       await router.invalidate();
     } catch (err) {
@@ -444,32 +324,6 @@ function AdminProductsPage() {
     if (ok) setUnlinkTarget(null);
   }
 
-  const nextSortOrder = data.products.reduce((max, p) => Math.max(max, p.sort_order), 0) + 1;
-
-  function createGoods(values: NewGoodsValues) {
-    // 亂數尾巴只是避免代稱撞名；之後在「編輯」裡可以改成好記的代稱。
-    const suffix = Math.random().toString(36).slice(2, 7);
-    const payload = buildNewGoodsPayload({
-      ...values,
-      slug: slugFromTitle(values.title.en, suffix),
-      sort_order: nextSortOrder,
-    });
-    return submitEdit(() => saveProduct(payload), "已新增商品");
-  }
-
-  function createCurated(values: CuratedItemFormValues) {
-    return submitEdit(async () => {
-      const { upsertCuratedItem } = await import("@/lib/admin/fns/curated");
-      await upsertCuratedItem({
-        data: {
-          ...values,
-          id: undefined,
-          sort_order: nextCuratedSortOrder(data.curatedItems, values.theme_id),
-        },
-      });
-    }, "已新增選品");
-  }
-
   const rowProps = (row: UnifiedRow) => ({
     row,
     // 任何一列在寫入時，所有列的快速動作都先停著：兩個整列寫入同時在飛，後到的
@@ -477,7 +331,6 @@ function AdminProductsPage() {
     busy: busyKey !== null,
     onToggle: (next: boolean) => togglePublish(row, next),
     onSavePrice: (raw: string) => savePrice(row, raw),
-    onEdit: () => openEdit(row),
     onLink: () => {
       const pub = pubById.get(String(row.id));
       if (pub) setLinkTarget(pub);
@@ -498,10 +351,7 @@ function AdminProductsPage() {
             前台看得到的一般商品、地方刊物、選品與活動票券，都在這一頁。共 {counts.all} 項。
           </p>
         </div>
-        <Button onClick={() => setCreate("pick")} className="gap-1.5">
-          <Plus className="h-4 w-4" />
-          新增商品
-        </Button>
+        <CreateMenu />
       </div>
 
       <div
@@ -534,13 +384,13 @@ function AdminProductsPage() {
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => setPrefs({ query: e.target.value })}
             placeholder="搜尋名稱、代稱、地區"
             className="pl-8"
             aria-label="搜尋商品"
           />
         </div>
-        <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
+        <Select value={status} onValueChange={(v) => setPrefs({ status: v as StatusFilter })}>
           <SelectTrigger className="w-[7.5rem]" aria-label="上架狀態">
             <SelectValue />
           </SelectTrigger>
@@ -550,7 +400,7 @@ function AdminProductsPage() {
             <SelectItem value="unpublished">未上架</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+        <Select value={sort} onValueChange={(v) => setPrefs({ sort: v as SortKey })}>
           <SelectTrigger className="w-[8.5rem]" aria-label="排序">
             <SelectValue />
           </SelectTrigger>
@@ -686,161 +536,6 @@ function AdminProductsPage() {
         )}
       </ul>
 
-      {/* 編輯：依種類開對應的那一張既有表單 */}
-      <Dialog open={edit !== null} onOpenChange={(o) => !o && setEdit(null)}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-          {edit?.kind === "product" ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>編輯「{edit.row.title.zh}」</DialogTitle>
-                <DialogDescription>
-                  中文、英文、日文皆為必填——資料庫要求三語齊備才能儲存。
-                </DialogDescription>
-              </DialogHeader>
-              <ProductForm
-                key={edit.row.id}
-                defaultValues={toFormValues(edit.row)}
-                onSubmit={(values) =>
-                  submitEdit(() => saveProduct({ ...values, id: edit.row.id }), "已更新商品")
-                }
-                submitting={submitting}
-                submitLabel="儲存變更"
-              />
-            </>
-          ) : edit?.kind === "publication" ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>編輯「{edit.row.title.zh}」</DialogTitle>
-                <DialogDescription>
-                  刊名、製作單位與介紹都是三語，缺一語前台那一語就會是空白。代稱與原始序號不開放修改——
-                  它們是回頭對照原始清單的憑據。
-                  {edit.row.product_id ? " 售價在清單上直接改。" : ""}
-                </DialogDescription>
-              </DialogHeader>
-              <PublicationForm
-                key={edit.row.id}
-                publication={edit.row}
-                onSubmit={(values) =>
-                  submitEdit(async () => {
-                    const { updatePublication } = await import("@/lib/admin/fns/publications");
-                    await updatePublication({ data: values });
-                  }, "已儲存")
-                }
-                submitting={submitting}
-              />
-            </>
-          ) : edit?.kind === "curated" ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>編輯選品「{edit.row.name.zh}」</DialogTitle>
-                <DialogDescription>
-                  選品只展示、不販售。主題本身與排序在「主題與排序」頁調整。
-                </DialogDescription>
-              </DialogHeader>
-              <CuratedItemForm
-                key={edit.row.id}
-                // 編輯時不給主題下拉：換主題要連 sort_order 一起換（unique(theme_id,
-                // sort_order)），而 upsertCuratedItem 的更新分支刻意不寫 sort_order。
-                defaultValues={toCuratedValues(edit.row)}
-                onSubmit={(values) =>
-                  submitEdit(async () => {
-                    const { upsertCuratedItem } = await import("@/lib/admin/fns/curated");
-                    await upsertCuratedItem({ data: { ...values, id: edit.row.id } });
-                  }, "已更新選品")
-                }
-                submitting={submitting}
-                submitLabel="儲存變更"
-              />
-            </>
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
-      {/* 新增：先選種類，再填那一種的必要欄位 */}
-      <Dialog open={create !== null} onOpenChange={(o) => !o && setCreate(null)}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {create === "pick" || create === null ? "新增商品" : `新增${KIND_LABEL[create]}`}
-            </DialogTitle>
-            <DialogDescription>
-              {create === "pick" || create === null
-                ? "先選要新增哪一種。"
-                : create === "goods"
-                  ? "只填開賣需要的幾格；長說明、原價、網址代稱之後在「編輯」補。"
-                  : "選品只展示、不販售。"}
-            </DialogDescription>
-          </DialogHeader>
-          {create === "pick" ? (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {CREATE_OPTIONS.map((opt) => {
-                const body = (
-                  <>
-                    <span className="font-medium">{opt.label}</span>
-                    <span className="mt-1 block text-xs text-muted-foreground">{opt.hint}</span>
-                  </>
-                );
-                const cls =
-                  "rounded-md border border-border p-3 text-left text-sm transition-colors hover:bg-muted";
-                if (opt.href) {
-                  const go = (
-                    <>
-                      {body}
-                      <span className="mt-1 inline-flex items-center gap-1 text-xs">
-                        前往 <ExternalLink className="h-3 w-3" />
-                      </span>
-                    </>
-                  );
-                  return opt.href === "/admin/journeys/new" ? (
-                    <Link key={opt.key} to="/admin/journeys/new" className={cls}>
-                      {go}
-                    </Link>
-                  ) : (
-                    <Link
-                      key={opt.key}
-                      to="/admin/events/$id"
-                      params={{ id: "new" }}
-                      className={cls}
-                    >
-                      {go}
-                    </Link>
-                  );
-                }
-                const disabled = opt.kind === "publication";
-                return (
-                  <button
-                    key={opt.key}
-                    type="button"
-                    disabled={disabled}
-                    data-testid={`create-${opt.key}`}
-                    onClick={() => setCreate(opt.kind)}
-                    className={`${cls} disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent`}
-                  >
-                    {body}
-                  </button>
-                );
-              })}
-            </div>
-          ) : create === "goods" ? (
-            <NewGoodsForm onSubmit={createGoods} submitting={submitting} />
-          ) : create === "curated" ? (
-            <CuratedItemForm
-              defaultValues={{
-                theme_id: data.curatedThemes[0]?.id ?? "",
-                name: { zh: "", en: "", ja: "" },
-                note: { zh: "", en: "", ja: "" },
-                is_published: false,
-                sort_order: 0,
-              }}
-              themes={data.curatedThemes}
-              onSubmit={createCurated}
-              submitting={submitting}
-              submitLabel="建立選品"
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={linkTarget !== null} onOpenChange={(o) => !o && setLinkTarget(null)}>
         <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
           <DialogHeader>
@@ -857,7 +552,7 @@ function AdminProductsPage() {
               suggested={matchesByPublication.get(linkTarget.id) ?? []}
               candidates={data.candidates}
               onSubmit={(values: PublicationLinkFormValues) =>
-                submitEdit(async () => {
+                submitLink(async () => {
                   const { linkPublicationToInventory } =
                     await import("@/lib/admin/fns/publications");
                   await linkPublicationToInventory({ data: values });
@@ -930,553 +625,75 @@ function AdminProductsPage() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// 一列的各個格子（表格與手機卡片共用）
-// ---------------------------------------------------------------------------
-
-type RowProps = {
-  row: UnifiedRow;
-  busy: boolean;
-  onToggle: (next: boolean) => void;
-  onSavePrice: (raw: string) => Promise<boolean>;
-  onEdit: () => void;
-  onLink: () => void;
-  onUnlink: () => void;
-  onDelete: () => void;
-};
-
-function Thumb({ row }: { row: UnifiedRow }) {
-  const src = rowImage(row);
-  if (!src) {
-    return (
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-border bg-muted text-muted-foreground">
-        <ImageOff className="h-4 w-4" aria-hidden />
-      </div>
-    );
-  }
+/**
+ * 「＋ 新增商品」：選單（不是彈窗），每一項直接連到那一種的新增內頁。
+ * 活動／策旅票券去各自的「一頁新增」；地方刊物是匯入的固定集合，不新增（灰掉並說明）。
+ */
+function CreateMenu() {
   return (
-    <img
-      src={src}
-      alt=""
-      loading="lazy"
-      className="h-12 w-12 shrink-0 rounded border border-border object-cover"
-    />
-  );
-}
-
-function NameCell({ row }: { row: UnifiedRow }) {
-  return (
-    <div className="min-w-0">
-      <p className="truncate font-medium" title={row.name}>
-        {row.name}
-      </p>
-      {row.subtitle ? (
-        <p className="truncate text-xs text-muted-foreground">{row.subtitle}</p>
-      ) : null}
-    </div>
-  );
-}
-
-function StockCell({ row }: { row: UnifiedRow }) {
-  if (row.stock == null) {
-    return <span className="text-muted-foreground">{row.stockNote || "—"}</span>;
-  }
-  const body = <span className="font-medium tabular-nums">{row.stock}</span>;
-  if (row.invName) {
-    // 可售量是進銷存算的（inv_listed_products）。點過去看那個品項的庫存與進貨。
-    return (
-      <Link
-        to="/admin/inventory-listing"
-        title={`進銷存品項：${row.invName}`}
-        className="underline-offset-2 hover:underline"
-      >
-        {body}
-      </Link>
-    );
-  }
-  return body;
-}
-
-function PriceCell({ row, busy, onSavePrice }: RowProps) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-
-  if (row.price == null) {
-    return (
-      <span className="text-sm text-muted-foreground">
-        {row.kind === "curated" ? "不販售" : "未定價"}
-      </span>
-    );
-  }
-
-  if (editing) {
-    return (
-      <form
-        className="flex items-center gap-1"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (await onSavePrice(draft)) setEditing(false);
-        }}
-      >
-        <Input
-          autoFocus
-          inputMode="numeric"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => e.key === "Escape" && setEditing(false)}
-          className="h-8 w-20"
-          aria-label={`${row.name} 的價格`}
-          disabled={busy}
-        />
-        <Button type="submit" size="sm" className="h-8 px-2" disabled={busy}>
-          {busy ? "…" : "存"}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button className="gap-1.5" data-testid="create-menu">
+          <Plus className="h-4 w-4" />
+          新增商品
+          <ChevronDown className="h-4 w-4 opacity-70" />
         </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="h-8 px-2"
-          onClick={() => setEditing(false)}
-          disabled={busy}
-        >
-          取消
-        </Button>
-      </form>
-    );
-  }
-
-  const text: ReactNode = (
-    <>
-      {row.comparePrice != null && row.comparePrice > row.price ? (
-        <span className="mr-1 text-xs line-through opacity-60">{formatTWD(row.comparePrice)}</span>
-      ) : null}
-      <span className="tabular-nums">{formatTWD(row.price)}</span>
-    </>
-  );
-
-  if (!row.priceEditable) return <span className="text-sm">{text}</span>;
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        setDraft(String(row.price));
-        setEditing(true);
-      }}
-      className="group inline-flex items-center gap-1 rounded px-1 text-sm hover:bg-muted"
-      aria-label={`修改 ${row.name} 的價格`}
-      data-testid="price-edit"
-    >
-      {text}
-      <Pencil className="h-3 w-3 text-muted-foreground opacity-60 group-hover:opacity-100" />
-    </button>
-  );
-}
-
-function PublishCell({ row, busy, onToggle }: RowProps) {
-  return (
-    <label className="inline-flex items-center gap-2 text-sm">
-      <Switch
-        checked={row.published}
-        onCheckedChange={onToggle}
-        disabled={busy || !row.editable}
-        aria-label={`${row.name} 上架`}
-        data-testid="publish-toggle"
-      />
-      <span className={`whitespace-nowrap ${row.published ? "" : "text-muted-foreground"}`}>
-        {row.statusLabel}
-      </span>
-    </label>
-  );
-}
-
-function RowActions({ row, busy, onEdit, onLink, onUnlink, onDelete }: RowProps) {
-  if (row.eventId) {
-    return (
-      <Button variant="ghost" size="sm" asChild className="gap-1">
-        <Link to="/admin/events/$id" params={{ id: row.eventId }}>
-          到活動頁編輯
-          <ExternalLink className="h-3.5 w-3.5" />
-        </Link>
-      </Button>
-    );
-  }
-  return (
-    <div className="flex justify-end gap-1">
-      <Button variant="ghost" size="sm" onClick={onEdit} disabled={busy} data-testid="row-edit">
-        編輯
-      </Button>
-      {row.kind === "publication" ? (
-        row.productId ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`解除連結 ${row.name}`}
-            title="解除商品連結"
-            onClick={onUnlink}
-            disabled={busy}
-          >
-            <Link2Off className="h-4 w-4" />
-          </Button>
-        ) : (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`連到庫存商品 ${row.name}`}
-            title="連到庫存商品（開賣）"
-            onClick={onLink}
-            disabled={busy}
-          >
-            <Link2 className="h-4 w-4" />
-          </Button>
-        )
-      ) : (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-destructive hover:text-destructive"
-          aria-label={`刪除 ${row.name}`}
-          onClick={onDelete}
-          disabled={busy}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 一般商品／活動票券的完整表單（原本就在這一頁；名額改由「活動報名」按場次維護）
-// ---------------------------------------------------------------------------
-
-type ProductFormProps = {
-  defaultValues: ProductFormValues;
-  onSubmit: (values: ProductFormValues) => Promise<void>;
-  submitting: boolean;
-  submitLabel: string;
-};
-
-function ProductForm({ defaultValues, onSubmit, submitting, submitLabel }: ProductFormProps) {
-  const form = useForm<ProductFormValues>({
-    resolver: zodResolver(productSchema),
-    defaultValues,
-  });
-
-  const productType = useWatch({ control: form.control, name: "product_type" });
-  const bookable = isBookableType(productType);
-  const shippable = isShippableType(productType);
-
-  return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="product_type"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>商品類型</FormLabel>
-                <Select
-                  value={field.value}
-                  onValueChange={(next) => {
-                    field.onChange(next);
-                    // Switching to a booking clears the leftover stock number,
-                    // otherwise an "event" product rides along carrying the
-                    // figure it had while it was "goods". There is no capacity
-                    // field to clear in the other direction any more — 0020
-                    // moved that number to public.event_sessions.
-                    if (isBookableType(next as ProductType)) {
-                      form.setValue("stock", null, { shouldValidate: true });
-                    }
-                  }}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {(Object.keys(PRODUCT_TYPE_LABEL) as ProductType[]).map((v) => (
-                      <SelectItem key={v} value={v}>
-                        {PRODUCT_TYPE_LABEL[v]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormDescription>決定下面顯示「庫存」還是「名額」欄位。</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="status"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>狀態</FormLabel>
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {(Object.keys(PRODUCT_STATUS_LABEL) as ProductStatus[]).map((v) => (
-                      <SelectItem key={v} value={v}>
-                        {PRODUCT_STATUS_LABEL[v]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <FormField
-          control={form.control}
-          name="slug"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>網址代稱</FormLabel>
-              <FormControl>
-                <Input placeholder="例如 spring-tea-set" {...field} />
-              </FormControl>
-              <FormDescription>建議使用半形英數字與連字號，且不能與其他商品重複。</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <LocalizedField name="title" label="標題" />
-        <LocalizedField name="summary" label="摘要" multiline />
-        <LocalizedField name="description" label="說明" multiline />
-
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="price"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>價格（元）</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    step={1}
-                    name={field.name}
-                    ref={field.ref}
-                    onBlur={field.onBlur}
-                    value={field.value}
-                    onChange={(e) =>
-                      field.onChange(e.target.value === "" ? 0 : Math.trunc(Number(e.target.value)))
-                    }
-                  />
-                </FormControl>
-                <FormDescription>新台幣整數，不接受小數。</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="compare_at_price"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>原價（選填）</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    step={1}
-                    name={field.name}
-                    ref={field.ref}
-                    onBlur={field.onBlur}
-                    value={field.value ?? ""}
-                    onChange={(e) =>
-                      field.onChange(
-                        e.target.value === "" ? null : Math.trunc(Number(e.target.value)),
-                      )
-                    }
-                  />
-                </FormControl>
-                <FormDescription>要顯示劃線比價時才填，單位同為元。</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        {shippable ? (
-          <div className="grid grid-cols-2 gap-4 rounded-md border border-border p-4">
-            <FormField
-              control={form.control}
-              name="stock"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>庫存（選填）</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      step={1}
-                      name={field.name}
-                      ref={field.ref}
-                      onBlur={field.onBlur}
-                      value={field.value ?? ""}
-                      onChange={(e) =>
-                        field.onChange(
-                          e.target.value === "" ? null : Math.trunc(Number(e.target.value)),
-                        )
-                      }
-                    />
-                  </FormControl>
-                  <FormDescription>留白表示不管理庫存（可持續下單）。</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="requires_shipping"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>需要寄送</FormLabel>
-                  <div className="flex h-9 items-center gap-2">
-                    <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <span className="text-sm text-muted-foreground">
-                      {field.value ? "是" : "否（例如電子憑證）"}
-                    </span>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        ) : null}
-
-        {/* 名額不在這裡了。0020 把它搬到 public.event_sessions，並且用一條 CHECK
-            強制 products.capacity 是 null —— 留一個會被資料庫拒收的輸入框，比沒有
-            這個輸入框更糟。一件活動也可能有兩個梯次、兩個名額，本來就放不進單一
-            欄位。 */}
-        {bookable ? (
-          <div className="rounded-md border border-border p-4 text-sm text-muted-foreground">
-            名額與日期改由「活動報名」頁按場次維護。先在這裡把商品存起來，再到那一頁
-            為它新增場次——沒有開放中的場次，前台就報不了名。
-          </div>
-        ) : null}
-
-        <FormField
-          control={form.control}
-          name="image_key"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>商品圖片</FormLabel>
-              {/* Not wrapped in <FormControl> (a Radix Slot): ImageField is a plain
-                  composite component, not a forwardRef primitive like Input/Switch,
-                  so Slot's ref-cloning would warn in the console for no benefit. */}
-              <ImageField
-                value={field.value ?? null}
-                onChange={field.onChange}
-                fallback={curatedObjects}
-              />
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="source_type"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>關聯來源類型（選填）</FormLabel>
-              <Select
-                value={field.value ?? NONE_SOURCE_TYPE}
-                onValueChange={(next) => field.onChange(next === NONE_SOURCE_TYPE ? null : next)}
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value={NONE_SOURCE_TYPE}>不關聯</SelectItem>
-                  {(Object.keys(PRODUCT_SOURCE_TYPE_LABEL) as ProductSourceType[]).map((v) => (
-                    <SelectItem key={v} value={v}>
-                      {PRODUCT_SOURCE_TYPE_LABEL[v]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormDescription>
-                用來把商品連回既有的活動或選品內容（例如賣一場活動的票）。與下方 ID
-                請一起填寫或一起留白；留白表示這是獨立商品。
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="source_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>關聯來源 ID（選填）</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="對應活動／策旅／選品項目的 id"
-                  name={field.name}
-                  ref={field.ref}
-                  onBlur={field.onBlur}
-                  value={field.value ?? ""}
-                  onChange={(e) => field.onChange(e.target.value === "" ? null : e.target.value)}
-                />
-              </FormControl>
-              <FormDescription>
-                純文字，不會檢查是否存在——請自行從對應頁面複製正確的 id。
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="sort_order"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>排序（數字越小越前面）</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  name={field.name}
-                  ref={field.ref}
-                  onBlur={field.onBlur}
-                  value={field.value}
-                  onChange={(e) =>
-                    field.onChange(e.target.value === "" ? 0 : Number(e.target.value))
-                  }
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <DialogFooter>
-          <Button type="submit" disabled={submitting}>
-            {submitting ? "儲存中…" : submitLabel}
-          </Button>
-        </DialogFooter>
-      </form>
-    </Form>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-[min(20rem,calc(100vw-2rem))]">
+        {CREATE_OPTIONS.map((opt) => {
+          const body = (
+            <span className="min-w-0">
+              <span className="flex items-center gap-1 font-medium">
+                {opt.label}
+                {opt.href ? <ExternalLink className="h-3 w-3" aria-hidden /> : null}
+              </span>
+              <span className="mt-0.5 block whitespace-normal break-words text-xs text-muted-foreground">
+                {opt.hint}
+              </span>
+            </span>
+          );
+          const testid = `create-${opt.key}`;
+          if (opt.href === "/admin/journeys/new") {
+            return (
+              <DropdownMenuItem key={opt.key} asChild data-testid={testid}>
+                <Link to="/admin/journeys/new">{body}</Link>
+              </DropdownMenuItem>
+            );
+          }
+          if (opt.href === "/admin/events/new") {
+            return (
+              <DropdownMenuItem key={opt.key} asChild data-testid={testid}>
+                <Link to="/admin/events/$id" params={{ id: "new" }}>
+                  {body}
+                </Link>
+              </DropdownMenuItem>
+            );
+          }
+          if (opt.kind === "goods") {
+            return (
+              <DropdownMenuItem key={opt.key} asChild data-testid={testid}>
+                <Link to="/admin/products/product/new" preload="intent">
+                  {body}
+                </Link>
+              </DropdownMenuItem>
+            );
+          }
+          if (opt.kind === "curated") {
+            return (
+              <DropdownMenuItem key={opt.key} asChild data-testid={testid}>
+                <Link to="/admin/products/curated/new" preload="intent">
+                  {body}
+                </Link>
+              </DropdownMenuItem>
+            );
+          }
+          return (
+            <DropdownMenuItem key={opt.key} disabled data-testid={testid}>
+              {body}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

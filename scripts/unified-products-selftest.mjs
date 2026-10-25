@@ -479,6 +479,26 @@ checkTrue(
   /validateSearch[\s\S]{0,200}parseUnifiedTab\(search\.type\)/.test(page),
 );
 check("單一頁的表單沒有 capacity 輸入框", /name="capacity"/.test(page), false);
+// 2026-10-25：完整商品表單從彈窗搬成內頁 /admin/products/product/$id 的本體（ProductForm.tsx）。
+const productForm = stripTs(readFile("src/components/admin/products/ProductForm.tsx"));
+check("商品完整表單（內頁）沒有 capacity 輸入框", /name="capacity"/.test(productForm), false);
+// 編輯／新增內頁：寫入一樣只走既有的 server fn（沒有第二條寫入路徑）。
+const DETAIL_PAGES = {
+  "_shell.products_.product.$id.tsx": ["@/lib/admin/fns/products"],
+  "_shell.products_.product.new.tsx": ["@/lib/admin/fns/products"],
+  "_shell.products_.publication.$id.tsx": [
+    "@/lib/admin/fns/products",
+    "@/lib/admin/fns/publications",
+  ],
+  "_shell.products_.curated.$id.tsx": ["@/lib/admin/fns/curated", "@/lib/admin/fns/products"],
+  "_shell.products_.curated.new.tsx": ["@/lib/admin/fns/curated", "@/lib/admin/fns/products"],
+};
+for (const [file, expected] of Object.entries(DETAIL_PAGES)) {
+  const src = stripTs(readFile(`src/routes/admin/${file}`));
+  const used = [...src.matchAll(/import\("(@\/lib\/admin\/fns\/[^"]+)"\)/g)].map((m) => m[1]);
+  check(`🔴 ${file} 只呼叫既有的 server fn`, [...new Set(used)].sort(), expected);
+  check(`${file} 不直接碰 supabase`, /supabase/i.test(src), false);
+}
 
 checkTrue(
   "🔴 列上快速動作先讀最新一列再寫（getProductById／getPublicationById／getCuratedItemById），不拿畫面快照整列寫回",
@@ -488,7 +508,9 @@ checkTrue(
     ),
 );
 {
-  const editForm = page.match(/<CuratedItemForm\s+key=\{edit\.row\.id\}[\s\S]*?\/>/)?.[0] ?? "";
+  // 2026-10-25：選品編輯從彈窗搬成內頁 /admin/products/curated/$id（商品頁與主題頁共用）。
+  const curatedEdit = stripTs(readFile("src/routes/admin/_shell.products_.curated.$id.tsx"));
+  const editForm = curatedEdit.match(/<CuratedItemForm\s[\s\S]*?\/>/)?.[0] ?? "";
   checkTrue("找得到選品的編輯表單", editForm.length > 0);
   check(
     "🔴 選品編輯不給換主題（換主題要連 sort_order 一起換，更新分支不寫 sort_order）",
@@ -518,7 +540,23 @@ check(
   false,
 );
 const themesPage = stripTs(readFile("src/routes/admin/_shell.products_.curated-themes.tsx"));
-checkTrue("選品主題頁用共用的 CuratedItemForm", themesPage.includes("<CuratedItemForm"));
+// 2026-10-25：主題頁的品項新增／編輯改成連到共用的選品內頁（同一張 CuratedItemForm），
+// 不再自己開表單彈窗。
+checkTrue(
+  "選品主題頁的品項編輯／新增連到共用的選品內頁",
+  themesPage.includes('to="/admin/products/curated/$id"') &&
+    themesPage.includes('to="/admin/products/curated/new"'),
+);
+check("選品主題頁不再自己放 CuratedItemForm", themesPage.includes("<CuratedItemForm"), false);
+checkTrue(
+  "選品內頁（編輯、新增）用共用的 CuratedItemForm",
+  stripTs(readFile("src/routes/admin/_shell.products_.curated.$id.tsx")).includes(
+    "<CuratedItemForm",
+  ) &&
+    stripTs(readFile("src/routes/admin/_shell.products_.curated.new.tsx")).includes(
+      "<CuratedItemForm",
+    ),
+);
 check("選品主題頁沒有自己的 ItemForm", /function ItemForm\(/.test(themesPage), false);
 checkTrue(
   "🔴 選品排序仍走 reorderCuratedItems（RPC），不是逐列寫 sort_order",

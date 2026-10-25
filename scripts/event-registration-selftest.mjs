@@ -1261,7 +1261,10 @@ check(
   false,
 );
 check("商品後台表單沒有 capacity 輸入框", /name="capacity"/.test(productsRouteTs), false);
-checkTrue("商品後台改為指向場次頁", /活動報名/.test(productsRouteTs));
+// 2026-10-25：完整商品表單從 _shell.products.tsx 的彈窗搬成內頁的本體（ProductForm.tsx）。
+const productFormTs = readFile(join(ROOT, "src/components/admin/products/ProductForm.tsx"));
+check("商品內頁表單沒有 capacity 輸入框", /name="capacity"/.test(productFormTs), false);
+checkTrue("商品內頁表單改為指向場次頁", /活動報名/.test(productFormTs));
 checkTrue(
   "新增了 eventSessionSchema",
   /export const eventSessionSchema/.test(readFile(join(ROOT, "src/lib/admin/schemas.ts"))),

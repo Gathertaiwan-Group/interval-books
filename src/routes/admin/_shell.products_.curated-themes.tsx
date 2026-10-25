@@ -7,6 +7,11 @@
  * 必須走 admin_reorder_curated_items RPC）。這一頁就是做那兩件事的，從商品頁的
  * 選品分頁點「主題與排序」進來；/admin/curated 舊網址轉去商品頁的選品分頁。
  *
+ * 2026-10-25（業主：「不要用彈窗，直接顯示內頁＆回到上一頁」）：品項的新增／編輯不再
+ * 開彈窗，連到與商品頁共用的選品內頁 /admin/products/curated/$id、/curated/new?theme=…
+ * （存檔後按上一頁回到這裡）。主題本身的新增／編輯（名稱三語）仍是這一頁的對話框。
+ * 目前選的主題記在 list-memory，從品項內頁回來時面板照樣開著（品項重新抓一次）。
+ *
  * 檔名的 `products_` 是 TanStack Router 的「不巢狀」寫法：網址在 /admin/products
  * 底下（側欄的「商品」會亮），但不需要商品頁渲染 <Outlet />，也不會先跑商品頁的
  * loader。
@@ -56,12 +61,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { LocalizedField } from "@/components/admin/LocalizedField";
-import { CuratedItemForm } from "@/components/admin/products/CuratedItemForm";
 import {
-  curatedThemeSchema,
-  type CuratedThemeFormValues,
-  type CuratedItemFormValues,
-} from "@/lib/admin/schemas";
+  rememberAdminPeek,
+  readAdminListMemory,
+  writeAdminListMemory,
+} from "@/lib/admin/list-memory";
+import { PRODUCT_PEEK_KIND } from "@/lib/admin/unified-products";
+import { curatedThemeSchema, type CuratedThemeFormValues } from "@/lib/admin/schemas";
 import type { listCuratedThemes, listCuratedItems } from "@/lib/admin/fns/curated";
 import { formatUpdatedAt } from "@/lib/admin/format";
 
@@ -71,8 +77,9 @@ type CuratedItemRow = Awaited<ReturnType<typeof listCuratedItems>>[number];
 const EMPTY_LOCALIZED = { zh: "", en: "", ja: "" };
 
 /**
- * Selection lives here (module scope is wrong — it's per-mount state) as a
- * single page, not a sub-route: curated_items only ever makes sense in the
+ * Selection lives here as a single page, not a sub-route (2026-10-25: the
+ * selected theme id is also kept in list-memory so it survives a round trip
+ * to the item edit page): curated_items only ever makes sense in the
  * context of its parent theme (theme_id is a required FK), so there is no
  * "/admin/curated/items" nav entry — picking a theme row below reveals an
  * items panel for that theme on the same page.
@@ -99,16 +106,8 @@ function toThemeFormValues(row: CuratedThemeRow): CuratedThemeFormValues {
   };
 }
 
-function toItemFormValues(row: CuratedItemRow): CuratedItemFormValues {
-  return {
-    id: row.id,
-    theme_id: row.theme_id,
-    name: row.name,
-    note: row.note,
-    is_published: row.is_published,
-    sort_order: row.sort_order,
-  };
-}
+/** 目前選的主題：記在分頁記憶體，從品項內頁回來時面板照樣開著。 */
+const SELECTED_THEME_KEY = "products:curated-themes:selected";
 
 function AdminCuratedPage() {
   const { themes } = Route.useLoaderData();
@@ -123,16 +122,18 @@ function AdminCuratedPage() {
   const [deletingTheme, setDeletingTheme] = useState(false);
 
   // ---- selected theme + its items ----
-  const [selectedThemeId, setSelectedThemeId] = useState<string | null>(null);
+  const [selectedThemeId, setSelectedThemeIdState] = useState<string | null>(
+    () => readAdminListMemory<string>(SELECTED_THEME_KEY) ?? null,
+  );
+  function setSelectedThemeId(id: string | null) {
+    writeAdminListMemory(SELECTED_THEME_KEY, id);
+    setSelectedThemeIdState(id);
+  }
   const [items, setItems] = useState<CuratedItemRow[]>([]);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [reorderingId, setReorderingId] = useState<number | null>(null);
 
-  // ---- item dialog / delete state ----
-  const [itemDialogOpen, setItemDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<CuratedItemRow | null>(null);
-  const [itemFormKey, setItemFormKey] = useState(0);
-  const [itemSubmitting, setItemSubmitting] = useState(false);
+  // ---- item delete state（新增／編輯是內頁 /admin/products/curated/…）----
   const [deleteItemTarget, setDeleteItemTarget] = useState<CuratedItemRow | null>(null);
   const [deletingItem, setDeletingItem] = useState(false);
 
@@ -209,43 +210,6 @@ function AdminCuratedPage() {
   }
 
   // ---- item handlers ----
-  function openCreateItem() {
-    setEditingItem(null);
-    setItemFormKey((k) => k + 1);
-    setItemDialogOpen(true);
-  }
-
-  function openEditItem(row: CuratedItemRow) {
-    setEditingItem(row);
-    setItemFormKey((k) => k + 1);
-    setItemDialogOpen(true);
-  }
-
-  async function handleItemSubmit(values: CuratedItemFormValues) {
-    if (!selectedThemeId) return;
-    setItemSubmitting(true);
-    try {
-      const { upsertCuratedItem } = await import("@/lib/admin/fns/curated");
-      await upsertCuratedItem({
-        data: editingItem
-          ? {
-              ...values,
-              id: editingItem.id,
-              theme_id: selectedThemeId,
-              sort_order: editingItem.sort_order,
-            }
-          : { ...values, theme_id: selectedThemeId, sort_order: nextItemSortOrder },
-      });
-      toast.success(editingItem ? "已更新品項" : "已新增品項");
-      setItemDialogOpen(false);
-      await loadItems(selectedThemeId);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "儲存失敗，請稍後再試");
-    } finally {
-      setItemSubmitting(false);
-    }
-  }
-
   async function handleItemDelete() {
     if (!deleteItemTarget || !selectedThemeId) return;
     setDeletingItem(true);
@@ -294,7 +258,6 @@ function AdminCuratedPage() {
   }
 
   const nextThemeSortOrder = themes.reduce((max, t) => Math.max(max, t.sort_order), 0) + 1;
-  const nextItemSortOrder = items.reduce((max, i) => Math.max(max, i.sort_order), 0) + 1;
 
   const themeDefaultValues: CuratedThemeFormValues = editingTheme
     ? toThemeFormValues(editingTheme)
@@ -303,16 +266,6 @@ function AdminCuratedPage() {
         description: { ...EMPTY_LOCALIZED },
         is_published: true,
         sort_order: nextThemeSortOrder,
-      };
-
-  const itemDefaultValues: CuratedItemFormValues = editingItem
-    ? toItemFormValues(editingItem)
-    : {
-        theme_id: selectedThemeId ?? "",
-        name: { ...EMPTY_LOCALIZED },
-        note: { ...EMPTY_LOCALIZED },
-        is_published: true,
-        sort_order: nextItemSortOrder,
       };
 
   return (
@@ -407,9 +360,15 @@ function AdminCuratedPage() {
               <h2 className="text-lg font-medium">「{selectedTheme.title.zh}」的品項</h2>
               <p className="mt-1 text-sm text-muted-foreground">共 {items.length} 項</p>
             </div>
-            <Button onClick={openCreateItem} size="sm" className="gap-1.5">
-              <Plus className="h-4 w-4" />
-              新增品項
+            <Button asChild size="sm" className="gap-1.5">
+              <Link
+                to="/admin/products/curated/new"
+                search={{ theme: selectedTheme.id }}
+                preload="intent"
+              >
+                <Plus className="h-4 w-4" />
+                新增品項
+              </Link>
             </Button>
           </div>
 
@@ -477,8 +436,20 @@ function AdminCuratedPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => openEditItem(item)}>
-                            編輯
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link
+                              to="/admin/products/curated/$id"
+                              params={{ id: String(item.id) }}
+                              preload="intent"
+                              onClick={() =>
+                                rememberAdminPeek(PRODUCT_PEEK_KIND, `curated:${item.id}`, {
+                                  name: item.name.zh,
+                                  subtitle: selectedTheme.title.zh,
+                                })
+                              }
+                            >
+                              編輯
+                            </Link>
                           </Button>
                           <Button
                             variant="ghost"
@@ -518,25 +489,6 @@ function AdminCuratedPage() {
             onSubmit={handleThemeSubmit}
             submitting={themeSubmitting}
             submitLabel={editingTheme ? "儲存變更" : "新增"}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* Item create/edit dialog */}
-      <Dialog open={itemDialogOpen} onOpenChange={setItemDialogOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingItem ? "編輯品項" : "新增品項"}</DialogTitle>
-            <DialogDescription>
-              中文、英文、日文皆為必填——資料庫要求三語齊備才能儲存。新增的品項會排在這個主題的最後面，順序請用列表上的上移／下移調整。
-            </DialogDescription>
-          </DialogHeader>
-          <CuratedItemForm
-            key={itemFormKey}
-            defaultValues={itemDefaultValues}
-            onSubmit={handleItemSubmit}
-            submitting={itemSubmitting}
-            submitLabel={editingItem ? "儲存變更" : "新增"}
           />
         </DialogContent>
       </Dialog>

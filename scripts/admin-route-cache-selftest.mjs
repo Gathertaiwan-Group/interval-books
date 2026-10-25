@@ -267,6 +267,37 @@ console.log("\n[3] 整頁 fn：GET、middleware 跟原本那幾支一樣、route
       "adminFnMiddleware",
       "_shell.products.tsx",
     ],
+    // 2026-10-25：商品頁的編輯／新增內頁（彈窗改內頁），授權與原本的存檔 fn 相同。
+    [
+      "src/lib/admin/fns/products.ts",
+      "getProductEditPageData",
+      "adminFnMiddleware",
+      "_shell.products_.product.$id.tsx",
+    ],
+    [
+      "src/lib/admin/fns/products.ts",
+      "getNewGoodsPageData",
+      "adminFnMiddleware",
+      "_shell.products_.product.new.tsx",
+    ],
+    [
+      "src/lib/admin/fns/products.ts",
+      "getPublicationEditPageData",
+      "adminFnMiddleware",
+      "_shell.products_.publication.$id.tsx",
+    ],
+    [
+      "src/lib/admin/fns/products.ts",
+      "getCuratedItemEditPageData",
+      "adminFnMiddleware",
+      "_shell.products_.curated.$id.tsx",
+    ],
+    [
+      "src/lib/admin/fns/products.ts",
+      "getCuratedItemNewPageData",
+      "adminFnMiddleware",
+      "_shell.products_.curated.new.tsx",
+    ],
     [
       "src/lib/admin/fns/events.ts",
       "getAdminEventsPageData",

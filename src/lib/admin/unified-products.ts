@@ -501,3 +501,42 @@ export const CREATE_OPTIONS: readonly {
     href: null,
   },
 ];
+
+// ---------------------------------------------------------------------------
+// 編輯內頁（2026-10-25 後台第 2 批：彈窗改內頁）
+// ---------------------------------------------------------------------------
+
+/**
+ * 清單上一列按「編輯」要去哪一個內頁：
+ *   product      /admin/products/product/$id      一般商品、沒有活動頁可去的票券（策旅…）
+ *   publication  /admin/products/publication/$id  刊物校稿
+ *   curated      /admin/products/curated/$id      選品一項
+ *   null         不在這裡編：活動票券（eventId）一律連到 /admin/events/$id，不重做一份
+ */
+export type ProductDetailKind = "product" | "publication" | "curated";
+
+export function detailKindFor(row: Pick<UnifiedRow, "kind" | "eventId">): ProductDetailKind | null {
+  if (row.eventId) return null;
+  if (row.kind === "publication") return "publication";
+  if (row.kind === "curated") return "curated";
+  return "product";
+}
+
+/** 內頁 pendingComponent 先畫標題用的 peek（list-memory 的 rememberAdminPeek）種類名。 */
+export const PRODUCT_PEEK_KIND = "products";
+
+/**
+ * products.id 與 publications.id 都是 `text primary key`（不是 uuid：0004／0015），
+ * 所以內頁的 loader 不能像訂單那樣用 isUuid 擋。這裡只擋「明顯不是 id」的網址參數
+ * （空白、太長、有空白字元或斜線），其餘交給查詢：查不到就是「找不到」畫面。
+ */
+export function isProductTextId(value: unknown): value is string {
+  return typeof value === "string" && /^[^\s/]{1,200}$/.test(value);
+}
+
+/** curated_items.id 是 bigint identity：網址參數只接受正整數字串。 */
+export function parseCuratedItemId(value: unknown): number | null {
+  if (typeof value !== "string" || !/^[1-9][0-9]{0,15}$/.test(value)) return null;
+  const n = Number(value);
+  return Number.isSafeInteger(n) ? n : null;
+}

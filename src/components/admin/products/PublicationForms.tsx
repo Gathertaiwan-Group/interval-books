@@ -5,6 +5,10 @@
  * 後台「商品」單一頁（src/routes/admin/_shell.products.tsx），舊網址只剩轉址，
  * 表單原封不動搬到這裡給新頁用 —— 寫入仍然走 fns/publications.ts 的
  * updatePublication / linkPublicationToInventory，沒有第二條路徑。
+ *
+ * 2026-10-25：校稿（PublicationForm）從彈窗改成內頁 /admin/products/publication/$id，
+ * 送出鈕改在內頁的動作列（<Button type="submit" form={formId}>）。「連到庫存商品」
+ * （LinkForm）是上架動作，照規格留在清單上的對話框裡，仍然自帶 DialogFooter。
  */
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -30,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { ImageField } from "@/components/admin/ImageField";
 import { LocalizedField } from "@/components/admin/LocalizedField";
+import { useReportDirty } from "@/components/admin/products/useReportDirty";
 import {
   publicationLinkSchema,
   publicationSchema,
@@ -47,13 +52,19 @@ export type Candidate = Awaited<ReturnType<typeof listInventoryCandidates>>[numb
 const formatTWD = (n: number) => `NT$${n.toLocaleString("zh-Hant-TW")}`;
 
 export function PublicationForm({
+  formId,
   publication,
   onSubmit,
   submitting,
+  onDirtyChange,
 }: {
+  /** <form id>：內頁動作列的送出鈕用 form={formId} 指到這張表單。 */
+  formId: string;
   publication: Publication;
   onSubmit: (values: PublicationFormValues) => void | Promise<void>;
   submitting: boolean;
+  /** 值跟第一次 render 不一樣 → true（內頁的未存變更防呆用）。 */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const form = useForm<PublicationFormValues>({
     resolver: zodResolver(publicationSchema),
@@ -70,10 +81,11 @@ export function PublicationForm({
       sort_order: publication.sort_order,
     },
   });
+  useReportDirty(form.control, onDirtyChange);
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+      <form id={formId} onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
         <FormField
           control={form.control}
           name="cover_image_key"
@@ -189,12 +201,6 @@ export function PublicationForm({
             )}
           />
         </div>
-
-        <DialogFooter>
-          <Button type="submit" disabled={submitting}>
-            {submitting ? "儲存中…" : "儲存"}
-          </Button>
-        </DialogFooter>
       </form>
     </Form>
   );

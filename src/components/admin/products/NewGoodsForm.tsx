@@ -6,12 +6,13 @@
  * src/lib/admin/unified-products.ts#buildNewGoodsPayload，送出時組成完整的
  * productSchema payload，走的是既有的 fns/products.ts#upsertProduct —— 沒有第二條
  * 寫入路徑。之後要補長說明或比價原價，在清單上按「編輯」就是完整表單。
+ *
+ * 2026-10-25 從彈窗改成內頁（/admin/products/product/new）：送出鈕改在內頁的動作列
+ * （<Button type="submit" form={formId}>），表單本身不再帶 DialogFooter。
  */
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { DialogFooter } from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -32,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { ImageField } from "@/components/admin/ImageField";
 import { LocalizedField } from "@/components/admin/LocalizedField";
+import { useReportDirty } from "@/components/admin/products/useReportDirty";
 import { localizedSchema } from "@/lib/admin/schemas";
 import { curatedObjects } from "@/lib/images";
 
@@ -50,11 +52,17 @@ export type NewGoodsValues = z.infer<typeof newGoodsSchema>;
 const EMPTY = { zh: "", en: "", ja: "" };
 
 export function NewGoodsForm({
+  formId,
   onSubmit,
   submitting,
+  onDirtyChange,
 }: {
+  /** <form id>：內頁動作列的送出鈕用 form={formId} 指到這張表單。 */
+  formId: string;
   onSubmit: (values: NewGoodsValues) => Promise<void>;
   submitting: boolean;
+  /** 值跟第一次 render 不一樣 → true（內頁的未存變更防呆用）。 */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const form = useForm<NewGoodsValues>({
     resolver: zodResolver(newGoodsSchema),
@@ -68,10 +76,11 @@ export function NewGoodsForm({
       publish: false,
     },
   });
+  useReportDirty(form.control, onDirtyChange);
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+      <form id={formId} onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
         <FormField
           control={form.control}
           name="product_type"
@@ -187,12 +196,6 @@ export function NewGoodsForm({
             </FormItem>
           )}
         />
-
-        <DialogFooter>
-          <Button type="submit" disabled={submitting}>
-            {submitting ? "建立中…" : "建立商品"}
-          </Button>
-        </DialogFooter>
       </form>
     </Form>
   );

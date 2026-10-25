@@ -92,3 +92,80 @@ export const getAdminProductsPageData = createServerFn({ method: "GET" })
       curatedItems: curatedItemsAndThemes.curatedItems,
     };
   });
+
+// ---------------------------------------------------------------------------
+// 編輯／新增內頁（2026-10-25 後台第 2 批：彈窗改內頁）
+// ---------------------------------------------------------------------------
+/*
+ * 業主：「不要用彈窗，直接顯示內頁＆回到上一頁」。原本商品頁的編輯／新增彈窗直接拿
+ * 整頁 loader（getAdminProductsPageData：商品、刊物、候選品項、選品…全部）在記憶體裡的
+ * 那一列；改成內頁之後，每一頁的 loader 只叫下面其中一支，**只抓那一筆＋那張表單要的
+ * 選項**，不再為了編一件商品把整頁七份資料重抓一次。
+ *
+ * 授權：五支全部 adminFnMiddleware —— 與它們對應的存檔 fn（upsertProduct、
+ * updatePublication〔fns/publications.ts〕、upsertCuratedItem〔fns/curated.ts〕）
+ * 一模一樣，沒有放寬（scripts/admin-detail-products-selftest.mjs 守著）。
+ * 刊物與選品的整頁 fn 放在這個檔案而不是各自的 fns 檔：它們是「商品」這一頁的內頁，
+ * 與 getAdminProductsPageData 放一起比較好找；repo 一樣是動態 import。
+ */
+
+/** /admin/products/product/$id —— 一般商品／票券的完整表單。 */
+export const getProductEditPageData = createServerFn({ method: "GET" })
+  .middleware([adminFnMiddleware])
+  .inputValidator(z.object({ id: z.string().trim().min(1) }))
+  .handler(async ({ data }) => {
+    const { getProductById } = await import("@/server/repos/products");
+    return { product: await getProductById(data.id) };
+  });
+
+/**
+ * /admin/products/product/new —— 新增一般商品的精簡表單只需要「下一個排序值」。
+ * 原本是商品頁拿記憶體裡整份 products 算 max(sort_order)+1；這裡同一條規則在伺服器上算。
+ */
+export const getNewGoodsPageData = createServerFn({ method: "GET" })
+  .middleware([adminFnMiddleware])
+  .handler(async () => {
+    const { listProducts } = await import("@/server/repos/products");
+    const products = await listProducts();
+    return { nextSortOrder: products.reduce((max, p) => Math.max(max, p.sort_order), 0) + 1 };
+  });
+
+/** /admin/products/publication/$id —— 刊物校稿。 */
+export const getPublicationEditPageData = createServerFn({ method: "GET" })
+  .middleware([adminFnMiddleware])
+  .inputValidator(z.object({ id: z.string().trim().min(1) }))
+  .handler(async ({ data }) => {
+    const { getPublicationById } = await import("@/server/repos/publications");
+    return { publication: await getPublicationById(data.id) };
+  });
+
+/**
+ * /admin/products/curated/$id —— 選品一項。主題名稱只拿來寫副標（編輯時不給換主題：
+ * 換主題要連 sort_order 一起換，upsertCuratedItem 的更新分支刻意不寫 sort_order）。
+ */
+export const getCuratedItemEditPageData = createServerFn({ method: "GET" })
+  .middleware([adminFnMiddleware])
+  .inputValidator(z.object({ id: z.number().int().positive() }))
+  .handler(async ({ data }) => {
+    const { getCuratedItemById, getCuratedThemeById } = await import("@/server/repos/curated");
+    const item = await getCuratedItemById(data.id);
+    const theme = item ? await getCuratedThemeById(item.theme_id) : null;
+    return { item, themeTitle: theme?.title.zh ?? null };
+  });
+
+/**
+ * /admin/products/curated/new —— 新增選品要選主題，sort_order 是「該主題目前最大值 + 1」
+ * （unique(theme_id, sort_order)，見 unified-products.ts#nextCuratedSortOrder）。
+ * 品項只回 theme_id／sort_order 兩欄：算排序值用不到名稱與備註。
+ */
+export const getCuratedItemNewPageData = createServerFn({ method: "GET" })
+  .middleware([adminFnMiddleware])
+  .handler(async () => {
+    const { listCuratedThemes, listCuratedItemsByThemes } = await import("@/server/repos/curated");
+    const themes = await listCuratedThemes();
+    const items = await listCuratedItemsByThemes(themes.map((t) => t.id));
+    return {
+      themes: themes.map((t) => ({ id: t.id, title: t.title })),
+      itemOrders: items.map((i) => ({ theme_id: i.theme_id, sort_order: i.sort_order })),
+    };
+  });

@@ -5,13 +5,15 @@
  * 單一頁之後，清單上的「編輯／新增」與主題管理頁（_shell.products_.curated-themes.tsx）
  * 共用這一份；寫入一律走 fns/curated.ts 的 upsertCuratedItem。
  *
- * `themes` 有傳時多一格「所屬主題」——從商品單一頁新增選品時要先選主題；主題管理頁
- * 是在某一個主題底下新增，不需要它。
+ * `themes` 有傳時多一格「所屬主題」——只有新增時給（/admin/products/curated/new）。
+ * 編輯時不給：換主題要連 sort_order 一起換（unique(theme_id, sort_order)），而
+ * upsertCuratedItem 的更新分支刻意不寫 sort_order。
+ *
+ * 2026-10-25 從彈窗改成內頁（/admin/products/curated/$id、/new）：送出鈕改在內頁的
+ * 動作列（<Button type="submit" form={formId}>），表單本身不再帶 DialogFooter。
  */
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button } from "@/components/ui/button";
-import { DialogFooter } from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -29,32 +31,36 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LocalizedField } from "@/components/admin/LocalizedField";
+import { useReportDirty } from "@/components/admin/products/useReportDirty";
 import { curatedItemSchema, type CuratedItemFormValues } from "@/lib/admin/schemas";
 
 export type CuratedItemFormProps = {
+  /** <form id>：內頁動作列的送出鈕用 form={formId} 指到這張表單。 */
+  formId: string;
   defaultValues: CuratedItemFormValues;
   onSubmit: (values: CuratedItemFormValues) => Promise<void>;
-  submitting: boolean;
-  submitLabel: string;
+  /** 值跟第一次 render 不一樣 → true（內頁的未存變更防呆用）。 */
+  onDirtyChange?: (dirty: boolean) => void;
   /** 有傳才顯示「所屬主題」下拉。 */
   themes?: { id: string; title: { zh: string } }[];
 };
 
 export function CuratedItemForm({
+  formId,
   defaultValues,
   onSubmit,
-  submitting,
-  submitLabel,
+  onDirtyChange,
   themes,
 }: CuratedItemFormProps) {
   const form = useForm<CuratedItemFormValues>({
     resolver: zodResolver(curatedItemSchema),
     defaultValues,
   });
+  useReportDirty(form.control, onDirtyChange);
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+      <form id={formId} onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
         {themes ? (
           <FormField
             control={form.control}
@@ -103,12 +109,6 @@ export function CuratedItemForm({
             </FormItem>
           )}
         />
-
-        <DialogFooter>
-          <Button type="submit" disabled={submitting}>
-            {submitting ? "儲存中…" : submitLabel}
-          </Button>
-        </DialogFooter>
       </form>
     </Form>
   );

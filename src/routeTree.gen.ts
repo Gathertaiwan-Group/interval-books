@@ -90,6 +90,11 @@ import { Route as AdminShellInventoryProductsIdIndexRouteImport } from './routes
 import { Route as AdminShellInventoryProductsIdEditRouteImport } from './routes/admin/_shell.inventory-products_.$id.edit'
 import { Route as AdminShellInventoryVendorsIdIndexRouteImport } from './routes/admin/_shell.inventory-vendors_.$id.index'
 import { Route as AdminShellInventoryVendorsIdEditRouteImport } from './routes/admin/_shell.inventory-vendors_.$id.edit'
+import { Route as AdminShellProductsCuratedIdRouteImport } from './routes/admin/_shell.products_.curated.$id'
+import { Route as AdminShellProductsCuratedNewRouteImport } from './routes/admin/_shell.products_.curated.new'
+import { Route as AdminShellProductsProductIdRouteImport } from './routes/admin/_shell.products_.product.$id'
+import { Route as AdminShellProductsProductNewRouteImport } from './routes/admin/_shell.products_.product.new'
+import { Route as AdminShellProductsPublicationIdRouteImport } from './routes/admin/_shell.products_.publication.$id'
 import { Route as AdminShellRegistrationsSessionIdIndexRouteImport } from './routes/admin/_shell.registrations_.$sessionId.index'
 import { Route as AdminShellRegistrationsSessionIdEditRouteImport } from './routes/admin/_shell.registrations_.$sessionId.edit'
 
@@ -521,6 +526,36 @@ const AdminShellInventoryVendorsIdEditRoute =
     path: '/edit',
     getParentRoute: () => AdminShellInventoryVendorsIdRoute,
   } as any)
+const AdminShellProductsCuratedIdRoute =
+  AdminShellProductsCuratedIdRouteImport.update({
+    id: '/products_/curated/$id',
+    path: '/products/curated/$id',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
+const AdminShellProductsCuratedNewRoute =
+  AdminShellProductsCuratedNewRouteImport.update({
+    id: '/products_/curated/new',
+    path: '/products/curated/new',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
+const AdminShellProductsProductIdRoute =
+  AdminShellProductsProductIdRouteImport.update({
+    id: '/products_/product/$id',
+    path: '/products/product/$id',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
+const AdminShellProductsProductNewRoute =
+  AdminShellProductsProductNewRouteImport.update({
+    id: '/products_/product/new',
+    path: '/products/product/new',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
+const AdminShellProductsPublicationIdRoute =
+  AdminShellProductsPublicationIdRouteImport.update({
+    id: '/products_/publication/$id',
+    path: '/products/publication/$id',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
 const AdminShellRegistrationsSessionIdIndexRoute =
   AdminShellRegistrationsSessionIdIndexRouteImport.update({
     id: '/',
@@ -613,6 +648,11 @@ export interface FileRoutesByFullPath {
   '/admin/inventory-combos/$id/edit': typeof AdminShellInventoryCombosIdEditRoute
   '/admin/inventory-products/$id/edit': typeof AdminShellInventoryProductsIdEditRoute
   '/admin/inventory-vendors/$id/edit': typeof AdminShellInventoryVendorsIdEditRoute
+  '/admin/products/curated/$id': typeof AdminShellProductsCuratedIdRoute
+  '/admin/products/curated/new': typeof AdminShellProductsCuratedNewRoute
+  '/admin/products/product/$id': typeof AdminShellProductsProductIdRoute
+  '/admin/products/product/new': typeof AdminShellProductsProductNewRoute
+  '/admin/products/publication/$id': typeof AdminShellProductsPublicationIdRoute
   '/admin/registrations/$sessionId/edit': typeof AdminShellRegistrationsSessionIdEditRoute
   '/admin/inventory-combos/$id/': typeof AdminShellInventoryCombosIdIndexRoute
   '/admin/inventory-products/$id/': typeof AdminShellInventoryProductsIdIndexRoute
@@ -692,6 +732,11 @@ export interface FileRoutesByTo {
   '/admin/inventory-combos/$id/edit': typeof AdminShellInventoryCombosIdEditRoute
   '/admin/inventory-products/$id/edit': typeof AdminShellInventoryProductsIdEditRoute
   '/admin/inventory-vendors/$id/edit': typeof AdminShellInventoryVendorsIdEditRoute
+  '/admin/products/curated/$id': typeof AdminShellProductsCuratedIdRoute
+  '/admin/products/curated/new': typeof AdminShellProductsCuratedNewRoute
+  '/admin/products/product/$id': typeof AdminShellProductsProductIdRoute
+  '/admin/products/product/new': typeof AdminShellProductsProductNewRoute
+  '/admin/products/publication/$id': typeof AdminShellProductsPublicationIdRoute
   '/admin/registrations/$sessionId/edit': typeof AdminShellRegistrationsSessionIdEditRoute
   '/admin/inventory-combos/$id': typeof AdminShellInventoryCombosIdIndexRoute
   '/admin/inventory-products/$id': typeof AdminShellInventoryProductsIdIndexRoute
@@ -778,6 +823,11 @@ export interface FileRoutesById {
   '/admin/_shell/inventory-combos_/$id/edit': typeof AdminShellInventoryCombosIdEditRoute
   '/admin/_shell/inventory-products_/$id/edit': typeof AdminShellInventoryProductsIdEditRoute
   '/admin/_shell/inventory-vendors_/$id/edit': typeof AdminShellInventoryVendorsIdEditRoute
+  '/admin/_shell/products_/curated/$id': typeof AdminShellProductsCuratedIdRoute
+  '/admin/_shell/products_/curated/new': typeof AdminShellProductsCuratedNewRoute
+  '/admin/_shell/products_/product/$id': typeof AdminShellProductsProductIdRoute
+  '/admin/_shell/products_/product/new': typeof AdminShellProductsProductNewRoute
+  '/admin/_shell/products_/publication/$id': typeof AdminShellProductsPublicationIdRoute
   '/admin/_shell/registrations_/$sessionId/edit': typeof AdminShellRegistrationsSessionIdEditRoute
   '/admin/_shell/inventory-combos_/$id/': typeof AdminShellInventoryCombosIdIndexRoute
   '/admin/_shell/inventory-products_/$id/': typeof AdminShellInventoryProductsIdIndexRoute
@@ -865,6 +915,11 @@ export interface FileRouteTypes {
     | '/admin/inventory-combos/$id/edit'
     | '/admin/inventory-products/$id/edit'
     | '/admin/inventory-vendors/$id/edit'
+    | '/admin/products/curated/$id'
+    | '/admin/products/curated/new'
+    | '/admin/products/product/$id'
+    | '/admin/products/product/new'
+    | '/admin/products/publication/$id'
     | '/admin/registrations/$sessionId/edit'
     | '/admin/inventory-combos/$id/'
     | '/admin/inventory-products/$id/'
@@ -944,6 +999,11 @@ export interface FileRouteTypes {
     | '/admin/inventory-combos/$id/edit'
     | '/admin/inventory-products/$id/edit'
     | '/admin/inventory-vendors/$id/edit'
+    | '/admin/products/curated/$id'
+    | '/admin/products/curated/new'
+    | '/admin/products/product/$id'
+    | '/admin/products/product/new'
+    | '/admin/products/publication/$id'
     | '/admin/registrations/$sessionId/edit'
     | '/admin/inventory-combos/$id'
     | '/admin/inventory-products/$id'
@@ -1029,6 +1089,11 @@ export interface FileRouteTypes {
     | '/admin/_shell/inventory-combos_/$id/edit'
     | '/admin/_shell/inventory-products_/$id/edit'
     | '/admin/_shell/inventory-vendors_/$id/edit'
+    | '/admin/_shell/products_/curated/$id'
+    | '/admin/_shell/products_/curated/new'
+    | '/admin/_shell/products_/product/$id'
+    | '/admin/_shell/products_/product/new'
+    | '/admin/_shell/products_/publication/$id'
     | '/admin/_shell/registrations_/$sessionId/edit'
     | '/admin/_shell/inventory-combos_/$id/'
     | '/admin/_shell/inventory-products_/$id/'
@@ -1639,6 +1704,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminShellInventoryVendorsIdEditRouteImport
       parentRoute: typeof AdminShellInventoryVendorsIdRoute
     }
+    '/admin/_shell/products_/curated/$id': {
+      id: '/admin/_shell/products_/curated/$id'
+      path: '/products/curated/$id'
+      fullPath: '/admin/products/curated/$id'
+      preLoaderRoute: typeof AdminShellProductsCuratedIdRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/products_/curated/new': {
+      id: '/admin/_shell/products_/curated/new'
+      path: '/products/curated/new'
+      fullPath: '/admin/products/curated/new'
+      preLoaderRoute: typeof AdminShellProductsCuratedNewRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/products_/product/$id': {
+      id: '/admin/_shell/products_/product/$id'
+      path: '/products/product/$id'
+      fullPath: '/admin/products/product/$id'
+      preLoaderRoute: typeof AdminShellProductsProductIdRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/products_/product/new': {
+      id: '/admin/_shell/products_/product/new'
+      path: '/products/product/new'
+      fullPath: '/admin/products/product/new'
+      preLoaderRoute: typeof AdminShellProductsProductNewRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/products_/publication/$id': {
+      id: '/admin/_shell/products_/publication/$id'
+      path: '/products/publication/$id'
+      fullPath: '/admin/products/publication/$id'
+      preLoaderRoute: typeof AdminShellProductsPublicationIdRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
     '/admin/_shell/registrations_/$sessionId/': {
       id: '/admin/_shell/registrations_/$sessionId/'
       path: '/'
@@ -1791,6 +1891,11 @@ interface AdminShellRouteChildren {
   AdminShellProductsCuratedThemesRoute: typeof AdminShellProductsCuratedThemesRoute
   AdminShellRegistrationsSessionIdRoute: typeof AdminShellRegistrationsSessionIdRouteWithChildren
   AdminShellRegistrationsNewRoute: typeof AdminShellRegistrationsNewRoute
+  AdminShellProductsCuratedIdRoute: typeof AdminShellProductsCuratedIdRoute
+  AdminShellProductsCuratedNewRoute: typeof AdminShellProductsCuratedNewRoute
+  AdminShellProductsProductIdRoute: typeof AdminShellProductsProductIdRoute
+  AdminShellProductsProductNewRoute: typeof AdminShellProductsProductNewRoute
+  AdminShellProductsPublicationIdRoute: typeof AdminShellProductsPublicationIdRoute
 }
 
 const AdminShellRouteChildren: AdminShellRouteChildren = {
@@ -1838,6 +1943,11 @@ const AdminShellRouteChildren: AdminShellRouteChildren = {
   AdminShellRegistrationsSessionIdRoute:
     AdminShellRegistrationsSessionIdRouteWithChildren,
   AdminShellRegistrationsNewRoute: AdminShellRegistrationsNewRoute,
+  AdminShellProductsCuratedIdRoute: AdminShellProductsCuratedIdRoute,
+  AdminShellProductsCuratedNewRoute: AdminShellProductsCuratedNewRoute,
+  AdminShellProductsProductIdRoute: AdminShellProductsProductIdRoute,
+  AdminShellProductsProductNewRoute: AdminShellProductsProductNewRoute,
+  AdminShellProductsPublicationIdRoute: AdminShellProductsPublicationIdRoute,
 }
 
 const AdminShellRouteWithChildren = AdminShellRoute._addFileChildren(
