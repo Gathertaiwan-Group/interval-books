@@ -1068,10 +1068,6 @@ const piiSources = [
   ["src/lib/admin/fns/event-registrations.ts", regFnTs],
   ["src/lib/admin/roster-csv.ts", readFile(join(ROOT, "src/lib/admin/roster-csv.ts"))],
   [
-    "src/components/admin/RegistrationRevealDialog.tsx",
-    readFile(join(ROOT, "src/components/admin/RegistrationRevealDialog.tsx")),
-  ],
-  [
     "src/routes/admin/_shell.registrations.tsx",
     readFile(join(ROOT, "src/routes/admin/_shell.registrations.tsx")),
   ],
@@ -1121,13 +1117,35 @@ checkTrue(
     /\$\{error\.code\} \$\{error\.message\}/.test(regRepoTs),
 );
 
-// --- 名單只回遮罩值 ----------------------------------------------------------
-console.log("\n[13] 名單頁不開明文出口");
-checkTrue(
-  "repo 回的是 email_masked / phone_masked",
-  /email_masked/.test(regRepoTs) && /phone_masked/.test(regRepoTs),
-);
-// RegistrationRosterRow 這個對外型別裡不可以有明文 email / phone。
+// --- 名單頁的明文一定先留紀錄（業主 2026-10-25）-----------------------------
+// 名單頁從「遮罩＋單筆揭露」改成直接顯示明文。守的事變成：listSessionRoster()
+// **先**呼叫 pii_log_access()、成功了才讀 event_registrations 的明文。
+console.log("\n[13] 名單頁的明文一定先留紀錄");
+{
+  const code = stripTs(regRepoTs);
+  const fnStart = code.indexOf("export async function listSessionRoster(");
+  checkTrue("反空殼：找得到 listSessionRoster", fnStart > 0);
+  const fnBody = code.slice(fnStart, code.indexOf("\nexport ", fnStart + 10));
+  const logAt = fnBody.indexOf('rpc("pii_log_access"');
+  const plainAt = fnBody.indexOf('from("event_registrations")');
+  checkTrue("🔴 listSessionRoster 呼叫 pii_log_access", logAt > 0);
+  checkTrue("listSessionRoster 讀 event_registrations 的明文", plainAt > 0);
+  checkTrue("🔴 紀錄寫在讀明文之前", logAt > 0 && plainAt > logAt);
+  checkTrue(
+    "🔴 紀錄寫失敗就 throw（不會繼續讀明文）",
+    /if \(logError[\s\S]{0,400}throw new Error/.test(fnBody.slice(logAt, plainAt)),
+  );
+  checkTrue(
+    "紀錄的對象是場次、事由 attendee_contact",
+    /p_subject_table: "public\.event_sessions"/.test(fnBody) &&
+      /p_reason: "attendee_contact"/.test(fnBody),
+  );
+  checkTrue(
+    "actor 由 fn 從 session 帶進來（context.staff）",
+    /actorUserId: context\.staff\.userId/.test(regFnTs),
+  );
+}
+// RegistrationRosterRow 這個對外型別現在**有**明文 email / phone（讀之前已寫紀錄）。
 // ⚠️ 切到型別自己的 `};` 為止，不是切到下一個 /** —— 0021 之後這個型別裡面就有
 //    JSDoc 註解了，用註解當終點會讓切出來的片段停在第一個欄位上，而那會讓下面
 //    兩條「沒有明文欄位」變成永遠通過的假性斷言。
@@ -1140,8 +1158,8 @@ checkTrue(
 );
 checkTrue("反空殼：切出來的片段有完整結尾", rosterType.trimEnd().endsWith("};"));
 checkTrue("反空殼：切出來的片段包含最後一個欄位", /on_roster/.test(rosterType));
-check("對外型別沒有明文 email 欄位", /^\s+email: string/m.test(rosterType), false);
-check("對外型別沒有明文 phone 欄位", /^\s+phone: string/m.test(rosterType), false);
+checkTrue("對外型別有明文 email 欄位", /^\s+email: string \| null;/m.test(rosterType));
+checkTrue("對外型別有明文 phone 欄位", /^\s+phone: string \| null;/m.test(rosterType));
 
 // ── 0021 開了那兩條明文出口 ────────────────────────────────────────────────
 //

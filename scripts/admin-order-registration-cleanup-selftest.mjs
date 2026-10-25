@@ -571,7 +571,8 @@ console.log("\n[11] 🔴 名單頁的移除按鈕與確認對話框");
   // 表格：「移除」按鈕在每一列裡，且與「顯示」放在同一個操作欄。
   checkTrue(
     "表格標題欄有「操作」（原本叫「聯絡方式」，見 0035 對這個檔案的改動）",
-    /<TableHead className="w-40 text-right">操作<\/TableHead>/.test(regRouteSrc),
+    // 2026-10-25 拿掉「顯示」鈕（名單直接是明文）後欄寬從 w-40 縮成 w-24。
+    /<TableHead className="w-\d+ text-right">操作<\/TableHead>/.test(regRouteSrc),
   );
   checkTrue(
     "每一列有一顆呼叫 setRemoveTarget(r) 的按鈕",

@@ -122,7 +122,8 @@ export const dedupeKeys = {
 // -----------------------------------------------------------------------------
 
 /**
- * 店家通知信要的訂購人資料、逐位參加者（遮罩值）、後台訂單連結。兩條店家信的路徑
+ * 店家通知信要的訂購人資料、逐位參加者（明文，業主 2026-10-25 決定）、後台訂單連結
+ * （/admin/orders/<id>；舊信的 ?order= 由列表頁轉址）。兩條店家信的路徑
  * （付款成功後／下單當下）共用。兩支 repo 都設計成讀失敗回 null／空 Map 而不丟例外；
  * 呼叫端仍然把整段包在自己的 try/catch 裡。
  *
@@ -138,7 +139,11 @@ async function loadAdminMailExtras(orderId: string): Promise<{
     getOrderContactForAdminNotify(orderId),
     loadOrderAttendeesForAdminNotify(orderId),
   ]);
-  return { contact, attendees, adminUrl: publicUrlFor("/admin/orders", { order: orderId }) };
+  return {
+    contact,
+    attendees,
+    adminUrl: publicUrlFor(`/admin/orders/${encodeURIComponent(orderId)}`),
+  };
 }
 
 // -----------------------------------------------------------------------------
@@ -230,7 +235,7 @@ async function queueWithClaim(orderId: string): Promise<NotifyOutcome> {
     // 場次的參加人數：這張訂單裡屬於同一個 session 的 item.quantity 加總。
     // ⚠️ 這是「這場買了幾個名額」，不是「簽到表上有幾筆」——不需要等下面的
     //    loadPaidRosterByOrder()，訂單的 order_items 就夠了。逐位參加者姓名另外由
-    //    loadAdminMailExtras() 從遮罩過的 admin_event_roster 讀（2026-10）。
+    //    loadAdminMailExtras() 從 event_registrations 讀（明文，2026-10-25）。
     const sessionParticipants = new Map<string, number>();
     for (const it of items) {
       if (!it.sessionId) continue;

@@ -45,6 +45,9 @@ function AdminLoginPage() {
     setSubmitting(true);
     try {
       const { role } = await signIn({ data: values });
+      // 換了一個人登入：前一個人的側欄快取不可以沿用（見 shell-user-cache.ts）。
+      const { clearShellUserCache } = await import("@/lib/admin/shell-user-cache");
+      clearShellUserCache();
       toast.success("登入成功");
       // 每個角色送去他真的看得到的第一頁。店員被送去儀表板會撞上
       // adminFnMiddleware —— 擋得對，但不該是他每天上班第一眼看到的東西。

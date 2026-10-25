@@ -4,6 +4,7 @@ import {
   Outlet,
   redirect,
   useNavigate,
+  useRouter,
   useRouterState,
 } from "@tanstack/react-router";
 import {
@@ -54,6 +55,11 @@ import {
 import { signOut } from "@/lib/admin/fns/auth";
 import { isNavItemActive } from "@/lib/admin/nav-active";
 import { backOfficeTypeScaleStyles } from "@/lib/admin/type-scale";
+import { clearShellUserCache, shellUserCache } from "@/lib/admin/shell-user-cache";
+
+type BackOfficeUserView = NonNullable<
+  Awaited<ReturnType<typeof import("@/lib/admin/fns/auth").getCurrentBackOfficeUser>>
+>;
 
 /**
  * Pathless layout for the whole /admin back office (except /admin/login and
@@ -74,8 +80,16 @@ import { backOfficeTypeScaleStyles } from "@/lib/admin/type-scale";
  */
 export const Route = createFileRoute("/admin/_shell")({
   beforeLoad: async () => {
-    const { getCurrentBackOfficeUser } = await import("@/lib/admin/fns/auth");
-    const user = await getCurrentBackOfficeUser();
+    // 瀏覽器端換頁時沿用 60 秒內的結果，省掉每次換頁前那一趟依序的 server fn
+    // （見 src/lib/admin/shell-user-cache.ts：這裡不是授權邊界，所以快取是安全的）。
+    const isBrowser = typeof window !== "undefined";
+    const cached = isBrowser ? (shellUserCache.get(Date.now()) as BackOfficeUserView | null) : null;
+    let user: BackOfficeUserView | null = cached;
+    if (!user) {
+      const { getCurrentBackOfficeUser } = await import("@/lib/admin/fns/auth");
+      user = await getCurrentBackOfficeUser();
+      if (isBrowser && user && user.role !== "pending") shellUserCache.set(user, Date.now());
+    }
     if (!user) {
       throw redirect({ to: "/admin/login" });
     }
@@ -233,6 +247,7 @@ const ROLE_LABEL: Record<string, string> = { admin: "管理員", staff: "門市�
 function AdminShell() {
   const { admin, user } = Route.useRouteContext();
   const navigate = useNavigate();
+  const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const isAdmin = user.role === "admin";
@@ -247,6 +262,9 @@ function AdminShell() {
   })).filter((group) => group.items.length > 0);
 
   async function handleSignOut() {
+    clearShellUserCache();
+    // 預載／已載入的頁面資料（例如訂單內頁的明文聯絡方式）一起從記憶體清掉。
+    router.clearCache();
     await signOut();
     toast.success("已登出");
     await navigate({ to: "/admin/login" });

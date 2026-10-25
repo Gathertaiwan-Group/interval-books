@@ -72,6 +72,7 @@ import { Route as VendorShellIndexRouteImport } from './routes/vendor/_shell.ind
 import { Route as VendorShellProductsRouteImport } from './routes/vendor/_shell.products'
 import { Route as AdminShellEventsIdRouteImport } from './routes/admin/_shell.events.$id'
 import { Route as AdminShellJourneysNewRouteImport } from './routes/admin/_shell.journeys_.new'
+import { Route as AdminShellOrdersIdRouteImport } from './routes/admin/_shell.orders_.$id'
 import { Route as AdminShellPagesSlugRouteImport } from './routes/admin/_shell.pages.$slug'
 import { Route as AdminShellProductsCuratedThemesRouteImport } from './routes/admin/_shell.products_.curated-themes'
 
@@ -398,6 +399,11 @@ const AdminShellJourneysNewRoute = AdminShellJourneysNewRouteImport.update({
   path: '/journeys/new',
   getParentRoute: () => AdminShellRoute,
 } as any)
+const AdminShellOrdersIdRoute = AdminShellOrdersIdRouteImport.update({
+  id: '/orders_/$id',
+  path: '/orders/$id',
+  getParentRoute: () => AdminShellRoute,
+} as any)
 const AdminShellPagesSlugRoute = AdminShellPagesSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
@@ -474,6 +480,7 @@ export interface FileRoutesByFullPath {
   '/vendor/': typeof VendorShellIndexRoute
   '/admin/events/$id': typeof AdminShellEventsIdRoute
   '/admin/journeys/new': typeof AdminShellJourneysNewRoute
+  '/admin/orders/$id': typeof AdminShellOrdersIdRoute
   '/admin/pages/$slug': typeof AdminShellPagesSlugRoute
   '/admin/products/curated-themes': typeof AdminShellProductsCuratedThemesRoute
 }
@@ -539,6 +546,7 @@ export interface FileRoutesByTo {
   '/vendor': typeof VendorShellIndexRoute
   '/admin/events/$id': typeof AdminShellEventsIdRoute
   '/admin/journeys/new': typeof AdminShellJourneysNewRoute
+  '/admin/orders/$id': typeof AdminShellOrdersIdRoute
   '/admin/pages/$slug': typeof AdminShellPagesSlugRoute
   '/admin/products/curated-themes': typeof AdminShellProductsCuratedThemesRoute
 }
@@ -607,6 +615,7 @@ export interface FileRoutesById {
   '/vendor/_shell/': typeof VendorShellIndexRoute
   '/admin/_shell/events/$id': typeof AdminShellEventsIdRoute
   '/admin/_shell/journeys_/new': typeof AdminShellJourneysNewRoute
+  '/admin/_shell/orders_/$id': typeof AdminShellOrdersIdRoute
   '/admin/_shell/pages/$slug': typeof AdminShellPagesSlugRoute
   '/admin/_shell/products_/curated-themes': typeof AdminShellProductsCuratedThemesRoute
 }
@@ -676,6 +685,7 @@ export interface FileRouteTypes {
     | '/vendor/'
     | '/admin/events/$id'
     | '/admin/journeys/new'
+    | '/admin/orders/$id'
     | '/admin/pages/$slug'
     | '/admin/products/curated-themes'
   fileRoutesByTo: FileRoutesByTo
@@ -741,6 +751,7 @@ export interface FileRouteTypes {
     | '/vendor'
     | '/admin/events/$id'
     | '/admin/journeys/new'
+    | '/admin/orders/$id'
     | '/admin/pages/$slug'
     | '/admin/products/curated-themes'
   id:
@@ -808,6 +819,7 @@ export interface FileRouteTypes {
     | '/vendor/_shell/'
     | '/admin/_shell/events/$id'
     | '/admin/_shell/journeys_/new'
+    | '/admin/_shell/orders_/$id'
     | '/admin/_shell/pages/$slug'
     | '/admin/_shell/products_/curated-themes'
   fileRoutesById: FileRoutesById
@@ -1289,6 +1301,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminShellJourneysNewRouteImport
       parentRoute: typeof AdminShellRoute
     }
+    '/admin/_shell/orders_/$id': {
+      id: '/admin/_shell/orders_/$id'
+      path: '/orders/$id'
+      fullPath: '/admin/orders/$id'
+      preLoaderRoute: typeof AdminShellOrdersIdRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
     '/admin/_shell/pages/$slug': {
       id: '/admin/_shell/pages/$slug'
       path: '/$slug'
@@ -1359,6 +1378,7 @@ interface AdminShellRouteChildren {
   AdminShellStringsRoute: typeof AdminShellStringsRoute
   AdminShellIndexRoute: typeof AdminShellIndexRoute
   AdminShellJourneysNewRoute: typeof AdminShellJourneysNewRoute
+  AdminShellOrdersIdRoute: typeof AdminShellOrdersIdRoute
   AdminShellProductsCuratedThemesRoute: typeof AdminShellProductsCuratedThemesRoute
 }
 
@@ -1392,6 +1412,7 @@ const AdminShellRouteChildren: AdminShellRouteChildren = {
   AdminShellStringsRoute: AdminShellStringsRoute,
   AdminShellIndexRoute: AdminShellIndexRoute,
   AdminShellJourneysNewRoute: AdminShellJourneysNewRoute,
+  AdminShellOrdersIdRoute: AdminShellOrdersIdRoute,
   AdminShellProductsCuratedThemesRoute: AdminShellProductsCuratedThemesRoute,
 }
 

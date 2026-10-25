@@ -1,7 +1,7 @@
 /**
  * event_registrations server functions —— 名單的五個入口。
  *
- *   listSessionRoster           遮罩過的整場名單            ✗ 不寫 log
+ *   listSessionRoster           整場名單（明文）            ✓ attendee_contact（一列／次）
  *   countRegistrationsBySession 每場幾人（給列表頁）        ✗ 不寫 log
  *   revealRegistrationContact   一位參加者的明文聯絡方式    ✓ attendee_contact
  *   exportSessionRoster         整場明文，回一份 CSV 字串   ✓ roster_export（一列）
@@ -19,6 +19,9 @@
  * pii_access_log 要回答的是「有沒有人在亂查」（0019 §1.1）。名單頁一次顯示 30 個
  * 人，每次開頁寫 30 列，三個月之後那張表 99% 是例行瀏覽 —— 稽核軌跡如果什麼都記，
  * 就等於什麼都沒記。所以遮罩過的東西不記，明文一定記。
+ *
+ * 2026-10-25 業主要名單頁直接顯示明文：listSessionRoster 因此也寫紀錄，但粒度是
+ * **一次開名單一筆**（subject＝場次），與 CSV 匯出相同，不是每位參加者一筆。
  *
  * ── 為什麼四支都不是 adminFnMiddleware ───────────────────────────────────
  * Phase 1 四支之中的兩支掛的是 adminFnMiddleware，那是「在 event.roster.read 這個
@@ -66,16 +69,23 @@ async function requireRosterRead(permissions: readonly string[]): Promise<void> 
 }
 
 // ---------------------------------------------------------------------------
-// 遮罩過的讀取 —— 不寫 log
+// 名單（明文，業主 2026-10-25）—— 開一次寫一筆紀錄；場次計數不含個資、不寫 log
 // ---------------------------------------------------------------------------
 
-export const listSessionRoster = createServerFn({ method: "GET" })
+// POST：每次呼叫都會寫一筆 pii_access_log。GET 可能被瀏覽器／代理重送，或被跨站的
+// 頂層導覽帶著 cookie 觸發，在刪不掉的稽核表裡灌出假紀錄（同 reveal／export 都是 POST）。
+export const listSessionRoster = createServerFn({ method: "POST" })
   .middleware([staffFnMiddleware()])
   .inputValidator(z.object({ sessionId: uuid }))
   .handler(async ({ data, context }) => {
     await requireRosterRead(context.staff.permissions);
     const { listSessionRoster } = await import("@/server/repos/event-registrations");
-    return await listSessionRoster(data.sessionId);
+    // 明文名單：repo 先寫一筆 pii_access_log 才讀。actor 只認 session，不收 data。
+    return await listSessionRoster({
+      actorUserId: context.staff.userId,
+      actorEmail: context.staff.email,
+      sessionId: data.sessionId,
+    });
   });
 
 export const countRegistrationsBySession = createServerFn({ method: "GET" })

@@ -11,40 +11,26 @@
  * scripts/admin-orders-selftest.mjs 有靜態測試守著「這個檔案不 import orders.ts」
  * 與「orders.ts 一個位元組都沒被這一期改到」。
  *
- * ── 🔴 個資：這裡是遮罩版，不是明文版 ──────────────────────────────────────
- * 0021 §0.1／§3 對報名名單的姿態是「遮罩做在 SQL（inv.mask_email／inv.mask_tail），
- * 明文只有一個會先寫 pii_access_log 才組值的出口（reveal_registration_contact）」。
- * 這個檔案**做不到同一個姿態**，理由是兩個既有的、與這一期無關的資料庫事實：
+ * ── 個資：後台看明文（業主 2026-10-25 決定）────────────────────────────────
+ * 業主決定訂單在後台**直接顯示明文、不留查閱紀錄**（「不用紀錄」）：訂購人姓名／
+ * 電話／信箱、收件人與電話、完整地址含門牌、超商門市、統編／抬頭、客人備註。理由是
+ * 出貨與聯絡本來就要用到這些，遮罩只是讓店員每次都得另外翻信件。
  *
- *   1. inv schema 沒有進 PostgREST 的 db_schema（0021 §2 檔頭）。這個專案的任何
- *      server fn 都呼叫不到 inv.mask_email／inv.mask_tail —— 那兩支是給**其他 SQL
- *      函式**呼叫的，不是給 PostgREST／supabase-js 呼叫的。要在 SQL 那一層遮
- *      orders 的聯絡方式，需要一支新的 public.admin_orders_* view（比照 0021 §3
- *      的 admin_event_roster），把遮罩留在資料庫裡。
- *   2. public.pii_access_log 對**所有** role 都是零權限，包含 service_role
- *      （0019 §1.3：「連 service_role 都不給。寫走 §1.4，讀走 §1.5」）。寫入唯一
- *      的路是 security definer 的 public.pii_log_access()，而它的
- *      subject_table／reason 兩欄各自是白名單 CHECK（0019 §1.2、0021 §1 加了
- *      'public.event_registrations' 與 'public.event_sessions' 兩個值）。目前的
- *      值域裡**沒有** 'public.orders'。要讓「查閱聯絡方式」在留下稽核紀錄，需要
- *      一支新 migration：放寬那兩條 CHECK，並比照 0021 §5
- *      reveal_registration_contact() 的形狀新增一支 security definer 函式。
+ * 所以這一支**不需要 migration**：pii_access_log 的白名單沒有 'public.orders'，
+ * 也不必有——這條路徑刻意不寫紀錄。與報名名單（event-registrations.ts，會先寫一筆
+ * pii_log_access 再讀明文）不同，那是業主另外的決定，兩者不要混為一談。
  *
- * 這一期任務書明講「不需要新的 migration」，並要求「範圍過大就先做遮罩版、明文
- * 一律不給」——上面兩點正是判斷「範圍過大」的具體理由，所以這個檔案選擇：
+ * 只有 adminFnMiddleware（role='admin'）的 server fn 會呼叫這裡，門市人員看不到。
  *
- *   customer_email / customer_phone / order_addresses.phone 一路到瀏覽器只有
- *   src/lib/admin/pii-mask.ts 算出來的遮罩值；order_addresses.street（門牌）
- *   完全不查詢、不回傳；**沒有「顯示完整聯絡方式」這顆按鈕**，因為結構上沒有一個
- *   會留下稽核紀錄的出口可以接。
+ * ⚠️ console.error 仍然只印 error.code 與 error.message：PostgREST 的 DETAIL 會帶
+ *    整列值，那一列就是客人的個資，不該進 Vercel log。
  *
- * 姓名（customer_name／order_addresses.recipient）不遮罩 —— 與 0021 對報名者姓名
- * 的處置同一個理由：核對匯款需要看得出「這是不是銀行對帳單上那個人」，遮了就對不
- * 了帳，而姓名單獨一項的識別風險遠低於信箱／電話。
- *
- * 街路門牌完全不回傳（不是遮罩後回傳）：這一頁的任務是核對匯款有沒有入帳，不是
- * 出貨；縣市／區與收件方式（宅配／超商／自取）已經足夠核對用，門牌號碼是這一頁不
- * 需要、但客人最容易被拿去對照現實身分的欄位，寧可少給。
+ * ── 速度 ──────────────────────────────────────────────────────────────────
+ * 詳情原本是三次**依序**查詢（orders → order_items → order_addresses），函式在
+ * iad1、資料庫在東京時每一次都是一趟跨太平洋。現在改成**一次** PostgREST 巢狀
+ * select（orders + order_items(event_sessions) + order_addresses + invoices），
+ * 一趟就回來。order_items／order_addresses／invoices 都有 order_id 外鍵指向
+ * orders，invoices 另有 unique(order_id)，所以它以物件（to-one）形式嵌入。
  *
  * ── 標記已收款 ────────────────────────────────────────────────────────────
  * markOrderPaidByAdmin() 呼叫 public.admin_mark_order_paid()（0034 §5）。
@@ -65,7 +51,6 @@
  */
 import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
-import { maskEmail, maskTail } from "@/lib/admin/pii-mask";
 import type { Localized } from "@/i18n/types";
 import { TO_SHIP_FILTER } from "@/lib/admin/order-fulfillment";
 
@@ -87,11 +72,9 @@ export type AdminOrderListFilter = {
 };
 
 /**
- * 列表欄位。**沒有 customer_email／customer_phone，也沒有 order_addresses 任何
- * 一欄** —— 這一頁的列表只需要訂單編號＋金額＋末五碼＋姓名就能核對匯款，刻意不多
- * 要（同 src/server/repos/customer-orders.ts 檔頭「先給最小集合，要用的時候再加」
- * 的理由）。scripts/admin-orders-selftest.mjs 有靜態測試守著這一條：這個字串裡
- * 不准出現 'email' 或 'phone'，也不准查詢 order_addresses。
+ * 列表欄位。列表只需要訂單編號＋金額＋末五碼＋姓名就能核對匯款，聯絡方式與地址
+ * 在詳情頁（/admin/orders/$id）才讀——不是為了遮，是列表最多 300 列，沒必要每一列
+ * 都多帶一包資料回來。
  */
 const LIST_COLUMNS =
   "id, order_no, created_at, total, payment_method, payment_status, status, shipping_method, remittance_last5, customer_name, archived_at";
@@ -107,7 +90,6 @@ export type AdminOrderListRow = {
   /** home／cvs／pickup／none（0005 CHECK）。 */
   shipping_method: string;
   remittance_last5: string | null;
-  /** 全名，不遮罩 —— 見檔頭。 */
   customer_name: string;
   /** 非 null＝已封存（0035）。列表預設濾掉，見 AdminOrderListFilter.includeArchived。 */
   archived_at: string | null;
@@ -166,39 +148,19 @@ export async function listAdminOrders(filter: AdminOrderListFilter): Promise<Adm
 // 詳情
 // ---------------------------------------------------------------------------
 
-const DETAIL_COLUMNS =
+const ORDER_COLUMNS =
   "id, order_no, created_at, paid_at, shipped_at, completed_at, status, payment_status, payment_method, " +
-  "subtotal, shipping_fee, discount, total, shipping_method, " +
+  "subtotal, shipping_fee, discount, total, shipping_method, note, " +
   "remittance_last5, remittance_reported_at, customer_name, customer_email, customer_phone, archived_at, " +
-  // 0040：推薦碼與當時的折扣%。⚠️ 這兩欄要等 0040 套上正式庫之後才存在。
+  // 0040：推薦碼與當時的折扣%。
   "referral_code, referral_discount_percent";
 
-type OrderDetailRawRow = {
-  id: string;
-  order_no: string;
-  created_at: string;
-  paid_at: string | null;
-  shipped_at: string | null;
-  completed_at: string | null;
-  status: string;
-  payment_status: string;
-  payment_method: string | null;
-  subtotal: number;
-  shipping_fee: number;
-  discount: number;
-  total: number;
-  shipping_method: string;
-  remittance_last5: string | null;
-  remittance_reported_at: string | null;
-  customer_name: string;
-  archived_at: string | null;
-  referral_code: string | null;
-  referral_discount_percent: number | string | null;
-  /** 明文。只在這個函式內部活過 —— 回傳前一定被 maskEmail() 換掉，見下方。 */
-  customer_email: string;
-  /** 明文。理由同上，回傳前被 maskTail() 換掉。 */
-  customer_phone: string;
-};
+/** 一次查完：訂單本身＋品項（含場次）＋收件資料＋發票資料。見檔頭「速度」。 */
+const DETAIL_SELECT =
+  ORDER_COLUMNS +
+  ", order_items(id, name, unit_price, quantity, subtotal, product_type, session_id, event_sessions(title, starts_at))" +
+  ", order_addresses(type, recipient, phone, postal_code, city, district, street, cvs_store_id, cvs_store_name, cvs_address, cvs_sub_type)" +
+  ", invoices(invoice_type, tax_id, company_title, carrier_type, carrier_number, love_code)";
 
 export type AdminOrderItemRow = {
   id: number;
@@ -215,18 +177,30 @@ export type AdminOrderItemRow = {
 
 export type AdminOrderAddress = {
   type: string;
-  /** 全名，不遮罩 —— 見檔頭。 */
   recipient: string;
-  /** 遮罩，見檔頭。 */
-  phone_masked: string | null;
+  phone: string | null;
   postal_code: string | null;
   city: string | null;
   district: string | null;
-  /** ⚠️ 沒有 street：門牌完全不查詢、不回傳，見檔頭。 */
+  /** 街路門牌（宅配才有）。 */
+  street: string | null;
+  cvs_store_id: string | null;
   cvs_store_name: string | null;
-  /** 超商本身的營業地址（公開資訊，不是客人的個資），原樣回傳。 */
   cvs_address: string | null;
   cvs_sub_type: string | null;
+};
+
+/** invoices 那一列（結帳時客人填的發票資料）。沒有那一列就是 null。 */
+export type AdminOrderInvoice = {
+  /** personal／company／donate（0005 CHECK）。 */
+  invoice_type: string;
+  /** 統一編號。 */
+  tax_id: string | null;
+  /** 發票抬頭。 */
+  company_title: string | null;
+  carrier_type: string | null;
+  carrier_number: string | null;
+  love_code: string | null;
 };
 
 export type AdminOrderDetail = {
@@ -234,7 +208,7 @@ export type AdminOrderDetail = {
   order_no: string;
   created_at: string;
   paid_at: string | null;
-  /** 標記已出貨的時間（_shell.orders.tsx 的「標記已出貨」寫入）。 */
+  /** 標記已出貨的時間。 */
   shipped_at: string | null;
   /** 標記已取貨／已完成的時間。 */
   completed_at: string | null;
@@ -248,12 +222,14 @@ export type AdminOrderDetail = {
   shipping_method: string;
   remittance_last5: string | null;
   remittance_reported_at: string | null;
-  /** 全名，不遮罩 —— 見檔頭。 */
   customer_name: string;
-  customer_email_masked: string | null;
-  customer_phone_masked: string | null;
+  customer_email: string | null;
+  customer_phone: string | null;
+  /** 客人在結帳頁填的備註（orders.note）。 */
+  note: string | null;
   items: AdminOrderItemRow[];
   addresses: AdminOrderAddress[];
+  invoice: AdminOrderInvoice | null;
   /** 非 null＝已封存（0035）。 */
   archived_at: string | null;
   /** 推薦碼（0040）。null＝沒有推薦人。 */
@@ -267,21 +243,91 @@ function firstOf<T>(v: T | T[] | null | undefined): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : v;
 }
 
+function blankToNull(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s === "" ? null : s;
+}
+
+type ItemRawRow = {
+  id: number;
+  name: Localized;
+  unit_price: number;
+  quantity: number;
+  subtotal: number;
+  product_type: string;
+  session_id: string | null;
+  event_sessions:
+    | { title: Localized; starts_at: string }
+    | { title: Localized; starts_at: string }[]
+    | null;
+};
+
+type AddrRawRow = {
+  type: string;
+  recipient: string;
+  phone: string | null;
+  postal_code: string | null;
+  city: string | null;
+  district: string | null;
+  street: string | null;
+  cvs_store_id: string | null;
+  cvs_store_name: string | null;
+  cvs_address: string | null;
+  cvs_sub_type: string | null;
+};
+
+type InvoiceRawRow = {
+  invoice_type: string;
+  tax_id: string | null;
+  company_title: string | null;
+  carrier_type: string | null;
+  carrier_number: string | null;
+  love_code: string | null;
+};
+
+type OrderDetailRawRow = {
+  id: string;
+  order_no: string;
+  created_at: string;
+  paid_at: string | null;
+  shipped_at: string | null;
+  completed_at: string | null;
+  status: string;
+  payment_status: string;
+  payment_method: string | null;
+  subtotal: number;
+  shipping_fee: number;
+  discount: number;
+  total: number;
+  shipping_method: string;
+  note: string | null;
+  remittance_last5: string | null;
+  remittance_reported_at: string | null;
+  customer_name: string;
+  customer_email: string | null;
+  customer_phone: string | null;
+  archived_at: string | null;
+  referral_code: string | null;
+  referral_discount_percent: number | string | null;
+  order_items: ItemRawRow[] | null;
+  order_addresses: AddrRawRow[] | null;
+  invoices: InvoiceRawRow | InvoiceRawRow[] | null;
+};
+
 /**
- * 一張訂單的詳情：品項（含場次）、金額拆解、收件資訊（遮罩）、聯絡資訊（遮罩）。
+ * 一張訂單的詳情：品項（含場次）、金額拆解、收件資訊、聯絡資訊、發票資料——全部
+ * 明文（見檔頭）。一次查詢（見檔頭「速度」）。
  *
  * 查無回 `null`（不是 throw）——呼叫端（fns/orders.ts）已經過 adminFnMiddleware，
- * 「這個 id 存不存在」是正常會發生的畫面狀態，不是授權問題，不需要比照
- * customer-orders.ts 那種「查無與不是你的回同一個 null」的防列舉考量（後台沒有
- * 「這是不是我的」這個問題）。
+ * 「這個 id 存不存在」是正常會發生的畫面狀態，不是授權問題。
  */
 export async function getAdminOrderDetail(orderId: string): Promise<AdminOrderDetail | null> {
   if (!orderId) return null;
-  const db = supabaseAdmin();
 
-  const { data, error } = await db
+  const { data, error } = await supabaseAdmin()
     .from("orders")
-    .select(DETAIL_COLUMNS)
+    .select(DETAIL_SELECT)
     .eq("id", orderId)
     .maybeSingle();
 
@@ -292,85 +338,48 @@ export async function getAdminOrderDetail(orderId: string): Promise<AdminOrderDe
   if (!data) return null;
   const o = data as unknown as OrderDetailRawRow;
 
-  const { data: itemRows, error: itemError } = await db
-    .from("order_items")
-    .select(
-      "id, name, unit_price, quantity, subtotal, product_type, session_id, event_sessions(title, starts_at)",
-    )
-    .eq("order_id", orderId)
-    .order("id", { ascending: true });
+  const items: AdminOrderItemRow[] = [...(o.order_items ?? [])]
+    .sort((a, b) => a.id - b.id)
+    .map((r) => {
+      const session = firstOf(r.event_sessions);
+      return {
+        id: r.id,
+        name: r.name,
+        unit_price: r.unit_price,
+        quantity: r.quantity,
+        subtotal: r.subtotal,
+        product_type: r.product_type,
+        session_id: r.session_id,
+        session_title: session?.title ?? null,
+        session_starts_at: session?.starts_at ?? null,
+      };
+    });
 
-  if (itemError) {
-    console.error(`[repo/orders-admin] items 失敗：${itemError.code} ${itemError.message}`);
-    throw new Error(`[repo/orders-admin] 訂單品項讀取失敗：${itemError.code}`);
-  }
-
-  type ItemRawRow = {
-    id: number;
-    name: Localized;
-    unit_price: number;
-    quantity: number;
-    subtotal: number;
-    product_type: string;
-    session_id: string | null;
-    event_sessions:
-      | { title: Localized; starts_at: string }
-      | { title: Localized; starts_at: string }[]
-      | null;
-  };
-
-  const items: AdminOrderItemRow[] = ((itemRows ?? []) as unknown as ItemRawRow[]).map((r) => {
-    const session = firstOf(r.event_sessions);
-    return {
-      id: r.id,
-      name: r.name,
-      unit_price: r.unit_price,
-      quantity: r.quantity,
-      subtotal: r.subtotal,
-      product_type: r.product_type,
-      session_id: r.session_id,
-      session_title: session?.title ?? null,
-      session_starts_at: session?.starts_at ?? null,
-    };
-  });
-
-  // ⚠️ 沒有 street：門牌完全不查詢，見檔頭。cvs_store_id 也不查 —— 那是給 ECPay
-  // 用的內部代碼，這一頁沒有用途。
-  const { data: addrRows, error: addrError } = await db
-    .from("order_addresses")
-    .select(
-      "type, recipient, phone, postal_code, city, district, cvs_store_name, cvs_address, cvs_sub_type",
-    )
-    .eq("order_id", orderId);
-
-  if (addrError) {
-    console.error(`[repo/orders-admin] addresses 失敗：${addrError.code} ${addrError.message}`);
-    throw new Error(`[repo/orders-admin] 收件資訊讀取失敗：${addrError.code}`);
-  }
-
-  type AddrRawRow = {
-    type: string;
-    recipient: string;
-    phone: string;
-    postal_code: string | null;
-    city: string | null;
-    district: string | null;
-    cvs_store_name: string | null;
-    cvs_address: string | null;
-    cvs_sub_type: string | null;
-  };
-
-  const addresses: AdminOrderAddress[] = ((addrRows ?? []) as unknown as AddrRawRow[]).map((r) => ({
+  const addresses: AdminOrderAddress[] = (o.order_addresses ?? []).map((r) => ({
     type: r.type,
     recipient: r.recipient,
-    phone_masked: maskTail(r.phone, 4),
+    phone: blankToNull(r.phone),
     postal_code: r.postal_code,
     city: r.city,
     district: r.district,
+    street: blankToNull(r.street),
+    cvs_store_id: blankToNull(r.cvs_store_id),
     cvs_store_name: r.cvs_store_name,
     cvs_address: r.cvs_address,
     cvs_sub_type: r.cvs_sub_type,
   }));
+
+  const inv = firstOf(o.invoices);
+  const invoice: AdminOrderInvoice | null = inv
+    ? {
+        invoice_type: inv.invoice_type,
+        tax_id: blankToNull(inv.tax_id),
+        company_title: blankToNull(inv.company_title),
+        carrier_type: blankToNull(inv.carrier_type),
+        carrier_number: blankToNull(inv.carrier_number),
+        love_code: blankToNull(inv.love_code),
+      }
+    : null;
 
   return {
     archived_at: o.archived_at,
@@ -391,10 +400,12 @@ export async function getAdminOrderDetail(orderId: string): Promise<AdminOrderDe
     remittance_last5: o.remittance_last5,
     remittance_reported_at: o.remittance_reported_at,
     customer_name: o.customer_name,
-    customer_email_masked: maskEmail(o.customer_email),
-    customer_phone_masked: maskTail(o.customer_phone, 4),
+    customer_email: blankToNull(o.customer_email),
+    customer_phone: blankToNull(o.customer_phone),
+    note: blankToNull(o.note),
     items,
     addresses,
+    invoice,
     referral_code: o.referral_code ?? null,
     referral_discount_percent:
       o.referral_discount_percent === null || o.referral_discount_percent === undefined

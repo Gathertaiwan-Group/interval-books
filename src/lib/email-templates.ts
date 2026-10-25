@@ -147,11 +147,14 @@ export type AdminOrderContact = {
   invoice: { taxId: string; companyTitle: string } | null;
 };
 
-/** 一位參加者。聯絡方式是 0021 admin_event_roster 遮罩過的值（見 notify.ts 的說明）。 */
+/**
+ * 一位參加者。聯絡方式是**明文**（業主 2026-10-25 決定：店家通知信不遮罩、不留查閱
+ * 紀錄）。只給店家通知信用——收件人是 site_settings.notify_emails，不是客人。
+ */
 export type AdminOrderAttendee = {
   name: string;
-  phoneMasked: string | null;
-  emailMasked: string | null;
+  phone: string | null;
+  email: string | null;
 };
 
 export type AdminOrderNotificationInput = {
@@ -163,7 +166,7 @@ export type AdminOrderNotificationInput = {
    */
   contact?: AdminOrderContact | null;
   /**
-   * 後台訂單詳情的網址（/admin/orders?order=<id>）。組不出可用的公開網址
+   * 後台訂單內頁的網址（/admin/orders/<id>）。組不出可用的公開網址
    * （SITE_URL 沒設）時是 null，信裡就只寫「請登入後台查看」，不放一條連不到的連結。
    */
   adminUrl?: string | null;
@@ -889,10 +892,9 @@ export function renderSessionReminderEmail(
  * 收件人是店家自己的信箱（notify_emails），不是客人，所以聯絡方式不遮罩——那正是
  * 這封信要給的東西。信件內文照舊 30 天後被 purge_sent_email_bodies() 清掉。
  *
- * ⚠️ 參加者（第三人）的電話／信箱是 0021 admin_event_roster 的**遮罩值**：明文出口
- *    只有 reveal_registration_contact()／export_event_roster() 兩支，而且一定寫
- *    pii_access_log（0021 §0.1）。這封信不開第三條不留痕的路——要聯絡參加者請到
- *    後台「報名名單」按「顯示完整聯絡方式」。
+ * 參加者（第三人）的電話／信箱也是明文（業主 2026-10-25 決定：店家通知信不遮罩、
+ * 不留查閱紀錄）。由 event-registrations.ts 的 loadOrderAttendeesForAdminNotify()
+ * 直接讀 event_registrations。
  *
  * 所有使用者輸入的欄位（姓名、地址、備註……）都經過 layout() 的 escapeHtml()。
  * 主旨是純文字，不跳脫，但會把換行與控制字元壓成空白並截斷過長的姓名。
@@ -973,7 +975,7 @@ export function renderAdminOrderNotificationEmail(
         { label: pick(LABELS.participants, "zh"), value: String(participants) },
         ...(attendees ?? []).map((a, i) => ({
           label: `${pick(LABELS.attendee, "zh")} ${i + 1}`,
-          value: [a.name, a.phoneMasked, a.emailMasked].filter((v) => v && v.trim()).join("　"),
+          value: [a.name, a.phone, a.email].filter((v) => v && v.trim()).join("　"),
         })),
       ],
     })),

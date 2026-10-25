@@ -35,6 +35,8 @@ function PendingApprovalPage() {
   const navigate = useNavigate();
 
   async function handleSignOut() {
+    const { clearShellUserCache } = await import("@/lib/admin/shell-user-cache");
+    clearShellUserCache();
     await signOut();
     await navigate({ to: "/admin/login" });
   }

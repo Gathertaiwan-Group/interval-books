@@ -502,8 +502,9 @@ console.log("\n[6b] 店家通知信的訂購人區塊接線（2026-10）");
     2,
   );
   checkTrue(
-    "後台連結是 /admin/orders?order=<id>（publicUrlFor，組不出來就是 null）",
-    /publicUrlFor\("\/admin\/orders",\s*\{\s*order:\s*orderId\s*\}\)/.test(notifyCode),
+    // 2026-10-25：訂單內頁改成獨立網址；舊信的 ?order= 由列表頁 beforeLoad 轉址。
+    "後台連結是 /admin/orders/<id>（publicUrlFor，組不出來就是 null）",
+    /publicUrlFor\(`\/admin\/orders\/\$\{encodeURIComponent\(orderId\)\}`\)/.test(notifyCode),
   );
   const fnStart = outboxCode.indexOf("export async function getOrderContactForAdminNotify(");
   checkTrue("反空殼：找得到 getOrderContactForAdminNotify", fnStart > 0);
@@ -531,15 +532,12 @@ console.log("\n[6b] 店家通知信的訂購人區塊接線（2026-10）");
   const aStart = regCode.indexOf("export async function loadOrderAttendeesForAdminNotify(");
   checkTrue("反空殼：找得到 loadOrderAttendeesForAdminNotify", aStart > 0);
   const aBody = regCode.slice(aStart, regCode.indexOf("\nexport ", aStart + 10));
+  // 業主 2026-10-25：店家通知信的參加者聯絡方式不遮罩、不留紀錄 → 直接讀本表明文。
   checkTrue(
-    "🔴 參加者讀遮罩過的 admin_event_roster（不是 event_registrations 本表）",
-    /from\("admin_event_roster"\)/.test(aBody) && !/from\("event_registrations"\)/.test(aBody),
+    "參加者從 event_registrations 本表讀明文 email／phone",
+    /from\("event_registrations"\)/.test(aBody) && /"[^"]*\bphone, email\b/.test(aBody),
   );
-  check(
-    "參加者只取遮罩欄位（沒有 select 明文 email／phone）",
-    /"[^"]*\b(email|phone)\b[,"]/.test(aBody),
-    false,
-  );
+  check("參加者讀取不寫 pii_access_log（通知信不留紀錄）", /pii_log_access/.test(aBody), false);
 }
 
 // =============================================================================
@@ -959,7 +957,7 @@ if (tpl) {
   }).subject;
   checkTrue("主旨裡過長的姓名被截斷", longSubject.includes("長".repeat(30) + "…｜"));
 
-  // 活動報名：逐位參加者（遮罩值）
+  // 活動報名：逐位參加者（明文，業主 2026-10-25）
   const attendeeMail = tpl.renderAdminOrderNotificationEmail({
     ...sessionInput,
     stage: "afterPayment",
@@ -969,19 +967,19 @@ if (tpl) {
         ...sessionInput.sessions[0],
         participants: 2,
         attendees: [
-          { name: "參加者甲", phoneMasked: "******5678", emailMasked: "a***@x.com" },
-          { name: "參加者乙", phoneMasked: null, emailMasked: "b***@y.com" },
+          { name: "參加者甲", phone: "0912345678", email: "a@x.com" },
+          { name: "參加者乙", phone: null, email: "b@y.com" },
         ],
       },
     ],
   });
   checkTrue(
-    "活動：參加者 1 姓名＋遮罩聯絡",
-    attendeeMail.text.includes("參加者 1：參加者甲　******5678　a***@x.com"),
+    "活動：參加者 1 姓名＋明文聯絡",
+    attendeeMail.text.includes("參加者 1：參加者甲　0912345678　a@x.com"),
   );
   checkTrue(
     "活動：參加者 2（沒電話就不印空白）",
-    attendeeMail.text.includes("參加者 2：參加者乙　b***@y.com"),
+    attendeeMail.text.includes("參加者 2：參加者乙　b@y.com"),
   );
   checkTrue("活動：參加人數仍在", attendeeMail.text.includes("參加人數：2"));
 
@@ -1001,7 +999,7 @@ if (tpl) {
     sessions: [
       {
         ...sessionInput.sessions[0],
-        attendees: [{ name: XSS, phoneMasked: null, emailMasked: null }],
+        attendees: [{ name: XSS, phone: XSS, email: XSS }],
       },
     ],
   });

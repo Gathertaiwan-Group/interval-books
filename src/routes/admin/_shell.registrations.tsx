@@ -3,7 +3,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Download, Eye, Plus, Trash2 } from "lucide-react";
+import { Download, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -58,12 +58,11 @@ import type {
   listEventSessions,
 } from "@/lib/admin/fns/event-sessions";
 import type { listSessionRoster } from "@/lib/admin/fns/event-registrations";
-import { RegistrationRevealDialog } from "@/components/admin/RegistrationRevealDialog";
 import { SessionPlansEditor } from "@/components/admin/SessionPlansEditor";
 
 type SessionRow = Awaited<ReturnType<typeof listEventSessions>>[number];
 type ProductRow = Awaited<ReturnType<typeof listBookableProducts>>[number];
-type RosterRow = Awaited<ReturnType<typeof listSessionRoster>>[number];
+type RosterRow = Awaited<ReturnType<typeof listSessionRoster>>["rows"][number];
 type PlanRow = Awaited<ReturnType<typeof listEventSessionPlans>>[number];
 
 const EMPTY_LOCALIZED = { zh: "", en: "", ja: "" };
@@ -80,19 +79,13 @@ const STATUS_LABEL: Record<EventSessionFormValues["status"], string> = {
  * migration 0020 §1）與**看名單**（誰報名了）。分成兩頁的話，「這個梯次為什麼還有
  * 位子卻報不了名」就得在兩頁之間來回比對。
  *
- * ⚠️ 名單頁的列表是**遮罩過的**，而明文有兩條路，兩條都會留下紀錄（0021 §0.1）：
- *    - 姓名是全名 —— 遮了現場點不了名，與 0019 讓廠商名稱明文、只遮識別碼是
- *      同一條線。
- *    - 電話與信箱只有遮罩值，而且遮罩是在 **SQL** 做的（0021 §3 的
- *      public.admin_event_roster）。這一頁與它底下的 Node 行程都拿不到明文，
- *      所以它**不可能**不小心把明文印出來。
- *    - 單列「顯示完整聯絡方式」→ reveal_registration_contact()，寫一筆
- *      reason='attendee_contact' 的 pii_access_log。
- *    - 「匯出簽到表」→ export_event_roster()，寫**一筆** reason='roster_export'，
- *      subject 是場次而不是每一位參加者。
- *
- * ⚠️ 列表本身**不寫 log**。名單頁一次顯示 30 個人，每次開頁寫 30 列會讓
- *    pii_access_log 失去唯一的用途（0019 §1.1：它要回答的是「有沒有人在亂查」）。
+ * ⚠️ 名單直接顯示明文電話與信箱（業主 2026-10-25），但每一條明文都留下紀錄：
+ *    - 打開一個場次的名單 → listSessionRoster() **先**寫一筆 pii_access_log
+ *      （subject 是場次、reason='attendee_contact'），寫成功才讀明文。一次開名單
+ *      一筆，不是每位參加者一筆——名單頁一次 30 個人，逐人寫會讓那張表失去
+ *      「有沒有人在亂查」這個用途（0019 §1.1）。
+ *    - 「匯出簽到表」→ export_event_roster()，寫**一筆** reason='roster_export'。
+ *    - 姓名是全名 —— 遮了現場點不了名。
  *
  * 名額不在 /admin/products 上了：0020 把 products.capacity 綁成 null，所以那個
  * 欄位已經從商品表單移除，改由這裡按場次維護。
@@ -240,7 +233,8 @@ function AdminRegistrationsPage() {
   const [rosterOf, setRosterOf] = useState<SessionRow | null>(null);
   const [roster, setRoster] = useState<RosterRow[] | null>(null);
   const [rosterLoading, setRosterLoading] = useState(false);
-  const [revealOf, setRevealOf] = useState<RosterRow | null>(null);
+  /** 這一次打開名單寫下的 pii_access_log 編號——印在畫面上，講明白會被記錄。 */
+  const [rosterLogId, setRosterLogId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<RosterRow | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -269,10 +263,13 @@ function AdminRegistrationsPage() {
   async function openRoster(row: SessionRow) {
     setRosterOf(row);
     setRoster(null);
+    setRosterLogId(null);
     setRosterLoading(true);
     try {
       const { listSessionRoster } = await import("@/lib/admin/fns/event-registrations");
-      setRoster(await listSessionRoster({ data: { sessionId: row.id } }));
+      const { rows, log_id } = await listSessionRoster({ data: { sessionId: row.id } });
+      setRoster(rows);
+      setRosterLogId(log_id);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "名單讀取失敗");
       setRosterOf(null);
@@ -290,8 +287,7 @@ function AdminRegistrationsPage() {
    *    可以讓它變成一份 HTML；授權失敗就是下面這個 catch，使用者看到 toast。
    *
    * ⚠️ 呼叫成功就一定留下一筆 pii_access_log（subject 是場次）。toast 把紀錄編號
-   *    印出來，理由與 RegistrationRevealDialog 相同：講明白會被記錄，比偷偷記錄
-   *    有用。
+   *    印出來：講明白會被記錄，比偷偷記錄有用。
    */
   async function handleExport(row: SessionRow) {
     setExporting(true);
@@ -556,8 +552,8 @@ function AdminRegistrationsPage() {
           <DialogHeader>
             <DialogTitle>{rosterOf ? rosterOf.title.zh : ""} 報名名單</DialogTitle>
             <DialogDescription>
-              電話與信箱只顯示遮罩值，而且遮罩是在資料庫做的——這一頁拿不到明文。
-              要看某一位的完整聯絡方式或匯出簽到表，兩條路都會留下刪不掉的存取紀錄。
+              打開名單與匯出簽到表都會留下一筆刪不掉的存取紀錄（誰、什麼時候、哪一場）。
+              {rosterLogId ? `這次查閱的紀錄編號：${rosterLogId}` : null}
             </DialogDescription>
           </DialogHeader>
 
@@ -612,7 +608,7 @@ function AdminRegistrationsPage() {
                     <TableHead>訂單</TableHead>
                     <TableHead className="w-24">付款</TableHead>
                     <TableHead className="w-24">注意事項</TableHead>
-                    <TableHead className="w-40 text-right">操作</TableHead>
+                    <TableHead className="w-24 text-right">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -620,13 +616,29 @@ function AdminRegistrationsPage() {
                     <TableRow key={r.registration_id}>
                       <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="font-medium">{r.name}</TableCell>
-                      {/* 「沒填」與「填了但你看不到」要長得不一樣 —— 遮罩值本身分
-                          不出這兩件事，所以 view 另外送了 has_email / has_phone。 */}
-                      <TableCell className="text-muted-foreground">
-                        {r.has_email ? (r.email_masked ?? "—") : "（未填）"}
+                      <TableCell className="break-all">
+                        {r.email ? (
+                          <a
+                            className="underline-offset-2 hover:underline"
+                            href={`mailto:${r.email}`}
+                          >
+                            {r.email}
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground">（未填）</span>
+                        )}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {r.has_phone ? (r.phone_masked ?? "—") : "（未填）"}
+                      <TableCell className="whitespace-nowrap">
+                        {r.phone ? (
+                          <a
+                            className="underline-offset-2 hover:underline"
+                            href={`tel:${r.phone.replace(/[^\d+]/g, "")}`}
+                          >
+                            {r.phone}
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground">（未填）</span>
+                        )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
                         {r.order_no}
@@ -641,16 +653,6 @@ function AdminRegistrationsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="gap-1.5"
-                            disabled={!r.has_email && !r.has_phone}
-                            onClick={() => setRevealOf(r)}
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            顯示
-                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -670,13 +672,6 @@ function AdminRegistrationsPage() {
           )}
         </DialogContent>
       </Dialog>
-
-      <RegistrationRevealDialog
-        open={revealOf !== null}
-        onOpenChange={(open) => !open && setRevealOf(null)}
-        registration={revealOf}
-        canReadRoster={canReadRoster}
-      />
 
       {/* 移除單筆報名（0035）。已付款的列（on_roster）在這裡明確示警——這一列的
           payment_status／on_roster 從 listSessionRoster() 就有了，不用等 RPC

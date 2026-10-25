@@ -15,8 +15,8 @@
  *               只透過 admin_mark_order_paid() 這支 RPC，而且參數名稱是
  *               p_order_id／p_actor_id／p_note。
  *             · 列表查詢的欄位字串裡沒有 email／phone，也不查 order_addresses。
- *             · 詳情裡的 customer_email／customer_phone 回傳前一定經過
- *               maskEmail()／maskTail()，回傳值裡沒有未遮罩的鍵。
+ *             · 詳情（業主 2026-10-25：明文、不留紀錄）一次巢狀查詢拿齊
+ *               訂單＋品項＋收件資料（含門牌）＋發票資料，回傳明文聯絡方式。
  *             · 沒有動到 src/server/repos/orders.ts（結帳路徑）、
  *               src/server/repos/payments.ts、四個金流檔，也沒有動到任何既有
  *               migration（0001–0034）——0035 是這一期唯一允許新增的一支
@@ -28,9 +28,8 @@
  *               [7c]）。
  *           **永遠會跑。**
  *
- *   [動態]  直接 import() src/lib/admin/pii-mask.ts 本人（純函式、零 import，見那
- *           個檔案檔頭），窮舉遮罩演算法的案例——包含 0021 §2 記錄過的那個真 bug
- *           （keepTail=0 時 `slice(-0)` 等於 `slice(0)`）的迴歸測試。**永遠會跑。**
+ *   [動態]  直接 import() src/lib/admin/order-labels.ts 本人（純函式、零 import），
+ *           驗列表篩選參數的解析（「回訂單列表」要帶回原本分頁靠它）。**永遠會跑。**
  *
  *   [連線]  對一個真的 PostgreSQL 跑 markOrderPaidByAdmin()，驅動**產線的程式碼
  *           本人**（不是重寫一次那句 SQL——見下面「為什麼是 shim」）。這一段驗的是
@@ -96,8 +95,9 @@ const SELF = "scripts/admin-orders-selftest.mjs";
 
 const FNS_PATH = join(ROOT, "src/lib/admin/fns/orders.ts");
 const REPO_PATH = join(ROOT, "src/server/repos/orders-admin.ts");
-const MASK_PATH = join(ROOT, "src/lib/admin/pii-mask.ts");
+const LABELS_PATH = join(ROOT, "src/lib/admin/order-labels.ts");
 const ROUTE_PATH = join(ROOT, "src/routes/admin/_shell.orders.tsx");
+const DETAIL_ROUTE_PATH = join(ROOT, "src/routes/admin/_shell.orders_.$id.tsx");
 const SHELL_PATH = join(ROOT, "src/routes/admin/_shell.tsx");
 const MIG_DIR = join(ROOT, "supabase/migrations");
 
@@ -163,22 +163,27 @@ console.log("\n[1] 檔案盤點");
 for (const [label, p] of [
   ["fns/orders.ts", FNS_PATH],
   ["repo/orders-admin.ts", REPO_PATH],
-  ["lib/admin/pii-mask.ts", MASK_PATH],
+  ["lib/admin/order-labels.ts", LABELS_PATH],
   ["routes/admin/_shell.orders.tsx", ROUTE_PATH],
+  ["routes/admin/_shell.orders_.$id.tsx", DETAIL_ROUTE_PATH],
 ]) {
   checkTrue(`${label} 存在`, existsSync(p));
 }
 const fnsSrcRaw = readFile(FNS_PATH);
 const repoSrcRaw = readFile(REPO_PATH);
 const routeSrcRaw = readFile(ROUTE_PATH);
+const detailRouteSrcRaw = readFile(DETAIL_ROUTE_PATH);
 const shellSrc = readFile(SHELL_PATH);
 checkTrue("fns/orders.ts 不是空檔", fnsSrcRaw.length > 500);
 checkTrue("repo/orders-admin.ts 不是空檔", repoSrcRaw.length > 2000);
 checkTrue("_shell.orders.tsx 不是空檔", routeSrcRaw.length > 2000);
+checkTrue("_shell.orders_.$id.tsx 不是空檔", detailRouteSrcRaw.length > 2000);
 
 const fnsSrc = stripTs(fnsSrcRaw);
 const repoSrc = stripTs(repoSrcRaw);
 const routeSrc = stripTs(routeSrcRaw);
+/** 訂單內頁（2026-10-25 從列表頁的 Dialog 搬出來）。動作相關的斷言看這一支。 */
+const detailSrc = stripTs(detailRouteSrcRaw);
 
 // =============================================================================
 // [2] 🔴 fns/orders.ts —— 每一支 server fn 都掛 adminFnMiddleware（AST）
@@ -370,7 +375,7 @@ console.log("\n[4] 🔴 列表回傳不含完整 email／電話／地址");
   const listFnSrc = sliceBetween(
     repoSrc,
     "export async function listAdminOrders",
-    "const DETAIL_COLUMNS =",
+    "const ORDER_COLUMNS =",
   );
   checkTrue("抓得到 listAdminOrders 的函式本體", listFnSrc.length > 50);
   checkFalse("🔴 listAdminOrders 完全不查 order_addresses", listFnSrc.includes("order_addresses"));
@@ -384,9 +389,12 @@ console.log("\n[4] 🔴 列表回傳不含完整 email／電話／地址");
 }
 
 // =============================================================================
-// [5] 詳情：明文回傳前一定經過遮罩
+// [5] 詳情：明文（業主 2026-10-25）、一次查詢拿齊
 // =============================================================================
-console.log("\n[5] 詳情頁的聯絡資訊一定經過遮罩");
+// 業主決定訂單在後台直接顯示明文、不留查閱紀錄（orders-admin.ts 檔頭）。這一段改守
+// 兩件事：(a) 該給的欄位真的給了（門牌、統編／抬頭、收件人電話、備註）；(b) 詳情是
+// **一次**巢狀查詢——函式在美東、資料庫在東京時，依序三次查詢就是三趟跨太平洋。
+console.log("\n[5] 詳情頁：明文聯絡方式＋一次查詢");
 {
   const detailFnSrc = sliceBetween(
     repoSrc,
@@ -394,30 +402,77 @@ console.log("\n[5] 詳情頁的聯絡資訊一定經過遮罩");
     "export async function markOrderPaidByAdmin",
   );
   checkTrue("抓得到 getAdminOrderDetail 的函式本體", detailFnSrc.length > 200);
-
+  check(
+    "🔴 詳情只發一次查詢（.from( 剛好一次）",
+    (detailFnSrc.match(/\.from\(/g) ?? []).length,
+    1,
+    "拆回多次依序查詢，每一次都是一趟資料庫往返（見 orders-admin.ts 檔頭「速度」）。",
+  );
+  const columnsSrc = sliceBetween(repoSrc, "const ORDER_COLUMNS =", "const DETAIL_SELECT =");
+  const selectSrc = sliceBetween(repoSrc, "const DETAIL_SELECT =", "export type AdminOrderItemRow");
+  checkTrue("抓得到 DETAIL_SELECT", selectSrc.length > 100);
   checkTrue(
-    "🔴 customer_email_masked 是 maskEmail(o.customer_email) 算出來的",
-    /customer_email_masked:\s*maskEmail\(o\.customer_email\)/.test(detailFnSrc),
+    "巢狀帶出 order_items（含 event_sessions）",
+    /order_items\(.*event_sessions\(/.test(selectSrc),
   );
   checkTrue(
-    "🔴 customer_phone_masked 是 maskTail(o.customer_phone, 4) 算出來的",
-    /customer_phone_masked:\s*maskTail\(o\.customer_phone,\s*4\)/.test(detailFnSrc),
+    "巢狀帶出 order_addresses，含門牌 street",
+    /order_addresses\([^)]*\bstreet\b/.test(selectSrc),
   );
-  checkFalse("🔴 回傳值裡沒有未遮罩的 customer_email 鍵", detailFnSrc.includes("customer_email:"));
-  checkFalse("🔴 回傳值裡沒有未遮罩的 customer_phone 鍵", detailFnSrc.includes("customer_phone:"));
   checkTrue(
-    "地址的電話也經過 maskTail(r.phone, 4)",
-    /phone_masked:\s*maskTail\(r\.phone,\s*4\)/.test(detailFnSrc),
+    "巢狀帶出 invoices 的統編與抬頭",
+    /invoices\([^)]*tax_id[^)]*company_title/.test(selectSrc),
   );
+  checkTrue("訂單欄位有 note（客人備註）", /\bnote\b/.test(columnsSrc));
+  checkTrue(
+    "回傳明文 customer_email／customer_phone",
+    /customer_email: blankToNull\(o\.customer_email\)/.test(detailFnSrc) &&
+      /customer_phone: blankToNull\(o\.customer_phone\)/.test(detailFnSrc),
+  );
+  checkTrue("地址回傳門牌", /street: blankToNull\(r\.street\)/.test(detailFnSrc));
+  checkFalse("不再 import 遮罩函式（pii-mask.ts 已刪）", /pii-mask/.test(repoSrc));
   checkFalse(
-    "🔴 沒有查詢 order_addresses.street（門牌完全不回傳）",
-    /\bstreet\b/.test(detailFnSrc),
+    "🔴 不寫 pii_access_log（業主決定訂單不留紀錄，也就不需要 migration）",
+    /pii_log_access/.test(repoSrc),
   );
 
+  checkTrue("內頁顯示門牌（formatHomeAddress）", /formatHomeAddress\(a\)/.test(detailSrc));
+  checkTrue("內頁顯示統編與抬頭", /統一編號/.test(detailSrc) && /抬頭/.test(detailSrc));
   checkTrue(
-    "import 了 maskEmail／maskTail",
-    repoSrc.includes('import { maskEmail, maskTail } from "@/lib/admin/pii-mask"'),
+    "內頁顯示訂購人電話與信箱",
+    /detail\.customer_phone/.test(detailSrc) && /detail\.customer_email/.test(detailSrc),
   );
+}
+
+// =============================================================================
+// [5b] 訂單內頁是獨立路由；舊的 ?order= 連結轉址；回列表保留篩選
+// =============================================================================
+console.log("\n[5b] /admin/orders/$id 獨立頁、?order= 轉址、回列表保留篩選");
+{
+  checkTrue(
+    "內頁 route id 是 /admin/_shell/orders_/$id",
+    detailRouteSrcRaw.includes('createFileRoute("/admin/_shell/orders_/$id")'),
+  );
+  checkTrue(
+    "內頁由 loader 取資料（不是掛載後再打）",
+    /loader: async \(\{ params \}\)/.test(detailSrc),
+  );
+  checkFalse("🔴 列表頁不再有詳情 Dialog", /<Dialog\b/.test(routeSrc));
+  checkTrue(
+    "🔴 列表頁 beforeLoad 把 ?order=<id> 轉址到 /admin/orders/$id",
+    /if \(search\.order\)[\s\S]{0,200}throw redirect\(\{[\s\S]{0,80}to: "\/admin\/orders\/\$id"/.test(
+      routeSrc,
+    ),
+  );
+  checkTrue(
+    "點列進內頁時帶著目前的篩選",
+    /to: "\/admin\/orders\/\$id",\s*params: \{ id \},\s*search: currentSearch/.test(routeSrc),
+  );
+  checkTrue(
+    "「回訂單列表」原樣帶回篩選參數",
+    /<Link to="\/admin\/orders" search=\{search\}>/.test(detailSrc),
+  );
+  checkTrue("列表滑過就預載內頁", /preloadRoute\(/.test(routeSrc));
 }
 
 // =============================================================================
@@ -551,25 +606,36 @@ console.log("\n[7b] 標記已收款的可用範圍，以及標記結果與畫面
 {
   checkTrue(
     "🔴 「標記已收款」只在 payment_method 是 transfer 或 null 時可用",
-    /payment_method === "transfer" \|\| detail\.payment_method === null/.test(routeSrc),
+    /payment_method === "transfer" \|\| detail\.payment_method === null/.test(detailSrc),
     "card／atm／cvs_cod／test_paid／free 卡在待付款時不該出現這顆按鈕——那些正常都由金流商 webhook 自動結清，卡住代表要去查金流商後台，不是對銀行對帳單。",
   );
 
   // ⚠️ 結尾界標改成下一支函式的宣告，不是 "return ("——0035 在 submitMarkPaid 與
   //    JSX 的 return ( 之間插了 submitDelete／submitArchive 兩支新函式，繼續切到
   //    "return (" 會把那兩支的 try 也算進來，讓下面的 tryCount 斷言失真。
+  // 2026-10-25 搬到內頁後：重讀畫面那一段收進 refresh()（router.invalidate()，自己
+  // 的 try/catch），submitMarkPaid 在呼叫 RPC 那段的 try 結束之後才 await refresh()。
   const submitFnSrc = sliceBetween(
-    routeSrc,
+    detailSrc,
     "async function submitMarkPaid",
     "async function submitDelete",
   );
   checkTrue("抓得到 submitMarkPaid 的函式本體", submitFnSrc.length > 200);
   const tryCount = (submitFnSrc.match(/\btry\s*\{/g) ?? []).length;
   check(
-    "🔴 submitMarkPaid 裡有兩段各自的 try：呼叫 RPC 一段，重讀畫面另一段",
-    tryCount,
-    2,
+    "🔴 submitMarkPaid 只有呼叫 RPC 那一段 try，重讀畫面交給 refresh()",
+    tryCount === 1 && /\}\s*finally\s*\{[\s\S]*?\}\s*await refresh\(\);/.test(submitFnSrc),
+    true,
     "併成一段的後果：重讀畫面失敗會被同一個 catch 接住，補一句「標記失敗」蓋掉已經成立的成功訊息。",
+  );
+  const refreshSrc = sliceBetween(
+    detailSrc,
+    "async function refresh",
+    "async function submitFulfillment",
+  );
+  checkTrue(
+    "refresh() 有自己的 try/catch",
+    /\btry\s*\{/.test(refreshSrc) && /catch/.test(refreshSrc),
   );
   const failedMsgCount = (submitFnSrc.match(/標記失敗，請稍後再試/g) ?? []).length;
   check(
@@ -578,7 +644,7 @@ console.log("\n[7b] 標記已收款的可用範圍，以及標記結果與畫面
     1,
     "如果重讀畫面那段的 catch 也講「標記失敗」，就是同一個矛盾 toast 的 bug 換句話重演。",
   );
-  checkTrue("重讀畫面失敗有自己的訊息，不是「標記失敗」", /畫面更新失敗/.test(submitFnSrc));
+  checkTrue("重讀畫面失敗有自己的訊息，不是「標記失敗」", /畫面更新失敗/.test(refreshSrc));
 }
 
 // =============================================================================
@@ -587,19 +653,19 @@ console.log("\n[7b] 標記已收款的可用範圍，以及標記結果與畫面
 console.log("\n[7c] 🔴 刪除／封存的分界與 reason 文案");
 {
   // 畫面分界與資料庫閘門用同一個條件：payment_status === "paid" → 只給封存，
-  // 其餘 → 只給刪除。routeSrc 已經被 stripTs() 拿掉註解，所以不能用「刪除／封存」
+  // 其餘 → 只給刪除。detailSrc 已經被 stripTs() 拿掉註解，所以不能用「刪除／封存」
   // 那段 JSX 註解當界標（stripTs 會把整段 /* … */ 連同分隔符一起清空）；改用
   // **最後一次**出現的 `payment_status === "paid" ? (`——檔案裡只有兩次，第一次是
   // [7b] 驗過的「標記已收款」那段純文字分支，第二次才是這個新區塊。
-  const lastBranchAt = routeSrc.lastIndexOf('detail.payment_status === "paid" ? (');
+  const lastBranchAt = detailSrc.lastIndexOf('detail.payment_status === "paid" ? (');
   checkTrue(
     '🔴 payment_status === "paid" 的三元運算剛好出現兩次',
-    (routeSrc.match(/detail\.payment_status === "paid" \? \(/g) ?? []).length === 2,
+    (detailSrc.match(/detail\.payment_status === "paid" \? \(/g) ?? []).length === 2,
   );
   const archiveOrDeleteSrc =
     lastBranchAt === -1
       ? ""
-      : routeSrc.slice(lastBranchAt, routeSrc.indexOf("</Dialog>", lastBranchAt));
+      : detailSrc.slice(lastBranchAt, detailSrc.indexOf("<AlertDialog", lastBranchAt));
   checkTrue("抓得到「刪除／封存」那個新區塊", archiveOrDeleteSrc.length > 200);
   checkTrue(
     '🔴 新區塊用 payment_status === "paid" 分流封存／刪除',
@@ -614,36 +680,37 @@ console.log("\n[7c] 🔴 刪除／封存的分界與 reason 文案");
   // 四種 reason 各自的訊息，逐一比對關鍵字，不是只驗字串存在。
   checkTrue(
     "🔴 has_inventory_sale 講人話「已轉入銷售紀錄，不能刪除，請改用封存」",
-    /已轉入銷售紀錄，不能刪除，請改用封存/.test(routeSrc),
+    /已轉入銷售紀錄，不能刪除，請改用封存/.test(detailSrc),
   );
   checkTrue(
     "🔴 order_is_paid 講人話並指向封存",
-    /已經收到款項，不能刪除/.test(routeSrc) && /封存/.test(routeSrc),
+    /已經收到款項，不能刪除/.test(detailSrc) && /封存/.test(detailSrc),
   );
-  checkTrue("order_not_found（刪除）另有訊息", /找不到這張訂單，可能已經被刪除/.test(routeSrc));
+  checkTrue("order_not_found（刪除）另有訊息", /找不到這張訂單，可能已經被刪除/.test(detailSrc));
   checkTrue(
-    "刪除成功後直接關掉詳情 Dialog（訂單已經不在了，不是重讀 getAdminOrderDetail）",
-    /setSelectedId\(null\);\s*\n\s*setDetail\(null\);\s*\n\s*await load\(scope, includeArchived\);/.test(
-      submitDeleteSrc(routeSrc),
+    "刪除成功後回到列表（訂單已經不在了，不是重讀 getAdminOrderDetail）",
+    /result\.reason === "deleted"[\s\S]{0,200}await navigate\(\{ to: "\/admin\/orders", search \}\)/.test(
+      submitDeleteSrc(detailSrc),
     ),
   );
 
   // 封存／取消封存的按鈕文字要跟著 archived_at 換。
   checkTrue(
     "封存按鈕文字依 archived_at 換成「取消封存」／「封存」",
-    /detail\.archived_at \? "取消封存" : "封存"/.test(routeSrc),
+    /detail\.archived_at \? "取消封存" : "封存"/.test(detailSrc),
   );
 
   // 「顯示已封存」開關：畫面狀態與 fns 呼叫都要接上 includeArchived。
+  // 「顯示已封存」開關在列表頁，2026-10-25 起是網址參數（?archived=1），回列表才保留得住。
   checkTrue("有「顯示已封存」開關", /顯示已封存/.test(routeSrc));
   checkTrue(
-    "🔴 開關接的是 includeArchived 這個 state（不是裝飾用的）",
-    /checked=\{includeArchived\}/.test(routeSrc) &&
-      /onCheckedChange=\{setIncludeArchived\}/.test(routeSrc),
+    "🔴 開關接的是網址上的 archived（不是裝飾用的）",
+    /checked=\{archived\}/.test(routeSrc) &&
+      /navigate\(\{ search: listSearch\(\{ archived: v \}\), replace: true \}\)/.test(routeSrc),
   );
   checkTrue(
-    "🔴 load() 把 includeArchived 傳給 listAdminOrders",
-    /includeArchived: archived/.test(routeSrc),
+    "🔴 loader 把 archived 傳給 listAdminOrders 的 includeArchived",
+    /includeArchived: deps\.archived/.test(routeSrc),
   );
   checkTrue(
     "🔴 fns/orders.ts 的 listAdminOrders inputValidator 收 includeArchived",
@@ -651,7 +718,7 @@ console.log("\n[7c] 🔴 刪除／封存的分界與 reason 文案");
   );
 
   // AlertDialog 的確認文案要提到「無法復原」與「還原名額」的效果。
-  const deleteAlertSrc = sliceBetween(routeSrc, "確定要刪除這張訂單嗎？", "</AlertDialog>");
+  const deleteAlertSrc = sliceBetween(detailSrc, "確定要刪除這張訂單嗎？", "</AlertDialog>");
   checkTrue("抓得到刪除確認對話框", deleteAlertSrc.length > 100);
   checkTrue(
     "🔴 刪除確認文案提到會連帶移除報名並釋放名額",
@@ -665,67 +732,70 @@ function submitDeleteSrc(src) {
 }
 
 // =============================================================================
-// [8] 動態：src/lib/admin/pii-mask.ts 本人（純函式，直接 import 產線那一份）
+// [8] 動態：src/lib/admin/order-labels.ts 本人（列表篩選參數）
 // =============================================================================
-console.log("\n[8] 遮罩演算法（動態呼叫 src/lib/admin/pii-mask.ts）");
+console.log("\n[8] 列表篩選參數的解析（動態呼叫 src/lib/admin/order-labels.ts）");
 {
-  const mask = await import(pathToFileURL(MASK_PATH).href);
-  checkTrue("反空殼：載得動 maskTail", typeof mask.maskTail === "function");
-  checkTrue("反空殼：載得動 maskEmail", typeof mask.maskEmail === "function");
+  const L = await import(pathToFileURL(LABELS_PATH).href);
+  checkTrue("反空殼：載得動 parseOrderListSearch", typeof L.parseOrderListSearch === "function");
+  check("空參數 → 預設分頁", L.parseOrderListSearch({}), {});
+  check("scope=to_ship", L.parseOrderListSearch({ scope: "to_ship" }), { scope: "to_ship" });
+  check("scope=all＋archived=1", L.parseOrderListSearch({ scope: "all", archived: "1" }), {
+    scope: "all",
+    archived: 1,
+  });
+  check("archived 數字 1 也收", L.parseOrderListSearch({ archived: 1 }), { archived: 1 });
+  check("不認得的 scope 當沒帶", L.parseOrderListSearch({ scope: "bogus" }), {});
+  check("archived=0 當沒開", L.parseOrderListSearch({ archived: "0" }), {});
+  check("scopeOf 預設 transfer_pending", L.scopeOf({}), "transfer_pending");
+  checkTrue("isUuid 認得 uuid", L.isUuid("3f1c2b8e-1a2b-4c3d-8e9f-0a1b2c3d4e5f"));
+  checkFalse("isUuid 不認得亂碼", L.isUuid("../../etc"));
+  check(
+    "宅配地址含門牌",
+    L.formatHomeAddress({
+      postal_code: "100",
+      city: "臺北市",
+      district: "中正區",
+      street: "羅斯福路三段 1 號",
+    }),
+    "100 臺北市中正區羅斯福路三段 1 號",
+  );
+}
 
-  // ── maskTail：逐字對照 inv.mask_tail() 的每一種分支 ────────────────────
-  check("null → null", mask.maskTail(null, 4), null);
-  check("undefined → null", mask.maskTail(undefined, 4), null);
-  check("空字串 → null", mask.maskTail("", 4), null);
-  check("全空白 → null", mask.maskTail("   ", 4), null);
-  check("手機遮尾 4 碼（同 0021 §3 電話的遮罩）", mask.maskTail("0912345678", 4), "******5678");
-  check("銀行帳號遮尾 4 碼", mask.maskTail("1234567890", 4), "******7890");
-  check("身分證字號留首 1 碼、遮尾 2 碼", mask.maskTail("A123456789", 2, 1), "A*******89");
-  check("統一編號遮尾 2 碼", mask.maskTail("12345678", 2), "******78");
-  check("長度剛好等於 keepTail → 整串星號（太短不遮尾）", mask.maskTail("1234", 4), "****");
-  check("長度小於 keepTail+keepHead → 整串星號", mask.maskTail("12", 4, 1), "**");
-  checkTrue("首尾空白會先被 trim 掉", mask.maskTail("  12345  ", 2) === "***45");
-  check(
-    "🔴 keepTail=0 時不是 slice(-0) 的那個真 bug：尾巴不會被整段接回去",
-    mask.maskTail("alice", 0, 1),
-    "a****",
-    "0021 §2 記錄的 bug 是 TS 版把 v.slice(-0) 當成 v.slice(0)，導致整段字串被接回去。",
+// =============================================================================
+// [8b] 動態：src/lib/admin/shell-user-cache.ts（後台換頁不再每次重問「誰登入」）
+// =============================================================================
+console.log("\n[8b] 後台外框身分快取（動態呼叫 src/lib/admin/shell-user-cache.ts）");
+{
+  const C = await import(pathToFileURL(join(ROOT, "src/lib/admin/shell-user-cache.ts")).href);
+  const cache = C.createShellUserCache(1000);
+  check("一開始是空的", cache.get(0), null);
+  cache.set({ userId: "u" }, 100);
+  check("TTL 內拿得到", cache.get(1099), { userId: "u" });
+  check("🔴 到 TTL 就失效", cache.get(1100), null);
+  cache.set({ userId: "u" }, 100);
+  check("時鐘倒退視為失效", cache.get(50), null);
+  cache.set({ userId: "u" }, 100);
+  cache.clear();
+  check("🔴 clear() 之後拿不到（登出用）", cache.get(101), null);
+  check("預設 TTL 60 秒", C.SHELL_USER_TTL_MS, 60000);
+  const shell = stripTs(shellSrc);
+  checkTrue("_shell beforeLoad 只在瀏覽器端用快取", /typeof window !== "undefined"/.test(shell));
+  checkTrue("pending 不進快取", /user\.role !== "pending"\) shellUserCache\.set/.test(shell));
+  checkTrue(
+    "🔴 登出時清快取（_shell 與 pending 兩條登出路徑）",
+    /clearShellUserCache\(\);[\s\S]{0,200}await signOut\(\)/.test(shell) &&
+      /clearShellUserCache\(\);\s*await signOut\(\)/.test(
+        stripTs(readFile(join(ROOT, "src/routes/admin/pending.tsx"))),
+      ),
   );
-  check("keepTail=0、keepHead=0 → 全部星號", mask.maskTail("hello", 0), "*****");
-
-  // ── maskEmail：逐字對照 inv.mask_email() 的每一種分支 ──────────────────
-  check("null → null", mask.maskEmail(null), null);
-  check("空字串 → null", mask.maskEmail(""), null);
-  check(
-    "一般信箱：留首碼 1 碼與完整 domain",
-    mask.maskEmail("alice@example.com"),
-    "a****@example.com",
+  checkTrue(
+    "🔴 登入成功也清快取（沒按登出就換帳號）",
+    /signIn\(\{ data: values \}\);[\s\S]{0,300}clearShellUserCache\(\);/.test(
+      stripTs(readFile(join(ROOT, "src/routes/admin/login.tsx"))),
+    ),
   );
-  check(
-    "單字元 local part → 整個 local part 變一顆星",
-    mask.maskEmail("a@example.com"),
-    "*@example.com",
-  );
-  check(
-    "🔴 迴歸測試：'ab@x.com' 必須遮成 'a*@x.com'，不是 0021 記錄的那個真 bug 'a*ab@x.com'",
-    mask.maskEmail("ab@x.com"),
-    "a*@x.com",
-  );
-  // "notanemail" 10 碼，maskTail(v,2)：留尾 2 碼、其餘 8 碼變星號。
-  check("沒有 @ 的字串當一般值處理（遮尾 2 碼）", mask.maskEmail("notanemail"), "********il");
-  // "@x.com" 6 碼整串（含開頭的 @）當一般值跑 maskTail(v,2)：留尾 2 碼「om」。
-  check(
-    "@ 是第一個字元（local part 是空的）→ 當一般字串遮尾 2 碼",
-    mask.maskEmail("@x.com"),
-    "****om",
-  );
-  // local part 用**最後一個** @ 切開 → "a@b"（3 碼）。maskTail("a@b", 0, 1)：留頭 1
-  // 碼「a」，其餘 2 碼（"@b"）變星號 → "a**"；domain 是最後一段 "@c.com"。
-  check(
-    "以最後一個 @ 切開（'a@b@c.com' 這種不合法但存得進去的值）",
-    mask.maskEmail("a@b@c.com"),
-    "a**@c.com",
-  );
+  checkTrue("登出時清掉路由快取（預載的訂單明文）", /router\.clearCache\(\)/.test(shell));
 }
 
 // -----------------------------------------------------------------------------

@@ -132,13 +132,12 @@ export const STATUS_LABEL_ZH: Record<string, string> = {
 
 /**
  * 二次確認的說明文字：一定講出訂單編號、狀態從什麼變成什麼、以及會不會寄信。
- * ship 會寄出貨通知信，所以講出收件信箱（遮罩過的，後台本來就只拿得到遮罩值）；
- * pickup／complete 不寄。
+ * ship 會寄出貨通知信，所以講出收件信箱；pickup／complete 不寄。
  */
 export function confirmDescription(
   action: FulfillmentAction,
   orderNo: string,
-  maskedEmail?: string | null,
+  email?: string | null,
 ): string {
   const t = FULFILLMENT_TRANSITIONS[action];
   const from = STATUS_LABEL_ZH[t.from];
@@ -147,7 +146,7 @@ export function confirmDescription(
   const head = `訂單 ${orderNo} 的狀態會從「${from}」改成「${to}」`;
   if (action === "ship") {
     return (
-      `${head}、記下現在的時間作為${stamp}，並寄出貨通知信給 ${maskedEmail || "訂購人信箱"}。` +
+      `${head}、記下現在的時間作為${stamp}，並寄出貨通知信給 ${email || "訂購人信箱"}。` +
       "這個動作無法在這一頁復原。"
     );
   }

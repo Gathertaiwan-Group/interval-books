@@ -557,34 +557,38 @@ console.log("\n[6] 靜態：授權、沒有寄信、列表與首頁同一組條�
     !/\.update\(/.test(list),
   );
 
+  // 2026-10-25：詳情從列表頁的 Dialog 搬到 /admin/orders/$id（_shell.orders_.$id.tsx）。
+  //   列表相關（分頁、列表狀態欄）看 route，詳情相關看 detailRoute。
   const route = stripComments(read("src/routes/admin/_shell.orders.tsx"));
+  const detailRoute = stripComments(read("src/routes/admin/_shell.orders_.$id.tsx"));
+  const labels = stripComments(read("src/lib/admin/order-labels.ts"));
   checkTrue(
     "詳情的按鈕由 availableFulfillmentAction() 決定",
-    /availableFulfillmentAction\(detail\)/.test(route),
+    /availableFulfillmentAction\(detail\)/.test(detailRoute),
   );
   checkTrue(
-    "有二次確認（confirmDescription）",
-    /confirmDescription\(fulfillAction, detail\.order_no, detail\.customer_email_masked\)/.test(
-      route,
+    "有二次確認（confirmDescription，帶訂購人信箱）",
+    /confirmDescription\(fulfillAction, detail\.order_no, detail\.customer_email\)/.test(
+      detailRoute,
     ),
   );
   checkTrue(
     "詳情顯示出貨時間（formatTaipeiDateTime）",
-    /formatTaipeiDateTime\(detail\.shipped_at\)/.test(route),
+    /formatTaipeiDateTime\(detail\.shipped_at\)/.test(detailRoute),
   );
   checkTrue("有「待出貨」分頁", /value="to_ship"/.test(route));
   checkTrue(
     "按鈕旁的說明：ship 講會寄出貨通知信、不再說不會寄信",
-    /ship: "[^"]*寄出貨通知信[^"]*"/.test(route) && !/ship: "[^"]*不會寄信/.test(route),
+    /ship: "[^"]*寄出貨通知信[^"]*"/.test(detailRoute) && !/ship: "[^"]*不會寄信/.test(detailRoute),
   );
   checkTrue(
     "排信失敗時顯示 notify_warning（toast.warning）",
-    /if \(result\.notify_warning\) toast\.warning\(result\.notify_warning\)/.test(route),
+    /if \(result\.notify_warning\) toast\.warning\(result\.notify_warning\)/.test(detailRoute),
   );
   checkTrue("列表顯示訂單狀態", /STATUS_LABEL\[o\.status\]/.test(route));
   checkTrue(
     "STATUS_LABEL 有 已出貨／已完成",
-    /shipped: "已出貨"/.test(route) && /completed: "已完成"/.test(route),
+    /shipped: "已出貨"/.test(labels) && /completed: "已完成"/.test(labels),
   );
 }
 

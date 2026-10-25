@@ -1028,16 +1028,15 @@ console.log("\n[10] repo / fn / 畫面");
 const regRepoTs = readFile(join(ROOT, "src/server/repos/event-registrations.ts"));
 const regFnTs = readFile(join(ROOT, "src/lib/admin/fns/event-registrations.ts"));
 const routeTs = readFile(join(ROOT, "src/routes/admin/_shell.registrations.tsx"));
-const dialogTs = readFile(join(ROOT, "src/components/admin/RegistrationRevealDialog.tsx"));
 const csvTs = readFile(join(ROOT, "src/lib/csv.ts"));
 const rosterCsvTs = readFile(join(ROOT, "src/lib/admin/roster-csv.ts"));
 
 checkTrue(
-  "反空殼：五個新／改的檔案都讀得到",
+  // 2026-10-25：RegistrationRevealDialog.tsx 已刪（名單直接顯示明文）。
+  "反空殼：四個新／改的檔案都讀得到",
   regRepoTs.length > 3000 &&
     regFnTs.length > 2000 &&
     routeTs.length > 5000 &&
-    dialogTs.length > 2000 &&
     csvTs.length > 1000 &&
     rosterCsvTs.length > 1000,
 );
@@ -1049,12 +1048,31 @@ check("repo 裡沒有 TypeScript 的 maskTail", /function maskTail/.test(regRepo
 check("repo 裡沒有 TypeScript 的 maskEmail", /function maskEmail/.test(regRepoTs), false);
 check("repo 裡沒有 repeat 星號的遮罩邏輯", /"\*"\.repeat\(/.test(regRepoTs), false);
 checkTrue("repo 改讀 admin_event_roster", /from\("admin_event_roster"\)/.test(regRepoTs));
-check(
-  "repo 不再直接 select event_registrations",
-  /from\("event_registrations"\)/.test(regRepoTs),
-  false,
-  "明文欄位就在那張表上；改走 view 才是「明文不進 Node 行程」",
-);
+// 2026-10-25（業主）：名單頁與店家通知信改顯示明文。直接讀本表的地方剛好兩處：
+// listSessionRoster()（先寫 pii_log_access 才讀）與 loadOrderAttendeesForAdminNotify()
+// （店家通知信，業主決定不留紀錄）。多出第三處就是多一條沒人審過的明文路徑。
+{
+  const code = stripTs(regRepoTs);
+  check(
+    "repo 直接讀 event_registrations 的地方剛好兩處",
+    (code.match(/from\("event_registrations"\)/g) ?? []).length,
+    2,
+  );
+  const fnOf = (name) => {
+    const at = code.indexOf(`export async function ${name}(`);
+    return at < 0 ? "" : code.slice(at, code.indexOf("\nexport ", at + 10));
+  };
+  checkTrue(
+    "其中一處在 listSessionRoster（排在 pii_log_access 之後）",
+    fnOf("listSessionRoster").indexOf('from("event_registrations")') >
+      fnOf("listSessionRoster").indexOf('rpc("pii_log_access"') &&
+      fnOf("listSessionRoster").includes('rpc("pii_log_access"'),
+  );
+  checkTrue(
+    "另一處在 loadOrderAttendeesForAdminNotify（店家通知信）",
+    fnOf("loadOrderAttendeesForAdminNotify").includes('from("event_registrations")'),
+  );
+}
 // COLUMNS 常數裡不可以有裸的 email / phone。
 const columnsLine = (regRepoTs.match(/const ROSTER_COLUMNS =[\s\S]*?;/) ?? [""])[0];
 checkTrue("反空殼：切得出 ROSTER_COLUMNS", columnsLine.length > 100);
@@ -1078,9 +1096,9 @@ checkTrue("repo 有 exportEventRoster", /export async function exportEventRoster
 checkTrue("reveal 走 rpc", /rpc\("reveal_registration_contact"/.test(regRepoTs));
 checkTrue("export 走 rpc", /rpc\("export_event_roster"/.test(regRepoTs));
 check(
-  "repo 的 rpc 呼叫就是那兩支，沒有第三支",
+  "repo 的 rpc 呼叫就是那三支（reveal／export／名單頁的 pii_log_access），沒有第四支",
   (stripTs(regRepoTs).match(/\.rpc\(/g) ?? []).length,
-  2,
+  3,
   "多一支讀明文的路就是多一條不留痕的路",
 );
 // 報名資料只由 SQL 函式寫（0020 §2 的不變量在這一期照樣成立）。
@@ -1228,15 +1246,18 @@ check(
 // 三個數字的差額要顯示出來（0020 §4.4 回填的舊場次只補一位參加者）。
 checkTrue("列表顯示「另有 N 位未登錄姓名」", /另有 \{unnamed\} 位未登錄姓名/.test(routeTs));
 checkTrue("差額是 seats_taken - total", /s\.seats_taken - count\.total/.test(routeTs));
-// 揭露對話框。
-checkTrue("畫面掛了 RegistrationRevealDialog", /<RegistrationRevealDialog/.test(routeTs));
-checkTrue("對話框告訴使用者會留下紀錄", /這次查閱會留下紀錄/.test(dialogTs));
-checkTrue("對話框把 log_id 印出來", /result\.log_id/.test(dialogTs));
-// ⚠️ 沒有事由下拉選單（0021 §1：名單只有兩種看法，由動作決定）。
-check("揭露對話框沒有事由下拉選單", /<Select/.test(dialogTs), false);
+// 名單直接顯示明文（業主 2026-10-25），單筆揭露對話框已拿掉。
+checkTrue(
+  "名單直接顯示明文信箱與電話",
+  /\{r\.email\}/.test(routeTs) && /\{r\.phone\}/.test(routeTs),
+);
+check("不再有單筆揭露對話框", /RegistrationRevealDialog/.test(routeTs), false);
+checkTrue("名單說明告訴使用者會留下紀錄", /都會留下一筆刪不掉的存取紀錄/.test(routeTs));
+checkTrue(
+  "名單把這次查閱的 log_id 印出來",
+  /這次查閱的紀錄編號/.test(routeTs) && /setRosterLogId\(log_id\)/.test(routeTs),
+);
 checkTrue("匯出成功的 toast 也印 log_id", /紀錄編號 \$\{log_id\}/.test(routeTs));
-// disabled 只是畫面，但仍然要在。
-checkTrue("沒有權限時揭露鈕 disabled", /!canReadRoster/.test(dialogTs));
 checkTrue("沒有權限時匯出鈕 disabled", /!canReadRoster/.test(routeTs));
 checkTrue(
   "權限來自 route context 而不是 loader 資料",
