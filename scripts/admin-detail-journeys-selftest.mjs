@@ -115,7 +115,7 @@ console.log("\n[1] 編輯內頁：loader 一支 fn、授權不放寬、pending")
   checkTrue("key={journey.id}（換一筆重新掛載）", /key=\{journey\.id\}/.test(edit));
   checkTrue(
     "存檔 → invalidate → 回上一頁（列表），否則 replace 到列表",
-    /await router\.invalidate\(\);\s*if \(backIfPreviousIs\(router\.history, \["\/admin\/journeys"\]\)\) return;\s*await navigate\(\{ to: "\/admin\/journeys", replace: true \}\)/.test(
+    /await router\.invalidate\(\{ sync: true \}\);\s*if \(backIfPreviousIs\(router\.history, \["\/admin\/journeys"\]\)\) return;\s*await navigate\(\{ to: "\/admin\/journeys", replace: true \}\)/.test(
       edit,
     ),
   );
@@ -130,8 +130,8 @@ console.log("\n[2] JourneyForm：防呆與寫入");
 {
   const form = code(FORM);
   checkTrue(
-    "🔴 掛 useUnsavedChangesGuard(dirty && !saving)",
-    /useUnsavedChangesGuard\(dirty && !saving\)/.test(form),
+    "🔴 掛 useUnsavedChangesGuard(dirty)（存檔中也攔，成功由 allowLeave 放行）",
+    /useUnsavedChangesGuard\(dirty\)/.test(form),
   );
   checkTrue(
     "dirty 比的是整張表單的值（useFormDirty(form.watch())）",

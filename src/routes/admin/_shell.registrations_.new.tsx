@@ -34,7 +34,7 @@ function SessionNewPage() {
       back={{ to: "/admin/registrations", label: "回場次列表" }}
       onPlansChanged={async () => undefined}
       onSaved={async () => {
-        await router.invalidate();
+        await router.invalidate({ sync: true });
         if (backIfPreviousIs(router.history, ["/admin/registrations"])) return;
         await navigate({ to: "/admin/registrations", replace: true });
       }}

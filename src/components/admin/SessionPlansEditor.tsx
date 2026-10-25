@@ -420,7 +420,16 @@ function PlanForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+      {/* ⚠️ 這個對話框（portal）在 React 樹上仍在場次表單 <form> 裡面：submit 事件會沿著
+          React 樹冒泡到場次表單的 onSubmit，等於按「儲存票種」順便存了場次並離開頁面。
+          一定要 stopPropagation。 */}
+      <form
+        onSubmit={(e) => {
+          e.stopPropagation();
+          void form.handleSubmit(onSubmit)(e);
+        }}
+        className="space-y-5"
+      >
         <LocalizedField name="title" label="方案名稱" />
 
         <div className="grid gap-5 sm:grid-cols-2">

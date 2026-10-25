@@ -182,7 +182,7 @@ function AdminCuratedPage() {
       });
       toast.success(editingTheme ? "已更新主題" : "已新增主題");
       setThemeDialogOpen(false);
-      await router.invalidate();
+      await router.invalidate({ sync: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "儲存失敗，請稍後再試");
     } finally {
@@ -201,7 +201,7 @@ function AdminCuratedPage() {
         setSelectedThemeId(null);
       }
       setDeleteThemeTarget(null);
-      await router.invalidate();
+      await router.invalidate({ sync: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "刪除失敗，請稍後再試");
     } finally {

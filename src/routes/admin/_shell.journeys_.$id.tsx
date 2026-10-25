@@ -78,7 +78,7 @@ function JourneyEditPage() {
       key={journey.id}
       journey={journey}
       onSaved={async () => {
-        await router.invalidate();
+        await router.invalidate({ sync: true });
         if (backIfPreviousIs(router.history, ["/admin/journeys"])) return;
         await navigate({ to: "/admin/journeys", replace: true });
       }}

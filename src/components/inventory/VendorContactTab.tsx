@@ -21,9 +21,18 @@ type Props = {
   contacts: AdminVendorContact[];
   onPatch: (next: Partial<FormState>) => void;
   onReload: () => Promise<void>;
+  onDraftDirtyChange?: (dirty: boolean) => void;
 };
 
-export function VendorContactTab({ form, busy, vendorId, contacts, onPatch, onReload }: Props) {
+export function VendorContactTab({
+  form,
+  busy,
+  vendorId,
+  contacts,
+  onPatch,
+  onReload,
+  onDraftDirtyChange,
+}: Props) {
   return (
     <TabsContent value="contact" className="space-y-4 pt-4">
       <div className="grid gap-4 sm:grid-cols-2">
@@ -92,6 +101,7 @@ export function VendorContactTab({ form, busy, vendorId, contacts, onPatch, onRe
         rows={contacts}
         disabled={busy}
         onReload={onReload}
+        onDirtyChange={onDraftDirtyChange}
       />
     </TabsContent>
   );

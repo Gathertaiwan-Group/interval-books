@@ -85,7 +85,7 @@ async function loadComboFormOptions() {
   return { approvalSettings, products };
 }
 
-/** 建套餐時要選商品（/admin/inventory-combos/new 的 loader）。 */
+/** 建／改套餐時要選商品（/admin/inventory-combos/new 與 /$id/edit 的 loader）。 */
 export const listComboFormOptions = createServerFn({ method: "GET" })
   .middleware([staffFnMiddleware()])
   .handler(async () => await loadComboFormOptions());
@@ -113,10 +113,12 @@ export const getInventoryCombosPageData = createServerFn({ method: "GET" })
 
 /**
  * /admin/inventory-combos/$id（詳情與編輯共用的 layout loader）一支拿齊：套餐、組成品項、
- * 最近 50 筆套餐銷售、表單選項。
+ * 最近 50 筆套餐銷售、審核設定。
  *
  * 2026-10-25 後台第 2 批：原本詳情彈窗打 getAdminComboSet ∥ listComboSales（兩支、各驗一次
- * 身分），編輯彈窗又打一次 getAdminComboSet。現在兩頁共用這一個 loader，詳情 → 編輯不重抓。
+ * 身分），編輯彈窗又打一次 getAdminComboSet。現在兩頁共用這一個 loader，詳情 → 編輯不重抓套餐。
+ * 可選商品清單（約 496 KB）只有編輯頁要用，由編輯頁自己的 loader 叫 listComboFormOptions——
+ * 只看詳情的人不用等它。
  * 權限與 getAdminComboSet／listComboSales／listComboFormOptions 相同（staffFnMiddleware）。
  */
 export const getInventoryComboPageData = createServerFn({ method: "GET" })
@@ -125,14 +127,15 @@ export const getInventoryComboPageData = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { getAdminComboSet, listComboItems, listComboSales } =
       await import("@/server/repos/inv-combos");
-    const [set, items, sales, options] = await Promise.all([
+    const { listApprovalSettings } = await import("@/server/repos/inv-products");
+    const [set, items, sales, approvalSettings] = await Promise.all([
       getAdminComboSet(data.comboSetId),
       listComboItems(data.comboSetId),
       // 不限日期：套餐一年賣不到幾百份，最近 50 筆就是完整的故事。
       listComboSales({ comboSetId: data.comboSetId, dateFrom: null, dateTo: null, limit: 50 }),
-      loadComboFormOptions(),
+      listApprovalSettings(),
     ]);
-    return { set, items, sales, options };
+    return { set, items, sales, approvalSettings };
   });
 
 // ---------------------------------------------------------------------------

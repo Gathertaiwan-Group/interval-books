@@ -99,7 +99,7 @@ export function ProductForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const { dirty } = useFormDirty({ form, withPurchase, purchase });
-  const guard = useUnsavedChangesGuard(dirty && !saving);
+  const guard = useUnsavedChangesGuard(dirty);
 
   /** 名稱打完自動把期數拆出來 —— 只在期數還是空的時候，不要蓋掉手動輸入。 */
   function handleNameBlur() {

@@ -17,13 +17,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { rememberAdminPeek } from "@/lib/admin/list-memory";
-import { detailKindFor, PRODUCT_PEEK_KIND, type UnifiedRow } from "@/lib/admin/unified-products";
+import {
+  detailKindFor,
+  formatTWD,
+  PRODUCT_PEEK_KIND,
+  type UnifiedRow,
+} from "@/lib/admin/unified-products";
 import { imageFor, curatedObjects } from "@/lib/images";
 import bookstoreImg from "@/assets/bookstore-interior.jpg";
-
-export function formatTWD(n: number): string {
-  return `NT$${n.toLocaleString("zh-Hant-TW")}`;
-}
 
 function rowImage(row: UnifiedRow): string | null {
   if (row.kind === "curated") return null;

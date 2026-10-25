@@ -94,10 +94,14 @@ const fns = stripComments(read(FNS));
     "getAdminComboSet(",
     "listComboItems(",
     "listComboSales(",
-    "loadComboFormOptions(",
+    "listApprovalSettings(",
   ]) {
     checkTrue(`整頁 fn 在伺服器上一起抓：${part}`, page.includes(part));
   }
+  checkTrue(
+    "🔴 詳情的整頁 fn 不帶可選商品清單（約 496 KB，只有編輯頁要用）",
+    !/listPosProducts|loadComboFormOptions/.test(page),
+  );
   checkTrue("整頁 fn 用 Promise.all（不是一支接一支）", /Promise\.all\(\[/.test(page));
   checkTrue(
     "銷售紀錄仍是最近 50 筆、不限日期",
@@ -145,13 +149,21 @@ console.log("\n[2] route：一頁一支 fn、詳情→編輯不重抓");
 
   for (const f of [INDEX, EDIT]) {
     const src = stripComments(read(f));
-    checkTrue(`${f}：沒有自己的 loader`, !/loader:/.test(src));
     checkTrue(
-      `${f}：資料取自 layout（getRouteApi）`,
+      `${f}：套餐資料取自 layout（getRouteApi）`,
       /getRouteApi\("\/admin\/_shell\/inventory-combos_\/\$id"\)/.test(src),
     );
-    checkTrue(`${f}：不另外 import server fn`, !/fns\/inv-combos/.test(src));
     checkTrue(`${f}：找不到時 AdminDetailNotFound`, /<AdminDetailNotFound/.test(src));
+  }
+  {
+    const idx = stripComments(read(INDEX));
+    checkTrue(`${INDEX}：沒有自己的 loader`, !/loader:/.test(idx));
+    checkTrue(`${INDEX}：不另外 import server fn`, !/fns\/inv-combos/.test(idx));
+    const edit = stripComments(read(EDIT));
+    check("編輯頁自己的 loader 只叫可選商品那一支：listComboFormOptions", loaderCalls(edit), [
+      "listComboFormOptions",
+    ]);
+    checkTrue("🔴 編輯頁不重抓套餐本身", !/getAdminComboSet|getInventoryComboPageData/.test(edit));
   }
 
   const neu = stripComments(read(NEW));
@@ -163,8 +175,10 @@ console.log("\n[2] route：一頁一支 fn、詳情→編輯不重抓");
 
   const index = stripComments(read(INDEX));
   checkTrue(
-    "詳情頁：動作做完 router.invalidate()",
-    /useComboActions\(\s*async \(\) => \{\s*await router\.invalidate\(\);/.test(index),
+    "詳情頁：動作做完 router.invalidate({ sync: true })",
+    /useComboActions\(\s*async \(\) => \{\s*await router\.invalidate\(\{ sync: true \}\);/.test(
+      index,
+    ),
   );
   checkTrue("詳情頁：有編輯連結", /to="\/admin\/inventory-combos\/\$id\/edit"/.test(index));
   checkTrue("詳情頁：有上下架", /handleToggleActive\(set\)/.test(index));
@@ -197,8 +211,8 @@ console.log("\n[3] 表單：防呆、初始化、payload");
 {
   const form = stripComments(read(FORM));
   checkTrue(
-    "🔴 掛 useUnsavedChangesGuard(dirty && !saving)",
-    /useUnsavedChangesGuard\(dirty && !saving\)/.test(form),
+    "🔴 掛 useUnsavedChangesGuard(dirty)（存檔中也攔，成功由 allowLeave 放行）",
+    /useUnsavedChangesGuard\(dirty\)/.test(form),
   );
   checkTrue("渲染 guard.dialog", /\{guard\.dialog\}/.test(form));
   checkTrue(
@@ -248,7 +262,10 @@ console.log("\n[3] 表單：防呆、初始化、payload");
     ),
   );
   checkTrue("編輯頁否則 replace 到詳情", /replace: true/.test(edit));
-  checkTrue("編輯頁存檔後 router.invalidate()", /await router\.invalidate\(\);/.test(edit));
+  checkTrue(
+    "編輯頁存檔後 router.invalidate({ sync: true })",
+    /await router\.invalidate\(\{ sync: true \}\);/.test(edit),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -270,7 +287,7 @@ console.log("\n[4] 列表");
     /Route\.useMatch\(\{ select: \(m\) => m\.updatedAt \}\)/.test(list),
   );
   checkTrue(
-    "寫入後 reload 再 router.invalidate()",
+    "寫入後 reload 再 router.invalidate({ sync: true })",
     /await reloadList\(\);\s*await router\.invalidate\(\);/.test(list),
   );
   checkTrue(

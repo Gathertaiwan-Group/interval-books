@@ -31,7 +31,7 @@ function VendorDetailPage() {
   const [sensitiveOpen, setSensitiveOpen] = useState(false);
 
   const { busyId, handleApprove } = useVendorActions(async () => {
-    await router.invalidate();
+    await router.invalidate({ sync: true });
   });
 
   if (!data?.row || !data.vendor) {

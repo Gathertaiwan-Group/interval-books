@@ -131,7 +131,7 @@ export function SessionForm({
   const [planDirty, setPlanDirty] = useState(false);
 
   const { dirty: fieldsDirty } = useFormDirty(form.watch());
-  const guard = useUnsavedChangesGuard((fieldsDirty || planDirty) && !submitting);
+  const guard = useUnsavedChangesGuard(fieldsDirty || planDirty);
 
   async function handleSubmit(values: EventSessionFormValues) {
     setSubmitting(true);

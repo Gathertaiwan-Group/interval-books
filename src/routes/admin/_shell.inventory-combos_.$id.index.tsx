@@ -5,7 +5,7 @@
  * 動作：編輯（內頁）、上架／下架、待審時的通過／退回、被退回時的重新送審。
  * 刪除留在列表（AlertDialog 二次確認）。
  *
- * ⚠️ 動作做完 router.invalidate() 重跑 layout loader；useComboActions 會等重抓完才放掉
+ * ⚠️ 動作做完 router.invalidate({ sync: true }) 等 layout loader 重抓完；useComboActions 再放掉
  *    busy，所以畫面不會停在動作前的舊狀態。
  * ⚠️ canApprove 只控制畫面；擋人的是 fns/inv-combos.ts#approveComboSet 的權限檢查。
  */
@@ -31,7 +31,7 @@ function ComboSetDetailPage() {
 
   const { busyId, handleToggleActive, handleResubmit, handleApprove } = useComboActions(
     async () => {
-      await router.invalidate();
+      await router.invalidate({ sync: true });
     },
   );
 

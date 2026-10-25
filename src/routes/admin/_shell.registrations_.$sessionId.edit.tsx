@@ -44,10 +44,10 @@ function SessionEditPage() {
       nextSortOrder={data.nextSortOrder}
       back={{ to: "/admin/registrations", label: "回場次列表", also: [rosterPath] }}
       onPlansChanged={async () => {
-        await router.invalidate();
+        await router.invalidate({ sync: true });
       }}
       onSaved={async () => {
-        await router.invalidate();
+        await router.invalidate({ sync: true });
         // 從列表或名單頁進來 → 按上一頁回原處（列表的捲動位置原樣）；否則換成列表。
         if (backIfPreviousIs(router.history, ["/admin/registrations", rosterPath])) return;
         await navigate({ to: "/admin/registrations", replace: true });

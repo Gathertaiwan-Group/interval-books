@@ -7,6 +7,7 @@
  * ⚠️ 清單上的帳號**永遠是遮罩**。完整帳號走 VendorSensitiveDialog（會留下一筆
  *    pii_access_log），這裡不放捷徑。
  */
+import { useOpenDraftDirty, useReportChildDirty } from "@/lib/admin/useChildDraftDirty";
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,13 +32,17 @@ export function VendorBankSection({
   rows,
   disabled,
   onReload,
+  onDirtyChange,
 }: {
   vendorId: string | null;
   rows: AdminVendorBankAccount[];
   disabled: boolean;
   onReload: () => Promise<void>;
+  /** 有打到一半、還沒存的匯款帳戶草稿（併進內頁的未存變更防呆）。 */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [draft, setDraft] = useState<BankDraft | null>(null);
+  useReportChildDirty(useOpenDraftDirty(draft), onDirtyChange);
   const [busy, setBusy] = useState(false);
 
   if (!vendorId) {

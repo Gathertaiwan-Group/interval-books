@@ -540,3 +540,8 @@ export function parseCuratedItemId(value: unknown): number | null {
   const n = Number(value);
   return Number.isSafeInteger(n) ? n : null;
 }
+
+/** 金額顯示（列表、改價提示共用）。 */
+export function formatTWD(n: number): string {
+  return `NT$${n.toLocaleString("zh-Hant-TW")}`;
+}

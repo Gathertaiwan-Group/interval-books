@@ -4,6 +4,9 @@
  * 從 VendorFormDialog 抽出來（原檔 2,353 行，元件檔的上限是 300）。上傳那張表單在
  * VendorAttachmentForm，真正的三步驟（上傳檔案 → 拿 key → 寫子表）留在這裡的 upload()。
  */
+import { stableStringify } from "@/lib/admin/form-dirty";
+import { formatTaipeiDateTime } from "@/lib/taipei-time";
+import { useReportChildDirty } from "@/lib/admin/useChildDraftDirty";
 import { useRef, useState } from "react";
 import { Loader2, Paperclip, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -37,13 +40,17 @@ export function VendorAttachmentSection({
   rows,
   disabled,
   onReload,
+  onDirtyChange,
 }: {
   vendorId: string | null;
   rows: AdminVendorAttachment[];
   disabled: boolean;
   onReload: () => Promise<void>;
+  /** 選了檔案或填了說明、還沒上傳（併進內頁的未存變更防呆）。 */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [draft, setDraft] = useState<AttachmentDraft>(EMPTY_ATTACHMENT);
+  useReportChildDirty(stableStringify(draft) !== stableStringify(EMPTY_ATTACHMENT), onDirtyChange);
   const [busy, setBusy] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -173,8 +180,7 @@ export function VendorAttachmentSection({
                     <p className="text-xs text-muted-foreground">{row.description}</p>
                   ) : null}
                   <p className="text-xs text-muted-foreground">
-                    {row.uploaded_by_name ?? "未知上傳者"}・
-                    {new Date(row.created_at).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}
+                    {row.uploaded_by_name ?? "未知上傳者"}・{formatTaipeiDateTime(row.created_at)}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5">

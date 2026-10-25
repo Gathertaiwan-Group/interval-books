@@ -47,6 +47,7 @@ type Props = {
   bankAccounts: AdminVendorBankAccount[];
   onPatch: (next: Partial<FormState>) => void;
   onReload: () => Promise<void>;
+  onDraftDirtyChange?: (dirty: boolean) => void;
 };
 
 export function VendorFinanceTab({
@@ -58,6 +59,7 @@ export function VendorFinanceTab({
   bankAccounts,
   onPatch,
   onReload,
+  onDraftDirtyChange,
 }: Props) {
   return (
     <TabsContent value="finance" className="space-y-4 pt-4">
@@ -170,6 +172,7 @@ export function VendorFinanceTab({
         rows={bankAccounts}
         disabled={busy}
         onReload={onReload}
+        onDirtyChange={onDraftDirtyChange}
       />
     </TabsContent>
   );

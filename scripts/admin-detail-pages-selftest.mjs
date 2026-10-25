@@ -223,6 +223,70 @@ console.log("\n[4] 接線（靜態）");
     checkTrue(`${route}：用 useLoaderBackedList`, /useLoaderBackedList\(/.test(src));
   }
 
+  // ── 第 2 批審查後的修正 ──────────────────────────────────────────────────
+  const { readdirSync } = await import("node:fs");
+  const detailRoutes = readdirSync(join(ROOT, "src/routes/admin")).filter((f) =>
+    /^_shell\.[\w-]+_\./.test(f),
+  );
+  checkTrue(`掃得到內頁 route（${detailRoutes.length} 個）`, detailRoutes.length >= 15);
+  check(
+    "🔴 內頁 route 寫入後一律 router.invalidate({ sync: true })（不等的話動作後會先畫舊資料）",
+    detailRoutes.filter((f) =>
+      /router\.invalidate\(\)/.test(stripComments(read(`src/routes/admin/${f}`))),
+    ),
+    [],
+  );
+  const FORM_PAGES = [
+    "src/components/inventory/VendorForm.tsx",
+    "src/components/inventory/ComboSetForm.tsx",
+    "src/components/inventory/ProductForm.tsx",
+    "src/components/admin/JourneyForm.tsx",
+    "src/components/admin/SessionForm.tsx",
+    "src/components/admin/products/ProductFormPage.tsx",
+  ];
+  for (const f of FORM_PAGES) {
+    const src = stripComments(read(f));
+    checkTrue(`${f}：掛 useUnsavedChangesGuard`, /useUnsavedChangesGuard\(/.test(src));
+    check(
+      `🔴 ${f}：存檔中也要攔（不可以 && !saving／!submitting，成功由 allowLeave 放行）`,
+      /useUnsavedChangesGuard\([^)]*!(saving|submitting)/.test(src),
+      false,
+    );
+  }
+  const SSR_VIEWS = [
+    "src/components/inventory/VendorDetailView.tsx",
+    "src/components/inventory/ComboSetDetailView.tsx",
+    "src/components/inventory/ProductDetailView.tsx",
+    "src/components/inventory/ProductMovementList.tsx",
+    "src/components/inventory/VendorAttachmentSection.tsx",
+  ];
+  for (const f of SSR_VIEWS) {
+    check(
+      `🔴 ${f}：日期不用 toLocale*String（SSR 會多 THIN SPACE → React #418），用 taipei-time`,
+      /new Date\([^)]*\)\.toLocale(Date|Time)?String\(/.test(stripComments(read(f))),
+      false,
+    );
+  }
+  const plans = stripComments(read("src/components/admin/SessionPlansEditor.tsx"));
+  checkTrue(
+    "🔴 票種對話框的 form submit 一定 stopPropagation（否則冒泡到場次表單：存了場次並離開）",
+    /<form\s+onSubmit=\{\(e\) => \{\s*e\.stopPropagation\(\);/.test(plans),
+  );
+  const vform = stripComments(read("src/components/inventory/VendorForm.tsx"));
+  checkTrue(
+    "廠商表單：子表草稿（聯絡人／匯款帳戶／附件）併進 dirty",
+    /onDraftDirtyChange=\{onContactDirty\}/.test(vform) &&
+      /onDraftDirtyChange=\{onBankDirty\}/.test(vform) &&
+      /onDirtyChange=\{onFilesDirty\}/.test(vform) &&
+      /childDirty\.contact \|\| childDirty\.bank \|\| childDirty\.files/.test(vform),
+  );
+  for (const f of ["VendorContactSection", "VendorBankSection", "VendorAttachmentSection"]) {
+    checkTrue(
+      `${f}：往上報草稿 dirty`,
+      /useReportChildDirty\(/.test(stripComments(read(`src/components/inventory/${f}.tsx`))),
+    );
+  }
+
   const guard = stripComments(read("src/components/admin/UnsavedChangesGuard.tsx"));
   checkTrue("防呆：useBlocker withResolver", /useBlocker\(\{[^}]*withResolver: true/.test(guard));
   checkTrue("防呆：beforeunload（關分頁、重新整理）", /enableBeforeUnload/.test(guard));

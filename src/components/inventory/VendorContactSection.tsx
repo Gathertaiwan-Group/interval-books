@@ -9,6 +9,7 @@
  *
  * ⚠️ 寫完只重抓（onReload），不猜結果 —— 排序與 is_primary 的互斥都是資料庫在管。
  */
+import { useOpenDraftDirty, useReportChildDirty } from "@/lib/admin/useChildDraftDirty";
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -26,13 +27,17 @@ export function VendorContactSection({
   rows,
   disabled,
   onReload,
+  onDirtyChange,
 }: {
   vendorId: string | null;
   rows: AdminVendorContact[];
   disabled: boolean;
   onReload: () => Promise<void>;
+  /** 有打到一半、還沒存的聯絡人草稿（併進內頁的未存變更防呆）。 */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [draft, setDraft] = useState<ContactDraft | null>(null);
+  useReportChildDirty(useOpenDraftDirty(draft), onDirtyChange);
   const [busy, setBusy] = useState(false);
 
   if (!vendorId) {

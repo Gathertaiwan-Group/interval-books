@@ -301,9 +301,9 @@ console.log("\n[4] 表單：未存變更防呆、只在掛載時初始化、存�
     /guard\.allowLeave\(\);\s*await onSaved\(\);/.test(form),
   );
   checkTrue(
-    "🔴 dirty ＝ 場次欄位（比值）或 票種對話框改到一半，存檔中不攔",
+    "🔴 dirty ＝ 場次欄位（比值）或 票種對話框改到一半（存檔中也攔，成功由 allowLeave 放行）",
     /useFormDirty\(form\.watch\(\)\)/.test(form) &&
-      /useUnsavedChangesGuard\(\(fieldsDirty \|\| planDirty\) && !submitting\)/.test(form) &&
+      /useUnsavedChangesGuard\(fieldsDirty \|\| planDirty\)/.test(form) &&
       /onDirtyChange=\{setPlanDirty\}/.test(form),
   );
   const plans = src(PLANS);
@@ -342,14 +342,18 @@ console.log("\n[4] 表單：未存變更防呆、只在掛載時初始化、存�
     const saved = between(s, "onSaved={async () => {", "}}");
     checkTrue(
       `${f}：存檔後 invalidate → backIfPreviousIs → 否則 replace 回列表`,
-      /await router\.invalidate\(\);\s*if \(backIfPreviousIs\(router\.history, /.test(saved) &&
+      /await router\.invalidate\(\{ sync: true \}\);\s*if \(backIfPreviousIs\(router\.history, /.test(
+        saved,
+      ) &&
         saved.includes(backs) &&
         /navigate\(\{ to: "\/admin\/registrations", replace: true \}\)/.test(saved),
     );
   }
   checkTrue(
     "票種寫完 router.invalidate()（票種清單更新，不重新掛載表單）",
-    /onPlansChanged=\{async \(\) => \{\s*await router\.invalidate\(\);/.test(src(EDIT)),
+    /onPlansChanged=\{async \(\) => \{\s*await router\.invalidate\(\{ sync: true \}\);/.test(
+      src(EDIT),
+    ),
   );
   checkTrue(
     "新增頁沒有票種區（還沒有場次 id 可以掛）",

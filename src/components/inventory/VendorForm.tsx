@@ -20,7 +20,7 @@
  * ⚠️ payload 裡**沒有** approval_status / approved_by / created_by / vendor_code。四個
  *    都由資料庫決定（0019 §5.1）。見 toVendorPayload。
  */
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -101,8 +101,17 @@ export function VendorForm({
 
   const vendorId = editing?.vendor_id ?? null;
 
-  const { dirty } = useFormDirty({ form, changing });
-  const guard = useUnsavedChangesGuard(dirty && !saving);
+  const { dirty: formDirty } = useFormDirty({ form, changing });
+  // 子表（聯絡人／匯款帳戶／附件）是各自當場存的；草稿打到一半也算「還沒存」。
+  const [childDirty, setChildDirty] = useState({ contact: false, bank: false, files: false });
+  const onContactDirty = useCallback(
+    (d: boolean) => setChildDirty((c) => ({ ...c, contact: d })),
+    [],
+  );
+  const onBankDirty = useCallback((d: boolean) => setChildDirty((c) => ({ ...c, bank: d })), []);
+  const onFilesDirty = useCallback((d: boolean) => setChildDirty((c) => ({ ...c, files: d })), []);
+  const dirty = formDirty || childDirty.contact || childDirty.bank || childDirty.files;
+  const guard = useUnsavedChangesGuard(dirty);
 
   function patch(next: Partial<FormState>) {
     setForm((prev) => ({ ...prev, ...next }));
@@ -204,6 +213,7 @@ export function VendorForm({
           contacts={contacts}
           onPatch={patch}
           onReload={onReloadChildren}
+          onDraftDirtyChange={onContactDirty}
         />
 
         <VendorFinanceTab
@@ -215,6 +225,7 @@ export function VendorForm({
           bankAccounts={bankAccounts}
           onPatch={patch}
           onReload={onReloadChildren}
+          onDraftDirtyChange={onBankDirty}
         />
 
         <TabsContent value="files" className="space-y-4 pt-4">
@@ -223,6 +234,7 @@ export function VendorForm({
             rows={attachments}
             disabled={busy}
             onReload={onReloadChildren}
+            onDirtyChange={onFilesDirty}
           />
         </TabsContent>
       </Tabs>

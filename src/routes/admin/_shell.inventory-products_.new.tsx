@@ -34,7 +34,7 @@ function ProductNewPage() {
       priceApprovalOn={isApprovalRequired(options.approvalSettings, "price_changes")}
       back={{ to: "/admin/inventory-products", label: "回商品列表" }}
       onSaved={async (productId) => {
-        await router.invalidate();
+        await router.invalidate({ sync: true });
         await navigate({
           to: "/admin/inventory-products/$id",
           params: { id: productId },

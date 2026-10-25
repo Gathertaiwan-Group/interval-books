@@ -74,7 +74,7 @@ export function JourneyForm({ journey, onSaved }: Props) {
   const [saving, setSaving] = useState(false);
 
   const { dirty } = useFormDirty(form.watch());
-  const guard = useUnsavedChangesGuard(dirty && !saving);
+  const guard = useUnsavedChangesGuard(dirty);
 
   async function handleSubmit(values: JourneyFormValues) {
     setSaving(true);

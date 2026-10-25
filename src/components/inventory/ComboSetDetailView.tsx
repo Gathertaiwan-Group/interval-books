@@ -7,6 +7,7 @@
  * ⚠️ 分攤預覽是預覽。實際入帳金額由資料庫在結帳當下算，見
  *    lib/admin/combo-allocation.ts 的檔頭。
  */
+import { formatTaipeiDateTime } from "@/lib/taipei-time";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ApprovalStatusBadge } from "@/components/inventory/ApprovalStatusBadge";
@@ -21,7 +22,8 @@ import type {
 } from "@/server/repos/inv-combos";
 
 function when(iso: string | null) {
-  return iso ? new Date(iso).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" }) : "—";
+  // SSR 與瀏覽器要印出一樣的字（toLocaleString 在 Node 會多一個 THIN SPACE → React #418）。
+  return iso ? formatTaipeiDateTime(iso) : "—";
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

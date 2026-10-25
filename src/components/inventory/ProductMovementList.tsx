@@ -23,10 +23,12 @@ import {
   reasonLabel,
   statusLabel,
 } from "@/lib/admin/inv-adjustment-labels";
+import { formatTaipeiDate } from "@/lib/taipei-time";
 import type { ProductMovementRow } from "@/server/repos/inv-adjustments";
 
+/** SSR 與瀏覽器要一樣（不用 toLocaleDateString，見 src/lib/taipei-time.ts）。 */
 function day(iso: string) {
-  return new Date(iso).toLocaleDateString("zh-TW", { timeZone: "Asia/Taipei" });
+  return formatTaipeiDate(iso);
 }
 
 export function ProductMovementList({ rows }: { rows: ProductMovementRow[] }) {

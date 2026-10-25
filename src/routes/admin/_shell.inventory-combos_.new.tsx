@@ -30,7 +30,7 @@ function ComboSetNewPage() {
       products={options.products}
       back={{ to: "/admin/inventory-combos", label: "回套餐列表" }}
       onSaved={async (comboSetId) => {
-        await router.invalidate();
+        await router.invalidate({ sync: true });
         await navigate({
           to: "/admin/inventory-combos/$id",
           params: { id: comboSetId },

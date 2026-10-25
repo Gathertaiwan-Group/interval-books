@@ -9,6 +9,7 @@
  *    路，而那一條路會留下 pii_access_log。這裡不放「顯示完整號碼」的捷徑 —— 稽核軌跡
  *    只要有一條旁路就等於沒有。
  */
+import { formatTaipeiDateTime } from "@/lib/taipei-time";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -38,7 +39,8 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function when(iso: string | null) {
-  return iso ? new Date(iso).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" }) : "—";
+  // SSR 與瀏覽器要印出一樣的字（toLocaleString 在 Node 會多一個 THIN SPACE → React #418）。
+  return iso ? formatTaipeiDateTime(iso) : "—";
 }
 
 /** 0–1 小數 → 百分比字串。toFixed 是為了躲 0.1115 × 100 = 11.150000000000002。 */

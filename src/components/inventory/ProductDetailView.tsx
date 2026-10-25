@@ -9,6 +9,7 @@
  * 型錄上**。最後那一項是來源沒有的 —— 來源的進銷存不知道網站的存在，所以停用一件
  * 還在網站上賣的商品時沒有任何地方會提醒。
  */
+import { formatTaipeiDateTime } from "@/lib/taipei-time";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -25,7 +26,8 @@ function money(n: number | null) {
 }
 
 function when(iso: string | null) {
-  return iso ? new Date(iso).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" }) : "—";
+  // SSR 與瀏覽器要印出一樣的字（toLocaleString 在 Node 會多一個 THIN SPACE → React #418）。
+  return iso ? formatTaipeiDateTime(iso) : "—";
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {

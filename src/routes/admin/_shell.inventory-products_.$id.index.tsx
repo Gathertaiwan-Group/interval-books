@@ -74,7 +74,7 @@ function ProductDetailPage() {
         product={pricing ? product : null}
         priceApprovalOn={priceApprovalOn}
         onDone={async () => {
-          await router.invalidate();
+          await router.invalidate({ sync: true });
         }}
       />
     </AdminDetailPage>

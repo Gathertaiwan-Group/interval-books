@@ -37,7 +37,7 @@ function VendorNewPage() {
       back={{ to: "/admin/inventory-vendors", label: "回廠商列表" }}
       onReloadChildren={async () => undefined}
       onSaved={async (vendorId) => {
-        await router.invalidate();
+        await router.invalidate({ sync: true });
         await navigate({
           to: "/admin/inventory-vendors/$id",
           params: { id: vendorId },

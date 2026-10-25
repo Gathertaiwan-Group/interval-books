@@ -176,13 +176,13 @@ console.log("\n[3] 表單內頁：未存變更防呆、存檔後換頁、只初�
 {
   const page = code(`${P}ProductFormPage.tsx`);
   checkTrue(
-    "🔴 ProductFormPage：掛 useUnsavedChangesGuard(dirty && !saving)",
-    /useUnsavedChangesGuard\(dirty && !saving\)/.test(page),
+    "🔴 ProductFormPage：掛 useUnsavedChangesGuard(dirty)（存檔中也攔，成功由 allowLeave 放行）",
+    /useUnsavedChangesGuard\(dirty\)/.test(page),
   );
   checkTrue("ProductFormPage：渲染 guard.dialog", /\{guard\.dialog\}/.test(page));
   const order = [
     "guard.allowLeave()",
-    "router.invalidate()",
+    "router.invalidate({ sync: true })",
     "backIfPreviousIs(",
     "router.navigate(",
   ].map((s) => page.indexOf(s));

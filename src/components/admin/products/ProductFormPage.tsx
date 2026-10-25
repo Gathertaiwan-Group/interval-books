@@ -62,7 +62,7 @@ export function ProductFormPage<V>({
   const router = useRouter();
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const guard = useUnsavedChangesGuard(dirty && !saving);
+  const guard = useUnsavedChangesGuard(dirty);
 
   async function onSubmit(values: V) {
     setSaving(true);
@@ -71,7 +71,7 @@ export function ProductFormPage<V>({
       toast.success(successMessage);
       guard.allowLeave();
       // 寫入後 src/start.ts 已清掉後台路由快取；這裡再 invalidate 一次讓列表是新的。
-      await router.invalidate();
+      await router.invalidate({ sync: true });
       if (backIfPreviousIs(router.history, [backTo, ...backAlso])) return;
       // 型別上 navigate 只收已註冊的路徑；backTo 是呼叫端給的列表路徑字串（同 BackToListLink）。
       await router.navigate({

@@ -196,8 +196,8 @@ console.log("\n[3] 表單頁：防呆、只在掛載時初始化、存檔成功�
 {
   const form = code(FORM);
   checkTrue(
-    "🔴 ProductForm：掛 useUnsavedChangesGuard(dirty && !saving)",
-    /useUnsavedChangesGuard\(dirty && !saving\)/.test(form),
+    "🔴 ProductForm：掛 useUnsavedChangesGuard(dirty)（存檔中也攔，成功由 allowLeave 放行）",
+    /useUnsavedChangesGuard\(dirty\)/.test(form),
   );
   checkTrue(
     "ProductForm：dirty 來自 useFormDirty",
@@ -228,14 +228,14 @@ console.log("\n[3] 表單頁：防呆、只在掛載時初始化、存檔成功�
   );
   checkTrue(
     "編輯頁：存檔 → invalidate → 回上一頁（詳情或列表），否則 replace 到詳情",
-    /await router\.invalidate\(\);[\s\S]*backIfPreviousIs\(router\.history, \[detailPath, "\/admin\/inventory-products"\]\)[\s\S]*replace: true/.test(
+    /await router\.invalidate\(\{ sync: true \}\);[\s\S]*backIfPreviousIs\(router\.history, \[detailPath, "\/admin\/inventory-products"\]\)[\s\S]*replace: true/.test(
       edit,
     ),
   );
   const nw = code(NEW);
   checkTrue(
     "新增頁：存檔 → invalidate → replace 到新商品詳情",
-    /await router\.invalidate\(\);[\s\S]*to: "\/admin\/inventory-products\/\$id"[\s\S]*replace: true/.test(
+    /await router\.invalidate\(\{ sync: true \}\);[\s\S]*to: "\/admin\/inventory-products\/\$id"[\s\S]*replace: true/.test(
       nw,
     ),
   );

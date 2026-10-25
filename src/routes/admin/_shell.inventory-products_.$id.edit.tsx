@@ -47,7 +47,7 @@ function ProductEditPage() {
       priceApprovalOn={isApprovalRequired(options.approvalSettings, "price_changes")}
       back={{ to: detailPath, label: "返回", also: ["/admin/inventory-products"] }}
       onSaved={async (productId) => {
-        await router.invalidate();
+        await router.invalidate({ sync: true });
         // 從詳情頁或列表進來 → 按上一頁回原處（歷史紀錄不多一筆）；否則換成詳情頁。
         if (backIfPreviousIs(router.history, [detailPath, "/admin/inventory-products"])) return;
         await navigate({

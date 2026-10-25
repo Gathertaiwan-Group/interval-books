@@ -52,10 +52,10 @@ function VendorEditPage() {
         also: ["/admin/inventory-vendors"],
       }}
       onReloadChildren={async () => {
-        await router.invalidate();
+        await router.invalidate({ sync: true });
       }}
       onSaved={async (vendorId) => {
-        await router.invalidate();
+        await router.invalidate({ sync: true });
         // 從詳情頁進來 → 按上一頁回詳情（歷史紀錄不多一筆）；否則換成詳情頁。
         if (backIfPreviousIs(router.history, [`/admin/inventory-vendors/${vendorId}`])) return;
         await navigate({

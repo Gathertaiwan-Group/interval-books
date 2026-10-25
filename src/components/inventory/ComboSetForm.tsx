@@ -66,7 +66,7 @@ export function ComboSetForm({
   const [saving, setSaving] = useState(false);
 
   const { dirty } = useFormDirty({ name, price, notes, isActive, items });
-  const guard = useUnsavedChangesGuard(dirty && !saving);
+  const guard = useUnsavedChangesGuard(dirty);
 
   const priceNumber = price.trim() === "" ? Number.NaN : Number(price);
   const previewItems: PreviewItem[] = items.map((item) => {
