@@ -77,6 +77,7 @@ import { Route as AdminShellInventoryProductsIdRouteImport } from './routes/admi
 import { Route as AdminShellInventoryProductsNewRouteImport } from './routes/admin/_shell.inventory-products_.new'
 import { Route as AdminShellInventoryVendorsIdRouteImport } from './routes/admin/_shell.inventory-vendors_.$id'
 import { Route as AdminShellInventoryVendorsNewRouteImport } from './routes/admin/_shell.inventory-vendors_.new'
+import { Route as AdminShellJourneysIdRouteImport } from './routes/admin/_shell.journeys_.$id'
 import { Route as AdminShellJourneysNewRouteImport } from './routes/admin/_shell.journeys_.new'
 import { Route as AdminShellOrdersIdRouteImport } from './routes/admin/_shell.orders_.$id'
 import { Route as AdminShellPagesSlugRouteImport } from './routes/admin/_shell.pages.$slug'
@@ -446,6 +447,11 @@ const AdminShellInventoryVendorsNewRoute =
     path: '/inventory-vendors/new',
     getParentRoute: () => AdminShellRoute,
   } as any)
+const AdminShellJourneysIdRoute = AdminShellJourneysIdRouteImport.update({
+  id: '/journeys_/$id',
+  path: '/journeys/$id',
+  getParentRoute: () => AdminShellRoute,
+} as any)
 const AdminShellJourneysNewRoute = AdminShellJourneysNewRouteImport.update({
   id: '/journeys_/new',
   path: '/journeys/new',
@@ -597,6 +603,7 @@ export interface FileRoutesByFullPath {
   '/admin/inventory-products/new': typeof AdminShellInventoryProductsNewRoute
   '/admin/inventory-vendors/$id': typeof AdminShellInventoryVendorsIdRouteWithChildren
   '/admin/inventory-vendors/new': typeof AdminShellInventoryVendorsNewRoute
+  '/admin/journeys/$id': typeof AdminShellJourneysIdRoute
   '/admin/journeys/new': typeof AdminShellJourneysNewRoute
   '/admin/orders/$id': typeof AdminShellOrdersIdRoute
   '/admin/pages/$slug': typeof AdminShellPagesSlugRoute
@@ -676,6 +683,7 @@ export interface FileRoutesByTo {
   '/admin/inventory-combos/new': typeof AdminShellInventoryCombosNewRoute
   '/admin/inventory-products/new': typeof AdminShellInventoryProductsNewRoute
   '/admin/inventory-vendors/new': typeof AdminShellInventoryVendorsNewRoute
+  '/admin/journeys/$id': typeof AdminShellJourneysIdRoute
   '/admin/journeys/new': typeof AdminShellJourneysNewRoute
   '/admin/orders/$id': typeof AdminShellOrdersIdRoute
   '/admin/pages/$slug': typeof AdminShellPagesSlugRoute
@@ -760,6 +768,7 @@ export interface FileRoutesById {
   '/admin/_shell/inventory-products_/new': typeof AdminShellInventoryProductsNewRoute
   '/admin/_shell/inventory-vendors_/$id': typeof AdminShellInventoryVendorsIdRouteWithChildren
   '/admin/_shell/inventory-vendors_/new': typeof AdminShellInventoryVendorsNewRoute
+  '/admin/_shell/journeys_/$id': typeof AdminShellJourneysIdRoute
   '/admin/_shell/journeys_/new': typeof AdminShellJourneysNewRoute
   '/admin/_shell/orders_/$id': typeof AdminShellOrdersIdRoute
   '/admin/_shell/pages/$slug': typeof AdminShellPagesSlugRoute
@@ -846,6 +855,7 @@ export interface FileRouteTypes {
     | '/admin/inventory-products/new'
     | '/admin/inventory-vendors/$id'
     | '/admin/inventory-vendors/new'
+    | '/admin/journeys/$id'
     | '/admin/journeys/new'
     | '/admin/orders/$id'
     | '/admin/pages/$slug'
@@ -925,6 +935,7 @@ export interface FileRouteTypes {
     | '/admin/inventory-combos/new'
     | '/admin/inventory-products/new'
     | '/admin/inventory-vendors/new'
+    | '/admin/journeys/$id'
     | '/admin/journeys/new'
     | '/admin/orders/$id'
     | '/admin/pages/$slug'
@@ -1008,6 +1019,7 @@ export interface FileRouteTypes {
     | '/admin/_shell/inventory-products_/new'
     | '/admin/_shell/inventory-vendors_/$id'
     | '/admin/_shell/inventory-vendors_/new'
+    | '/admin/_shell/journeys_/$id'
     | '/admin/_shell/journeys_/new'
     | '/admin/_shell/orders_/$id'
     | '/admin/_shell/pages/$slug'
@@ -1536,6 +1548,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminShellInventoryVendorsNewRouteImport
       parentRoute: typeof AdminShellRoute
     }
+    '/admin/_shell/journeys_/$id': {
+      id: '/admin/_shell/journeys_/$id'
+      path: '/journeys/$id'
+      fullPath: '/admin/journeys/$id'
+      preLoaderRoute: typeof AdminShellJourneysIdRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
     '/admin/_shell/journeys_/new': {
       id: '/admin/_shell/journeys_/new'
       path: '/journeys/new'
@@ -1766,6 +1785,7 @@ interface AdminShellRouteChildren {
   AdminShellInventoryProductsNewRoute: typeof AdminShellInventoryProductsNewRoute
   AdminShellInventoryVendorsIdRoute: typeof AdminShellInventoryVendorsIdRouteWithChildren
   AdminShellInventoryVendorsNewRoute: typeof AdminShellInventoryVendorsNewRoute
+  AdminShellJourneysIdRoute: typeof AdminShellJourneysIdRoute
   AdminShellJourneysNewRoute: typeof AdminShellJourneysNewRoute
   AdminShellOrdersIdRoute: typeof AdminShellOrdersIdRoute
   AdminShellProductsCuratedThemesRoute: typeof AdminShellProductsCuratedThemesRoute
@@ -1811,6 +1831,7 @@ const AdminShellRouteChildren: AdminShellRouteChildren = {
   AdminShellInventoryVendorsIdRoute:
     AdminShellInventoryVendorsIdRouteWithChildren,
   AdminShellInventoryVendorsNewRoute: AdminShellInventoryVendorsNewRoute,
+  AdminShellJourneysIdRoute: AdminShellJourneysIdRoute,
   AdminShellJourneysNewRoute: AdminShellJourneysNewRoute,
   AdminShellOrdersIdRoute: AdminShellOrdersIdRoute,
   AdminShellProductsCuratedThemesRoute: AdminShellProductsCuratedThemesRoute,

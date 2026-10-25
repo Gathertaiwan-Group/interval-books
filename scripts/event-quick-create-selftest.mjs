@@ -641,7 +641,12 @@ checkTrue(
 );
 const journeysList = stripTs(readFile("src/routes/admin/_shell.journeys.tsx"));
 checkTrue("策旅列表的「新增策旅」連到一頁新增", journeysList.includes('to="/admin/journeys/new"'));
-checkTrue("策旅列表仍保留編輯（openEdit）", journeysList.includes("openEdit("));
+// 2026-10-25 編輯從 Dialog（openEdit）改成內頁 /admin/journeys/$id：不變量仍是「列表保留編輯」。
+checkTrue(
+  "策旅列表仍保留編輯（連到 /admin/journeys/$id 內頁）",
+  journeysList.includes('to="/admin/journeys/$id"') &&
+    existsSync(join(ROOT, "src/routes/admin/_shell.journeys_.$id.tsx")),
+);
 checkTrue(
   "元件以 kind 切換文案（COPY.event／COPY.journey）",
   /COPY = \{\s*event:/.test(uiSrc) && uiSrc.includes("journey: {"),
