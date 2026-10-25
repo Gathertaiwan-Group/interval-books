@@ -423,9 +423,23 @@ console.log("\n[5] 瘦身");
     /searchProductPickerRows[\s\S]{0,500}\.eq\("is_active", true\)/.test(repo),
   );
   checkTrue(
-    "搜尋剝掉 PostgREST or() 會壞掉的字元與 ilike 萬用字元",
-    /keyword\.replace\(\/\[\(\),%_\*\\\\\]\/g, " "\)/.test(repo),
+    "搜尋剝掉 PostgREST or() 會壞掉的字元（含雙引號）與 ilike 萬用字元",
+    /keyword\s*\.replace\(\/\[\(\),"%_\*\\\\\]\/g, " "\)/.test(repo),
   );
+  checkTrue(
+    "搜尋依空白拆段、每段各一個 or()（段與段 AND，跨欄位的打法也找得到）",
+    /\.split\(\/\\s\+\/\)[\s\S]{0,80}\.slice\(0, 5\)[\s\S]{0,80}for \(const t of tokens\)\s*\{\s*query = query\.or\(/.test(
+      repo,
+    ),
+  );
+  {
+    const form = code("src/components/inventory/PurchaseForm.tsx");
+    const fields = code("src/components/inventory/PurchaseFormFields.tsx");
+    checkTrue(
+      "搜尋還沒回來時顯示「搜尋中」，不閃「找不到商品」",
+      /searching=\{searching\}/.test(form) && /searching \? "搜尋中…" : "找不到商品"/.test(fields),
+    );
+  }
   const route = code(R("_shell.inventory-purchases.tsx"));
   checkTrue(
     "進貨列表 loader 不再從 loader 拿 products",

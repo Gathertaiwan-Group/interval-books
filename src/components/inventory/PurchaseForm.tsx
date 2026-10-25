@@ -62,12 +62,17 @@ function initialForm(purchase: AdminPurchaseRow | null): PurchaseFormState {
 }
 
 /** 新增時的商品搜尋：打字停 250ms 才問一次；舊的回應晚到不蓋掉新的。 */
-function useProductSearch(enabled: boolean, keyword: string): ProductPickerRow[] {
+function useProductSearch(
+  enabled: boolean,
+  keyword: string,
+): { matches: ProductPickerRow[]; searching: boolean } {
   const [matches, setMatches] = useState<ProductPickerRow[]>([]);
+  const [searching, setSearching] = useState(enabled);
   const seq = useRef(0);
   useEffect(() => {
     if (!enabled) return;
     const my = ++seq.current;
+    setSearching(true);
     const timer = setTimeout(async () => {
       try {
         const { searchPurchaseProducts } = await import("@/lib/admin/fns/inv-purchases");
@@ -75,11 +80,13 @@ function useProductSearch(enabled: boolean, keyword: string): ProductPickerRow[]
         if (my === seq.current) setMatches(rows);
       } catch (err) {
         if (my === seq.current) toast.error(err instanceof Error ? err.message : "商品搜尋失敗");
+      } finally {
+        if (my === seq.current) setSearching(false);
       }
     }, 250);
     return () => clearTimeout(timer);
   }, [enabled, keyword]);
-  return matches;
+  return { matches, searching };
 }
 
 type Props = {
@@ -98,7 +105,7 @@ export function PurchaseForm({ purchase, vendors, approvalOn, onSaved }: Props) 
   const [saving, setSaving] = useState(false);
 
   const isEdit = purchase !== null;
-  const matches = useProductSearch(!isEdit, keyword);
+  const { matches, searching } = useProductSearch(!isEdit, keyword);
 
   // 搜尋關鍵字不算「改過」：只有表單本身的值。
   const { dirty } = useFormDirty(form);
@@ -203,6 +210,7 @@ export function PurchaseForm({ purchase, vendors, approvalOn, onSaved }: Props) 
         setForm={setForm}
         onPickProduct={pickProduct}
         matches={matches}
+        searching={searching}
         keyword={keyword}
         onKeywordChange={setKeyword}
         vendors={vendors}

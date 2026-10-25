@@ -72,6 +72,7 @@ function money(n: number | null | undefined) {
 function SalesPage() {
   const { initial: loaderSales, paymentMethods } = Route.useLoaderData();
   const loaderUpdatedAt = Route.useMatch({ select: (m) => m.updatedAt });
+  const navigate = Route.useNavigate();
 
   // 篩選 → 重抓、背景重抓會反映在畫面上、從別頁回來篩選還原：都交給 useLoaderBackedList。
   // loader 已經用 DEFAULT_FILTER 抓過了，所以第一次不會再打一次。
@@ -145,16 +146,25 @@ function SalesPage() {
               </TableRow>
             ) : (
               rows.map((row) => (
-                <TableRow key={row.sale_id} className="relative hover:bg-muted/50">
+                <TableRow
+                  key={row.sale_id}
+                  className="cursor-pointer"
+                  // 整列可點（與原本一樣）：點在連結以外的地方也進明細。鍵盤與螢幕報讀走品名那個連結
+                  // （Tab → Enter），tr 本身不給 tabIndex，不重複出現兩個可聚焦的東西。
+                  // 不用「連結 ::after 蓋滿整列」的做法：要靠 tr 上的 position: relative，舊版 Safari 不穩。
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest("a")) return;
+                    rememberAdminPeek("sale", row.sale_id, row);
+                    void navigate({ to: "/admin/sales/$saleId", params: { saleId: row.sale_id } });
+                  }}
+                >
                   <TableCell className="tabular-nums">{row.sale_date}</TableCell>
                   <TableCell>
-                    {/* 整列可點：連結的 ::after 蓋滿這一列（relative 在 TableRow 上）。
-                        鍵盤走這個連結本身（Tab → Enter），不是 tr 上的 tabIndex。 */}
                     <Link
                       to="/admin/sales/$saleId"
                       params={{ saleId: row.sale_id }}
                       preload="intent"
-                      className="block max-w-[22rem] truncate after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring"
+                      className="block max-w-[22rem] truncate underline-offset-2 hover:underline"
                       onClick={() => rememberAdminPeek("sale", row.sale_id, row)}
                     >
                       {row.product_name ?? "（無品名）"}

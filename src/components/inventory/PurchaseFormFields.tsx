@@ -20,6 +20,8 @@ type Props = {
   setForm: (next: PurchaseFormState) => void;
   onPickProduct: (product: ProductPickerRow) => void;
   matches: ProductPickerRow[];
+  /** 新增時的資料庫端搜尋還沒回來（清單是空的時候顯示「搜尋中」，不閃「找不到」）。 */
+  searching?: boolean;
   keyword: string;
   onKeywordChange: (next: string) => void;
   vendors: VendorOption[];
@@ -44,6 +46,7 @@ export function PurchaseFormFields({
   setForm,
   onPickProduct,
   matches,
+  searching = false,
   keyword,
   onKeywordChange,
   vendors,
@@ -83,7 +86,9 @@ export function PurchaseFormFields({
           </div>
           <div className="max-h-44 overflow-y-auto rounded-md border border-border">
             {matches.length === 0 ? (
-              <p className="p-3 text-sm text-muted-foreground">找不到商品</p>
+              <p className="p-3 text-sm text-muted-foreground" aria-live="polite">
+                {searching ? "搜尋中…" : "找不到商品"}
+              </p>
             ) : (
               matches.map((p) => (
                 <button

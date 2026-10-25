@@ -123,8 +123,11 @@ export function ReferrerForm({ referrer, defaultDiscount, onSaved }: Props) {
       actions={actions}
       width="md"
     >
+      {/* noValidate：原本的對話框沒有包 <form>，瀏覽器不會擋 type="email" 的格式；驗證一律交給
+          server fn 的 zod（Email 只是排除自購用的備忘，不要求格式）。 */}
       <form
         id="referrer-form"
+        noValidate
         onSubmit={(e) => {
           e.preventDefault();
           void save();
