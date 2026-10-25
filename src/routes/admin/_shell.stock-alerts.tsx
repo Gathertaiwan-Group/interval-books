@@ -16,8 +16,8 @@
  * ⚠️ 標記已處理需要 approve_stock_adjustments 權限（見 lib/admin/fns/pos.ts）。
  *    看得到不等於改得動：宣告「帳現在對了」是一個需要授權的動作。
  */
-import { useCallback, useEffect, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { CheckCircle2, Loader2, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { StockAlertRow } from "@/server/repos/inv-sales";
 import { formatTaipeiDateTime } from "@/lib/taipei-time";
 import { needsPermissionHint } from "@/lib/admin/permission-labels";
+import { useLoaderBackedList } from "@/lib/admin/useLoaderBackedList";
 
 type Status = "open" | "resolved" | "all";
 
@@ -49,12 +50,30 @@ export const Route = createFileRoute("/admin/_shell/stock-alerts")({
 });
 
 function StockAlertsPage() {
-  const { alerts: initial } = Route.useLoaderData();
+  const { alerts: loaderAlerts } = Route.useLoaderData();
+  const loaderUpdatedAt = Route.useMatch({ select: (m) => m.updatedAt });
   const { user } = Route.useRouteContext();
+  const router = useRouter();
 
-  const [status, setStatus] = useState<Status>("open");
-  const [alerts, setAlerts] = useState<StockAlertRow[]>(initial);
-  const [loading, setLoading] = useState(false);
+  // 分頁籤（待處理／已處理／全部）就是篩選：換籤 → 重抓、背景重抓會反映在畫面上、
+  // 從別頁回來還停在原本那一籤，都交給 useLoaderBackedList。
+  const list = useLoaderBackedList({
+    key: "stock-alerts",
+    loaderFilter: "open" as Status,
+    loaderData: loaderAlerts,
+    loaderUpdatedAt,
+    errorMessage: "告警讀取失敗",
+    fetcher: async (next: Status) => {
+      const { listStockAlerts } = await import("@/lib/admin/fns/pos");
+      return await listStockAlerts({ data: { status: next } });
+    },
+  });
+  const status = list.filter;
+  const alerts: StockAlertRow[] = list.data;
+  const loading = list.loading;
+
+  // ⚠️ 正在標記的那一列與打到一半的處理說明留在這一頁的 state：背景重抓換掉 alerts
+  //    不會關掉對話框，也不會清掉說明。沒有樂觀更新——標記成功後重抓（見下面）。
   const [resolving, setResolving] = useState<StockAlertRow | null>(null);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -62,24 +81,6 @@ function StockAlertsPage() {
   // 側欄看得到這一頁不代表按鈕按得下去。這個旗標只控制畫面 —— 真正擋人的是
   // staffFnMiddleware("approve_stock_adjustments")，它會重讀一次 staff_permissions。
   const canResolve = user.permissions.includes("approve_stock_adjustments");
-
-  const load = useCallback(async (next: Status) => {
-    setLoading(true);
-    try {
-      const { listStockAlerts } = await import("@/lib/admin/fns/pos");
-      setAlerts(await listStockAlerts({ data: { status: next } }));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "告警讀取失敗");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const isInitial = status === "open" && alerts === initial;
-  useEffect(() => {
-    if (isInitial) return;
-    void load(status);
-  }, [status, isInitial, load]);
 
   async function submitResolution() {
     if (!resolving) return;
@@ -97,7 +98,9 @@ function StockAlertsPage() {
       }
       setResolving(null);
       setNote("");
-      await load(status);
+      // 重抓目前這一籤，再讓 loader 重跑（loader 那一份「待處理」也要換成新的）。
+      await list.reload();
+      await router.invalidate();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "標記失敗");
     } finally {
@@ -126,7 +129,7 @@ function StockAlertsPage() {
         請去盤點、或聯絡客人，處理完再回來標記，並寫下你做了什麼。
       </p>
 
-      <Tabs value={status} onValueChange={(v) => setStatus(v as Status)}>
+      <Tabs value={status} onValueChange={(v) => list.setFilter(v as Status)}>
         <TabsList>
           <TabsTrigger value="open">待處理</TabsTrigger>
           <TabsTrigger value="resolved">已處理</TabsTrigger>

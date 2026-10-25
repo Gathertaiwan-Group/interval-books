@@ -19,7 +19,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { FileSpreadsheet, Loader2, Plus, Truck } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ProductPagination } from "@/components/inventory/ProductPagination";
 import { PurchaseBatchBar } from "@/components/inventory/PurchaseBatchBar";
@@ -28,7 +27,10 @@ import { PurchaseFilterBar } from "@/components/inventory/PurchaseFilterBar";
 import { PurchaseTable } from "@/components/inventory/PurchaseTable";
 import { PurchasePageHeader } from "@/components/inventory/PurchasePageHeader";
 import { isApprovalRequired } from "@/lib/admin/inv-product-utils";
+import { stableStringify } from "@/lib/admin/form-dirty";
 import { usePurchaseActions } from "@/lib/admin/usePurchaseActions";
+import { useLoaderBackedList } from "@/lib/admin/useLoaderBackedList";
+import { usePruneVanishedSelection } from "@/lib/admin/usePruneVanishedSelection";
 import type { PurchaseFilterValues } from "@/lib/admin/schemas";
 import type { AdminPurchaseRow } from "@/server/repos/inv-purchases";
 
@@ -59,17 +61,42 @@ export const Route = createFileRoute("/admin/_shell/inventory-purchases")({
 });
 
 function InventoryPurchasesPage() {
-  const { page: initialPage, summary: initialSummary, options, products } = Route.useLoaderData();
+  const { page: loaderPage, summary: loaderSummary, options, products } = Route.useLoaderData();
+  const loaderUpdatedAt = Route.useMatch({ select: (m) => m.updatedAt });
   const { user } = Route.useRouteContext();
   const router = useRouter();
 
-  const [filter, setFilter] = useState<PurchaseFilterValues>(DEFAULT_FILTER);
-  const [data, setData] = useState(initialPage);
-  const [summary, setSummary] = useState(initialSummary);
-  const [loading, setLoading] = useState(false);
+  // 清單與統計卡是同一組篩選抓的兩份，合成一份交給 useLoaderBackedList：背景重抓
+  // （staleTime 過期、寫入後 invalidate）會反映在畫面上，篩選從內頁回來會還原。
+  const loaderData = useMemo(
+    () => ({ page: loaderPage, summary: loaderSummary }),
+    [loaderPage, loaderSummary],
+  );
+  const list = useLoaderBackedList({
+    key: "inventory-purchases",
+    loaderFilter: DEFAULT_FILTER,
+    loaderData,
+    loaderUpdatedAt,
+    errorMessage: "進貨清單讀取失敗",
+    fetcher: async (next: PurchaseFilterValues) => {
+      const { listAdminPurchases, getPurchaseSummary } =
+        await import("@/lib/admin/fns/inv-purchases");
+      const [page, summary] = await Promise.all([
+        listAdminPurchases({ data: next }),
+        getPurchaseSummary({ data: next }),
+      ]);
+      return { page, summary };
+    },
+  });
+  const { filter, loading } = list;
+  const data = list.data.page;
+  const summary = list.data.summary;
 
+  // ⚠️ 勾選是使用者正在做的事，留在這一頁自己的 state；背景更新只拿掉剛剛消失的那幾列。
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const rowIds = useMemo(() => data.rows.map((r) => r.purchase_id), [data.rows]);
+  usePruneVanishedSelection(rowIds, stableStringify(filter), loading, setSelectedIds);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<AdminPurchaseRow | null>(null);
@@ -80,36 +107,18 @@ function InventoryPurchasesPage() {
   const canApprove = user.permissions.includes("approve_purchases");
   const approvalOn = isApprovalRequired(options.approvalSettings, "purchases");
 
-  const reload = useCallback(async (next: PurchaseFilterValues) => {
-    setLoading(true);
-    try {
-      const { listAdminPurchases, getPurchaseSummary } =
-        await import("@/lib/admin/fns/inv-purchases");
-      const [rows, totals] = await Promise.all([
-        listAdminPurchases({ data: next }),
-        getPurchaseSummary({ data: next }),
-      ]);
-      setData(rows);
-      setSummary(totals);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "進貨清單讀取失敗");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   function changeFilter(next: PurchaseFilterValues) {
-    setFilter(next);
     setSelectedIds([]);
-    void reload(next);
+    list.setFilter(next);
   }
 
   /** 寫入之後重抓這一頁。這個 repo 沒有 react-query，重抓就是唯一的同步方式。 */
+  const reloadList = list.reload;
   const refresh = useCallback(async () => {
-    await reload(filter);
+    await reloadList();
     // 商品清單與審核設定在 loader 裡，匯入可能剛剛建了新商品 —— 一起重跑。
     await router.invalidate();
-  }, [filter, reload, router]);
+  }, [reloadList, router]);
 
   const rowsById = useMemo(() => {
     const map = new Map<string, AdminPurchaseRow>();
@@ -233,11 +242,7 @@ function InventoryPurchasesPage() {
         page={filter.page}
         totalPages={Math.max(1, Math.ceil(data.total / filter.pageSize))}
         disabled={loading}
-        onPageChange={(page) => {
-          const next = { ...filter, page };
-          setFilter(next);
-          void reload(next);
-        }}
+        onPageChange={(page) => list.setFilter({ ...filter, page })}
       />
 
       {!canApprove ? (

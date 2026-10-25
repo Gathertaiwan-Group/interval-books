@@ -14,10 +14,9 @@
  *    fns/inv-adjustments.ts 裡 approveRecord 那一次權限檢查，而且它重讀
  *    staff_permissions，不信任前端送來的任何東西。
  */
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Loader2, Plus, SlidersHorizontal } from "lucide-react";
-import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +30,7 @@ import { ProductPagination } from "@/components/inventory/ProductPagination";
 import { ADJUSTMENT_CATEGORY_OPTIONS } from "@/lib/admin/inv-adjustment-labels";
 import { isApprovalRequired } from "@/lib/admin/inv-product-utils";
 import { useAdjustmentActions } from "@/lib/admin/useAdjustmentActions";
+import { useLoaderBackedList } from "@/lib/admin/useLoaderBackedList";
 import type { AdjustmentFilterValues } from "@/lib/admin/schemas";
 import type { AdminAdjustmentRow } from "@/server/repos/inv-adjustments";
 
@@ -61,15 +61,39 @@ export const Route = createFileRoute("/admin/_shell/inventory-adjustments")({
 });
 
 function InventoryAdjustmentsPage() {
-  const { page: initialPage, summary: initialSummary, options } = Route.useLoaderData();
+  const { page: loaderPage, summary: loaderSummary, options } = Route.useLoaderData();
+  const loaderUpdatedAt = Route.useMatch({ select: (m) => m.updatedAt });
   const { user } = Route.useRouteContext();
   const router = useRouter();
 
-  const [filter, setFilter] = useState<AdjustmentFilterValues>(DEFAULT_FILTER);
-  const [data, setData] = useState(initialPage);
-  const [summary, setSummary] = useState(initialSummary);
-  const [loading, setLoading] = useState(false);
+  // 清單與統計卡吃同一組篩選（統計只看日期區間），合成一份交給 useLoaderBackedList：
+  // 背景重抓會反映在畫面上，篩選從內頁回來會還原。
+  const loaderData = useMemo(
+    () => ({ page: loaderPage, summary: loaderSummary }),
+    [loaderPage, loaderSummary],
+  );
+  const list = useLoaderBackedList({
+    key: "inventory-adjustments",
+    loaderFilter: DEFAULT_FILTER,
+    loaderData,
+    loaderUpdatedAt,
+    errorMessage: "異動清單讀取失敗",
+    fetcher: async (next: AdjustmentFilterValues) => {
+      const { getAdjustmentSummary, listAdminAdjustments } =
+        await import("@/lib/admin/fns/inv-adjustments");
+      // 統計卡與清單吃同一組日期區間，所以兩支一起重抓。
+      const [page, summary] = await Promise.all([
+        listAdminAdjustments({ data: next }),
+        getAdjustmentSummary({ data: { dateFrom: next.dateFrom, dateTo: next.dateTo } }),
+      ]);
+      return { page, summary };
+    },
+  });
+  const { filter, loading } = list;
+  const data = list.data.page;
+  const summary = list.data.summary;
 
+  // 對話框看的是點開那一刻那一列的副本（留在這一頁的 state），背景重抓不會把它關掉或換掉。
   const [formOpen, setFormOpen] = useState(false);
   const [detail, setDetail] = useState<AdminAdjustmentRow | null>(null);
   const [confirming, setConfirming] = useState<PendingConfirm>(null);
@@ -78,35 +102,16 @@ function InventoryAdjustmentsPage() {
   // 只拿來寫提示文字。真正的 status 是 inv.stock_adjustment_initial_status() 算的。
   const approvalOn = isApprovalRequired(options.approvalSettings, "stock_adjustments");
 
-  const reload = useCallback(async (next: AdjustmentFilterValues) => {
-    setLoading(true);
-    try {
-      const { getAdjustmentSummary, listAdminAdjustments } =
-        await import("@/lib/admin/fns/inv-adjustments");
-      // 統計卡與清單吃同一組日期區間，所以兩支一起重抓。
-      const [page, stats] = await Promise.all([
-        listAdminAdjustments({ data: next }),
-        getAdjustmentSummary({ data: { dateFrom: next.dateFrom, dateTo: next.dateTo } }),
-      ]);
-      setData(page);
-      setSummary(stats);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "異動清單讀取失敗");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   function changeFilter(next: AdjustmentFilterValues) {
-    setFilter(next);
-    void reload(next);
+    list.setFilter(next);
   }
 
   /** 寫入之後重抓這一頁；審核設定放在 loader 裡，所以也讓 router 重跑一次。 */
+  const reloadList = list.reload;
   const refresh = useCallback(async () => {
-    await reload(filter);
+    await reloadList();
     await router.invalidate();
-  }, [filter, reload, router]);
+  }, [reloadList, router]);
 
   const { busyId, handleSubmit, handleDelete, handleResubmit, handleApprove, handleReverse } =
     useAdjustmentActions(refresh);
@@ -188,11 +193,7 @@ function InventoryAdjustmentsPage() {
         page={filter.page}
         totalPages={totalPages}
         disabled={loading}
-        onPageChange={(page) => {
-          const next = { ...filter, page };
-          setFilter(next);
-          void reload(next);
-        }}
+        onPageChange={(page) => list.setFilter({ ...filter, page })}
       />
 
       {!canApprove ? (

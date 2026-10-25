@@ -18,7 +18,6 @@
 import { useCallback, useState } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { ClipboardCheck, ClipboardList, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BatchStockCountDialog } from "@/components/inventory/BatchStockCountDialog";
@@ -28,6 +27,7 @@ import { StockCountFilterBar, type CountFilter } from "@/components/inventory/St
 import { StockCountSummaryCards } from "@/components/inventory/StockCountSummaryCards";
 import { RecentStockCounts, StockCountTable } from "@/components/inventory/StockCountTable";
 import { isApprovalRequired } from "@/lib/admin/inv-product-utils";
+import { useLoaderBackedList } from "@/lib/admin/useLoaderBackedList";
 import type { StockCountProductRow } from "@/server/repos/inv-adjustments";
 
 const DEFAULT_FILTER: CountFilter = {
@@ -69,43 +69,46 @@ export const Route = createFileRoute("/admin/_shell/inventory-count")({
 });
 
 function InventoryCountPage() {
-  const { page: initialPage, options, summary, recent } = Route.useLoaderData();
+  // 統計卡與最近盤點紀錄直接用 loader 的（router 重跑就會更新）；清單依篩選另外抓，
+  // 交給 useLoaderBackedList 取兩份裡比較新的。
+  const { page: loaderPage, options, summary, recent } = Route.useLoaderData();
+  const loaderUpdatedAt = Route.useMatch({ select: (m) => m.updatedAt });
   const router = useRouter();
 
-  const [filter, setFilter] = useState<CountFilter>(DEFAULT_FILTER);
-  const [data, setData] = useState(initialPage);
-  const [loading, setLoading] = useState(false);
+  const list = useLoaderBackedList({
+    key: "inventory-count",
+    loaderFilter: DEFAULT_FILTER,
+    loaderData: loaderPage,
+    loaderUpdatedAt,
+    errorMessage: "商品清單讀取失敗",
+    fetcher: async (next: CountFilter) => {
+      const { listStockCountProducts } = await import("@/lib/admin/fns/inv-adjustments");
+      return await listStockCountProducts({ data: next });
+    },
+  });
+  const { filter, data, loading } = list;
+
+  // ⚠️ 正在盤的那一列是點下去那一刻的副本，不從 data 用 id 反查：StockCountDialog 在
+  //    product 換掉時會把打到一半的實盤數量清空，背景重抓不可以觸發它。差異本來就由
+  //    資料庫用送出當下的庫存算（見檔頭），副本裡的庫存只拿來顯示。
   const [counting, setCounting] = useState<StockCountProductRow | null>(null);
   const [batchOpen, setBatchOpen] = useState(false);
 
   // 只拿來寫提示文字。真正的 status 是資料庫算的。
   const countApprovalOn = isApprovalRequired(options.approvalSettings, "stock_adjustments");
 
-  const reload = useCallback(async (next: CountFilter) => {
-    setLoading(true);
-    try {
-      const { listStockCountProducts } = await import("@/lib/admin/fns/inv-adjustments");
-      setData(await listStockCountProducts({ data: next }));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "商品清單讀取失敗");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   function changeFilter(patch: Partial<CountFilter>) {
     // 任何條件變動都回到第一頁 —— 停在第 5 頁再換一個只有 3 頁結果的條件，看到的會是
     // 「沒有資料」而不是「你在第 5 頁」。
-    const next = { ...filter, ...patch, page: 0 };
-    setFilter(next);
-    void reload(next);
+    list.setFilter({ ...filter, ...patch, page: 0 });
   }
 
   /** 盤完之後重抓這一頁，順便讓 loader 重跑（統計卡與最近紀錄在那裡）。 */
+  const reloadList = list.reload;
   const refresh = useCallback(async () => {
-    await reload(filter);
+    await reloadList();
     await router.invalidate();
-  }, [filter, reload, router]);
+  }, [reloadList, router]);
 
   const totalPages = Math.max(1, Math.ceil(data.total / filter.pageSize));
 
@@ -159,11 +162,7 @@ function InventoryCountPage() {
         page={filter.page}
         totalPages={totalPages}
         disabled={loading}
-        onPageChange={(page) => {
-          const next = { ...filter, page };
-          setFilter(next);
-          void reload(next);
-        }}
+        onPageChange={(page) => list.setFilter({ ...filter, page })}
       />
 
       <RecentStockCounts rows={recent.rows} />

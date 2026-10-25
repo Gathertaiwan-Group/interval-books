@@ -17,10 +17,9 @@
  *   金額分攤規則（第一件吃全額、其餘記 0）需要一頁自己的 UI 才講得清楚。
  * · 月結對帳的「標記已對帳」寫入：這一頁看得到 is_reconciled，但還不能改它。
  */
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight, Loader2, Receipt } from "lucide-react";
-import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +34,7 @@ import { SaleDetailDialog } from "@/components/pos/SaleDetailDialog";
 import { SalesFilterBar } from "@/components/pos/SalesFilterBar";
 import type { PosSaleRow } from "@/server/repos/inv-sales";
 import type { SalesFilterValues } from "@/lib/admin/schemas";
+import { useLoaderBackedList } from "@/lib/admin/useLoaderBackedList";
 
 const PAGE_SIZE = 50;
 
@@ -68,31 +68,26 @@ function money(n: number | null | undefined) {
 }
 
 function SalesPage() {
-  const { initial, paymentMethods } = Route.useLoaderData();
+  const { initial: loaderSales, paymentMethods } = Route.useLoaderData();
+  const loaderUpdatedAt = Route.useMatch({ select: (m) => m.updatedAt });
 
-  const [filter, setFilter] = useState<SalesFilterValues>(DEFAULT_FILTER);
-  const [data, setData] = useState(initial);
-  const [loading, setLoading] = useState(false);
-  const [selected, setSelected] = useState<PosSaleRow | null>(null);
-
-  const load = useCallback(async (next: SalesFilterValues) => {
-    setLoading(true);
-    try {
+  // 篩選 → 重抓、背景重抓會反映在畫面上、從別頁回來篩選還原：都交給 useLoaderBackedList。
+  // loader 已經用 DEFAULT_FILTER 抓過了，所以第一次不會再打一次。
+  const list = useLoaderBackedList({
+    key: "sales",
+    loaderFilter: DEFAULT_FILTER,
+    loaderData: loaderSales,
+    loaderUpdatedAt,
+    errorMessage: "銷售紀錄讀取失敗",
+    fetcher: async (next: SalesFilterValues) => {
       const { listPosSales } = await import("@/lib/admin/fns/pos");
-      setData(await listPosSales({ data: next }));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "銷售紀錄讀取失敗");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return await listPosSales({ data: next });
+    },
+  });
+  const { filter, setFilter, data, loading } = list;
 
-  // 第一次不重打：loader 已經用 DEFAULT_FILTER 抓過了。
-  const isInitial = filter === DEFAULT_FILTER;
-  useEffect(() => {
-    if (isInitial) return;
-    void load(filter);
-  }, [filter, isInitial, load]);
+  // 明細對話框看的是點開那一刻那一列的副本，背景重抓不會把它關掉或換掉（第 3 批再改內頁）。
+  const [selected, setSelected] = useState<PosSaleRow | null>(null);
 
   const { rows, total, summary } = data;
   const lastPage = Math.max(0, Math.ceil(total / filter.pageSize) - 1);
@@ -207,7 +202,7 @@ function SalesPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setFilter((f) => ({ ...f, page: f.page - 1 }))}
+            onClick={() => setFilter({ ...filter, page: filter.page - 1 })}
             disabled={loading || filter.page <= 0}
           >
             <ChevronLeft className="mr-1 h-4 w-4" />
@@ -216,7 +211,7 @@ function SalesPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setFilter((f) => ({ ...f, page: f.page + 1 }))}
+            onClick={() => setFilter({ ...filter, page: filter.page + 1 })}
             disabled={loading || filter.page >= lastPage}
           >
             下一頁
