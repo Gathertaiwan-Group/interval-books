@@ -33,7 +33,7 @@
  */
 import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
-import type { EmailCopy } from "@/lib/email-templates";
+import type { AdminOrderContact, EmailCopy } from "@/lib/email-templates";
 import type { Lang, Localized } from "@/i18n/types";
 
 /** 與 0022 §5 fail_email 的 p_max_attempts 預設值一致。改這裡要一起改 SQL。 */
@@ -617,6 +617,95 @@ export async function getOrderPublicToken(orderId: string): Promise<string | nul
   }
   const token = (data as { public_token?: unknown } | null)?.public_token;
   return typeof token === "string" && token !== "" ? token : null;
+}
+
+// -----------------------------------------------------------------------------
+// 店家通知信要用的訂購人資料（2026-10）
+// -----------------------------------------------------------------------------
+
+/**
+ * 店家新訂單通知信最上面那一區：訂購人姓名／電話／信箱、收件資料、統編、備註。
+ *
+ * 🔴 **回傳的是明文個資，只准餵給 renderAdminOrderNotificationEmail()。** 那封信的
+ *    收件人是 site_settings.notify_emails（店家自己的信箱）。刻意**不**併進
+ *    getOrderForNotify()：那支同時餵客人的信，混進去就等於讓客人那幾條路徑也拿得到
+ *    別人的電話與地址（同 getOrderPublicToken() 不併進去的理由）。
+ *
+ * ⚠️ 不 throw。任何一段讀失敗回 null（或那一段是 null），店家信照寄、只是少資料——
+ *    這支跑在結帳／付款成功的路徑上，規約是絕不拖垮訂單。console.error 只印
+ *    error.code 與 error.message（PostgREST 的 DETAIL 會帶整列值，那就是個資）。
+ */
+export async function getOrderContactForAdminNotify(
+  orderId: string,
+): Promise<AdminOrderContact | null> {
+  try {
+    const db = supabaseAdmin();
+    const [orderRes, addrRes, invRes] = await Promise.all([
+      db
+        .from("orders")
+        .select("customer_name, customer_phone, customer_email, note")
+        .eq("id", orderId)
+        .maybeSingle(),
+      db
+        .from("order_addresses")
+        .select(
+          "recipient, phone, postal_code, city, district, street, cvs_store_id, cvs_store_name, cvs_address",
+        )
+        .eq("order_id", orderId)
+        .eq("type", "shipping")
+        .maybeSingle(),
+      db.from("invoices").select("tax_id, company_title").eq("order_id", orderId).maybeSingle(),
+    ]);
+
+    if (orderRes.error || !orderRes.data) {
+      if (orderRes.error) {
+        console.error(
+          `[repo/email-outbox] 店家信讀訂購人失敗 order=${orderId}：${orderRes.error.code} ${orderRes.error.message}`,
+        );
+      }
+      return null;
+    }
+    if (addrRes.error) {
+      console.error(
+        `[repo/email-outbox] 店家信讀收件地址失敗 order=${orderId}：${addrRes.error.code} ${addrRes.error.message}`,
+      );
+    }
+    if (invRes.error) {
+      console.error(
+        `[repo/email-outbox] 店家信讀發票資料失敗 order=${orderId}：${invRes.error.code} ${invRes.error.message}`,
+      );
+    }
+
+    const str = (v: unknown) => (v == null ? "" : String(v).trim());
+    const o = orderRes.data as Record<string, unknown>;
+    const a = (addrRes.error ? null : addrRes.data) as Record<string, unknown> | null;
+    const inv = (invRes.error ? null : invRes.data) as Record<string, unknown> | null;
+
+    return {
+      customerName: str(o.customer_name),
+      customerPhone: str(o.customer_phone),
+      customerEmail: str(o.customer_email),
+      note: str(o.note),
+      shipping: a
+        ? {
+            recipient: str(a.recipient),
+            phone: str(a.phone),
+            postalCode: str(a.postal_code),
+            city: str(a.city),
+            district: str(a.district),
+            street: str(a.street),
+            cvsStoreName: str(a.cvs_store_name),
+            cvsStoreId: str(a.cvs_store_id),
+            cvsAddress: str(a.cvs_address),
+          }
+        : null,
+      invoice: inv ? { taxId: str(inv.tax_id), companyTitle: str(inv.company_title) } : null,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[repo/email-outbox] 店家信讀訂購人發生例外 order=${orderId}：${message}`);
+    return null;
+  }
 }
 
 // -----------------------------------------------------------------------------

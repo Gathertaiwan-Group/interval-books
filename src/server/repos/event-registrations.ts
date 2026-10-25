@@ -62,6 +62,8 @@
  *   名單頁     → listSessionRoster()：回**全部**報名，畫面自己用 on_roster 分。
  *   CSV 匯出   → SQL 的 export_event_roster()：它自己 `where v.on_roster`。
  *   Phase 3    → loadPaidRoster()：目前**零呼叫端**，是為提醒信預留的。
+ *   店家通知信 → loadOrderAttendeesForAdminNotify()：一張訂單的**全部**報名（遮罩值），
+ *               不篩 on_roster（待收款那封寄出時還沒付款）。不是簽到表。
  *
  * 三邊共用的是那個 `on_roster` 欄位，不是同一支 TypeScript 函式 —— 而共用欄位
  * 比共用函式更硬，因為 SQL 那一側也繞不過去。
@@ -74,6 +76,7 @@
 import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
 import type { Localized } from "@/i18n/types";
+import type { AdminOrderAttendee } from "@/lib/email-templates";
 
 /**
  * 0021 §3 的 public.admin_event_roster。
@@ -235,6 +238,55 @@ export async function loadPaidRoster(sessionId: string): Promise<RegistrationRos
  */
 export async function loadPaidRosterByOrder(orderId: string): Promise<RegistrationRosterRow[]> {
   return queryPaidRoster("order_id", orderId);
+}
+
+/**
+ * 這張訂單上的每一位參加者，依場次分組——店家通知信用。
+ *
+ * 讀的是 0021 §3 的 public.admin_event_roster（**遮罩過的** view），不是
+ * event_registrations 本表：明文的出口只有 reveal_registration_contact()／
+ * export_event_roster()，而那兩支一定寫 pii_access_log（0021 §0.1）。這裡不開第三條
+ * 不留痕的路，所以信裡的參加者電話／信箱是遮罩值、姓名是全名（同名單頁）。
+ *
+ * ⚠️ **不篩 on_roster**：匯款待收款那封（atOrderTime）寄出時訂單還沒付款，篩了就
+ *    一個人都拿不到。這是「這張訂單填了誰」，不是「誰在簽到表上」——簽到表、提醒信
+ *    與報名成功信仍然走 event-registrations.ts 的 loadPaidRoster*()。
+ *
+ * 不 throw；讀失敗回空 Map（信照寄，只印人數）。
+ */
+export async function loadOrderAttendeesForAdminNotify(
+  orderId: string,
+): Promise<Map<string, AdminOrderAttendee[]>> {
+  const out = new Map<string, AdminOrderAttendee[]>();
+  try {
+    const { data, error } = await supabaseAdmin()
+      .from("admin_event_roster")
+      .select("session_id, name, phone_masked, email_masked, seat_no, created_at")
+      .eq("order_id", orderId)
+      .order("created_at", { ascending: true })
+      .order("seat_no", { ascending: true });
+    if (error) {
+      console.error(
+        `[repo/event-registrations] 店家信讀參加者失敗 order=${orderId}：${error.code} ${error.message}`,
+      );
+      return out;
+    }
+    for (const r of (data ?? []) as Record<string, unknown>[]) {
+      const sid = String(r.session_id ?? "");
+      if (!sid) continue;
+      const list = out.get(sid) ?? [];
+      list.push({
+        name: String(r.name ?? "").trim(),
+        phoneMasked: r.phone_masked == null ? null : String(r.phone_masked),
+        emailMasked: r.email_masked == null ? null : String(r.email_masked),
+      });
+      out.set(sid, list);
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[repo/event-registrations] 店家信讀參加者發生例外 order=${orderId}：${message}`);
+  }
+  return out;
 }
 
 /**

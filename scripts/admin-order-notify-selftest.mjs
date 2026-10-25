@@ -486,6 +486,62 @@ if (adminEnqueueLog) {
   );
 }
 
+// ── 2026-10：店家信的訂購人資料／參加者／後台連結接線 ─────────────────────────
+console.log("\n[6b] 店家通知信的訂購人區塊接線（2026-10）");
+{
+  // ⚠️ 這兩條用原始碼（notifyTs）數，不用 stripTs 過的：stripTs 的區塊註解 regex 會把
+  //    兩段之間某些含 `/*` 的字串一起吃掉，數出來少一個（第一次跑就這樣紅過）。
+  check(
+    "兩條店家信路徑都呼叫 loadAdminMailExtras(orderId)",
+    (notifyTs.match(/await loadAdminMailExtras\(orderId\)/g) ?? []).length,
+    2,
+  );
+  check(
+    "兩次 renderAdminOrderNotificationEmail 都傳 contact 與 adminUrl",
+    (notifyTs.match(/contact:\s*extras\.contact,\s*adminUrl:\s*extras\.adminUrl/g) ?? []).length,
+    2,
+  );
+  checkTrue(
+    "後台連結是 /admin/orders?order=<id>（publicUrlFor，組不出來就是 null）",
+    /publicUrlFor\("\/admin\/orders",\s*\{\s*order:\s*orderId\s*\}\)/.test(notifyCode),
+  );
+  const fnStart = outboxCode.indexOf("export async function getOrderContactForAdminNotify(");
+  checkTrue("反空殼：找得到 getOrderContactForAdminNotify", fnStart > 0);
+  const fnBody = outboxCode.slice(fnStart, outboxCode.indexOf("\nexport ", fnStart + 10));
+  checkTrue(
+    "getOrderContactForAdminNotify 讀 orders 的姓名／電話／信箱／備註",
+    /"customer_name, customer_phone, customer_email, note"/.test(fnBody),
+  );
+  check("getOrderContactForAdminNotify 不 throw", /\bthrow\b/.test(fnBody), false);
+
+  // 明文個資只准進店家那封信：整個 src/ 只有 notify.ts 呼叫它。
+  const { readdirSync, statSync } = await import("node:fs");
+  const walk = (d) =>
+    readdirSync(d).flatMap((n) => {
+      const f = join(d, n);
+      return statSync(f).isDirectory() ? walk(f) : /\.(ts|tsx)$/.test(n) ? [f] : [];
+    });
+  const callers = walk(join(ROOT, "src"))
+    .filter((f) => !f.endsWith("email-outbox.ts"))
+    .filter((f) => stripTs(readFileSync(f, "utf8")).includes("getOrderContactForAdminNotify"))
+    .map((f) => f.slice(ROOT.length + 1));
+  check("🔴 getOrderContactForAdminNotify 只有 notify.ts 在用", callers, ["src/server/notify.ts"]);
+
+  const regCode = stripTs(readFile(join(ROOT, "src/server/repos/event-registrations.ts")));
+  const aStart = regCode.indexOf("export async function loadOrderAttendeesForAdminNotify(");
+  checkTrue("反空殼：找得到 loadOrderAttendeesForAdminNotify", aStart > 0);
+  const aBody = regCode.slice(aStart, regCode.indexOf("\nexport ", aStart + 10));
+  checkTrue(
+    "🔴 參加者讀遮罩過的 admin_event_roster（不是 event_registrations 本表）",
+    /from\("admin_event_roster"\)/.test(aBody) && !/from\("event_registrations"\)/.test(aBody),
+  );
+  check(
+    "參加者只取遮罩欄位（沒有 select 明文 email／phone）",
+    /"[^"]*\b(email|phone)\b[,"]/.test(aBody),
+    false,
+  );
+}
+
 // =============================================================================
 // [7] src/server/email.ts：parseRecipients 用在 Resend 的 to 陣列
 // =============================================================================
@@ -722,10 +778,11 @@ if (tpl) {
     eventMail.text.includes("無需配送"),
   );
 
-  // ── 個資最小化：型別上沒有地址／電話欄位，這裡用反射確認呼叫端真的傳不進去 ──
+  // ── 2026-10 起訂購人資料走 contact 欄位（店家通知信，業主要求）；不傳 contact
+  //    的舊呼叫形狀仍然排得出一封信（當作讀不到訂購人）。 ──
   checkTrue(
-    "🔴 AdminOrderNotificationInput 沒有 phone / address 這種欄位可傳（編譯期保證，這裡做執行期輔證）",
-    !("phone" in baseInput) && !("address" in baseInput) && !("customerPhone" in baseInput),
+    "不傳 contact 時信仍排得出來，並註明訂購人讀取失敗",
+    bookMail.text.includes("訂購人資料讀取失敗"),
   );
 
   // ── XSS：品項名稱裡的符號在 html 輸出要被跳脫（沿用既有的 escapeHtml，不是繞過它）──
@@ -738,6 +795,268 @@ if (tpl) {
   const xssMail = tpl.renderAdminOrderNotificationEmail(xssInput);
   check("html 裡的 <script> 被跳脫成 &lt;script&gt;", xssMail.html.includes("<script>"), false);
   checkTrue("跳脫後的字串確實在 html 裡", xssMail.html.includes("&lt;script&gt;"));
+
+  // ── 2026-10：訂購人區塊（業主要求「一眼看出是誰的訂單」）────────────────────
+  const contactFull = {
+    customerName: "王小明",
+    customerPhone: "0912-345-678",
+    customerEmail: "buyer@example.com",
+    note: "請週末送達",
+    shipping: {
+      recipient: "陳大華",
+      phone: "0987654321",
+      postalCode: "100",
+      city: "臺北市",
+      district: "中正區",
+      street: "重慶南路一段 1 號 3 樓",
+      cvsStoreName: "",
+      cvsStoreId: "",
+      cvsAddress: "",
+    },
+    invoice: { taxId: "12345678", companyTitle: "小時光有限公司" },
+  };
+  const homeMail = tpl.renderAdminOrderNotificationEmail({
+    ...baseInput,
+    stage: "afterPayment",
+    contact: contactFull,
+    adminUrl:
+      "https://intervalbooks.example/admin/orders?order=00000000-0000-4000-8000-000000000001",
+  });
+  check(
+    "🔴 主旨：新訂單 <編號>｜<訂購人>｜<金額>",
+    homeMail.subject,
+    "【小時光書店】新訂單 IB-SELFTEST-0032｜王小明｜NT$1,280",
+  );
+  {
+    const t = homeMail.text;
+    const iBuyer = t.indexOf("訂購人");
+    const iOrderNo = t.indexOf("訂單編號");
+    checkTrue("訂購人區塊在訂單摘要之前（最上面）", iBuyer > 0 && iBuyer < iOrderNo);
+    for (const [label, v] of [
+      ["姓名", "王小明"],
+      ["電話", "0912-345-678"],
+      ["Email", "buyer@example.com"],
+      ["收件方式", "宅配到府"],
+      ["收件人", "陳大華"],
+      ["收件人電話", "0987654321"],
+      ["地址", "100 臺北市中正區重慶南路一段 1 號 3 樓"],
+      ["統編", "12345678"],
+      ["抬頭", "小時光有限公司"],
+      ["備註", "請週末送達"],
+    ]) {
+      checkTrue(`text 有「${label}：${v}」`, t.includes(`${label}：${v}`));
+    }
+    check("收件方式只印一次（不在摘要重複）", t.split("收件方式").length - 1, 1);
+    checkTrue(
+      "text 有後台訂單連結",
+      t.includes("/admin/orders?order=00000000-0000-4000-8000-000000000001"),
+    );
+  }
+  checkTrue("html 電話是 tel: 連結（去掉分隔符）", homeMail.html.includes('href="tel:0912345678"'));
+  checkTrue(
+    "html Email 是 mailto: 連結",
+    homeMail.html.includes('href="mailto:buyer@example.com"'),
+  );
+  checkTrue("html 有「到後台查看這張訂單」按鈕", homeMail.html.includes("到後台查看這張訂單"));
+
+  // 收件人與訂購人相同 → 不重複印收件人
+  const sameMail = tpl.renderAdminOrderNotificationEmail({
+    ...baseInput,
+    stage: "afterPayment",
+    contact: {
+      ...contactFull,
+      shipping: { ...contactFull.shipping, recipient: "王小明", phone: "0912-345-678" },
+    },
+  });
+  check("收件人＝訂購人時不印「收件人」列", sameMail.text.includes("收件人："), false);
+  checkTrue("收件人＝訂購人時地址照印", sameMail.text.includes("地址：100 臺北市"));
+
+  // 超商取貨
+  const cvsMail = tpl.renderAdminOrderNotificationEmail({
+    ...baseInput,
+    shippingMethod: "cvs",
+    stage: "afterPayment",
+    contact: {
+      ...contactFull,
+      shipping: {
+        ...contactFull.shipping,
+        postalCode: "",
+        city: "",
+        district: "",
+        street: "",
+        cvsStoreName: "7-ELEVEN 博愛門市",
+        cvsStoreId: "123456",
+        cvsAddress: "臺北市中正區博愛路 1 號",
+      },
+    },
+  });
+  checkTrue(
+    "超商：印取貨門市＋店號",
+    cvsMail.text.includes("取貨門市：7-ELEVEN 博愛門市（123456）"),
+  );
+  checkTrue("超商：印門市地址", cvsMail.text.includes("門市地址：臺北市中正區博愛路 1 號"));
+  check("超商：不印宅配地址列", cvsMail.text.includes("\n  地址："), false);
+
+  // 缺欄位：沒電話／沒信箱／沒備註／沒統編／沒地址 → 整列不印，不印空白
+  const sparseMail = tpl.renderAdminOrderNotificationEmail({
+    ...baseInput,
+    shippingMethod: "pickup",
+    stage: "afterPayment",
+    contact: {
+      customerName: "林",
+      customerPhone: "",
+      customerEmail: "",
+      note: "   ",
+      shipping: null,
+      invoice: null,
+    },
+  });
+  for (const label of ["電話：", "Email：", "備註：", "統編：", "抬頭：", "收件人：", "地址："]) {
+    check(`缺欄位時不印「${label}」`, sparseMail.text.includes(label), false);
+  }
+  checkTrue("缺欄位時仍印收件方式", sparseMail.text.includes("收件方式：門市自取"));
+  check("沒有 adminUrl 時不放連結", sparseMail.html.includes("到後台查看這張訂單"), false);
+  checkTrue("沒有 adminUrl 時提示登入後台", sparseMail.text.includes("請登入後台"));
+
+  // contact = null（讀失敗）→ 信照寄、主旨不帶姓名、摘要保留收件方式
+  const nullMail = tpl.renderAdminOrderNotificationEmail({
+    ...baseInput,
+    stage: "afterPayment",
+    contact: null,
+  });
+  check(
+    "讀不到訂購人時主旨＝編號＋金額",
+    nullMail.subject,
+    "【小時光書店】新訂單 IB-SELFTEST-0032｜NT$1,280",
+  );
+  checkTrue("讀不到訂購人時註明請到後台查看", nullMail.text.includes("訂購人資料讀取失敗"));
+  checkTrue("讀不到訂購人時摘要仍有收件方式", nullMail.text.includes("收件方式：宅配到府"));
+
+  // 待收款（atOrderTime）主旨
+  const placedMail = tpl.renderAdminOrderNotificationEmail({
+    ...baseInput,
+    stage: "atOrderTime",
+    paymentMethod: "transfer",
+    contact: contactFull,
+  });
+  check(
+    "🔴 待收款主旨：待收款訂單 <編號>｜<訂購人>｜<金額>",
+    placedMail.subject,
+    "【小時光書店】待收款訂單 IB-SELFTEST-0032｜王小明｜NT$1,280",
+  );
+
+  // 主旨：換行／控制字元壓平、過長截斷
+  const evilSubject = tpl.renderAdminOrderNotificationEmail({
+    ...baseInput,
+    stage: "afterPayment",
+    contact: { ...contactFull, customerName: "王\r\nBcc: x@evil.test\t小明" },
+  }).subject;
+  check("主旨裡沒有換行", /[\r\n\t]/.test(evilSubject), false);
+  const longSubject = tpl.renderAdminOrderNotificationEmail({
+    ...baseInput,
+    stage: "afterPayment",
+    contact: { ...contactFull, customerName: "長".repeat(80) },
+  }).subject;
+  checkTrue("主旨裡過長的姓名被截斷", longSubject.includes("長".repeat(30) + "…｜"));
+
+  // 活動報名：逐位參加者（遮罩值）
+  const attendeeMail = tpl.renderAdminOrderNotificationEmail({
+    ...sessionInput,
+    stage: "afterPayment",
+    contact: { ...contactFull, shipping: null, invoice: null, note: "" },
+    sessions: [
+      {
+        ...sessionInput.sessions[0],
+        participants: 2,
+        attendees: [
+          { name: "參加者甲", phoneMasked: "******5678", emailMasked: "a***@x.com" },
+          { name: "參加者乙", phoneMasked: null, emailMasked: "b***@y.com" },
+        ],
+      },
+    ],
+  });
+  checkTrue(
+    "活動：參加者 1 姓名＋遮罩聯絡",
+    attendeeMail.text.includes("參加者 1：參加者甲　******5678　a***@x.com"),
+  );
+  checkTrue(
+    "活動：參加者 2（沒電話就不印空白）",
+    attendeeMail.text.includes("參加者 2：參加者乙　b***@y.com"),
+  );
+  checkTrue("活動：參加人數仍在", attendeeMail.text.includes("參加人數：2"));
+
+  // XSS：姓名／地址／備註／參加者裡的 <script> 與引號都要被跳脫
+  const XSS = `<script>alert("x")</script>'"`;
+  const xssContactMail = tpl.renderAdminOrderNotificationEmail({
+    ...sessionInput,
+    stage: "afterPayment",
+    contact: {
+      customerName: XSS,
+      customerPhone: `09"><img src=x onerror=alert(1)>`,
+      customerEmail: `a"@x.com><script>`,
+      note: XSS,
+      shipping: { ...contactFull.shipping, recipient: XSS, street: XSS },
+      invoice: { taxId: XSS, companyTitle: XSS },
+    },
+    sessions: [
+      {
+        ...sessionInput.sessions[0],
+        attendees: [{ name: XSS, phoneMasked: null, emailMasked: null }],
+      },
+    ],
+  });
+  check(
+    "🔴 訂購人欄位的 <script> 不會原樣出現在 html",
+    xssContactMail.html.includes("<script>"),
+    false,
+  );
+  check("🔴 <img onerror> 不會原樣出現在 html", xssContactMail.html.includes("<img"), false);
+  checkTrue(
+    "跳脫後的 &lt;script&gt; 在 html 裡",
+    xssContactMail.html.includes("&lt;script&gt;alert(&quot;x&quot;)"),
+  );
+  checkTrue("單引號被跳脫成 &#39;", xssContactMail.html.includes("&#39;&quot;"));
+  check(
+    "🔴 mailto href 的引號被跳脫（屬性逃不出去）",
+    /href="mailto:a"/.test(xssContactMail.html),
+    false,
+  );
+  checkTrue(
+    "mailto href 用 &quot; 跳脫",
+    xssContactMail.html.includes('href="mailto:a&quot;@x.com&gt;&lt;script&gt;"'),
+  );
+  check(
+    "tel: href 只留數字與 +（注入字元全被濾掉）",
+    (xssContactMail.html.match(/href="tel:([^"]*)"/) ?? [])[1],
+    "091",
+  );
+
+  // ── 寄給客人的信不受影響：沒有 mailto／tel 連結、沒有訂購人區塊 ──────────────
+  const custCopy = undefined;
+  const custSession = sessionInput.sessions[0].session;
+  const customerMails = [
+    tpl.renderOrderPaidEmail(
+      {
+        orderNo: "IB-1",
+        customerName: "王小明",
+        total: 100,
+        items: baseInput.items,
+        sessions: [custSession],
+      },
+      custCopy,
+      "zh",
+    ),
+    tpl.renderRegistrationTicketEmail(
+      { participantName: "王小明", seatNo: 1, orderNo: "IB-1", session: custSession },
+      custCopy,
+      "zh",
+    ),
+  ];
+  for (const [i, m] of customerMails.entries()) {
+    check(`客人信 #${i + 1} 沒有 mailto:/tel: 連結`, /href="(mailto|tel):/.test(m.html), false);
+    check(`客人信 #${i + 1} 沒有「訂購人」區塊`, m.text.includes("訂購人\n"), false);
+    check(`客人信 #${i + 1} 沒有店家區塊的底色樣式`, m.html.includes("border-left:3px"), false);
+  }
 }
 
 // email-templates.ts 不可以 import server-only 的東西（改完之後重驗一次）。

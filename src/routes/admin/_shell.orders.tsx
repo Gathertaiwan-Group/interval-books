@@ -54,7 +54,7 @@
  * 「待出貨」分頁（?scope=to_ship）與首頁「今日待辦」的「待出貨」卡片用同一組條件
  * （TO_SHIP_FILTER）。
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Archive, ArchiveRestore, Landmark, Loader2, PackageCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -180,9 +180,22 @@ function money(n: number): string {
 
 export const Route = createFileRoute("/admin/_shell/orders")({
   // ?scope=to_ship 讓首頁「待出貨」卡片可以直接落在那個分頁；不帶就是預設分頁。
-  validateSearch: (search: Record<string, unknown>): { scope?: "to_ship" | "all" } => {
+  // ?order=<uuid> 讓店家通知信的「到後台查看這張訂單」直接打開那張訂單的詳情
+  // （2026-10）。只收 uuid 形狀的字串，其他值當作沒帶。
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { scope?: "to_ship" | "all"; order?: string } => {
     const v = search.scope;
-    return v === "to_ship" || v === "all" ? { scope: v } : {};
+    const o = search.order;
+    const out: { scope?: "to_ship" | "all"; order?: string } = {};
+    if (v === "to_ship" || v === "all") out.scope = v;
+    if (
+      typeof o === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(o)
+    ) {
+      out.order = o;
+    }
+    return out;
   },
   loaderDeps: ({ search }) => ({ scope: search.scope }),
   loader: async ({ deps }) => {
@@ -252,6 +265,16 @@ function AdminOrdersPage() {
     void load(scope, includeArchived);
   }, [scope, includeArchived, isInitial, load]);
 
+  // 從通知信的連結進來（?order=<id>）：掛載後打開那張訂單一次。訂單不在目前分頁的
+  // 列表裡也沒關係——詳情是另外用 id 查的。
+  const deepLinkOrder = Route.useSearch().order;
+  const deepLinkOpened = useRef(false);
+  useEffect(() => {
+    if (!deepLinkOrder || deepLinkOpened.current) return;
+    deepLinkOpened.current = true;
+    void openDetail(deepLinkOrder);
+  }, [deepLinkOrder]);
+
   async function openDetail(id: string) {
     setSelectedId(id);
     setDetail(null);
@@ -277,6 +300,10 @@ function AdminOrdersPage() {
 
   function closeDetail(open: boolean) {
     if (open) return;
+    // 關掉之後把 ?order= 從網址拿掉，重新整理不會又跳出同一張。
+    if (deepLinkOrder) {
+      void navigate({ search: scope === "transfer_pending" ? {} : { scope }, replace: true });
+    }
     setSelectedId(null);
     setDetail(null);
     setNote("");

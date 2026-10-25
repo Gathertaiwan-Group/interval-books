@@ -48,6 +48,7 @@ import {
   failOrderNotify,
   finishEmail,
   finishOrderNotify,
+  getOrderContactForAdminNotify,
   getOrderForNotify,
   getOrderForShippedEmail,
   getOrderPublicToken,
@@ -61,7 +62,11 @@ import {
   REMINDER_LEAD,
   type RegistrationMailItem,
 } from "@/server/repos/email-outbox";
-import { loadPaidRoster, loadPaidRosterByOrder } from "@/server/repos/event-registrations";
+import {
+  loadOrderAttendeesForAdminNotify,
+  loadPaidRoster,
+  loadPaidRosterByOrder,
+} from "@/server/repos/event-registrations";
 import { getEventSessionById } from "@/server/repos/event-sessions";
 import { getRemittanceAccount } from "@/server/repos/site-settings";
 import { publicUrlFor } from "@/server/public-url";
@@ -73,6 +78,8 @@ import {
   renderOrderShippedEmail,
   renderRemittanceEmail,
   renderSessionReminderEmail,
+  type AdminOrderAttendee,
+  type AdminOrderContact,
   type SessionBrief,
 } from "@/lib/email-templates";
 import { remittanceConfigured, remittanceDueAt } from "@/lib/checkout";
@@ -109,6 +116,30 @@ export const dedupeKeys = {
    */
   orderShipped: (orderId: string) => `order_shipped:${orderId}`,
 };
+
+// -----------------------------------------------------------------------------
+// 店家通知信的「這是誰的單」（2026-10）
+// -----------------------------------------------------------------------------
+
+/**
+ * 店家通知信要的訂購人資料、逐位參加者（遮罩值）、後台訂單連結。兩條店家信的路徑
+ * （付款成功後／下單當下）共用。兩支 repo 都設計成讀失敗回 null／空 Map 而不丟例外；
+ * 呼叫端仍然把整段包在自己的 try/catch 裡。
+ *
+ * 後台連結組不出來（SITE_URL 沒設）就是 null，信裡改寫「請登入後台查看」——不放一條
+ * 連不到的連結（同匯款信的立場，見 public-url.ts）。
+ */
+async function loadAdminMailExtras(orderId: string): Promise<{
+  contact: AdminOrderContact | null;
+  attendees: Map<string, AdminOrderAttendee[]>;
+  adminUrl: string | null;
+}> {
+  const [contact, attendees] = await Promise.all([
+    getOrderContactForAdminNotify(orderId),
+    loadOrderAttendeesForAdminNotify(orderId),
+  ]);
+  return { contact, attendees, adminUrl: publicUrlFor("/admin/orders", { order: orderId }) };
+}
 
 // -----------------------------------------------------------------------------
 // 付款成功之後排信
@@ -198,8 +229,8 @@ async function queueWithClaim(orderId: string): Promise<NotifyOutcome> {
   try {
     // 場次的參加人數：這張訂單裡屬於同一個 session 的 item.quantity 加總。
     // ⚠️ 這是「這場買了幾個名額」，不是「簽到表上有幾筆」——不需要等下面的
-    //    loadPaidRosterByOrder()，訂單的 order_items 就夠了，店家通知信也不需要
-    //    逐位名單（那要登入後台看）。
+    //    loadPaidRosterByOrder()，訂單的 order_items 就夠了。逐位參加者姓名另外由
+    //    loadAdminMailExtras() 從遮罩過的 admin_event_roster 讀（2026-10）。
     const sessionParticipants = new Map<string, number>();
     for (const it of items) {
       if (!it.sessionId) continue;
@@ -208,19 +239,28 @@ async function queueWithClaim(orderId: string): Promise<NotifyOutcome> {
         (sessionParticipants.get(it.sessionId) ?? 0) + it.quantity,
       );
     }
+    const extras = await loadAdminMailExtras(orderId);
     const adminMail = renderAdminOrderNotificationEmail({
       // 0034：這條路永遠是「付款成功之後」——它跑在 claim_order_notify() 之內，
       // 而那道閘門的第一句就是「訂單必須已經結清」（0022 §8 閘門 1）。
       stage: "afterPayment",
       orderNo: order.orderNo,
       total: order.total,
+      contact: extras.contact,
+      adminUrl: extras.adminUrl,
       paymentMethod: order.paymentMethod,
       shippingMethod: order.shippingMethod,
       items: items.map((i) => ({ name: i.name, quantity: i.quantity, subtotal: i.subtotal })),
       sessions: sessionIds.flatMap((id) => {
         const session = sessions.get(id);
         if (!session) return [];
-        return [{ session, participants: sessionParticipants.get(id) ?? 0 }];
+        return [
+          {
+            session,
+            participants: sessionParticipants.get(id) ?? 0,
+            attendees: extras.attendees.get(id) ?? [],
+          },
+        ];
       }),
     });
     const addedAdminMail = await enqueueAdminOrderEmail({
@@ -414,17 +454,26 @@ export async function queueOrderPlacedNotifications(orderId: string): Promise<No
           (sessionParticipants.get(it.sessionId) ?? 0) + it.quantity,
         );
       }
+      const extras = await loadAdminMailExtras(orderId);
       const adminMail = renderAdminOrderNotificationEmail({
         stage: "atOrderTime",
         orderNo: order.orderNo,
         total: order.total,
+        contact: extras.contact,
+        adminUrl: extras.adminUrl,
         paymentMethod: order.paymentMethod,
         shippingMethod: order.shippingMethod,
         items: items.map((i) => ({ name: i.name, quantity: i.quantity, subtotal: i.subtotal })),
         sessions: sessionIds.flatMap((id) => {
           const session = sessions.get(id);
           if (!session) return [];
-          return [{ session, participants: sessionParticipants.get(id) ?? 0 }];
+          return [
+            {
+              session,
+              participants: sessionParticipants.get(id) ?? 0,
+              attendees: extras.attendees.get(id) ?? [],
+            },
+          ];
         }),
       });
       const added = await enqueueAdminOrderEmail({

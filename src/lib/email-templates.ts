@@ -114,18 +114,59 @@ export type RegistrationEmailInput = {
 };
 
 /**
- * 店家的新訂單／新報名通知（renderAdminOrderNotificationEmail 的輸入）。
+ * 店家通知信上「這是誰的單」那一區（業主 2026-10 要求：一眼看出是誰的訂單）。
  *
- * ⚠️ **刻意沒有 customer_name / phone / 完整地址欄位。** 這封信只是「有新單，
- *    去後台看」的提醒，店家點進後台本來就看得到完整資料；信件內文 30 天後會被
- *    purge_sent_email_bodies() 清掉（0022 §6），但清掉前那 30 天內文都躺在
- *    email_outbox 與 Resend 的紀錄裡——這是原始個資的副本，能不放就不放
- *    （同 0022 §0.4.2 的理由）。型別上沒有這幾個欄位，notify.ts 想傳也傳不了，
- *    這是編譯期就擋住的保證，不是「記得不要傳」這種約定。
+ * 🔴 **這裡面是明文個資**（電話、信箱、收件地址、統編）。只給店家通知信用——收件人
+ *    是 site_settings.notify_emails（店家自己的信箱），不是客人。寄給客人的那幾支
+ *    render 函式的輸入型別上沒有這個欄位。
+ *
+ *    內文仍然在 30 天後被 purge_sent_email_bodies() 清掉（0022 §6），那一段沒有動。
+ *
+ * 由 src/server/repos/email-outbox.ts 的 getOrderContactForAdminNotify() 讀出來；
+ * 讀不到（查詢失敗）時呼叫端傳 null，信照寄、只是少這一區並註明「請到後台查看」。
  */
+export type AdminOrderContact = {
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  /** orders.note（客人在結帳頁填的備註）。空字串＝沒填。 */
+  note: string;
+  /** order_addresses（type='shipping'）。沒有那一列（自取／純活動）就是 null。 */
+  shipping: {
+    recipient: string;
+    phone: string;
+    postalCode: string;
+    city: string;
+    district: string;
+    street: string;
+    cvsStoreName: string;
+    cvsStoreId: string;
+    cvsAddress: string;
+  } | null;
+  /** invoices 那一列的統編／抬頭。兩者都空就不印。 */
+  invoice: { taxId: string; companyTitle: string } | null;
+};
+
+/** 一位參加者。聯絡方式是 0021 admin_event_roster 遮罩過的值（見 notify.ts 的說明）。 */
+export type AdminOrderAttendee = {
+  name: string;
+  phoneMasked: string | null;
+  emailMasked: string | null;
+};
+
 export type AdminOrderNotificationInput = {
   orderNo: string;
   total: number;
+  /**
+   * 訂購人／收件人／統編／備註。null 或不傳＝讀不到（信照寄，少這一區）。
+   * 見 AdminOrderContact 的檔頭。
+   */
+  contact?: AdminOrderContact | null;
+  /**
+   * 後台訂單詳情的網址（/admin/orders?order=<id>）。組不出可用的公開網址
+   * （SITE_URL 沒設）時是 null，信裡就只寫「請登入後台查看」，不放一條連不到的連結。
+   */
+  adminUrl?: string | null;
   /**
    * 這封信是什麼時候排的（0034）。
    *
@@ -149,8 +190,15 @@ export type AdminOrderNotificationInput = {
   /** public.orders.shipping_method（0005:86）。 */
   shippingMethod: string;
   items: { name: Localized; quantity: number; subtotal: number }[];
-  /** 這張訂單買到的場次，附這個場次總共幾位參加者（不是逐位名單——名單要登入後台看）。 */
-  sessions: { session: SessionBrief; participants: number }[];
+  /**
+   * 這張訂單買到的場次，附這個場次總共幾位參加者，以及（讀得到時）逐位參加者。
+   * attendees 不傳或是空陣列＝只印人數。
+   */
+  sessions: {
+    session: SessionBrief;
+    participants: number;
+    attendees?: AdminOrderAttendee[];
+  }[];
 };
 
 // -----------------------------------------------------------------------------
@@ -483,7 +531,24 @@ function formatRange(session: SessionBrief, lang: Lang): string {
 // 版型
 // -----------------------------------------------------------------------------
 
-type Row = { label: string; value: string };
+type Row = {
+  label: string;
+  value: string;
+  /**
+   * 這個值可以點（mailto:／tel:）。目前只有店家通知信用（訂購人的電話與信箱）；
+   * 寄給客人的信一列都沒有設，所以那幾封的輸出與加這個欄位之前逐字元相同。
+   *
+   * ⚠️ 只接受 mailto: 與 tel: 開頭——其他字串（包含 javascript:）一律當作沒有
+   *    href，只印文字。值與網址都會過 escapeHtml()。
+   */
+  href?: string;
+};
+
+/** Row.href 的白名單：只有 mailto: 與 tel:。 */
+function safeHref(href: string | undefined): string | null {
+  if (!href) return null;
+  return /^(mailto|tel):/i.test(href) ? href : null;
+}
 
 /**
  * 一封信的骨架。三封信共用，所以版型只有一份。
@@ -496,6 +561,11 @@ function layout(input: {
   heading: string;
   intro: string;
   rows: Row[];
+  /**
+   * 排在 rows **之前**的區塊（緊接在 intro 之後）。店家通知信用它把「訂購人」放在
+   * 最上面——收信的人第一眼要看到的是「這是誰的單」。客人的信都不設，輸出不變。
+   */
+  leadBlocks?: { title: string; rows: Row[] }[];
   blocks: { title: string; rows: Row[] }[];
   outro: string;
   signature: string;
@@ -515,6 +585,11 @@ function layout(input: {
 }): { text: string; html: string } {
   const textLines: string[] = [input.heading, ""];
   if (input.intro) textLines.push(input.intro, "");
+  for (const b of input.leadBlocks ?? []) {
+    textLines.push(b.title);
+    for (const r of b.rows) textLines.push(`  ${r.label}：${r.value}`);
+    textLines.push("");
+  }
   for (const r of input.rows) textLines.push(`${r.label}：${r.value}`);
   for (const b of input.blocks) {
     textLines.push("", b.title);
@@ -524,10 +599,16 @@ function layout(input: {
   if (input.outro) textLines.push("", input.outro);
   textLines.push("", input.signature, "", input.footerNote);
 
+  const cell = (r: Row) => {
+    const href = safeHref(r.href);
+    return href
+      ? `<a href="${escapeHtml(href)}" style="color:#2b2621;word-break:break-all">${escapeHtml(r.value)}</a>`
+      : escapeHtml(r.value);
+  };
   const row = (r: Row) =>
     `<tr>` +
     `<td style="padding:4px 12px 4px 0;color:#6b6257;white-space:nowrap;vertical-align:top">${escapeHtml(r.label)}</td>` +
-    `<td style="padding:4px 0;color:#2b2621;white-space:pre-line">${escapeHtml(r.value)}</td>` +
+    `<td style="padding:4px 0;color:#2b2621;white-space:pre-line">${cell(r)}</td>` +
     `</tr>`;
 
   const table = (rows: Row[]) =>
@@ -542,6 +623,15 @@ function layout(input: {
     (input.intro
       ? `<p style="font-size:14px;line-height:1.8;margin:0 0 16px">${escapeHtml(input.intro)}</p>`
       : "") +
+    (input.leadBlocks ?? [])
+      .map(
+        (b) =>
+          `<div style="margin:0 0 16px;padding:12px 14px;background:#f6f2ec;border-left:3px solid #2b2621">` +
+          `<p style="font-size:14px;font-weight:600;margin:0 0 6px">${escapeHtml(b.title)}</p>` +
+          table(b.rows) +
+          `</div>`,
+      )
+      .join("") +
     table(input.rows) +
     input.blocks
       .map(
@@ -790,16 +880,29 @@ export function renderSessionReminderEmail(
  * 要打動客人的行銷文案），所以整封信——不只是欄位標籤——都直接寫在這裡，不查
  * email_copy、不接受 copy 參數。文案要改就是改這支函式，跟改 LABELS 一樣。
  *
- * ── 為什麼不含客人的完整地址與電話 ──────────────────────────────────────────
- * AdminOrderNotificationInput 的型別上就沒有這兩個欄位（見該型別的檔頭）：
- * 店家點進後台看得到完整資料，這封信只負責「有新單，去後台看」。少放一份
- * 個資副本進 Resend 與 email_outbox 的紀錄裡。
+ * ── 訂購人區塊（2026-10，業主要求）─────────────────────────────────────────
+ * 原本這封信刻意不放客人的姓名／電話／地址（「有新單，去後台看」）。業主實際用下來
+ * 的回饋是「要可以一眼看出是誰的訂單」，所以改成：主旨帶訂購人姓名與金額，內文最
+ * 上面一區是訂購人（姓名、電話、Email 可點）、收件人（與訂購人不同時）、地址／
+ * 門市、統編／抬頭、備註；活動報名逐場列出參加者姓名。
+ *
+ * 收件人是店家自己的信箱（notify_emails），不是客人，所以聯絡方式不遮罩——那正是
+ * 這封信要給的東西。信件內文照舊 30 天後被 purge_sent_email_bodies() 清掉。
+ *
+ * ⚠️ 參加者（第三人）的電話／信箱是 0021 admin_event_roster 的**遮罩值**：明文出口
+ *    只有 reveal_registration_contact()／export_event_roster() 兩支，而且一定寫
+ *    pii_access_log（0021 §0.1）。這封信不開第三條不留痕的路——要聯絡參加者請到
+ *    後台「報名名單」按「顯示完整聯絡方式」。
+ *
+ * 所有使用者輸入的欄位（姓名、地址、備註……）都經過 layout() 的 escapeHtml()。
+ * 主旨是純文字，不跳脫，但會把換行與控制字元壓成空白並截斷過長的姓名。
  */
 export function renderAdminOrderNotificationEmail(
   input: AdminOrderNotificationInput,
 ): RenderedEmail {
   const hasSessions = input.sessions.length > 0;
   const placed = input.stage === "atOrderTime";
+  const contact = input.contact ?? null;
   // 兩個 stage 的標題與主旨刻意長得不一樣。店家收到的是兩封信，而它們要做的事完全
   // 不同（一封是「錢收到了，去出貨」，一封是「還沒收到錢，去追」）——主旨一樣的話
   // 收件匣裡分不出來，而分不出來的後果是有人去出一張沒收到錢的貨。
@@ -810,9 +913,13 @@ export function renderAdminOrderNotificationEmail(
     : hasSessions
       ? "有新的訂單／活動報名"
       : "有新的訂單";
-  const subject = placed
-    ? `【小時光書店】待收款訂單 ${input.orderNo}`
-    : `【小時光書店】新訂單 ${input.orderNo}`;
+  const buyerName = subjectSafe(contact?.customerName ?? "");
+  const subject =
+    (placed
+      ? `【小時光書店】待收款訂單 ${input.orderNo}`
+      : `【小時光書店】新訂單 ${input.orderNo}`) +
+    (buyerName ? `｜${buyerName}` : "") +
+    `｜${formatMoney(input.total)}`;
 
   const itemLines = input.items
     .map((it) => `${pick(it.name, "zh")} × ${it.quantity}　${formatMoney(it.subtotal)}`)
@@ -831,33 +938,125 @@ export function renderAdminOrderNotificationEmail(
     { label: pick(LABELS.orderNo, "zh"), value: input.orderNo },
     { label: pick(LABELS.total, "zh"), value: formatMoney(input.total) },
     { label: pick(LABELS.paymentMethod, "zh"), value: paymentLabel },
-    { label: pick(LABELS.shippingMethod, "zh"), value: shippingMethodLabel(input.shippingMethod) },
   ];
+  // 收件方式在訂購人區塊裡已經印了（跟地址放在一起才看得懂）；讀不到訂購人時才放這裡。
+  if (!contact) {
+    rows.push({
+      label: pick(LABELS.shippingMethod, "zh"),
+      value: shippingMethodLabel(input.shippingMethod),
+    });
+  }
   if (itemLines) rows.push({ label: pick(LABELS.items, "zh"), value: itemLines });
+
+  const leadBlocks = contact
+    ? [{ title: "訂購人", rows: adminContactRows(contact, input.shippingMethod) }]
+    : [
+        {
+          title: "訂購人",
+          rows: [{ label: "說明", value: "訂購人資料讀取失敗，請登入後台查看這張訂單。" }],
+        },
+      ];
 
   const { text, html } = layout({
     heading,
     // ⚠️ 純文字，不要用 **粗體** 這類 markdown —— layout() 會把它逐字跳脫之後印出來
     //    （信裡就會出現兩個星號），它沒有 markdown 轉換那一步。
     intro: placed
-      ? "後台收到一筆新訂單，款項尚未入帳。品項與座位已經先保留起來，完整資料請登入後台查看。"
-      : "後台收到一筆新訂單，摘要如下，完整資料請登入後台查看。",
+      ? "後台收到一筆新訂單，款項尚未入帳。品項與座位已經先保留起來。"
+      : "後台收到一筆新訂單，摘要如下。",
+    leadBlocks,
     rows,
-    blocks: input.sessions.map(({ session, participants }) => ({
+    blocks: input.sessions.map(({ session, participants, attendees }) => ({
       title: pick(LABELS.sessionTitle, "zh"),
       rows: [
         ...sessionRows(session, "zh"),
         { label: pick(LABELS.participants, "zh"), value: String(participants) },
+        ...(attendees ?? []).map((a, i) => ({
+          label: `${pick(LABELS.attendee, "zh")} ${i + 1}`,
+          value: [a.name, a.phoneMasked, a.emailMasked].filter((v) => v && v.trim()).join("　"),
+        })),
       ],
     })),
+    link: input.adminUrl ? { label: "到後台查看這張訂單", url: input.adminUrl } : undefined,
     outro: placed
       ? "收到款項之後，請到後台把這張訂單標記為已付款——標記之後才會寄出付款成功信與報名成功信，發票也才會開立。"
-      : "",
+      : input.adminUrl
+        ? ""
+        : "完整資料請登入後台「訂單」查看。",
     signature: "小時光書店後台系統",
     footerNote: "本信件由系統自動發送，收件人於後台「全站設定」設定。",
   });
 
   return { subject, text, html };
+}
+
+/** 主旨用：換行／控制字元壓成空白、頭尾去空白、過長截斷。主旨是純文字，不做 HTML 跳脫。 */
+function subjectSafe(value: string): string {
+  const flat = Array.from(value, (ch) => {
+    const code = ch.codePointAt(0) ?? 0;
+    return code < 0x20 || code === 0x7f ? " " : ch;
+  })
+    .join("")
+    .replace(/\s+/g, " ")
+    .trim();
+  return flat.length > 30 ? `${flat.slice(0, 30)}…` : flat;
+}
+
+const trimmed = (v: string | null | undefined) => (v ?? "").trim();
+
+/** 店家通知信最上面那一區的每一列。空的欄位整列不印（不印「電話：」後面空白）。 */
+function adminContactRows(c: AdminOrderContact, shippingMethod: string): Row[] {
+  const out: Row[] = [];
+  const name = trimmed(c.customerName);
+  const phone = trimmed(c.customerPhone);
+  const email = trimmed(c.customerEmail);
+  out.push({ label: "姓名", value: name || "（未填）" });
+  if (phone) out.push({ label: "電話", value: phone, href: `tel:${phone.replace(/[^\d+]/g, "")}` });
+  if (email) out.push({ label: "Email", value: email, href: `mailto:${email}` });
+  out.push({ label: "收件方式", value: shippingMethodLabel(shippingMethod) });
+
+  const s = c.shipping;
+  if (s && (shippingMethod === "home" || shippingMethod === "cvs")) {
+    const recipient = trimmed(s.recipient);
+    const rPhone = trimmed(s.phone);
+    // 收件人與訂購人相同（同名同電話）時不重複印，只印地址／門市。
+    const differs = (recipient && recipient !== name) || (rPhone && rPhone !== phone);
+    if (differs) {
+      if (recipient) out.push({ label: "收件人", value: recipient });
+      if (rPhone) {
+        out.push({
+          label: "收件人電話",
+          value: rPhone,
+          href: `tel:${rPhone.replace(/[^\d+]/g, "")}`,
+        });
+      }
+    }
+    if (shippingMethod === "home") {
+      const addr = [
+        trimmed(s.postalCode),
+        `${trimmed(s.city)}${trimmed(s.district)}${trimmed(s.street)}`,
+      ]
+        .filter(Boolean)
+        .join(" ");
+      if (addr) out.push({ label: "地址", value: addr });
+    } else {
+      const store = [
+        trimmed(s.cvsStoreName),
+        trimmed(s.cvsStoreId) ? `（${trimmed(s.cvsStoreId)}）` : "",
+      ].join("");
+      if (store) out.push({ label: "取貨門市", value: store });
+      if (trimmed(s.cvsAddress)) out.push({ label: "門市地址", value: trimmed(s.cvsAddress) });
+    }
+  }
+
+  const taxId = trimmed(c.invoice?.taxId);
+  const title = trimmed(c.invoice?.companyTitle);
+  if (taxId) out.push({ label: "統編", value: taxId });
+  if (title) out.push({ label: "抬頭", value: title });
+
+  const note = trimmed(c.note);
+  if (note) out.push({ label: "備註", value: note });
+  return out;
 }
 
 // -----------------------------------------------------------------------------
