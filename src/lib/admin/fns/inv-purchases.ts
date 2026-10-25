@@ -15,6 +15,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { staffFnMiddleware } from "@/lib/admin/middleware";
+import { readOnlyFnMiddleware } from "@/lib/admin/read-only-fn";
 import {
   approveRecordSchema,
   importPurchasesSchema,
@@ -28,7 +29,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export const listAdminPurchases = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(purchaseFilterSchema)
   .handler(async ({ data }) => {
     const { listAdminPurchases } = await import("@/server/repos/inv-purchases");
@@ -36,7 +37,7 @@ export const listAdminPurchases = createServerFn({ method: "POST" })
   });
 
 export const getPurchaseSummary = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(purchaseFilterSchema)
   .handler(async ({ data }) => {
     const { getPurchaseSummary } = await import("@/server/repos/inv-purchases");
@@ -65,7 +66,7 @@ export const listProductPickerRows = createServerFn({ method: "GET" })
   });
 
 export const getAdminPurchase = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(z.object({ id: z.string().trim().uuid() }))
   .handler(async ({ data }) => {
     const { getAdminPurchase } = await import("@/server/repos/inv-purchases");
@@ -163,4 +164,26 @@ export const approveRecord = createServerFn({ method: "POST" })
       id: data.id,
       approved: data.approved,
     });
+  });
+
+// ---------------------------------------------------------------------------
+// 整頁的資料（2026-10-25 後台提速）
+// ---------------------------------------------------------------------------
+// 頁面進場時原本平行打好幾支 fn —— 每一支都各自驗一次身分（重讀 profiles），正式站上每一支
+// 還是一趟獨立的 HTTP。這裡改成一支：身分只驗一次，查詢在伺服器上平行跑。
+// 權限與原本那幾支**完全一樣**（都是 staffFnMiddleware()，不帶細權限）；原本那幾支保留給
+// 頁面上的換頁／篩選／重抓使用。
+
+export const getInventoryPurchasesPageData = createServerFn({ method: "GET" })
+  .middleware([staffFnMiddleware()])
+  .inputValidator(z.object({ filter: purchaseFilterSchema }))
+  .handler(async ({ data }) => {
+    const repo = await import("@/server/repos/inv-purchases");
+    const [page, summary, options, products] = await Promise.all([
+      repo.listAdminPurchases(data.filter),
+      repo.getPurchaseSummary(data.filter),
+      repo.listPurchaseFormOptions(),
+      repo.listProductPickerRows(),
+    ]);
+    return { page, summary, options, products };
   });

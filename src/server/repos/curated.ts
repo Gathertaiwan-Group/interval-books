@@ -132,6 +132,43 @@ export async function listCuratedItemsByTheme(themeId: string): Promise<CuratedI
   return (data ?? []) as CuratedItemRow[];
 }
 
+/** Supabase PostgREST 的 db-max-rows 預設值。 */
+const SUPABASE_MAX_ROWS = 1000;
+
+/**
+ * 好幾個主題的選品一次讀回來（後台商品頁用；原本是每個主題各打一支 fn，N+1）。
+ * 回傳順序跟「照 themeIds 的順序逐一呼叫 listCuratedItemsByTheme() 再接起來」完全一樣：
+ * 主題照傳入順序，主題內 sort_order、id 由小到大。
+ */
+export async function listCuratedItemsByThemes(
+  themeIds: readonly string[],
+): Promise<CuratedItemRow[]> {
+  if (themeIds.length === 0) return [];
+  const { data, error } = await supabaseAdmin()
+    .from("curated_items")
+    .select(ITEM_COLUMNS)
+    .in("theme_id", [...themeIds])
+    .order("sort_order", { ascending: true })
+    .order("id", { ascending: true })
+    .limit(5000);
+
+  if (error) throw new Error(`[repo/curated] listItems 失敗：${error.message}`);
+  const rows = (data ?? []) as CuratedItemRow[];
+  // PostgREST 的 db-max-rows（Supabase 預設 1000）會蓋過 .limit()。合併成一次查詢之後，上限從
+  // 「每個主題 1000」變成「全部加起來 1000」——碰到上限就退回原本一個主題一次，不靜默截斷。
+  if (rows.length >= SUPABASE_MAX_ROWS) {
+    return (await Promise.all(themeIds.map((id) => listCuratedItemsByTheme(id)))).flat();
+  }
+  const byTheme = new Map<string, CuratedItemRow[]>();
+  for (const row of rows) {
+    const key = String(row.theme_id);
+    const list = byTheme.get(key);
+    if (list) list.push(row);
+    else byTheme.set(key, [row]);
+  }
+  return themeIds.flatMap((id) => byTheme.get(String(id)) ?? []);
+}
+
 export async function getCuratedItemById(id: number): Promise<CuratedItemRow | null> {
   const { data, error } = await supabaseAdmin()
     .from("curated_items")

@@ -17,6 +17,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { staffFnMiddleware } from "@/lib/admin/middleware";
+import { readOnlyFnMiddleware } from "@/lib/admin/read-only-fn";
 import {
   comboCheckoutSchema,
   comboFilterSchema,
@@ -29,7 +30,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export const listAdminComboSets = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(comboFilterSchema)
   .handler(async ({ data }) => {
     const { listAdminComboSets, listAllComboItems } = await import("@/server/repos/inv-combos");
@@ -39,7 +40,7 @@ export const listAdminComboSets = createServerFn({ method: "POST" })
   });
 
 export const getAdminComboSet = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(z.object({ id: z.string().trim().uuid() }))
   .handler(async ({ data }) => {
     const { getAdminComboSet, listComboItems } = await import("@/server/repos/inv-combos");
@@ -48,7 +49,7 @@ export const getAdminComboSet = createServerFn({ method: "POST" })
   });
 
 export const listComboSales = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(
     z.object({
       comboSetId: z.string().trim().uuid().nullable(),

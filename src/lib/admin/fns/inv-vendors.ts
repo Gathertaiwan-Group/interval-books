@@ -25,6 +25,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { adminFnMiddleware, staffFnMiddleware } from "@/lib/admin/middleware";
+import { readOnlyFnMiddleware } from "@/lib/admin/read-only-fn";
 import {
   piiAccessLogFilterSchema,
   vendorAttachmentSchema,
@@ -54,7 +55,7 @@ async function requirePermission(
 // ---------------------------------------------------------------------------
 
 export const listAdminVendors = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(vendorFilterSchema)
   .handler(async ({ data }) => {
     const { listAdminVendors } = await import("@/server/repos/inv-vendors");
@@ -62,7 +63,7 @@ export const listAdminVendors = createServerFn({ method: "POST" })
   });
 
 export const getAdminVendor = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(z.object({ vendorId: uuid }))
   .handler(async ({ data }) => {
     const { getAdminVendor, listVendorContacts, listVendorBankAccounts, listVendorAttachments } =
@@ -78,17 +79,19 @@ export const getAdminVendor = createServerFn({ method: "POST" })
     return { vendor, contacts, bankAccounts, attachments };
   });
 
+async function loadVendorFormOptions() {
+  const { listVendorFormOptions } = await import("@/server/repos/inv-vendors");
+  const { listApprovalSettings } = await import("@/server/repos/inv-products");
+  const [options, approvalSettings] = await Promise.all([
+    listVendorFormOptions(),
+    listApprovalSettings(),
+  ]);
+  return { ...options, approvalSettings };
+}
+
 export const listVendorFormOptions = createServerFn({ method: "GET" })
   .middleware([staffFnMiddleware()])
-  .handler(async () => {
-    const { listVendorFormOptions } = await import("@/server/repos/inv-vendors");
-    const { listApprovalSettings } = await import("@/server/repos/inv-products");
-    const [options, approvalSettings] = await Promise.all([
-      listVendorFormOptions(),
-      listApprovalSettings(),
-    ]);
-    return { ...options, approvalSettings };
-  });
+  .handler(async () => await loadVendorFormOptions());
 
 // ---------------------------------------------------------------------------
 // 敏感欄位 —— 這一支是整個站唯一的那扇門
@@ -294,7 +297,7 @@ export const uploadVendorAttachmentFile = createServerFn({ method: "POST" })
 // ---------------------------------------------------------------------------
 
 export const listVendorSubmissions = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(z.object({ approvalStatus: z.enum(["all", "pending", "approved", "rejected"]) }))
   .handler(async ({ data }) => {
     const { listVendorSubmissions } = await import("@/server/repos/inv-vendors");
@@ -331,7 +334,7 @@ export const approveVendorSubmission = createServerFn({ method: "POST" })
 //    密碼從頭到尾不經過這個 codebase。
 
 export const listVendorPortalAccounts = createServerFn({ method: "POST" })
-  .middleware([adminFnMiddleware])
+  .middleware([adminFnMiddleware, readOnlyFnMiddleware])
   .inputValidator(z.object({ vendorId: uuid }))
   .handler(async ({ data }) => {
     const { listVendorPortalAccounts } = await import("@/server/repos/inv-vendors");
@@ -345,4 +348,30 @@ export const setVendorPortalAccountActive = createServerFn({ method: "POST" })
     const { setVendorPortalAccountActive } = await import("@/server/repos/inv-vendors");
     await setVendorPortalAccountActive(data);
     return { ok: true };
+  });
+
+// ---------------------------------------------------------------------------
+// 整頁的資料（2026-10-25 後台提速）
+// ---------------------------------------------------------------------------
+// 頁面進場時原本平行打好幾支 fn —— 每一支都各自驗一次身分（重讀 profiles），正式站上每一支
+// 還是一趟獨立的 HTTP。這裡改成一支：身分只驗一次，查詢在伺服器上平行跑。
+// 權限與原本那幾支**完全一樣**（都是 staffFnMiddleware()，不帶細權限）；原本那幾支保留給
+// 頁面上的換頁／篩選／重抓使用。
+
+export const getInventoryVendorsPageData = createServerFn({ method: "GET" })
+  .middleware([staffFnMiddleware()])
+  .inputValidator(
+    z.object({
+      filter: vendorFilterSchema,
+      approvalStatus: z.enum(["all", "pending", "approved", "rejected"]),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const { listAdminVendors, listVendorSubmissions } = await import("@/server/repos/inv-vendors");
+    const [vendors, options, submissions] = await Promise.all([
+      listAdminVendors(data.filter),
+      loadVendorFormOptions(),
+      listVendorSubmissions(data.approvalStatus),
+    ]);
+    return { vendors, options, submissions };
   });

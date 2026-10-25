@@ -167,7 +167,7 @@ function AdminJourneysPage() {
         {/* 新增走「一頁新增策旅」（_shell.journeys_.new.tsx）：卡片＋報名頁＋梯次＋票種一次建好。
             下面的 Dialog 仍然負責「編輯」既有卡片的文字。 */}
         <Button asChild className="gap-1.5">
-          <Link to="/admin/journeys/new">
+          <Link preload="intent" to="/admin/journeys/new">
             <Plus className="h-4 w-4" />
             新增策旅
           </Link>

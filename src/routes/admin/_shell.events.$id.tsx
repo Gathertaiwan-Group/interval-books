@@ -346,29 +346,13 @@ function toFormValues(
 export const Route = createFileRoute("/admin/_shell/events/$id")({
   loader: async ({ params }) => {
     const isNew = params.id === NEW_EVENT_ID;
-    const { getEventById, listEventProducts, listEvents, listSessionsForEvent } =
-      await import("@/lib/admin/fns/events");
-    const { listEventCategories } = await import("@/lib/admin/fns/event-categories");
-    const { listArtistOptions } = await import("@/lib/admin/fns/artists");
-    const { listEventBlocks } = await import("@/lib/admin/fns/event-blocks");
-    const [event, categories, artists, products, sessions, events, blocks] = await Promise.all([
-      isNew ? Promise.resolve(null) : getEventById({ data: { id: params.id } }),
-      listEventCategories(),
-      listArtistOptions(),
-      listEventProducts(),
-      // §3 那一段的資料來源。時間、地點、名額都是場次的屬性，不是活動的 ——
-      // 所以那一段在這一頁上是**唯讀的鏡子**，不是輸入框。
-      isNew
-        ? Promise.resolve([] as SessionBrief[])
-        : listSessionsForEvent({ data: { id: params.id } }),
-      // 新增時才要知道「下一個排序號」。編輯既有活動時它自己就有 sort_order。
-      isNew ? listEvents() : Promise.resolve([]),
-      // §5／§8／§9 的三種區塊，一次撈完（三種一起回，由畫面自己分組）。
-      // 活動還沒建立時沒有 events.id 可以掛，所以是空的。
-      isNew
-        ? Promise.resolve([] as BlockRow[])
-        : listEventBlocks({ data: { event_id: params.id } }),
-    ]);
+    // 一支 fn 拿齊（見 src/lib/admin/fns/events.ts 的 getAdminEventEditorPageData）：
+    //   · §3 場次是唯讀的鏡子——時間、地點、名額都是場次的屬性，不是活動的。
+    //   · 新增時才要活動清單（算「下一個排序號」）；編輯既有活動時它自己就有 sort_order。
+    //   · §5／§8／§9 的三種區塊一次撈完，由畫面自己分組；活動還沒建立時是空的。
+    const { getAdminEventEditorPageData } = await import("@/lib/admin/fns/events");
+    const { event, categories, artists, products, sessions, events, blocks } =
+      await getAdminEventEditorPageData({ data: { id: isNew ? null : params.id } });
     if (!isNew && !event) throw notFound();
     return { event, categories, artists, products, sessions, events, blocks, isNew };
   },
@@ -679,7 +663,7 @@ function AdminEventAssemblerPage() {
       <div className="space-y-6 pb-24">
         <div>
           <Button variant="ghost" size="sm" className="-ml-2 gap-1.5" asChild>
-            <Link to="/admin/events">
+            <Link preload="intent" to="/admin/events">
               <ArrowLeft className="h-4 w-4" />
               返回活動列表
             </Link>

@@ -81,7 +81,7 @@ function AdminPagesListPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" asChild>
-                      <Link to="/admin/pages/$slug" params={{ slug: p.slug }}>
+                      <Link preload="intent" to="/admin/pages/$slug" params={{ slug: p.slug }}>
                         編輯
                       </Link>
                     </Button>

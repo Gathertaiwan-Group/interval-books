@@ -110,7 +110,7 @@ function BackToList() {
   const search = Route.useSearch();
   return (
     <Button asChild variant="ghost" size="sm" className="-ml-2 gap-1.5">
-      <Link to="/admin/orders" search={search}>
+      <Link preload="intent" to="/admin/orders" search={search}>
         <ArrowLeft className="h-4 w-4" />
         回訂單列表
       </Link>

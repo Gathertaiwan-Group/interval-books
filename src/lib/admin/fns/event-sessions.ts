@@ -136,3 +136,91 @@ export const removeEventSessionPlan = createServerFn({ method: "POST" })
     const { removeEventSessionPlan } = await import("@/server/repos/event-sessions");
     return await removeEventSessionPlan(data.id);
   });
+
+// ---------------------------------------------------------------------------
+// 整頁的資料（2026-10-25 後台提速）
+// ---------------------------------------------------------------------------
+
+/**
+ * 「這個錯誤是不是『表／view 還不存在』」（原本在 _shell.registrations.tsx 的 loader 裡，2026-10-25
+ * 隨整頁資料搬到伺服器）。
+ *
+ * PostgREST 對「表不存在」回的是 PGRST205（schema cache 找不到），直連 Postgres
+ * 則是 42P01。兩個字串都認，因為這一段的重點是訊息本身。
+ *
+ * ⚠️ 刻意**沒有**收 `/does not exist/i`。那個字串太寬：`function … does not exist`
+ *    （RPC 簽名打錯）與 `column … does not exist`（COLUMNS 漏改）也會命中，而那
+ *    兩件事都是真的 bug，被說成「還沒套 migration」就會被藏起來，直到有人納悶
+ *    為什麼套完了畫面還是那句話。
+ */
+function isSchemaMissingError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /PGRST205|42P01|schema cache/i.test(message);
+}
+
+type Settled<T> = { ok: true; value: T } | { ok: false; error: unknown };
+const settle = <T>(p: Promise<T>): Promise<Settled<T>> =>
+  p.then(
+    (value) => ({ ok: true as const, value }),
+    (error: unknown) => ({ ok: false as const, error }),
+  );
+
+/**
+ * /admin/registrations 進場要的全部資料，一支 fn。
+ *
+ * 原本 loader 在瀏覽器端分**三輪**打 4 支 fn（場次＋商品 → 方案 → 報名人數），每一支都各自驗一次
+ * 身分。現在身分只驗一次、4 個查詢同時跑。
+ *
+ * 權限與原本那 4 支**完全一樣**：staffFnMiddleware() ＋ requireRosterRead（event.roster.read）。
+ *
+ * 「migration 還沒套」的退化規則照搬 route 檔頭的說明，判斷順序也照原本的三輪：
+ *   場次／商品任一個不是「表不存在」的錯 → 照丟；是 → schemaMissing。
+ *   方案：不是「表不存在」→ 照丟；是 → 空的。
+ *   報名人數：不是「表不存在」→ 照丟；是 → rosterReady: false。
+ */
+export const getAdminRegistrationsPageData = createServerFn({ method: "GET" })
+  .middleware([staffFnMiddleware()])
+  .handler(async ({ context }) => {
+    await requireRosterRead(context.staff.permissions);
+    const repo = await import("@/server/repos/event-sessions");
+    const { countRegistrationsBySession } = await import("@/server/repos/event-registrations");
+    const [sessionsR, productsR, plansR, countsR] = await Promise.all([
+      settle(repo.listEventSessions()),
+      settle(repo.listBookableProducts()),
+      settle(repo.listEventSessionPlans()),
+      settle(countRegistrationsBySession()),
+    ]);
+    type Counts = Awaited<ReturnType<typeof countRegistrationsBySession>>;
+    const empty = {
+      sessions: [] as Awaited<ReturnType<typeof repo.listEventSessions>>,
+      products: [] as Awaited<ReturnType<typeof repo.listBookableProducts>>,
+      plans: [] as Awaited<ReturnType<typeof repo.listEventSessionPlans>>,
+      counts: {} as Counts,
+    };
+
+    for (const r of [sessionsR, productsR]) {
+      if (!r.ok && !isSchemaMissingError(r.error)) throw r.error;
+    }
+    if (!sessionsR.ok || !productsR.ok) {
+      return { ...empty, schemaMissing: true, rosterReady: false };
+    }
+    const sessions = sessionsR.value;
+    const products = productsR.value;
+
+    let plans = empty.plans;
+    if (plansR.ok) plans = plansR.value;
+    else if (!isSchemaMissingError(plansR.error)) throw plansR.error;
+
+    if (!countsR.ok) {
+      if (!isSchemaMissingError(countsR.error)) throw countsR.error;
+      return { ...empty, sessions, products, plans, schemaMissing: false, rosterReady: false };
+    }
+    return {
+      sessions,
+      products,
+      plans,
+      counts: countsR.value,
+      schemaMissing: false,
+      rosterReady: true,
+    };
+  });

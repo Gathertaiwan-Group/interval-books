@@ -1223,7 +1223,21 @@ checkTrue(
 console.log("\n[12] 畫面");
 
 // 0021 未套用時不可以整頁爆掉（沿用 Phase 1 在 loader 做的那個形狀）。
-checkTrue("loader 認得「表／view 不存在」", /PGRST205\|42P01/.test(routeTs));
+// 2026-10-25 起這段退化邏輯隨整頁資料搬到伺服器（getAdminRegistrationsPageData），
+// route 的 loader 只剩呼叫那一支 fn。
+const regFnsTs = stripTs(readFile(join(ROOT, "src/lib/admin/fns/event-sessions.ts")));
+const regPageFn = regFnsTs.slice(regFnsTs.indexOf("export const getAdminRegistrationsPageData"));
+checkTrue(
+  "loader 經由整頁 fn 取資料",
+  /getAdminRegistrationsPageData\(\)/.test(routeTs) && regPageFn.length > 0,
+);
+checkTrue("loader 認得「表／view 不存在」", /PGRST205\|42P01/.test(regFnsTs));
+checkTrue(
+  "整頁 fn 的權限與原本 4 支一樣（staffFnMiddleware ＋ requireRosterRead）",
+  /\.middleware\(\[staffFnMiddleware\(\)\]\)[\s\S]{0,120}await requireRosterRead\(context\.staff\.permissions\)/.test(
+    regPageFn,
+  ),
+);
 checkTrue(
   "0020 與 0021 是兩個旗標（0021 沒套時場次照樣維護得動）",
   /schemaMissing/.test(routeTs) && /rosterReady/.test(routeTs),
@@ -1240,7 +1254,9 @@ check(
   // countRegistrationsBySession 那段）用的是同一個 isSchemaMissing() 判斷式，
   // 不是新發明一種吞法。
   "loader 只吞「不存在」這一種錯誤，其餘往上丟",
-  (routeTs.match(/if \(!isSchemaMissing\(err\)\) throw err;/g) ?? []).length,
+  // 2026-10-25：搬到伺服器後是三個判斷點（場次／商品那組、方案、報名人數），每個都是
+  // 「不是表不存在 → 照丟」。
+  (regPageFn.match(/!isSchemaMissingError\([^)]*\)\) throw [\w.]+;/g) ?? []).length,
   3,
 );
 // 三個數字的差額要顯示出來（0020 §4.4 回填的舊場次只補一位參加者）。

@@ -128,7 +128,7 @@ function AdminPageDetailPage() {
     <div className="space-y-6">
       <div>
         <Button variant="ghost" size="sm" className="-ml-2 gap-1.5" asChild>
-          <Link to="/admin/pages">
+          <Link preload="intent" to="/admin/pages">
             <ArrowLeft className="h-4 w-4" />
             返回頁面文案列表
           </Link>

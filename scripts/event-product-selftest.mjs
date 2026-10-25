@@ -596,7 +596,21 @@ checkFalse(
   /from\("products"\)/.test(adminEventsSrc),
 );
 // 後台列表顯示「這場活動的商品」狀態。
-checkTrue("後台會載入 listEventProducts()", adminEventsSrc.includes("listEventProducts()"));
+// 2026-10-25 起列表頁的 loader 改成一支整頁 fn（getAdminEventsPageData），由它在伺服器上呼叫
+// listEventProducts()——仍然是一次撈完，不是一場一場問。
+{
+  const eventFnsSrc = stripTs(readFile(join(ROOT, "src/lib/admin/fns/events.ts")));
+  const pageFn = eventFnsSrc.slice(
+    eventFnsSrc.indexOf("export const getAdminEventsPageData"),
+    eventFnsSrc.indexOf("export const getAdminEventEditorPageData"),
+  );
+  checkTrue(
+    "後台會載入 listEventProducts()（經由整頁 fn getAdminEventsPageData）",
+    adminEventsSrc.includes("getAdminEventsPageData()") &&
+      /adminFnMiddleware/.test(pageFn) &&
+      pageFn.includes("listEventProducts()"),
+  );
+}
 checkTrue("後台列表顯示場次數", adminEventsSrc.includes("session_count"));
 
 // repo 的 RPC wrapper。

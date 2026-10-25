@@ -61,15 +61,10 @@ const DEFAULT_FILTER: ProductFilterValues = {
 
 export const Route = createFileRoute("/admin/_shell/inventory-products")({
   loader: async () => {
-    const { listAdminProducts, listProductFormOptions } =
-      await import("@/lib/admin/fns/inv-products");
-    // 兩支都是 staffFnMiddleware 守的。店員進得來、customer 進不來，而且擋人的
-    // 是 middleware 重讀 profiles 那一下，不是側欄。
-    const [page, options] = await Promise.all([
-      listAdminProducts({ data: DEFAULT_FILTER }),
-      listProductFormOptions(),
-    ]);
-    return { page, options };
+    const { getInventoryProductsPageData } = await import("@/lib/admin/fns/inv-products");
+    // 一支 fn 拿齊（清單第一頁＋表單選項），staffFnMiddleware 守的。店員進得來、customer
+    // 進不來，而且擋人的是 middleware 重讀 profiles 那一下，不是側欄。
+    return await getInventoryProductsPageData({ data: { filter: DEFAULT_FILTER } });
   },
   head: () => ({ meta: [{ title: "商品管理｜小時光書店後台" }] }),
   component: InventoryProductsPage,

@@ -138,3 +138,47 @@ export const countEventsByCategory = createServerFn({ method: "GET" })
     const { countEventsByCategory } = await import("@/server/repos/events");
     return await countEventsByCategory();
   });
+
+// ---------------------------------------------------------------------------
+// 整頁的資料（2026-10-25 後台提速）
+// ---------------------------------------------------------------------------
+// /admin/events 與 /admin/events/$id 進場時原本各平行打 4 支／7 支 fn —— 每一支都各自驗一次
+// 身分（重讀 profiles），正式站上每一支還是一趟獨立的 HTTP。改成各一支：身分只驗一次，查詢在
+// 伺服器上平行跑。原本那幾支全部都是 adminFnMiddleware，這裡一樣。原本那幾支保留。
+
+export const getAdminEventsPageData = createServerFn({ method: "GET" })
+  .middleware([adminFnMiddleware])
+  .handler(async () => {
+    const { listEvents, listEventProducts } = await import("@/server/repos/events");
+    const { listEventCategories } = await import("@/server/repos/event-categories");
+    const { listArtistOptions } = await import("@/server/repos/artists");
+    const [events, categories, artists, products] = await Promise.all([
+      listEvents(),
+      listEventCategories(),
+      listArtistOptions(),
+      listEventProducts(),
+    ]);
+    return { events, categories, artists, products };
+  });
+
+/** id 是 null ＝ 新增活動（那時沒有活動本身、場次、區塊，但要「下一個排序號」用的活動清單）。 */
+export const getAdminEventEditorPageData = createServerFn({ method: "GET" })
+  .middleware([adminFnMiddleware])
+  .inputValidator(z.object({ id: z.string().trim().min(1).nullable() }))
+  .handler(async ({ data }) => {
+    const repo = await import("@/server/repos/events");
+    const { listEventCategories } = await import("@/server/repos/event-categories");
+    const { listArtistOptions } = await import("@/server/repos/artists");
+    const { listEventBlocks } = await import("@/server/repos/event-blocks");
+    const id = data.id;
+    const [event, categories, artists, products, sessions, events, blocks] = await Promise.all([
+      id === null ? Promise.resolve(null) : repo.getEventById(id),
+      listEventCategories(),
+      listArtistOptions(),
+      repo.listEventProducts(),
+      id === null ? Promise.resolve([]) : repo.listSessionsForEvent(id),
+      id === null ? repo.listEvents() : Promise.resolve([]),
+      id === null ? Promise.resolve([]) : listEventBlocks(id),
+    ]);
+    return { event, categories, artists, products, sessions, events, blocks };
+  });

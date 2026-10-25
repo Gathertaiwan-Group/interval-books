@@ -18,6 +18,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { staffFnMiddleware } from "@/lib/admin/middleware";
+import { readOnlyFnMiddleware } from "@/lib/admin/read-only-fn";
 import { posCheckoutSchema, resolveAlertSchema, salesFilterSchema } from "@/lib/admin/schemas";
 
 export const listPosProducts = createServerFn({ method: "GET" })
@@ -35,7 +36,7 @@ export const listPosPaymentMethods = createServerFn({ method: "GET" })
   });
 
 export const findPosProductByBarcode = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(z.object({ barcode: z.string().trim().min(1).max(64) }))
   .handler(async ({ data }) => {
     const { findPosProductByBarcode } = await import("@/server/repos/inv-sales");
@@ -64,7 +65,7 @@ export const posCheckout = createServerFn({ method: "POST" })
   });
 
 export const listPosSales = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(salesFilterSchema)
   .handler(async ({ data }) => {
     const { listPosSales, summarisePosSales } = await import("@/server/repos/inv-sales");
@@ -73,7 +74,7 @@ export const listPosSales = createServerFn({ method: "POST" })
   });
 
 export const listStockAlerts = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(z.object({ status: z.enum(["all", "open", "resolved"]) }))
   .handler(async ({ data }) => {
     const { listStockAlerts } = await import("@/server/repos/inv-sales");

@@ -50,14 +50,11 @@ const DEFAULT_FILTER: AdjustmentFilterValues = {
 
 export const Route = createFileRoute("/admin/_shell/inventory-adjustments")({
   loader: async () => {
-    const { getAdjustmentSummary, listAdjustmentFormOptions, listAdminAdjustments } =
-      await import("@/lib/admin/fns/inv-adjustments");
-    const [page, summary, options] = await Promise.all([
-      listAdminAdjustments({ data: DEFAULT_FILTER }),
-      getAdjustmentSummary({ data: { dateFrom: null, dateTo: null } }),
-      listAdjustmentFormOptions(),
-    ]);
-    return { page, summary, options };
+    const { getInventoryAdjustmentsPageData } = await import("@/lib/admin/fns/inv-adjustments");
+    // 一支 fn 拿齊（清單第一頁、統計、表單選項），staffFnMiddleware 守的。
+    return await getInventoryAdjustmentsPageData({
+      data: { filter: DEFAULT_FILTER, summary: { dateFrom: null, dateTo: null } },
+    });
   },
   head: () => ({ meta: [{ title: "在庫異動｜小時光書店後台" }] }),
   component: InventoryAdjustmentsPage,

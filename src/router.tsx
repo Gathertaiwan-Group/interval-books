@@ -9,6 +9,7 @@ import {
   isStaleDeployError,
   preloadErrorAction,
 } from "@/lib/stale-deploy";
+import { applyAdminRouteCacheDefaults, registerAdminCacheRouter } from "@/lib/admin/route-cache";
 
 /**
  * 部署之後還開著的分頁會壞：頁面記得的是上一版的程式檔名，而 Vercel 每次部署都是一整組新的
@@ -167,7 +168,13 @@ export const getRouter = () => {
     defaultPreloadStaleTime: 0,
     defaultErrorComponent: DefaultErrorComponent,
   });
-  if (typeof window !== "undefined") currentRouter = router;
+  // 後台（/admin/_shell 底下）的 route 一律 30 秒內沿用 loader 資料；前台不動。
+  // 寫入之後怎麼清、換人登入怎麼清，見 src/lib/admin/route-cache.ts。
+  applyAdminRouteCacheDefaults(router.routesById);
+  if (typeof window !== "undefined") {
+    currentRouter = router;
+    registerAdminCacheRouter(router);
+  }
 
   return router;
 };

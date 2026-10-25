@@ -180,35 +180,11 @@ export const Route = createFileRoute("/admin/_shell/products")({
     const type = parseUnifiedTab(search.type);
     return type && type !== "all" ? { type } : {};
   },
+  // 一支 fn 拿齊整頁（身分只驗一次、查詢在伺服器上平行跑、同名比對在程式裡算）——
+  // 見 src/lib/admin/fns/products.ts 的 getAdminProductsPageData。
   loader: async () => {
-    const { listProducts } = await import("@/lib/admin/fns/products");
-    const { listPublications, listPublicationNameMatches } =
-      await import("@/lib/admin/fns/publications");
-    const { listInventoryCandidates, listListedInventoryProducts } =
-      await import("@/lib/admin/fns/inventory-listing");
-    const { listCuratedThemes, listCuratedItems } = await import("@/lib/admin/fns/curated");
-    const [products, publications, nameMatches, candidates, listed, curatedThemes] =
-      await Promise.all([
-        listProducts(),
-        listPublications(),
-        listPublicationNameMatches(),
-        listInventoryCandidates(),
-        listListedInventoryProducts(),
-        listCuratedThemes(),
-      ]);
-    // 選品按主題讀（既有的 fn 就是這個形狀）。主題只有個位數，平行讀即可。
-    const curatedItems = (
-      await Promise.all(curatedThemes.map((t) => listCuratedItems({ data: { theme_id: t.id } })))
-    ).flat();
-    return {
-      products,
-      publications,
-      nameMatches,
-      candidates,
-      listed,
-      curatedThemes,
-      curatedItems,
-    };
+    const { getAdminProductsPageData } = await import("@/lib/admin/fns/products");
+    return await getAdminProductsPageData();
   },
   head: () => ({
     meta: [{ title: "商品｜小時光書店後台" }],
@@ -590,7 +566,7 @@ function AdminProductsPage() {
         <div className="ml-auto flex flex-wrap gap-2">
           {tab === "curated" ? (
             <Button variant="outline" size="sm" asChild className="gap-1.5">
-              <Link to="/admin/products/curated-themes">
+              <Link preload="intent" to="/admin/products/curated-themes">
                 <ListOrdered className="h-4 w-4" />
                 主題與排序
               </Link>
@@ -598,7 +574,7 @@ function AdminProductsPage() {
           ) : null}
           {tab === "goods" ? (
             <Button variant="outline" size="sm" asChild className="gap-1.5">
-              <Link to="/admin/inventory-listing">
+              <Link preload="intent" to="/admin/inventory-listing">
                 <Link2 className="h-4 w-4" />
                 從進銷存上架
               </Link>

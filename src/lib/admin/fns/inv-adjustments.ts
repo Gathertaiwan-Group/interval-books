@@ -15,6 +15,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { staffFnMiddleware } from "@/lib/admin/middleware";
+import { readOnlyFnMiddleware } from "@/lib/admin/read-only-fn";
 import {
   adjustmentFilterSchema,
   approveRecordSchema,
@@ -23,12 +24,32 @@ import {
   stockCountSchema,
 } from "@/lib/admin/schemas";
 
+const summaryRangeSchema = z.object({
+  dateFrom: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable(),
+  dateTo: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable(),
+});
+
+const stockCountFilterSchema = z.object({
+  keyword: z.string().trim().max(100).nullable(),
+  categoryId: z.string().trim().uuid().nullable(),
+  productType: z.enum(INV_PRODUCT_TYPES).nullable(),
+  lowStockOnly: z.boolean(),
+  page: z.number().int().min(0),
+  pageSize: z.number().int().min(1).max(200),
+});
+
 // ---------------------------------------------------------------------------
 // 讀
 // ---------------------------------------------------------------------------
 
 export const listAdminAdjustments = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(adjustmentFilterSchema)
   .handler(async ({ data }) => {
     const { listAdminAdjustments } = await import("@/server/repos/inv-adjustments");
@@ -36,26 +57,15 @@ export const listAdminAdjustments = createServerFn({ method: "POST" })
   });
 
 export const getAdjustmentSummary = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
-  .inputValidator(
-    z.object({
-      dateFrom: z
-        .string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/)
-        .nullable(),
-      dateTo: z
-        .string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/)
-        .nullable(),
-    }),
-  )
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
+  .inputValidator(summaryRangeSchema)
   .handler(async ({ data }) => {
     const { getAdjustmentSummary } = await import("@/server/repos/inv-adjustments");
     return await getAdjustmentSummary(data);
   });
 
 export const getAdminAdjustment = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(z.object({ id: z.string().trim().uuid() }))
   .handler(async ({ data }) => {
     const { getAdminAdjustment } = await import("@/server/repos/inv-adjustments");
@@ -70,17 +80,8 @@ export const listAdjustmentFormOptions = createServerFn({ method: "GET" })
   });
 
 export const listStockCountProducts = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
-  .inputValidator(
-    z.object({
-      keyword: z.string().trim().max(100).nullable(),
-      categoryId: z.string().trim().uuid().nullable(),
-      productType: z.enum(INV_PRODUCT_TYPES).nullable(),
-      lowStockOnly: z.boolean(),
-      page: z.number().int().min(0),
-      pageSize: z.number().int().min(1).max(200),
-    }),
-  )
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
+  .inputValidator(stockCountFilterSchema)
   .handler(async ({ data }) => {
     const { listStockCountProducts } = await import("@/server/repos/inv-adjustments");
     return await listStockCountProducts(data);
@@ -94,7 +95,7 @@ export const listStockCountProducts = createServerFn({ method: "POST" })
  * 每一次盤點在那裡都是空的。
  */
 export const listProductMovements = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(
     z.object({
       productId: z.string().trim().uuid(),
@@ -210,4 +211,45 @@ export const approveRecord = createServerFn({ method: "POST" })
       id: data.id,
       approved: data.approved,
     });
+  });
+
+// ---------------------------------------------------------------------------
+// 整頁的資料（2026-10-25 後台提速）
+// ---------------------------------------------------------------------------
+// 盤點頁與在庫異動頁進場時原本各打 4 支／3 支 fn —— 每一支都各自驗一次身分（重讀 profiles），
+// 正式站上每一支還是一趟獨立的 HTTP。這裡改成一支：身分只驗一次，查詢在伺服器上平行跑。
+// 權限與原本那幾支**完全一樣**：全部都是 staffFnMiddleware()（不帶細權限）。
+// 原本那幾支保留給頁面上的換頁／篩選／重抓使用。
+
+export const getInventoryCountPageData = createServerFn({ method: "GET" })
+  .middleware([staffFnMiddleware()])
+  .inputValidator(
+    z.object({
+      filter: stockCountFilterSchema,
+      summary: summaryRangeSchema,
+      recent: adjustmentFilterSchema,
+    }),
+  )
+  .handler(async ({ data }) => {
+    const repo = await import("@/server/repos/inv-adjustments");
+    const [page, options, summary, recent] = await Promise.all([
+      repo.listStockCountProducts(data.filter),
+      repo.listAdjustmentFormOptions(),
+      repo.getAdjustmentSummary(data.summary),
+      repo.listAdminAdjustments(data.recent),
+    ]);
+    return { page, options, summary, recent };
+  });
+
+export const getInventoryAdjustmentsPageData = createServerFn({ method: "GET" })
+  .middleware([staffFnMiddleware()])
+  .inputValidator(z.object({ filter: adjustmentFilterSchema, summary: summaryRangeSchema }))
+  .handler(async ({ data }) => {
+    const repo = await import("@/server/repos/inv-adjustments");
+    const [page, summary, options] = await Promise.all([
+      repo.listAdminAdjustments(data.filter),
+      repo.getAdjustmentSummary(data.summary),
+      repo.listAdjustmentFormOptions(),
+    ]);
+    return { page, summary, options };
   });

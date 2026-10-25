@@ -2,6 +2,7 @@ import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/r
 import { Toaster } from "@/components/ui/sonner";
 import { LanguageProvider, useT } from "@/i18n/LanguageContext";
 import { fetchSiteContent, FALLBACK_SITE_CONTENT } from "@/lib/cms";
+import { isBackOfficePath } from "@/lib/admin/back-office-path";
 import { SiteContentProvider, useSiteContent } from "@/lib/site-content";
 import { ReferralCapture } from "@/components/ReferralCapture";
 
@@ -36,10 +37,34 @@ function NotFoundInner() {
   );
 }
 
+/**
+ * 瀏覽器端：root loader 手上的資料是不是「後台用的預設文案」。第一次是 SSR 給的（loader 沒有在
+ * 瀏覽器跑過），所以用載入時的網址判斷；之後每次 root loader 在瀏覽器跑都會更新。
+ */
+let rootDataIsBackOfficeFallback =
+  typeof window !== "undefined" && isBackOfficePath(window.location.pathname);
+
 export const Route = createRootRoute({
   // Runs on the server for the initial request (and on the client for
   // subsequent navigations), so the shell copy is present in the SSR HTML.
-  loader: async () => ({ site: await fetchSiteContent() }),
+  //
+  // 後台（/admin 底下）一個字都不用前台的站台文案（site_settings／ui_strings／
+  // contact_phones），所以不查那三張表——否則後台每一次整頁載入都多三個查詢。
+  // 後台頁面的 <title> 各自有寫；萬一有哪裡用到 useSiteContent()，拿到的是程式內建的預設值。
+  //
+  // root 的 match 在整個 SPA 期間不會自己重跑（換頁都是 cause "stay"）。所以從後台用 client 端
+  // 換頁到前台（404 頁的「回首頁」、上一頁／下一頁）時要強制重跑一次，前台才不會一直掛著預設文案。
+  loader: async ({ location }) => {
+    const backOffice = isBackOfficePath(location.pathname);
+    if (typeof window !== "undefined") rootDataIsBackOfficeFallback = backOffice;
+    return { site: backOffice ? FALLBACK_SITE_CONTENT : await fetchSiteContent() };
+  },
+  shouldReload: ({ location }) =>
+    typeof window !== "undefined" &&
+    rootDataIsBackOfficeFallback &&
+    !isBackOfficePath(location.pathname)
+      ? true
+      : undefined,
   head: ({ loaderData }) => {
     const site = loaderData?.site ?? FALLBACK_SITE_CONTENT;
     return {

@@ -49,21 +49,10 @@ const DEFAULT_FILTER: PurchaseFilterValues = {
 
 export const Route = createFileRoute("/admin/_shell/inventory-purchases")({
   loader: async () => {
-    const {
-      listAdminPurchases,
-      getPurchaseSummary,
-      listPurchaseFormOptions,
-      listProductPickerRows,
-    } = await import("@/lib/admin/fns/inv-purchases");
-    // 四支都是 staffFnMiddleware 守的。擋人的是 middleware 重讀 profiles 那一下，
+    const { getInventoryPurchasesPageData } = await import("@/lib/admin/fns/inv-purchases");
+    // 一支 fn 拿齊，staffFnMiddleware 守的。擋人的是 middleware 重讀 profiles 那一下，
     // 不是側欄。商品清單整份撈是刻意的 —— 表單與匯入比對都要對著完整清單。
-    const [page, summary, options, products] = await Promise.all([
-      listAdminPurchases({ data: DEFAULT_FILTER }),
-      getPurchaseSummary({ data: DEFAULT_FILTER }),
-      listPurchaseFormOptions(),
-      listProductPickerRows(),
-    ]);
-    return { page, summary, options, products };
+    return await getInventoryPurchasesPageData({ data: { filter: DEFAULT_FILTER } });
   },
   head: () => ({ meta: [{ title: "進貨｜小時光書店後台" }] }),
   component: InventoryPurchasesPage,

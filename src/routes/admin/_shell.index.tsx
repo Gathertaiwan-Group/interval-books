@@ -55,7 +55,11 @@ function AdminDashboard() {
           <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <CalendarDays className="h-4 w-4" aria-hidden="true" />7 天內的場次
           </h2>
-          <Link to="/admin/registrations" className="text-sm underline-offset-4 hover:underline">
+          <Link
+            preload="intent"
+            to="/admin/registrations"
+            className="text-sm underline-offset-4 hover:underline"
+          >
             看全部場次
           </Link>
         </div>
@@ -145,13 +149,13 @@ function TodoCardLink({ card }: { card: TodoCard }) {
   // 「待出貨」要帶 ?scope=to_ship 才會落在那個分頁；其餘卡片照舊只連到頁面本身。
   if (card.search) {
     return (
-      <Link to="/admin/orders" search={card.search} className="block">
+      <Link preload="intent" to="/admin/orders" search={card.search} className="block">
         {body}
       </Link>
     );
   }
   return (
-    <Link to={card.href} className="block">
+    <Link preload="intent" to={card.href} className="block">
       {body}
     </Link>
   );

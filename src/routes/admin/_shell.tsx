@@ -55,7 +55,11 @@ import {
 import { signOut } from "@/lib/admin/fns/auth";
 import { isNavItemActive } from "@/lib/admin/nav-active";
 import { backOfficeTypeScaleStyles } from "@/lib/admin/type-scale";
-import { clearShellUserCache, shellUserCache } from "@/lib/admin/shell-user-cache";
+import { shellUserCache } from "@/lib/admin/shell-user-cache";
+import {
+  clearAdminRouteCacheOnIdentityChange,
+  noteAdminIdentityChange,
+} from "@/lib/admin/route-cache";
 
 type BackOfficeUserView = NonNullable<
   Awaited<ReturnType<typeof import("@/lib/admin/fns/auth").getCurrentBackOfficeUser>>
@@ -79,7 +83,7 @@ type BackOfficeUserView = NonNullable<
  *    給他一個一按就壞掉的連結。
  */
 export const Route = createFileRoute("/admin/_shell")({
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     // 瀏覽器端換頁時沿用 60 秒內的結果，省掉每次換頁前那一趟依序的 server fn
     // （見 src/lib/admin/shell-user-cache.ts：這裡不是授權邊界，所以快取是安全的）。
     const isBrowser = typeof window !== "undefined";
@@ -95,6 +99,13 @@ export const Route = createFileRoute("/admin/_shell")({
     }
     if (user.role === "pending") {
       throw redirect({ to: "/admin/pending" });
+    }
+    // 換了一個人（例如 cookie 被別的分頁換掉、而這個分頁沒收到廣播）：上一個人看過的頁面
+    // 資料不可以從快取畫給下一個人看。這一次換頁的 match 在 beforeLoad 之前就已經從快取複製
+    // 好了，只清快取擋不住——直接整頁重載到要去的網址（見 src/lib/admin/route-cache.ts）。
+    if (isBrowser && clearAdminRouteCacheOnIdentityChange(user.userId)) {
+      window.location.assign(location.href);
+      await new Promise<never>(() => {});
     }
     // `admin` 這個名字保留給既有的 15 個 route，它們都在讀 context.admin.email。
     return { admin: { userId: user.userId, email: user.email }, user };
@@ -262,8 +273,9 @@ function AdminShell() {
   })).filter((group) => group.items.length > 0);
 
   async function handleSignOut() {
-    clearShellUserCache();
-    // 預載／已載入的頁面資料（例如訂單內頁的明文聯絡方式）一起從記憶體清掉。
+    // 「誰登入」快取、預載／已載入的頁面資料（例如訂單內頁的明文聯絡方式）一起從記憶體清掉，
+    // 同一個瀏覽器的其他分頁也會收到通知一起清（見 src/lib/admin/route-cache.ts）。
+    noteAdminIdentityChange();
     router.clearCache();
     await signOut();
     toast.success("已登出");
@@ -296,7 +308,9 @@ function AdminShell() {
                         tooltip={item.label}
                         isActive={isNavItemActive(pathname, item.to)}
                       >
-                        <Link to={item.to}>
+                        {/* preload="intent"：滑過（或鍵盤聚焦）就先跑那一頁的 loader，30 秒內點下去
+                            直接沿用（staleTime 見 src/lib/admin/route-cache.ts）。 */}
+                        <Link to={item.to} preload="intent">
                           <item.icon />
                           <span>{item.label}</span>
                         </Link>

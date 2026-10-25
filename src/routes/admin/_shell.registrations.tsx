@@ -121,65 +121,17 @@ export const Route = createFileRoute("/admin/_shell/registrations")({
    * 前台不需要這種處理：purchase 路徑的每一支查詢都有「購物車裡真的有活動才查」
    * 的前置判斷，全是書的購物車一次都不會碰到 event_sessions。
    */
+  // 上面兩個旗標的退化規則現在在伺服器上算（一支 fn、4 個查詢同時跑、身分只驗一次），
+  // 規則與判斷順序照舊——見 src/lib/admin/fns/event-sessions.ts 的 getAdminRegistrationsPageData。
   loader: async () => {
-    const { listEventSessions, listBookableProducts, listEventSessionPlans } =
-      await import("@/lib/admin/fns/event-sessions");
-    const { countRegistrationsBySession } = await import("@/lib/admin/fns/event-registrations");
-    const empty = {
-      sessions: [] as Awaited<ReturnType<typeof listEventSessions>>,
-      products: [] as Awaited<ReturnType<typeof listBookableProducts>>,
-      plans: [] as Awaited<ReturnType<typeof listEventSessionPlans>>,
-      counts: {} as Awaited<ReturnType<typeof countRegistrationsBySession>>,
-    };
-
-    let sessions = empty.sessions;
-    let products = empty.products;
-    try {
-      [sessions, products] = await Promise.all([listEventSessions(), listBookableProducts()]);
-    } catch (err) {
-      if (!isSchemaMissing(err)) throw err;
-      return { ...empty, schemaMissing: true, rosterReady: false };
-    }
-
-    // 0036：方案表是這一期才加的，用同一套「還沒套 migration 就退化」處理——
-    // 場次照常顯示，只有「方案」那一塊會是空的。與 rosterReady 平行但各自獨立：
-    // 「0020 套了、0036 還沒套」是真的會發生的中間狀態（程式碼先上線）。
-    let plans = empty.plans;
-    try {
-      plans = await listEventSessionPlans();
-    } catch (err) {
-      if (!isSchemaMissing(err)) throw err;
-    }
-
-    try {
-      const counts = await countRegistrationsBySession();
-      return { sessions, products, plans, counts, schemaMissing: false, rosterReady: true };
-    } catch (err) {
-      if (!isSchemaMissing(err)) throw err;
-      return { ...empty, sessions, products, plans, schemaMissing: false, rosterReady: false };
-    }
+    const { getAdminRegistrationsPageData } = await import("@/lib/admin/fns/event-sessions");
+    return await getAdminRegistrationsPageData();
   },
   head: () => ({
     meta: [{ title: "活動報名｜小時光書店後台" }],
   }),
   component: AdminRegistrationsPage,
 });
-
-/**
- * 「這個錯誤是不是『表／view 還不存在』」。
- *
- * PostgREST 對「表不存在」回的是 PGRST205（schema cache 找不到），直連 Postgres
- * 則是 42P01。兩個字串都認，因為這一段的重點是訊息本身。
- *
- * ⚠️ 刻意**沒有**收 `/does not exist/i`。那個字串太寬：`function … does not exist`
- *    （RPC 簽名打錯）與 `column … does not exist`（COLUMNS 漏改）也會命中，而那
- *    兩件事都是真的 bug，被說成「還沒套 migration」就會被藏起來，直到有人納悶
- *    為什麼套完了畫面還是那句話。
- */
-function isSchemaMissing(err: unknown): boolean {
-  const message = err instanceof Error ? err.message : String(err);
-  return /PGRST205|42P01|schema cache/i.test(message);
-}
 
 /**
  * timestamptz → `<input type="datetime-local">` 吃得下的字串。

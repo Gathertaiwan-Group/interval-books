@@ -54,20 +54,15 @@ const RECENT_FILTER = {
 
 export const Route = createFileRoute("/admin/_shell/inventory-count")({
   loader: async () => {
-    const {
-      getAdjustmentSummary,
-      listAdjustmentFormOptions,
-      listAdminAdjustments,
-      listStockCountProducts,
-    } = await import("@/lib/admin/fns/inv-adjustments");
-    // 四支都是 staffFnMiddleware 守的。店員進得來、customer 進不來。
-    const [page, options, summary, recent] = await Promise.all([
-      listStockCountProducts({ data: DEFAULT_FILTER }),
-      listAdjustmentFormOptions(),
-      getAdjustmentSummary({ data: { dateFrom: null, dateTo: null } }),
-      listAdminAdjustments({ data: RECENT_FILTER }),
-    ]);
-    return { page, options, summary, recent };
+    const { getInventoryCountPageData } = await import("@/lib/admin/fns/inv-adjustments");
+    // 一支 fn 拿齊，staffFnMiddleware 守的。店員進得來、customer 進不來。
+    return await getInventoryCountPageData({
+      data: {
+        filter: DEFAULT_FILTER,
+        summary: { dateFrom: null, dateTo: null },
+        recent: RECENT_FILTER,
+      },
+    });
   },
   head: () => ({ meta: [{ title: "庫存盤點｜小時光書店後台" }] }),
   component: InventoryCountPage,

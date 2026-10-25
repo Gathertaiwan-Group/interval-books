@@ -460,9 +460,10 @@ check(
 
 const page = stripTs(readFile("src/routes/admin/_shell.products.tsx"));
 const fnImports = [...page.matchAll(/import\("(@\/lib\/admin\/fns\/[^"]+)"\)/g)].map((m) => m[1]);
+// 2026-10-25：進場資料改成 fns/products 的整頁 fn（getAdminProductsPageData），頁面本身
+// 不再 import fns/inventory-listing（那幾支只剩 loader 在用）。
 check("🔴 單一頁只呼叫既有的 server fn（沒有自己的寫入路徑）", [...new Set(fnImports)].sort(), [
   "@/lib/admin/fns/curated",
-  "@/lib/admin/fns/inventory-listing",
   "@/lib/admin/fns/products",
   "@/lib/admin/fns/publications",
 ]);

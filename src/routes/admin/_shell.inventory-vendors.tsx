@@ -60,15 +60,12 @@ type SubmissionStatus = "all" | "pending" | "approved" | "rejected";
 
 export const Route = createFileRoute("/admin/_shell/inventory-vendors")({
   loader: async () => {
-    const { listAdminVendors, listVendorFormOptions, listVendorSubmissions } =
-      await import("@/lib/admin/fns/inv-vendors");
-    const [vendors, options, submissions] = await Promise.all([
-      listAdminVendors({ data: DEFAULT_FILTER }),
-      listVendorFormOptions(),
-      // 預設只看待審的：這一區存在的理由就是「有東西在等」，全部撈回來會把它稀釋掉。
-      listVendorSubmissions({ data: { approvalStatus: "pending" } }),
-    ]);
-    return { vendors, options, submissions };
+    const { getInventoryVendorsPageData } = await import("@/lib/admin/fns/inv-vendors");
+    // 一支 fn 拿齊（廠商清單、表單選項、送審佇列）。送審預設只看待審的：這一區存在的理由
+    // 就是「有東西在等」，全部撈回來會把它稀釋掉。
+    return await getInventoryVendorsPageData({
+      data: { filter: DEFAULT_FILTER, approvalStatus: "pending" },
+    });
   },
   head: () => ({ meta: [{ title: "廠商｜小時光書店後台" }] }),
   component: InventoryVendorsPage,

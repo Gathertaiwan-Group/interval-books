@@ -470,7 +470,7 @@ console.log("\n[5b] /admin/orders/$id 獨立頁、?order= 轉址、回列表保�
   );
   checkTrue(
     "「回訂單列表」原樣帶回篩選參數",
-    /<Link to="\/admin\/orders" search=\{search\}>/.test(detailSrc),
+    /<Link (preload="intent" )?to="\/admin\/orders" search=\{search\}>/.test(detailSrc),
   );
   checkTrue("列表滑過就預載內頁", /preloadRoute\(/.test(routeSrc));
 }
@@ -783,15 +783,17 @@ console.log("\n[8b] 後台外框身分快取（動態呼叫 src/lib/admin/shell-
   checkTrue("_shell beforeLoad 只在瀏覽器端用快取", /typeof window !== "undefined"/.test(shell));
   checkTrue("pending 不進快取", /user\.role !== "pending"\) shellUserCache\.set/.test(shell));
   checkTrue(
+    // 2026-10-25：改成 noteAdminIdentityChange()（route-cache.ts），它會清「誰登入」快取、
+    // router 快取，並通知同一個瀏覽器的其他分頁。
     "🔴 登出時清快取（_shell 與 pending 兩條登出路徑）",
-    /clearShellUserCache\(\);[\s\S]{0,200}await signOut\(\)/.test(shell) &&
-      /clearShellUserCache\(\);\s*await signOut\(\)/.test(
+    /noteAdminIdentityChange\(\);[\s\S]{0,200}await signOut\(\)/.test(shell) &&
+      /noteAdminIdentityChange\(\);\s*await signOut\(\)/.test(
         stripTs(readFile(join(ROOT, "src/routes/admin/pending.tsx"))),
       ),
   );
   checkTrue(
     "🔴 登入成功也清快取（沒按登出就換帳號）",
-    /signIn\(\{ data: values \}\);[\s\S]{0,300}clearShellUserCache\(\);/.test(
+    /signIn\(\{ data: values \}\);[\s\S]{0,300}noteAdminIdentityChange\(\);/.test(
       stripTs(readFile(join(ROOT, "src/routes/admin/login.tsx"))),
     ),
   );

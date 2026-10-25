@@ -484,7 +484,10 @@ checkTrue(
   "套餐的 server fn 沒有一支漏掉 middleware",
   (() => {
     const decls = fnsCombo.match(/createServerFn\(/g) ?? [];
-    const mws = fnsCombo.match(/\.middleware\(\[staffFnMiddleware\(\)\]\)/g) ?? [];
+    // 2026-10-25：只讀的 fn 在授權後面多掛一支 readOnlyFnMiddleware（只有 client 半邊，
+    // 見 src/lib/admin/read-only-fn.ts）；授權那一支仍然必須是第一個。
+    const mws =
+      fnsCombo.match(/\.middleware\(\[staffFnMiddleware\(\)(, readOnlyFnMiddleware)?\]\)/g) ?? [];
     return decls.length > 0 && decls.length === mws.length;
   })(),
   "每一支 createServerFn 都要 chain staffFnMiddleware()",

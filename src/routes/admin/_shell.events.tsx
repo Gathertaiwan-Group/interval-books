@@ -46,18 +46,11 @@ type EventRow = Awaited<ReturnType<typeof listEvents>>[number];
  *    活動的固定欄位只有一個家。這一頁只剩「有哪些活動、去編哪一場、刪掉哪一場」。
  */
 export const Route = createFileRoute("/admin/_shell/events")({
+  // 一支 fn 拿齊（活動、分類、講者、「這場活動的商品」那一欄——一次撈完，不要一場一場問）。
+  // 見 src/lib/admin/fns/events.ts 的 getAdminEventsPageData。
   loader: async () => {
-    const { listEvents, listEventProducts } = await import("@/lib/admin/fns/events");
-    const { listEventCategories } = await import("@/lib/admin/fns/event-categories");
-    const { listArtistOptions } = await import("@/lib/admin/fns/artists");
-    const [events, categories, artists, products] = await Promise.all([
-      listEvents(),
-      listEventCategories(),
-      listArtistOptions(),
-      // 「這場活動的商品」那一欄。一次撈完，不要一場一場問（N+1）。
-      listEventProducts(),
-    ]);
-    return { events, categories, artists, products };
+    const { getAdminEventsPageData } = await import("@/lib/admin/fns/events");
+    return await getAdminEventsPageData();
   },
   head: () => ({
     meta: [{ title: "活動｜小時光書店後台" }],
@@ -124,7 +117,7 @@ function AdminEventsPage() {
           </p>
         </div>
         <Button asChild className="gap-1.5">
-          <Link to="/admin/events/$id" params={{ id: "new" }}>
+          <Link preload="intent" to="/admin/events/$id" params={{ id: "new" }}>
             <Plus className="h-4 w-4" />
             新增活動
           </Link>
@@ -204,7 +197,7 @@ function AdminEventsPage() {
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="ghost" size="sm" asChild>
-                        <Link to="/admin/events/$id" params={{ id: e.id }}>
+                        <Link preload="intent" to="/admin/events/$id" params={{ id: e.id }}>
                           編輯
                         </Link>
                       </Button>

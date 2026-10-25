@@ -17,6 +17,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { staffFnMiddleware } from "@/lib/admin/middleware";
+import { readOnlyFnMiddleware } from "@/lib/admin/read-only-fn";
 import {
   approveRecordSchema,
   batchUpdateSchema,
@@ -31,7 +32,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export const listAdminProducts = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(productFilterSchema)
   .handler(async ({ data }) => {
     const { listAdminProducts } = await import("@/server/repos/inv-products");
@@ -39,26 +40,24 @@ export const listAdminProducts = createServerFn({ method: "POST" })
   });
 
 /** 分類／供應商／審核設定／母品項候選 —— 表單開一次要的四份參考資料。 */
+async function loadProductFormOptions() {
+  const { listAdminCategories, listAdminVendors, listApprovalSettings, listBaseProductCandidates } =
+    await import("@/server/repos/inv-products");
+  const [categories, vendors, approvalSettings, baseProducts] = await Promise.all([
+    listAdminCategories(),
+    listAdminVendors(),
+    listApprovalSettings(),
+    listBaseProductCandidates(),
+  ]);
+  return { categories, vendors, approvalSettings, baseProducts };
+}
+
 export const listProductFormOptions = createServerFn({ method: "GET" })
   .middleware([staffFnMiddleware()])
-  .handler(async () => {
-    const {
-      listAdminCategories,
-      listAdminVendors,
-      listApprovalSettings,
-      listBaseProductCandidates,
-    } = await import("@/server/repos/inv-products");
-    const [categories, vendors, approvalSettings, baseProducts] = await Promise.all([
-      listAdminCategories(),
-      listAdminVendors(),
-      listApprovalSettings(),
-      listBaseProductCandidates(),
-    ]);
-    return { categories, vendors, approvalSettings, baseProducts };
-  });
+  .handler(async () => await loadProductFormOptions());
 
 export const getAdminProduct = createServerFn({ method: "POST" })
-  .middleware([staffFnMiddleware()])
+  .middleware([staffFnMiddleware(), readOnlyFnMiddleware])
   .inputValidator(z.object({ id: z.string().trim().uuid() }))
   .handler(async ({ data }) => {
     const { getAdminProduct } = await import("@/server/repos/inv-products");
@@ -223,4 +222,24 @@ export const resubmitProduct = createServerFn({ method: "POST" })
     // 「只有 rejected 能重送」的判斷在 inv_resubmit_product() 裡面，不在這裡先
     // 查一次再決定 —— 先查後改中間有窗口，而且那個判斷會變成兩份。
     return await resubmitProduct(data.id);
+  });
+
+// ---------------------------------------------------------------------------
+// 整頁的資料（2026-10-25 後台提速）
+// ---------------------------------------------------------------------------
+// 頁面進場時原本平行打好幾支 fn —— 每一支都各自驗一次身分（重讀 profiles），正式站上每一支
+// 還是一趟獨立的 HTTP。這裡改成一支：身分只驗一次，查詢在伺服器上平行跑。
+// 權限與原本那幾支**完全一樣**（都是 staffFnMiddleware()，不帶細權限）；原本那幾支保留給
+// 頁面上的換頁／篩選／重抓使用。
+
+export const getInventoryProductsPageData = createServerFn({ method: "GET" })
+  .middleware([staffFnMiddleware()])
+  .inputValidator(z.object({ filter: productFilterSchema }))
+  .handler(async ({ data }) => {
+    const { listAdminProducts } = await import("@/server/repos/inv-products");
+    const [page, options] = await Promise.all([
+      listAdminProducts(data.filter),
+      loadProductFormOptions(),
+    ]);
+    return { page, options };
   });
