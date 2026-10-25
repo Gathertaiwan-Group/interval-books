@@ -11,13 +11,22 @@
  *    inv.allocate_combo_amounts() 在資料庫算，見 lib/admin/combo-allocation.ts 檔頭。
  *
  * ⚠️ 送出去的 payload 沒有 approval_status，也沒有 amount / unit_price / cost_price
- *    —— 那四個全部是資料庫算的。見 ComboSetFormDialog 的檔頭。
+ *    —— 那四個全部是資料庫算的。見 ComboSetForm 的檔頭。
  *
  * ⚠️ `canApprove` 只控制畫面。擋住直接 POST /_serverFn/… 的是 fns/inv-combos.ts 裡
  *    approveComboSet 那一次權限檢查，而且它重讀 staff_permissions，不信任前端。
+ *
+ * ── 內頁（2026-10-25 起）──────────────────────────────────────────────────
+ * 詳情／編輯／新增不再是彈窗：/admin/inventory-combos/$id、/$id/edit、/new
+ * （_shell.inventory-combos_.*.tsx）。這一頁的篩選記在 list-memory，從內頁「← 回到列表」
+ * 回來原樣還原；畫面上的清單取 loader 與自己抓的兩份裡比較新的（useLoaderBackedList），
+ * 背景重抓會反映在畫面上。上下架／審核／刪除確認仍在列上。
+ *
+ * ⚠️ loader 只抓清單＋審核設定（getInventoryCombosPageData）。可選商品清單（約 496 KB）
+ *    只有表單要用，跟著表單搬到內頁的 loader 去了。
  */
 import { useCallback, useState } from "react";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { Info, Loader2, Package2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +36,7 @@ import { ComboSetFilterBar } from "@/components/inventory/ComboSetFilterBar";
 import { ComboSetTable } from "@/components/inventory/ComboSetTable";
 import { isApprovalRequired } from "@/lib/admin/inv-product-utils";
 import { useComboActions } from "@/lib/admin/useComboActions";
+import { useLoaderBackedList } from "@/lib/admin/useLoaderBackedList";
 import type { ComboFilterValues } from "@/lib/admin/schemas";
 import type { AdminComboSetRow } from "@/server/repos/inv-combos";
 
@@ -39,71 +49,56 @@ const DEFAULT_FILTER: ComboFilterValues = {
 
 export const Route = createFileRoute("/admin/_shell/inventory-combos")({
   loader: async () => {
-    const { listAdminComboSets, listComboFormOptions } = await import("@/lib/admin/fns/inv-combos");
-    const [data, options] = await Promise.all([
-      listAdminComboSets({ data: DEFAULT_FILTER }),
-      listComboFormOptions(),
-    ]);
-    return { data, options };
+    const { getInventoryCombosPageData } = await import("@/lib/admin/fns/inv-combos");
+    return await getInventoryCombosPageData({ data: DEFAULT_FILTER });
   },
   head: () => ({ meta: [{ title: "套餐｜小時光書店後台" }] }),
   component: InventoryCombosPage,
 });
 
 function InventoryCombosPage() {
-  const { data: initialData, options } = Route.useLoaderData();
+  const { list: loaderList, approvalSettings } = Route.useLoaderData();
+  const loaderUpdatedAt = Route.useMatch({ select: (m) => m.updatedAt });
   const { user } = Route.useRouteContext();
   const router = useRouter();
 
-  const [filter, setFilter] = useState<ComboFilterValues>(DEFAULT_FILTER);
-  const [data, setData] = useState(initialData);
-  const [loading, setLoading] = useState(false);
+  const comboList = useLoaderBackedList({
+    key: "inventory-combos",
+    loaderFilter: DEFAULT_FILTER,
+    loaderData: loaderList,
+    loaderUpdatedAt,
+    errorMessage: "套餐清單讀取失敗",
+    fetcher: async (next: ComboFilterValues) => {
+      const { listAdminComboSets } = await import("@/lib/admin/fns/inv-combos");
+      return await listAdminComboSets({ data: next });
+    },
+  });
+  const filter = comboList.filter;
+  const data = comboList.data;
+  const loading = comboList.loading;
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<AdminComboSetRow | null>(null);
-  const [detail, setDetail] = useState<AdminComboSetRow | null>(null);
   const [deleting, setDeleting] = useState<AdminComboSetRow | null>(null);
 
   const canApprove = user.permissions.includes("approve_combo_sets");
   // 只拿來寫提示文字。真正的 status 是 inv.initial_approval_status() 算的。
-  const approvalOn = isApprovalRequired(options.approvalSettings, "combo_sets");
-
-  const reload = useCallback(async (next: ComboFilterValues) => {
-    setLoading(true);
-    try {
-      const { listAdminComboSets } = await import("@/lib/admin/fns/inv-combos");
-      setData(await listAdminComboSets({ data: next }));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "套餐清單讀取失敗");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const approvalOn = isApprovalRequired(approvalSettings, "combo_sets");
 
   function changeFilter(next: ComboFilterValues) {
-    setFilter(next);
-    void reload(next);
+    comboList.setFilter(next);
   }
 
-  /** 寫入之後重抓這一頁；審核設定與商品清單放在 loader 裡，所以也讓 router 重跑一次。 */
+  /** 寫入之後重抓這一頁；審核設定放在 loader 裡，所以也讓 router 重跑一次。 */
+  const reloadList = comboList.reload;
   const refresh = useCallback(async () => {
-    await reload(filter);
+    await reloadList();
     await router.invalidate();
-  }, [filter, reload, router]);
+  }, [reloadList, router]);
 
   const { busyId, handleToggleActive, handleDelete, handleResubmit, handleApprove } =
     useComboActions(refresh);
 
-  /** 動作做完就把詳情關掉 —— 留著會顯示動作前的舊狀態。 */
   function run(task: Promise<void>) {
-    setDetail(null);
     void task;
-  }
-
-  function openForm(row: AdminComboSetRow | null) {
-    setEditing(row);
-    setDetail(null);
-    setFormOpen(true);
   }
 
   const pending = data.sets.filter((s) => s.approval_status === "pending").length;
@@ -128,9 +123,11 @@ function InventoryCombosPage() {
             </Badge>
           ) : null}
         </div>
-        <Button size="sm" className="gap-1.5" onClick={() => openForm(null)}>
-          <Plus className="h-4 w-4" />
-          新增套餐
+        <Button asChild size="sm" className="gap-1.5">
+          <Link to="/admin/inventory-combos/new" preload="intent">
+            <Plus className="h-4 w-4" />
+            新增套餐
+          </Link>
         </Button>
       </div>
 
@@ -167,8 +164,6 @@ function InventoryCombosPage() {
           items={data.items}
           busyId={busyId}
           canApprove={canApprove}
-          onView={setDetail}
-          onEdit={openForm}
           onToggleActive={(row) => run(handleToggleActive(row))}
           onAskDelete={setDeleting}
           onApprove={(row) => run(handleApprove(row, true))}
@@ -185,14 +180,6 @@ function InventoryCombosPage() {
       ) : null}
 
       <ComboSetDialogs
-        approvalOn={approvalOn}
-        products={options.products}
-        refresh={refresh}
-        formOpen={formOpen}
-        setFormOpen={setFormOpen}
-        editing={editing}
-        detail={detail}
-        setDetail={setDetail}
         deleting={deleting}
         setDeleting={setDeleting}
         onConfirmDelete={(row) => run(handleDelete(row))}

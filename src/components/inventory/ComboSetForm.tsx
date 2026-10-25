@@ -1,6 +1,11 @@
 /**
  * 新增／編輯套餐。
  *
+ * 2026-10-25 從 ComboSetFormDialog 改成內頁的本體（/admin/inventory-combos/new 與
+ * /admin/inventory-combos/$id/edit）。資料由 route loader 給（編輯與詳情頁共用同一個
+ * loader，「詳情 → 編輯」不再重抓一次 getAdminComboSet），存檔與 payload 一行都沒改。
+ * 欄位只在掛載時從 loader 填一次：loader 之後重跑不可以蓋掉打到一半的欄位。
+ *
  * ⚠️ 送出去的 payload **沒有 approval_status，也沒有 amount / unit_price /
  *    cost_price**。狀態由 inv.initial_approval_status() 在資料庫算（改了組成品項或
  *    組合價會重新進待審），金額由 inv.allocate_combo_amounts() 在結帳當下分攤。
@@ -10,86 +15,58 @@
  * ⚠️ 下面那張分攤預覽是**預覽**，不會被送出。它與資料庫用同一套最大餘額法（見
  *    lib/admin/combo-allocation.ts），但資料庫才是權威。
  */
-import { useEffect, useState } from "react";
-import { Loader2, Save } from "lucide-react";
+import { useState } from "react";
+import { Loader2, Package2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { AdminDetailPage } from "@/components/admin/AdminDetailPage";
+import { useUnsavedChangesGuard } from "@/components/admin/UnsavedChangesGuard";
 import {
   ComboSetAllocationPreview,
   type PreviewItem,
 } from "@/components/inventory/ComboSetAllocationPreview";
 import { ComboSetItemEditor } from "@/components/inventory/ComboSetItemEditor";
+import { useFormDirty } from "@/lib/admin/form-dirty";
 import { comboSetSchema, type ComboItemValues } from "@/lib/admin/schemas";
-import type { AdminComboSetRow } from "@/server/repos/inv-combos";
+import type { AdminComboItemRow, AdminComboSetRow } from "@/server/repos/inv-combos";
 import type { PosProduct } from "@/server/repos/inv-sales";
 
 type Props = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   approvalOn: boolean;
   /** null = 新增。 */
   editing: AdminComboSetRow | null;
+  /** 編輯時既有的組成品項（新增時是空陣列）。 */
+  initialItems: AdminComboItemRow[];
   products: PosProduct[];
-  onSaved: () => Promise<void>;
+  /** 「← 回到…」：編輯回詳情頁、新增回列表。 */
+  back: { to: string; label: string; also?: readonly string[] };
+  /** 存檔成功（已經 allowLeave）：呼叫端負責換頁。 */
+  onSaved: (comboSetId: string) => Promise<void>;
 };
 
-export function ComboSetFormDialog({
-  open,
-  onOpenChange,
+export function ComboSetForm({
   approvalOn,
   editing,
+  initialItems,
   products,
+  back,
   onSaved,
 }: Props) {
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [notes, setNotes] = useState("");
-  const [isActive, setIsActive] = useState(true);
-  const [items, setItems] = useState<ComboItemValues[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [name, setName] = useState(() => editing?.name ?? "");
+  const [price, setPrice] = useState(() => (editing ? String(editing.selling_price) : ""));
+  const [notes, setNotes] = useState(() => editing?.notes ?? "");
+  const [isActive, setIsActive] = useState(() => editing?.is_active ?? true);
+  const [items, setItems] = useState<ComboItemValues[]>(() =>
+    initialItems.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
+  );
   const [saving, setSaving] = useState(false);
 
-  // 開啟時重置。編輯的話還要把既有的組成品項抓回來 —— 清單頁那份是給表格用的，
-  // 這裡重抓一次才不會拿到別人剛剛改過之前的舊內容。
-  useEffect(() => {
-    if (!open) return;
-    setName(editing?.name ?? "");
-    setPrice(editing ? String(editing.selling_price) : "");
-    setNotes(editing?.notes ?? "");
-    setIsActive(editing?.is_active ?? true);
-    setItems([]);
-    if (!editing) return;
-
-    let cancelled = false;
-    setLoading(true);
-    void (async () => {
-      try {
-        const { getAdminComboSet } = await import("@/lib/admin/fns/inv-combos");
-        const result = await getAdminComboSet({ data: { id: editing.combo_set_id } });
-        if (cancelled) return;
-        setItems(result.items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })));
-      } catch (err) {
-        if (!cancelled) toast.error(err instanceof Error ? err.message : "組成品項讀取失敗");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [open, editing]);
+  const { dirty } = useFormDirty({ name, price, notes, isActive, items });
+  const guard = useUnsavedChangesGuard(dirty && !saving);
 
   const priceNumber = price.trim() === "" ? Number.NaN : Number(price);
   const previewItems: PreviewItem[] = items.map((item) => {
@@ -126,8 +103,8 @@ export function ComboSetFormDialog({
           ? `「${parsed.data.name}」已儲存（${result.item_count} 件組成品項）`
           : `「${parsed.data.name}」已儲存待審核，核准後才能販售`,
       );
-      onOpenChange(false);
-      await onSaved();
+      guard.allowLeave();
+      await onSaved(result.id);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "套餐儲存失敗");
     } finally {
@@ -135,19 +112,32 @@ export function ComboSetFormDialog({
     }
   }
 
-  return (
-    <Dialog open={open} onOpenChange={(o) => !saving && onOpenChange(o)}>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-base">{editing ? "編輯套餐" : "新增套餐"}</DialogTitle>
-          <DialogDescription>
-            一個套餐只有一個組合價，賣掉的時候會依組成品項拆成各自的營收。
-            {approvalOn
-              ? "套餐目前需要審核：儲存之後會進入待審核，核准後才能販售。"
-              : "套餐目前不需要審核，儲存後即可販售。"}
-          </DialogDescription>
-        </DialogHeader>
+  const actions = (
+    <Button className="gap-1.5" disabled={saving} onClick={() => void save()}>
+      {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+      儲存
+    </Button>
+  );
 
+  return (
+    <AdminDetailPage
+      backTo={back.to}
+      backLabel={back.label}
+      backAlso={back.also}
+      icon={<Package2 className="h-5 w-5" aria-hidden="true" />}
+      title={editing ? `編輯套餐：${editing.name}` : "新增套餐"}
+      meta={
+        <>
+          一個套餐只有一個組合價，賣掉的時候會依組成品項拆成各自的營收。
+          {approvalOn
+            ? "套餐目前需要審核：儲存之後會進入待審核，核准後才能販售。"
+            : "套餐目前不需要審核，儲存後即可販售。"}
+        </>
+      }
+      actions={actions}
+      width="md"
+    >
+      <div className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="combo-name">套餐名稱</Label>
@@ -199,34 +189,21 @@ export function ComboSetFormDialog({
           </Label>
         </div>
 
-        {loading ? (
-          <div className="flex h-24 items-center justify-center rounded-md border border-border">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <ComboSetItemEditor
-            items={items}
-            products={products}
-            disabled={saving}
-            onChange={setItems}
-          />
-        )}
+        <ComboSetItemEditor
+          items={items}
+          products={products}
+          disabled={saving}
+          onChange={setItems}
+        />
 
         <ComboSetAllocationPreview
           sellingPrice={Number.isNaN(priceNumber) ? 0 : priceNumber}
           items={previewItems}
         />
+      </div>
 
-        <DialogFooter>
-          <Button variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>
-            取消
-          </Button>
-          <Button className="gap-1.5" disabled={saving || loading} onClick={() => void save()}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            儲存
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <div className="hidden justify-end md:flex">{actions}</div>
+      {guard.dialog}
+    </AdminDetailPage>
   );
 }

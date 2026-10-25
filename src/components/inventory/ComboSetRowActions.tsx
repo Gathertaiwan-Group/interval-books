@@ -8,18 +8,21 @@
  *
  * ⚠️ 刪除是破壞性動作，所以往上丟給 ComboSetDialogs 的 AlertDialog 再問一次。
  *    已經賣過的套餐資料庫會直接擋掉，那句中文由 useComboActions 原樣 toast 出來。
+ *
+ * 詳情／編輯是內頁（2026-10-25 起不再是彈窗）：連結滑過就預載，點下去之前先把這一列
+ * 記進 list-memory（rememberAdminPeek），內頁 loader 還在跑時標題列先畫得出來。
  */
+import { Link } from "@tanstack/react-router";
 import { Eye, Loader2, Pencil, Power, PowerOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApprovalActions } from "@/components/inventory/ApprovalActions";
+import { rememberAdminPeek } from "@/lib/admin/list-memory";
 import type { AdminComboSetRow } from "@/server/repos/inv-combos";
 
 type Props = {
   row: AdminComboSetRow;
   busy: boolean;
   canApprove: boolean;
-  onView: (row: AdminComboSetRow) => void;
-  onEdit: (row: AdminComboSetRow) => void;
   onToggleActive: (row: AdminComboSetRow) => void;
   onAskDelete: (row: AdminComboSetRow) => void;
   onApprove: (row: AdminComboSetRow) => void;
@@ -31,8 +34,6 @@ export function ComboSetRowActions({
   row,
   busy,
   canApprove,
-  onView,
-  onEdit,
   onToggleActive,
   onAskDelete,
   onApprove,
@@ -52,28 +53,30 @@ export function ComboSetRowActions({
         onResubmit={() => onResubmit(row)}
       />
 
-      <Button
-        size="icon"
-        variant="ghost"
-        className="h-8 w-8"
-        title="查看詳細"
-        disabled={busy}
-        onClick={() => onView(row)}
-      >
-        <Eye className="h-4 w-4" />
-        <span className="sr-only">查看詳細</span>
+      <Button asChild size="icon" variant="ghost" className="h-8 w-8" title="查看詳細">
+        <Link
+          to="/admin/inventory-combos/$id"
+          params={{ id: row.combo_set_id }}
+          preload="intent"
+          aria-disabled={busy || undefined}
+          onClick={() => rememberAdminPeek("combo", row.combo_set_id, row)}
+        >
+          <Eye className="h-4 w-4" />
+          <span className="sr-only">查看詳細</span>
+        </Link>
       </Button>
 
-      <Button
-        size="icon"
-        variant="ghost"
-        className="h-8 w-8"
-        title="編輯"
-        disabled={busy}
-        onClick={() => onEdit(row)}
-      >
-        <Pencil className="h-4 w-4" />
-        <span className="sr-only">編輯</span>
+      <Button asChild size="icon" variant="ghost" className="h-8 w-8" title="編輯">
+        <Link
+          to="/admin/inventory-combos/$id/edit"
+          params={{ id: row.combo_set_id }}
+          preload="intent"
+          aria-disabled={busy || undefined}
+          onClick={() => rememberAdminPeek("combo", row.combo_set_id, row)}
+        >
+          <Pencil className="h-4 w-4" />
+          <span className="sr-only">編輯</span>
+        </Link>
       </Button>
 
       <Button

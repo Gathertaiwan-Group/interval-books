@@ -31,8 +31,6 @@ type Props = {
   items: AdminComboItemRow[];
   busyId: string | null;
   canApprove: boolean;
-  onView: (row: AdminComboSetRow) => void;
-  onEdit: (row: AdminComboSetRow) => void;
   onToggleActive: (row: AdminComboSetRow) => void;
   onAskDelete: (row: AdminComboSetRow) => void;
   onApprove: (row: AdminComboSetRow) => void;

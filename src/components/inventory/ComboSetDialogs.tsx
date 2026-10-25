@@ -1,9 +1,8 @@
 /**
- * 這一頁的兩個對話框 + 一個二次確認。
+ * 套餐這一頁剩下的對話框：刪除的二次確認。
  *
- * 全部收在一起，理由與 AdjustmentDialogs.tsx 相同：它們對 route 來說是同一件事
- * 「某個 state 不是 null 的時候蓋一層東西上去」。留在 route 檔只會把真正的版面
- * （標題列、篩選、表格）推到 300 行以外。
+ * 2026-10-25 起詳情與新增／編輯是內頁（/admin/inventory-combos/$id、/$id/edit、/new），
+ * 不再是彈窗；確認類的小框照舊留在列表上。
  *
  * ⚠️ 只有刪除要按兩次。上下架按錯了再按一次就回來了；審核通過不問（那是這一頁最常
  *    做的事，每次都跳對話框只會訓練出「看到就按確定」），退回由 ApprovalActions
@@ -19,59 +18,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ComboSetDetailDialog } from "@/components/inventory/ComboSetDetailDialog";
-import { ComboSetFormDialog } from "@/components/inventory/ComboSetFormDialog";
 import type { AdminComboSetRow } from "@/server/repos/inv-combos";
-import type { PosProduct } from "@/server/repos/inv-sales";
 
 type Props = {
-  approvalOn: boolean;
-  products: PosProduct[];
-  refresh: () => Promise<void>;
-
-  formOpen: boolean;
-  setFormOpen: (v: boolean) => void;
-  /** null = 新增。 */
-  editing: AdminComboSetRow | null;
-
-  detail: AdminComboSetRow | null;
-  setDetail: (v: AdminComboSetRow | null) => void;
-
   deleting: AdminComboSetRow | null;
   setDeleting: (v: AdminComboSetRow | null) => void;
   onConfirmDelete: (row: AdminComboSetRow) => void;
 };
 
-export function ComboSetDialogs({
-  approvalOn,
-  products,
-  refresh,
-  formOpen,
-  setFormOpen,
-  editing,
-  detail,
-  setDetail,
-  deleting,
-  setDeleting,
-  onConfirmDelete,
-}: Props) {
+export function ComboSetDialogs({ deleting, setDeleting, onConfirmDelete }: Props) {
   return (
     <>
-      <ComboSetFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        approvalOn={approvalOn}
-        editing={editing}
-        products={products}
-        onSaved={refresh}
-      />
-
-      <ComboSetDetailDialog
-        open={detail !== null}
-        onOpenChange={(o) => !o && setDetail(null)}
-        row={detail}
-      />
-
       <AlertDialog open={deleting !== null} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

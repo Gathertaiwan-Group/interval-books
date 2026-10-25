@@ -650,7 +650,15 @@ const comboComp = existsSync(join(ROOT, "src/components/inventory"))
       .filter((f) => /^Combo/.test(f))
       .map((f) => `src/components/inventory/${f}`)
   : [];
-const ROUTES = ["src/routes/admin/_shell.inventory-combos.tsx", "src/routes/admin/_shell.pos.tsx"];
+// 2026-10-25：詳情／編輯／新增從彈窗改成內頁，那幾個 route 檔一樣要守下面的前端不變量。
+const ROUTES = [
+  "src/routes/admin/_shell.inventory-combos.tsx",
+  "src/routes/admin/_shell.inventory-combos_.$id.tsx",
+  "src/routes/admin/_shell.inventory-combos_.$id.index.tsx",
+  "src/routes/admin/_shell.inventory-combos_.$id.edit.tsx",
+  "src/routes/admin/_shell.inventory-combos_.new.tsx",
+  "src/routes/admin/_shell.pos.tsx",
+];
 const ALL_NEW = [...newFrontFiles, ...comboComp, ...ROUTES].filter((f) =>
   existsSync(join(ROOT, f)),
 );

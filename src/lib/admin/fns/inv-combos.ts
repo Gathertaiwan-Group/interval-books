@@ -69,18 +69,70 @@ export const listComboSales = createServerFn({ method: "POST" })
     return await listComboSales(data);
   });
 
-/** 建套餐時要選商品。沿用商品主檔那一支（已審核、上架、不是組合子品項）。 */
+/**
+ * 表單要的選項：審核設定（提示文字用）與可選的商品（沿用櫃檯那一支：已審核、上架、
+ * 不是組合子品項）。新增頁的 loader 與詳情／編輯的整頁 fn 共用。
+ *
+ * 2026-10-25：拿掉 paymentMethods —— 套餐頁從來沒有用到（結帳在 /admin/pos，自己抓）。
+ */
+async function loadComboFormOptions() {
+  const { listApprovalSettings } = await import("@/server/repos/inv-products");
+  const { listPosProducts } = await import("@/server/repos/inv-sales");
+  const [approvalSettings, products] = await Promise.all([
+    listApprovalSettings(),
+    listPosProducts(),
+  ]);
+  return { approvalSettings, products };
+}
+
+/** 建套餐時要選商品（/admin/inventory-combos/new 的 loader）。 */
 export const listComboFormOptions = createServerFn({ method: "GET" })
   .middleware([staffFnMiddleware()])
-  .handler(async () => {
+  .handler(async () => await loadComboFormOptions());
+
+/**
+ * /admin/inventory-combos 列表的 loader 一支拿齊：套餐清單＋組成品項＋審核設定。
+ *
+ * 2026-10-25 後台第 2 批：表單搬到內頁以後，列表只剩「需審核」那個提示要用審核設定。
+ * 原本列表另外抓 listComboFormOptions（整份可選商品，約 496 KB）只為了表單，現在不抓。
+ * 權限與 listAdminComboSets／listComboFormOptions 相同（staffFnMiddleware）。
+ */
+export const getInventoryCombosPageData = createServerFn({ method: "GET" })
+  .middleware([staffFnMiddleware()])
+  .inputValidator(comboFilterSchema)
+  .handler(async ({ data }) => {
+    const { listAdminComboSets, listAllComboItems } = await import("@/server/repos/inv-combos");
     const { listApprovalSettings } = await import("@/server/repos/inv-products");
-    const { listPosProducts, listPosPaymentMethods } = await import("@/server/repos/inv-sales");
-    const [approvalSettings, products, paymentMethods] = await Promise.all([
+    const [sets, items, approvalSettings] = await Promise.all([
+      listAdminComboSets(data),
+      listAllComboItems(),
       listApprovalSettings(),
-      listPosProducts(),
-      listPosPaymentMethods(),
     ]);
-    return { approvalSettings, products, paymentMethods };
+    return { list: { sets, items }, approvalSettings };
+  });
+
+/**
+ * /admin/inventory-combos/$id（詳情與編輯共用的 layout loader）一支拿齊：套餐、組成品項、
+ * 最近 50 筆套餐銷售、表單選項。
+ *
+ * 2026-10-25 後台第 2 批：原本詳情彈窗打 getAdminComboSet ∥ listComboSales（兩支、各驗一次
+ * 身分），編輯彈窗又打一次 getAdminComboSet。現在兩頁共用這一個 loader，詳情 → 編輯不重抓。
+ * 權限與 getAdminComboSet／listComboSales／listComboFormOptions 相同（staffFnMiddleware）。
+ */
+export const getInventoryComboPageData = createServerFn({ method: "GET" })
+  .middleware([staffFnMiddleware()])
+  .inputValidator(z.object({ comboSetId: z.string().trim().uuid() }))
+  .handler(async ({ data }) => {
+    const { getAdminComboSet, listComboItems, listComboSales } =
+      await import("@/server/repos/inv-combos");
+    const [set, items, sales, options] = await Promise.all([
+      getAdminComboSet(data.comboSetId),
+      listComboItems(data.comboSetId),
+      // 不限日期：套餐一年賣不到幾百份，最近 50 筆就是完整的故事。
+      listComboSales({ comboSetId: data.comboSetId, dateFrom: null, dateTo: null, limit: 50 }),
+      loadComboFormOptions(),
+    ]);
+    return { set, items, sales, options };
   });
 
 // ---------------------------------------------------------------------------

@@ -298,6 +298,18 @@ console.log("\n[3] 整頁 fn：GET、middleware 跟原本那幾支一樣、route
       "_shell.inventory-vendors.tsx",
     ],
     [
+      "src/lib/admin/fns/inv-combos.ts",
+      "getInventoryCombosPageData",
+      "staffFnMiddleware()",
+      "_shell.inventory-combos.tsx",
+    ],
+    [
+      "src/lib/admin/fns/inv-combos.ts",
+      "getInventoryComboPageData",
+      "staffFnMiddleware()",
+      "_shell.inventory-combos_.$id.tsx",
+    ],
+    [
       "src/lib/admin/fns/inv-purchases.ts",
       "getInventoryPurchasesPageData",
       "staffFnMiddleware()",
@@ -344,6 +356,7 @@ console.log("\n[3] 整頁 fn：GET、middleware 跟原本那幾支一樣、route
     "event-sessions",
     "inv-products",
     "inv-vendors",
+    "inv-combos",
     "inv-purchases",
     "inv-adjustments",
   ]) {
