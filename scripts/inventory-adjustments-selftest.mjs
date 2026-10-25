@@ -617,9 +617,9 @@ checkTrue(
   "放寬只能加不能減：[10] 掃到的每一個檔案都必須也在 [10b] 裡",
 );
 checkTrue(
-  "VendorFormDialog 真的進了行數那條線",
-  cappedFiles.includes("src/components/inventory/VendorFormDialog.tsx"),
-  "它是當初被漏掉的那個 2,353 行檔案。掉出去就等於這條線白改了",
+  "VendorForm（原 VendorFormDialog，2026-10-25 改成內頁）真的進了行數那條線",
+  cappedFiles.includes("src/components/inventory/VendorForm.tsx"),
+  "它的前身是當初被漏掉的那個 2,353 行檔案。掉出去就等於這條線白改了",
 );
 
 const codeFront = stripTs(ALL_FRONT.map((f) => read(join(ROOT, f))).join("\n"));

@@ -10,6 +10,7 @@ import {
   preloadErrorAction,
 } from "@/lib/stale-deploy";
 import { applyAdminRouteCacheDefaults, registerAdminCacheRouter } from "@/lib/admin/route-cache";
+import { registerAdminDetailNav } from "@/lib/admin/detail-nav";
 
 /**
  * 部署之後還開著的分頁會壞：頁面記得的是上一版的程式檔名，而 Vercel 每次部署都是一整組新的
@@ -174,6 +175,8 @@ export const getRouter = () => {
   if (typeof window !== "undefined") {
     currentRouter = router;
     registerAdminCacheRouter(router);
+    // 後台內頁「← 回到列表」判斷能不能直接按上一頁（見 src/lib/admin/detail-nav.ts）。
+    registerAdminDetailNav(router);
   }
 
   return router;

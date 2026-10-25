@@ -469,8 +469,8 @@ console.log("\n[5b] /admin/orders/$id 獨立頁、?order= 轉址、回列表保�
     /to: "\/admin\/orders\/\$id",\s*params: \{ id \},\s*search: currentSearch/.test(routeSrc),
   );
   checkTrue(
-    "「回訂單列表」原樣帶回篩選參數",
-    /<Link (preload="intent" )?to="\/admin\/orders" search=\{search\}>/.test(detailSrc),
+    "「回訂單列表」原樣帶回篩選參數（共用 AdminDetailPage：上一頁是列表就 history.back，否則帶 search 導回）",
+    /backTo="\/admin\/orders"\s*backSearch=\{search\}/.test(detailSrc),
   );
   checkTrue("列表滑過就預載內頁", /preloadRoute\(/.test(routeSrc));
 }

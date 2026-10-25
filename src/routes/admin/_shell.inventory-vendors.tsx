@@ -28,11 +28,17 @@
  *    貨的歷史不能因為刪一筆主檔就變成孤兒。不再往來的正確做法是把「往來狀態」改成
  *    「已終止」。這一頁把三個數字直接印在列上，就是為了讓人在按下刪除之前就知道。
  *
+ * ── 內頁（2026-10-25 起）──────────────────────────────────────────────────
+ * 詳情／編輯／新增不再是彈窗：/admin/inventory-vendors/$id、/$id/edit、/new
+ * （_shell.inventory-vendors_.*.tsx）。這一頁的篩選與送審佇列狀態記在 list-memory，
+ * 從內頁「← 回到列表」回來原樣還原；畫面上的清單取 loader 與自己抓的兩份裡比較新的
+ * （useLoaderBackedList），背景重抓會反映在畫面上。
+ *
  * ⚠️ 廠商**沒有**「重新送審」：inv_save_vendor() 的 UPDATE 分支刻意不碰
  *    approval_status，inv_approve_record() 也只吃 pending。被退回的廠商是終點。
  */
 import { useCallback, useState } from "react";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { Building2, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -43,11 +49,12 @@ import { VendorSensitiveDialog } from "@/components/inventory/VendorSensitiveDia
 import { VendorSubmissionQueue } from "@/components/inventory/VendorSubmissionQueue";
 import { VendorTable } from "@/components/inventory/VendorTable";
 import { isApprovalRequired } from "@/lib/admin/inv-product-utils";
+import { useLoaderBackedList } from "@/lib/admin/useLoaderBackedList";
 import { useVendorActions } from "@/lib/admin/useVendorActions";
 import type { VendorFilterValues } from "@/lib/admin/schemas";
-import type { AdminVendorRow, VendorSubmissionRow } from "@/server/repos/inv-vendors";
+import type { AdminVendorRow } from "@/server/repos/inv-vendors";
 
-const DEFAULT_FILTER: VendorFilterValues = {
+const DEFAULT_VENDOR_FILTER: VendorFilterValues = {
   keyword: null,
   entityType: "all",
   consignment: "all",
@@ -64,7 +71,7 @@ export const Route = createFileRoute("/admin/_shell/inventory-vendors")({
     // 一支 fn 拿齊（廠商清單、表單選項、送審佇列）。送審預設只看待審的：這一區存在的理由
     // 就是「有東西在等」，全部撈回來會把它稀釋掉。
     return await getInventoryVendorsPageData({
-      data: { filter: DEFAULT_FILTER, approvalStatus: "pending" },
+      data: { filter: DEFAULT_VENDOR_FILTER, approvalStatus: "pending" },
     });
   },
   head: () => ({ meta: [{ title: "廠商｜小時光書店後台" }] }),
@@ -72,25 +79,41 @@ export const Route = createFileRoute("/admin/_shell/inventory-vendors")({
 });
 
 function InventoryVendorsPage() {
-  const {
-    vendors: initialVendors,
-    options,
-    submissions: initialSubmissions,
-  } = Route.useLoaderData();
+  const { vendors: loaderVendors, options, submissions: loaderSubmissions } = Route.useLoaderData();
+  const loaderUpdatedAt = Route.useMatch({ select: (m) => m.updatedAt });
   const { user } = Route.useRouteContext();
   const router = useRouter();
 
-  const [filter, setFilter] = useState<VendorFilterValues>(DEFAULT_FILTER);
-  const [rows, setRows] = useState<AdminVendorRow[]>(initialVendors);
-  const [loading, setLoading] = useState(false);
+  const vendorList = useLoaderBackedList({
+    key: "inventory-vendors",
+    loaderFilter: DEFAULT_VENDOR_FILTER,
+    loaderData: loaderVendors,
+    loaderUpdatedAt,
+    errorMessage: "廠商清單讀取失敗",
+    fetcher: async (next: VendorFilterValues) => {
+      const { listAdminVendors } = await import("@/lib/admin/fns/inv-vendors");
+      return await listAdminVendors({ data: next });
+    },
+  });
+  const filter = vendorList.filter;
+  const rows = vendorList.data;
+  const loading = vendorList.loading;
 
-  const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>("pending");
-  const [submissions, setSubmissions] = useState<VendorSubmissionRow[]>(initialSubmissions);
-  const [submissionsLoading, setSubmissionsLoading] = useState(false);
+  const submissionList = useLoaderBackedList({
+    key: "inventory-vendors:submissions",
+    loaderFilter: "pending" as SubmissionStatus,
+    loaderData: loaderSubmissions,
+    loaderUpdatedAt,
+    errorMessage: "送審清單讀取失敗",
+    fetcher: async (next: SubmissionStatus) => {
+      const { listVendorSubmissions } = await import("@/lib/admin/fns/inv-vendors");
+      return await listVendorSubmissions({ data: { approvalStatus: next } });
+    },
+  });
+  const submissionStatus = submissionList.filter;
+  const submissions = submissionList.data;
+  const submissionsLoading = submissionList.loading;
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<AdminVendorRow | null>(null);
-  const [detail, setDetail] = useState<AdminVendorRow | null>(null);
   const [deleting, setDeleting] = useState<AdminVendorRow | null>(null);
   const [sensitive, setSensitive] = useState<AdminVendorRow | null>(null);
 
@@ -102,38 +125,12 @@ function InventoryVendorsPage() {
   // 只拿來寫提示文字。真正的 status 是 inv.initial_approval_status() 算的。
   const approvalOn = isApprovalRequired(options.approvalSettings, "vendors");
 
-  const reload = useCallback(async (next: VendorFilterValues) => {
-    setLoading(true);
-    try {
-      const { listAdminVendors } = await import("@/lib/admin/fns/inv-vendors");
-      setRows(await listAdminVendors({ data: next }));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "廠商清單讀取失敗");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const reloadSubmissions = useCallback(async (next: SubmissionStatus) => {
-    setSubmissionsLoading(true);
-    try {
-      const { listVendorSubmissions } = await import("@/lib/admin/fns/inv-vendors");
-      setSubmissions(await listVendorSubmissions({ data: { approvalStatus: next } }));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "送審清單讀取失敗");
-    } finally {
-      setSubmissionsLoading(false);
-    }
-  }, []);
-
   function changeFilter(next: VendorFilterValues) {
-    setFilter(next);
-    void reload(next);
+    vendorList.setFilter(next);
   }
 
   function changeSubmissionStatus(next: SubmissionStatus) {
-    setSubmissionStatus(next);
-    void reloadSubmissions(next);
+    submissionList.setFilter(next);
   }
 
   /**
@@ -143,24 +140,18 @@ function InventoryVendorsPage() {
    * 在 loader 裡）。核准一件送審商品會同時改變佇列與那家廠商的 product_count，
    * 只重抓一半的話畫面會自相矛盾。
    */
+  const reloadVendors = vendorList.reload;
+  const reloadSubmissions = submissionList.reload;
   const refresh = useCallback(async () => {
-    await Promise.all([reload(filter), reloadSubmissions(submissionStatus)]);
+    await Promise.all([reloadVendors(), reloadSubmissions()]);
     await router.invalidate();
-  }, [filter, reload, reloadSubmissions, router, submissionStatus]);
+  }, [reloadVendors, reloadSubmissions, router]);
 
   const { busyId, handleApprove, handleDelete, handleSubmissionDecision } =
     useVendorActions(refresh);
 
-  /** 動作做完就把詳情關掉 —— 留著會顯示動作前的舊狀態。 */
   function run(task: Promise<void>) {
-    setDetail(null);
     void task;
-  }
-
-  function openForm(row: AdminVendorRow | null) {
-    setEditing(row);
-    setDetail(null);
-    setFormOpen(true);
   }
 
   const pending = rows.filter((r) => r.approval_status === "pending").length;
@@ -194,9 +185,11 @@ function InventoryVendorsPage() {
             </Badge>
           ) : null}
         </div>
-        <Button size="sm" className="gap-1.5" onClick={() => openForm(null)}>
-          <Plus className="h-4 w-4" />
-          新增廠商
+        <Button asChild size="sm" className="gap-1.5">
+          <Link to="/admin/inventory-vendors/new" preload="intent">
+            <Plus className="h-4 w-4" />
+            新增廠商
+          </Link>
         </Button>
       </div>
 
@@ -232,8 +225,6 @@ function InventoryVendorsPage() {
           busyId={busyId}
           canApprove={canApprove}
           canReadPii={canReadPii}
-          onView={setDetail}
-          onEdit={openForm}
           onAskDelete={setDeleting}
           onReadSensitive={setSensitive}
           onApprove={(row) => run(handleApprove(row, true))}
@@ -260,16 +251,6 @@ function InventoryVendorsPage() {
       ) : null}
 
       <VendorDialogs
-        approvalOn={approvalOn}
-        categories={options.categories}
-        taxTypes={options.taxTypes}
-        withholdingCategories={options.withholdingCategories}
-        refresh={refresh}
-        formOpen={formOpen}
-        setFormOpen={setFormOpen}
-        editing={editing}
-        detail={detail}
-        setDetail={setDetail}
         deleting={deleting}
         setDeleting={setDeleting}
         onConfirmDelete={(row) => run(handleDelete(row))}

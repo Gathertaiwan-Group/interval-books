@@ -1500,7 +1500,7 @@ if (!TOKEN) {
 // 之前**：跑到 schema 驗證那一步就代表 payload 已經組好了。
 console.log("\n[PII] 沒按更改就儲存的閘門");
 
-const vendorFormCode = stripTs(read(join(ROOT, "src/components/inventory/VendorFormDialog.tsx")));
+const vendorFormCode = stripTs(read(join(ROOT, "src/components/inventory/VendorForm.tsx")));
 const saveStart = vendorFormCode.indexOf("async function save()");
 const saveBody = saveStart === -1 ? "" : vendorFormCode.slice(saveStart);
 

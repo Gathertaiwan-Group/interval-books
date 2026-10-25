@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   createFileRoute,
   Link,
@@ -82,6 +83,12 @@ type BackOfficeUserView = NonNullable<
  *    loader 會被 adminFnMiddleware 擋下來），而不是一頁資料。側欄只負責不要
  *    給他一個一按就壞掉的連結。
  */
+/**
+ * 同一時間只問一次「誰登入」：滑過連結的預載與接著的點擊會各跑一次 beforeLoad，
+ * 快取還沒寫進去之前兩趟會一起打出去（2026-10-25 量到內頁一次換頁打兩次）。只在瀏覽器端用。
+ */
+let inflightUser: Promise<BackOfficeUserView | null> | null = null;
+
 export const Route = createFileRoute("/admin/_shell")({
   beforeLoad: async ({ location }) => {
     // 瀏覽器端換頁時沿用 60 秒內的結果，省掉每次換頁前那一趟依序的 server fn
@@ -90,8 +97,18 @@ export const Route = createFileRoute("/admin/_shell")({
     const cached = isBrowser ? (shellUserCache.get(Date.now()) as BackOfficeUserView | null) : null;
     let user: BackOfficeUserView | null = cached;
     if (!user) {
-      const { getCurrentBackOfficeUser } = await import("@/lib/admin/fns/auth");
-      user = await getCurrentBackOfficeUser();
+      const ask = async () => {
+        const { getCurrentBackOfficeUser } = await import("@/lib/admin/fns/auth");
+        return await getCurrentBackOfficeUser();
+      };
+      if (isBrowser) {
+        const pending = (inflightUser ??= ask().finally(() => {
+          inflightUser = null;
+        }));
+        user = await pending;
+      } else {
+        user = await ask();
+      }
       if (isBrowser && user && user.role !== "pending") shellUserCache.set(user, Date.now());
     }
     if (!user) {
@@ -257,6 +274,13 @@ const ROLE_LABEL: Record<string, string> = { admin: "管理員", staff: "門市�
 
 function AdminShell() {
   const { admin, user } = Route.useRouteContext();
+  // 整頁載入時 beforeLoad 跑在伺服器上，瀏覽器端的「誰登入」快取是空的——第一次換頁會再問
+  // 一次。把 SSR 剛問到的結果放進快取（同一個答案、同樣 60 秒；授權仍在每支 server fn）。
+  useEffect(() => {
+    if (user.role !== "pending" && !shellUserCache.get(Date.now())) {
+      shellUserCache.set(user, Date.now());
+    }
+  }, [user]);
   const navigate = useNavigate();
   const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });

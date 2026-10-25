@@ -323,6 +323,19 @@ export async function listAdminVendors(filter: VendorFilter): Promise<AdminVendo
   return (data ?? []) as unknown as AdminVendorRow[];
 }
 
+/** 清單 view 的單一列（內頁標題列與統計數字用；欄位與 listAdminVendors 相同）。 */
+export async function getAdminVendorRow(vendorId: string): Promise<AdminVendorRow | null> {
+  const { data, error } = await supabaseAdmin()
+    .from("inv_admin_vendor_list")
+    .select(LIST_COLUMNS)
+    .eq("vendor_id", vendorId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(`[repo/inv-vendors] 廠商讀取失敗：${error.message}`);
+  return (data as unknown as AdminVendorRow | null) ?? null;
+}
+
 export async function getAdminVendor(vendorId: string): Promise<AdminVendorDetail | null> {
   const { data, error } = await supabaseAdmin()
     .from("inv_admin_vendor_detail")

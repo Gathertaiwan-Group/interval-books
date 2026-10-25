@@ -375,3 +375,34 @@ export const getInventoryVendorsPageData = createServerFn({ method: "GET" })
     ]);
     return { vendors, options, submissions };
   });
+
+/**
+ * /admin/inventory-vendors/$id（詳情與編輯共用的 layout loader）一支拿齊：清單那一列
+ * （商品數、進貨數這些統計只有清單的 view 有）、詳情、三張子表、表單選項。
+ *
+ * 2026-10-25 後台第 2 批：原本詳情彈窗與編輯彈窗各自打一次 getAdminVendor，
+ * 「詳情 → 編輯」等於同一家廠商抓兩次。現在兩頁共用這一個 loader，詳情 → 編輯不重抓。
+ * 權限與 getAdminVendor／listVendorFormOptions 相同（staffFnMiddleware）。
+ * ⚠️ 識別碼一律只有遮罩（inv_admin_vendor_detail／list 的 *_masked），與原本相同。
+ */
+export const getInventoryVendorPageData = createServerFn({ method: "GET" })
+  .middleware([staffFnMiddleware()])
+  .inputValidator(z.object({ vendorId: uuid }))
+  .handler(async ({ data }) => {
+    const {
+      getAdminVendor,
+      getAdminVendorRow,
+      listVendorContacts,
+      listVendorBankAccounts,
+      listVendorAttachments,
+    } = await import("@/server/repos/inv-vendors");
+    const [row, vendor, contacts, bankAccounts, attachments, options] = await Promise.all([
+      getAdminVendorRow(data.vendorId),
+      getAdminVendor(data.vendorId),
+      listVendorContacts(data.vendorId),
+      listVendorBankAccounts(data.vendorId),
+      listVendorAttachments(data.vendorId),
+      loadVendorFormOptions(),
+    ]);
+    return { row, vendor, contacts, bankAccounts, attachments, options };
+  });

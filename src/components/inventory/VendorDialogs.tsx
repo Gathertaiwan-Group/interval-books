@@ -1,17 +1,13 @@
 /**
- * 廠商這一頁的兩個對話框 + 一個二次確認。
+ * 廠商這一頁剩下的對話框：刪除的二次確認。
  *
- * 全部收在一起，理由與 ComboSetDialogs.tsx / AdjustmentDialogs.tsx 相同：它們對
- * route 來說是同一件事「某個 state 不是 null 的時候蓋一層東西上去」。留在 route 檔
- * 只會把真正的版面（標題列、送審佇列、篩選、表格）推到 300 行以外。
+ * 2026-10-25 起詳情與編輯是內頁（/admin/inventory-vendors/$id、/$id/edit、/new），
+ * 不再是彈窗；確認類的小框照舊留在列表上。
  *
  * ⚠️ **刪除的對話框要把話講完。** inv_delete_vendor() 會在還有商品／進貨／退貨單／
  *    入口帳號的時候擋下來，並回一句「解約請把往來狀態改成『已終止』」。這裡把同一件
  *    事先講在前面，而且把那四個數字印出來 —— 「按了才知道不行」是最差的順序，尤其
  *    當正確做法（改往來狀態）根本不在同一個按鈕底下的時候。
- *
- * ⚠️ 詳情是唯讀的，而且**識別碼與匯款帳號永遠是遮罩**（見 VendorDetailDialog）。
- *    完整號碼只有 VendorSensitiveDialog 那一條路，而那一條路會留下 pii_access_log。
  */
 import {
   AlertDialog,
@@ -23,50 +19,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { VendorDetailDialog } from "@/components/inventory/VendorDetailDialog";
-import { VendorFormDialog } from "@/components/inventory/VendorFormDialog";
-import type {
-  AdminVendorRow,
-  TaxTypeRow,
-  VendorCategoryRow,
-  WithholdingRow,
-} from "@/server/repos/inv-vendors";
+import type { AdminVendorRow } from "@/server/repos/inv-vendors";
 
 type Props = {
-  approvalOn: boolean;
-  categories: VendorCategoryRow[];
-  taxTypes: TaxTypeRow[];
-  withholdingCategories: WithholdingRow[];
-  refresh: () => Promise<void>;
-
-  formOpen: boolean;
-  setFormOpen: (v: boolean) => void;
-  /** null = 新增。 */
-  editing: AdminVendorRow | null;
-
-  detail: AdminVendorRow | null;
-  setDetail: (v: AdminVendorRow | null) => void;
-
   deleting: AdminVendorRow | null;
   setDeleting: (v: AdminVendorRow | null) => void;
   onConfirmDelete: (row: AdminVendorRow) => void;
 };
 
-export function VendorDialogs({
-  approvalOn,
-  categories,
-  taxTypes,
-  withholdingCategories,
-  refresh,
-  formOpen,
-  setFormOpen,
-  editing,
-  detail,
-  setDetail,
-  deleting,
-  setDeleting,
-  onConfirmDelete,
-}: Props) {
+export function VendorDialogs({ deleting, setDeleting, onConfirmDelete }: Props) {
   const linkedCount =
     (deleting?.product_count ?? 0) +
     (deleting?.purchase_count ?? 0) +
@@ -74,23 +35,6 @@ export function VendorDialogs({
 
   return (
     <>
-      <VendorFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        approvalOn={approvalOn}
-        editing={editing}
-        categories={categories}
-        taxTypes={taxTypes}
-        withholdingCategories={withholdingCategories}
-        onSaved={refresh}
-      />
-
-      <VendorDetailDialog
-        open={detail !== null}
-        onOpenChange={(o) => !o && setDetail(null)}
-        row={detail}
-      />
-
       <AlertDialog open={deleting !== null} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

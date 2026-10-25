@@ -25,6 +25,7 @@
  *    inv_approve_record() 也只吃 pending。所以 ApprovalActions 只在 pending 時
  *    才渲染，onResubmit 是一個永遠不會被呼叫到的 no-op（見下面那一行註解）。
  */
+import { Link } from "@tanstack/react-router";
 import { Eye, KeyRound, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ import {
 } from "@/lib/admin/schemas";
 import type { AdminVendorRow } from "@/server/repos/inv-vendors";
 import { needsPermissionHint } from "@/lib/admin/permission-labels";
+import { rememberAdminPeek } from "@/lib/admin/list-memory";
 
 // view 回傳的是 text，schemas 那邊的 enum 才是值域。認不出來的值原樣印出去 ——
 // 與 ApprovalStatusBadge 同一條規矩：看到奇怪的字會有人來問，看不到東西不會。
@@ -57,8 +59,6 @@ type Props = {
   busyId: string | null;
   canApprove: boolean;
   canReadPii: boolean;
-  onView: (row: AdminVendorRow) => void;
-  onEdit: (row: AdminVendorRow) => void;
   onAskDelete: (row: AdminVendorRow) => void;
   onReadSensitive: (row: AdminVendorRow) => void;
   onApprove: (row: AdminVendorRow) => void;
@@ -97,8 +97,6 @@ export function VendorTable({
   busyId,
   canApprove,
   canReadPii,
-  onView,
-  onEdit,
   onAskDelete,
   onReadSensitive,
   onApprove,
@@ -219,15 +217,17 @@ export function VendorTable({
                       />
                     ) : null}
 
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      disabled={busy}
-                      onClick={() => onView(row)}
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      詳情
+                    {/* 詳情／編輯是內頁（2026-10-25 起不再是彈窗）。滑過就預載。 */}
+                    <Button asChild size="sm" variant="outline" className="gap-1.5" disabled={busy}>
+                      <Link
+                        to="/admin/inventory-vendors/$id"
+                        params={{ id: row.vendor_id }}
+                        preload="intent"
+                        onClick={() => rememberAdminPeek("vendor", row.vendor_id, row)}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        詳情
+                      </Link>
                     </Button>
 
                     <Button
@@ -248,15 +248,16 @@ export function VendorTable({
                       完整號碼
                     </Button>
 
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      disabled={busy}
-                      onClick={() => onEdit(row)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      編輯
+                    <Button asChild size="sm" variant="outline" className="gap-1.5" disabled={busy}>
+                      <Link
+                        to="/admin/inventory-vendors/$id/edit"
+                        params={{ id: row.vendor_id }}
+                        preload="intent"
+                        onClick={() => rememberAdminPeek("vendor", row.vendor_id, row)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        編輯
+                      </Link>
                     </Button>
 
                     <Button

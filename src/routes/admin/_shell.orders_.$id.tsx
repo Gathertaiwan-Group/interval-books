@@ -29,9 +29,10 @@
  * 通知信給客人（業主 2026-10-22 核准）。
  */
 import { useState, type ReactNode } from "react";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { Archive, ArchiveRestore, ArrowLeft, Landmark, PackageCheck, Trash2 } from "lucide-react";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { Archive, ArchiveRestore, Landmark, PackageCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { AdminDetailNotFound, AdminDetailPage } from "@/components/admin/AdminDetailPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -106,28 +107,17 @@ export const Route = createFileRoute("/admin/_shell/orders_/$id")({
   component: AdminOrderDetailRoute,
 });
 
-function BackToList() {
-  const search = Route.useSearch();
-  return (
-    <Button asChild variant="ghost" size="sm" className="-ml-2 gap-1.5">
-      <Link preload="intent" to="/admin/orders" search={search}>
-        <ArrowLeft className="h-4 w-4" />
-        回訂單列表
-      </Link>
-    </Button>
-  );
-}
-
 function AdminOrderDetailRoute() {
   const { detail } = Route.useLoaderData();
+  const search = Route.useSearch();
   if (!detail) {
     return (
-      <div className="space-y-4">
-        <BackToList />
-        <p className="rounded-md border border-border p-6 text-center text-sm text-muted-foreground">
-          找不到這張訂單，可能已被刪除或網址有誤。
-        </p>
-      </div>
+      <AdminDetailNotFound
+        backTo="/admin/orders"
+        backSearch={search}
+        backLabel="回訂單列表"
+        message="找不到這張訂單，可能已被刪除或網址有誤。"
+      />
     );
   }
   // 換一張訂單＝重新掛載，確認框與備註不會跨訂單殘留。
@@ -290,18 +280,20 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <div className="space-y-2">
-        <BackToList />
-        <h1 className="flex flex-wrap items-center gap-2 text-lg font-medium">
-          <Landmark className="h-5 w-5" aria-hidden="true" />
-          <span className="font-mono">{detail.order_no}</span>
-          {detail.archived_at ? (
-            <Badge variant="outline" className="font-normal">
-              已封存
-            </Badge>
-          ) : null}
-        </h1>
+    <AdminDetailPage
+      backTo="/admin/orders"
+      backSearch={search}
+      backLabel="回訂單列表"
+      icon={<Landmark className="h-5 w-5" aria-hidden="true" />}
+      title={<span className="font-mono">{detail.order_no}</span>}
+      titleExtra={
+        detail.archived_at ? (
+          <Badge variant="outline" className="font-normal">
+            已封存
+          </Badge>
+        ) : null
+      }
+      meta={
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={statusBadgeVariant(detail.status)}>
             {STATUS_LABEL[detail.status] ?? detail.status}
@@ -309,15 +301,15 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
           <Badge variant={paymentStatusBadgeVariant(detail.payment_status)}>
             {PAYMENT_STATUS_LABEL[detail.payment_status] ?? detail.payment_status}
           </Badge>
-          <span className="text-sm text-muted-foreground">
+          <span>
             下單於 {formatTaipeiDateTime(detail.created_at)}
             {detail.paid_at ? `・付款於 ${formatTaipeiDateTime(detail.paid_at)}` : ""}
             {detail.shipped_at ? `・出貨於 ${formatTaipeiDateTime(detail.shipped_at)}` : ""}
             {detail.completed_at ? `・完成於 ${formatTaipeiDateTime(detail.completed_at)}` : ""}
           </span>
         </div>
-      </div>
-
+      }
+    >
       <Section title="訂購人">
         <dl className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-1 text-sm">
           <dt className="text-muted-foreground">姓名</dt>
@@ -688,7 +680,7 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AdminDetailPage>
   );
 }
 

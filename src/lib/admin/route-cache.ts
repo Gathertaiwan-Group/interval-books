@@ -34,6 +34,7 @@
  */
 import { clearShellUserCache } from "./shell-user-cache.ts";
 import { isBackOfficePath } from "./back-office-path.ts";
+import { clearAdminListMemory } from "./list-memory.ts";
 
 export const ADMIN_STALE_TIME_MS = 30_000;
 
@@ -112,6 +113,7 @@ export function registerAdminCacheRouter(router: AdminCacheRouter): void {
   // 別的分頁登入／登出了：這個分頁記得的「誰登入」與頁面資料都不可以再用。
   channel = openChannel(() => {
     clearShellUserCache();
+    clearAdminListMemory();
     registered?.clearCache();
     // 只清快取不夠：畫面上那一頁（例如前一位 admin 的訂單內頁）不在快取裡，下一次換頁時
     // 還會被搬進快取、30 秒內按「上一頁」就原樣畫出來。換人了就整頁重載，記憶體裡的
@@ -165,7 +167,11 @@ export function clearAdminRouteCacheOnIdentityChange(userId: string | null): boo
   // 回傳 true 時（userId 不是 null）呼叫端要整頁重載：見 _shell.tsx 的 beforeLoad。
   const changed = userId === null || (lastUserId !== null && lastUserId !== userId);
   lastUserId = userId;
-  if (changed) registered?.clearCache();
+  if (changed) {
+    registered?.clearCache();
+    // 列表記住的篩選與資料（list-memory.ts）也是上一個人的。
+    clearAdminListMemory();
+  }
   return changed;
 }
 
