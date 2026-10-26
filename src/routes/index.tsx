@@ -4,10 +4,11 @@ import { CoverImage } from "@/components/CoverImage";
 import { HomeProductShelf } from "@/components/shop/HomeProductShelf";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
-import { fetchEvents, fetchJourneys, fetchNews, fetchPage, pageText } from "@/lib/cms";
+import { fetchEvents, fetchJourneys, fetchNewsTicker, fetchPage, pageText } from "@/lib/cms";
+import { NewsTicker } from "@/components/NewsTicker";
 import { useSiteContent } from "@/lib/site-content";
 import { isEventPast } from "@/lib/event-status";
-import { CARD, featureLayout } from "@/lib/feature-layout";
+import { featureLayout } from "@/lib/feature-layout";
 import { imageFor } from "@/lib/images";
 import { fetchHomeShelfProducts } from "@/lib/shop";
 import heroImg from "@/assets/hero-mountain.jpg";
@@ -90,17 +91,18 @@ const ENTRY_LINKS = ["/events", "/journeys", "/visit"] as const;
 /** Latin section eyebrows — same string in all three languages, matching current output. */
 const SECTION_EYEBROWS = {
   journeys: { zh: "Journeys", en: "Journeys", ja: "Journeys" },
-  news: { zh: "News", en: "News", ja: "News" },
 };
 
 export const Route = createFileRoute("/")({
   loader: async () => {
     // shelf：「主理人的選品」那一排商品卡，跟其他讀取平行，不多一段等待。
+    // news：頁首下方的「最新消息」跑馬燈（2026-10-26 取代原本頁底那三張長卡片），
+    //       只讀標題與日期，最多 6 則。
     const [page, events, journeys, news, shelf] = await Promise.all([
       fetchPage("index"),
       fetchEvents(),
       fetchJourneys(),
-      fetchNews(),
+      fetchNewsTicker(6),
       fetchHomeShelfProducts(4),
     ]);
     return { page, events, journeys, news, shelf };
@@ -138,8 +140,6 @@ function Index() {
   const featuredEvents = events.filter((e) => !isEventPast(e)).slice(0, 3);
   const eventsLayout = featureLayout(featuredEvents.length);
   const journeysLayout = featureLayout(featuredJourneys.length);
-  const latestNews = news.slice(0, 3);
-  const newsLayout = featureLayout(latestNews.length);
   const p = pageText(page);
   const { ui, site, map } = useSiteContent();
   const heroSrc = imageFor(page?.ogImageKey, heroImg);
@@ -153,6 +153,9 @@ function Index() {
 
   return (
     <PageShell>
+      {/* 最新消息跑馬燈：緊貼頁首下方、只在首頁出現；沒有任何一則就整條不出現 */}
+      <NewsTicker items={news} />
+
       {/* Hero */}
       <section className="container-editorial pt-16 md:pt-24 pb-20">
         <div className="grid lg:grid-cols-12 gap-10 lg:gap-16 items-end">
@@ -390,34 +393,6 @@ function Index() {
           </div>
         </div>
       </section>
-
-      {/* 最新消息 —— 沒有任何一則就整區（含標題與「查看全部」）不出現 */}
-      {latestNews.length > 0 && (
-        <>
-          <SectionHeader
-            eyebrow={t(p.block("sections.newsEyebrow", SECTION_EYEBROWS.news))}
-            title={t(ui.sections.latestNews)}
-            link={{ to: "/news", label: t(ui.buttons.viewAll) }}
-          />
-          <div className={`container-editorial pb-24 ${newsLayout.grid}`}>
-            {latestNews.map((n) => (
-              <article key={n.id} className={`${CARD} ${newsLayout.card}`}>
-                <div className={`flex flex-1 flex-col p-6 ${newsLayout.body}`}>
-                  <p className="text-sm tracking-widest text-muted-foreground">{n.date}</p>
-                  <h3
-                    className={`display mt-3 text-2xl leading-snug whitespace-pre-line ${newsLayout.title}`}
-                  >
-                    {t(n.title)}
-                  </h3>
-                  <p className="mt-4 text-sm leading-relaxed text-foreground/75 whitespace-pre-line">
-                    {t(n.summary)}
-                  </p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </>
-      )}
     </PageShell>
   );
 }
@@ -429,7 +404,7 @@ function SectionHeader({
 }: {
   eyebrow: string;
   title: string;
-  link?: { to: "/events" | "/journeys" | "/news"; label: string };
+  link?: { to: "/events" | "/journeys"; label: string };
 }) {
   return (
     <div className="container-editorial pt-12 pb-10 flex items-end justify-between border-t border-border">

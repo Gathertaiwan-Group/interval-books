@@ -196,3 +196,190 @@
   }
   .hover-underline:hover::after { width: 100%; }
 }
+
+/* -----------------------------------------------------------------------------
+ * 首頁「最新消息」列（src/components/NewsTicker.tsx）——單行淡入淡出輪播
+ * 高度固定 42px＋底線 1px（SSR 就是這個高度，換則、換語言都不會推動下面的版面）；
+ * 每則都疊在同一格裡，長標題用省略號截斷，頁面本身不會出現橫向捲軸。
+ * -------------------------------------------------------------------------- */
+@layer components {
+  .news-ticker {
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+    background: color-mix(in oklab, var(--oat) 85%, var(--sand));
+  }
+  .news-ticker-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    height: 42px;
+  }
+  .news-ticker-label {
+    flex: none;
+    font-family: var(--font-serif);
+    font-size: 0.8125rem;
+    letter-spacing: 0.14em;
+    color: var(--clay);
+    padding-right: 1rem;
+    border-right: 1px solid var(--border);
+    line-height: 1.25rem;
+  }
+  .news-ticker-viewport {
+    display: grid;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    align-items: center;
+  }
+  .news-ticker-item {
+    grid-area: 1 / 1;
+    min-width: 0;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 700ms ease,
+      visibility 0s linear 700ms;
+  }
+  .news-ticker-item[data-active] {
+    opacity: 1;
+    visibility: visible;
+    transition:
+      opacity 700ms ease,
+      visibility 0s;
+  }
+  .news-ticker-link {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    min-width: 0;
+    color: var(--foreground);
+    transition: color 200ms ease;
+  }
+  .news-ticker-link:hover {
+    color: var(--clay);
+  }
+  .news-ticker-link:focus-visible,
+  .news-ticker-btn:focus-visible,
+  .news-ticker-label:focus-visible {
+    outline: 1px solid var(--ring);
+    outline-offset: 3px;
+  }
+  .news-ticker-date {
+    flex: none;
+    display: none;
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    letter-spacing: 0.14em;
+    font-variant-caps: all-small-caps;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted-foreground);
+  }
+  .news-ticker-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-serif);
+    font-size: 0.875rem;
+    letter-spacing: 0.02em;
+  }
+  .news-ticker-controls {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+    color: var(--muted-foreground);
+  }
+  .news-ticker-count {
+    display: none;
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    letter-spacing: 0.12em;
+    font-variant-numeric: tabular-nums;
+    margin-right: 0.375rem;
+  }
+  .news-ticker-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 9999px;
+    opacity: 0.6;
+    transition:
+      opacity 200ms ease,
+      color 200ms ease;
+  }
+  .news-ticker-btn svg {
+    width: 14px;
+    height: 14px;
+    stroke-width: 1.5;
+  }
+  .news-ticker:hover .news-ticker-btn,
+  .news-ticker:focus-within .news-ticker-btn {
+    opacity: 1;
+  }
+  .news-ticker-btn:hover {
+    color: var(--clay);
+  }
+  .news-ticker-step {
+    display: none;
+  }
+  .news-ticker-all {
+    display: none;
+    flex: none;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    color: var(--clay);
+    padding-left: 1rem;
+    border-left: 1px solid var(--border);
+  }
+  @media (min-width: 640px) {
+    .news-ticker-date {
+      display: inline;
+    }
+  }
+  @media (min-width: 768px) {
+    .news-ticker-row {
+      gap: 1.25rem;
+    }
+    .news-ticker-title {
+      font-size: 0.9375rem;
+    }
+    .news-ticker-count,
+    .news-ticker-step {
+      display: inline-grid;
+    }
+    .news-ticker-count {
+      display: inline;
+    }
+    .news-ticker-all {
+      display: inline-block;
+    }
+  }
+
+  /* 減少動態：不輪播（JS 也不啟動計時），所有消息排成一排、可以左右滑 */
+  @media (prefers-reduced-motion: reduce) {
+    .news-ticker-viewport {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .news-ticker-viewport::-webkit-scrollbar {
+      display: none;
+    }
+    .news-ticker-item,
+    .news-ticker-item[data-active] {
+      flex: none;
+      opacity: 1;
+      visibility: visible;
+      transition: none;
+    }
+    .news-ticker-title {
+      overflow: visible;
+    }
+    .news-ticker-controls {
+      display: none;
+    }
+  }
+}

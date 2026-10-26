@@ -1049,6 +1049,35 @@ export async function fetchNews(): Promise<NewsEntry[]> {
   return mapped.length ? mapped : FALLBACK_NEWS;
 }
 
+/** /news 列表上每一則的錨點 id；首頁跑馬燈連到 `/news#${newsAnchorId(id)}`。 */
+export function newsAnchorId(id: string): string {
+  return `news-${id}`;
+}
+
+/** 首頁跑馬燈的一則：只要標題與日期，不帶摘要／內文。 */
+export type NewsTickerEntry = Pick<NewsEntry, "id" | "title" | "date">;
+
+/**
+ * 首頁「最新消息」跑馬燈用。與 fetchNews() 同一張表、同一個排序、同一套公開可見規則
+ * （RLS 只放行已發布的），但只 select 跑馬燈畫得到的欄位——摘要與內文常常是好幾百字，
+ * 首頁用不到就不要搬。讀取失敗時退回內建消息（與 fetchNews 一致），所以 /news 與首頁看到的
+ * 是同一批。
+ */
+export async function fetchNewsTicker(limit = 6): Promise<NewsTickerEntry[]> {
+  const rows = await select("news", "id,title,display_date,sort_order", { order: "sort_order" });
+  const fallback = () =>
+    FALLBACK_NEWS.slice(0, limit).map(({ id, title, date }) => ({ id, title, date }));
+  if (!rows || !rows.length) return fallback();
+  const mapped: NewsTickerEntry[] = [];
+  for (const r of rows) {
+    const title = loc(r.title);
+    if (!title) continue;
+    mapped.push({ id: str(r.id), title, date: str(r.display_date) });
+    if (mapped.length >= limit) break;
+  }
+  return mapped.length ? mapped : fallback();
+}
+
 export async function fetchCuratedThemes(): Promise<CuratedThemeEntry[]> {
   const [themeRows, itemRows] = await Promise.all([
     select("curated_themes", "id,title,description,sort_order", { order: "sort_order" }),

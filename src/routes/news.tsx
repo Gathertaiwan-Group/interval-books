@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageShell, PageHeader } from "@/components/PageShell";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
-import { eyebrowOf, fetchNews, fetchPage, pageText } from "@/lib/cms";
+import { eyebrowOf, fetchNews, fetchPage, newsAnchorId, pageText } from "@/lib/cms";
 import { CARD, featureLayout } from "@/lib/feature-layout";
 
 /** Fallback copy — used only when the Supabase read fails. */
@@ -68,7 +68,13 @@ function News() {
       <section className="container-editorial pb-32">
         <ul className={layout.grid}>
           {news.map((n) => (
-            <li key={n.id} className={`${CARD} ${layout.card}`}>
+            // id：首頁跑馬燈每一則都連到 /news#news-<id>（沒有逐則的內頁）；scroll-mt 讓錨點
+            // 落在黏住的頁首下方，不被蓋住。版面本身不變。
+            <li
+              key={n.id}
+              id={newsAnchorId(n.id)}
+              className={`${CARD} ${layout.card} scroll-mt-24`}
+            >
               <div className={`flex flex-1 flex-col p-6 ${layout.body}`}>
                 <p className="text-sm tracking-widest text-muted-foreground">{n.date}</p>
                 <h3
