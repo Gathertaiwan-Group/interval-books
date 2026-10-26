@@ -751,6 +751,64 @@ export async function fetchActiveProductsForList(): Promise<ShopListCardResult> 
 }
 
 /**
+ * 首頁「主理人的選品」那一排商品卡（src/components/shop/HomeProductShelf.tsx）。
+ *
+ * 選哪幾件：跟 /shop〈商品〉分頁**同一個排序**——後台商品的「排序（數字越小越
+ * 前面）」，同分再比 id——取前面幾件**現在買得到**的書籍／選物。所以店主想讓哪一
+ * 本上首頁，就在後台把那件商品的排序調小；下架（status 不是 active）或售完的會
+ * 自動讓位給下一件，不需要另一個「精選」欄位（也沒有 DDL 權限加）。
+ *
+ * 為什麼不直接用 fetchActiveProductsForList() 再 slice：
+ *   - 那一支撈整份目錄（含 23+ 件的三語 summary）塞進首頁的 SSR payload，首頁只
+ *     畫 4 張；
+ *   - 它還要 attachSessions() → attachPlans() 兩段**序列**查詢，那是給
+ *     event/journey 用的，書與選物用不到——首頁 loader 會被多拖一段往返。
+ * 這裡只查 goods/book、limit 一個小量，然後只做 attachAvailability()（判斷售完要用）。
+ *
+ * 活動／策旅不在這裡：它們在首頁上面各有自己的一區，而且要先選場次才能加購物車。
+ *
+ * 失敗語意同 fetchActiveProductsForList()：讀壞回 unavailable:true，首頁那一區
+ * 會退回原本的單張意象圖，不會開天窗。
+ */
+export async function fetchHomeShelfProducts(limit = 4): Promise<ShopListCardResult> {
+  const db = supabase;
+  if (!db) {
+    logFailure("home shelf", "Supabase is not configured");
+    return { products: [], unavailable: true };
+  }
+  try {
+    // 多撈幾件當備胎：售完的要跳過，但「售完」要等 attachAvailability() 才知道。
+    const { data, error } = await db
+      .from("products")
+      .select(CARD_COLUMNS)
+      .eq("status", "active")
+      .in("product_type", ["goods", "book"])
+      .order("sort_order", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(limit * 4);
+
+    if (error || !Array.isArray(data)) {
+      logFailure("home shelf", error?.message ?? "unexpected response shape");
+      return { products: [], unavailable: true };
+    }
+
+    const candidates: ShopProductCard[] = [];
+    for (const row of data as unknown as Row[]) {
+      const p = toProductCard(row);
+      if (p) candidates.push(p);
+    }
+    await attachAvailability(candidates);
+    return {
+      products: candidates.filter((p) => !isSoldOut(p)).slice(0, limit),
+      unavailable: false,
+    };
+  } catch (err) {
+    logFailure("home shelf", err instanceof Error ? err.message : String(err));
+    return { products: [], unavailable: true };
+  }
+}
+
+/**
  * The subset of the catalogue referenced by a specific set of ids.
  *
  * Exists for /publications, where 126 exhibits are on the page but only the

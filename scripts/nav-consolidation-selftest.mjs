@@ -719,10 +719,12 @@ checkTrue('首頁有 <Link to="/about">', indexTargets.includes("/about"));
 
 const shopLinkWithTab = indexLinks.find((e) => strOf(e.props.to) === "/shop" && e.props.search);
 checkTrue('首頁有 <Link to="/shop" search={…}>', !!shopLinkWithTab);
+// 2026-10：首頁「主理人的選品」那一區改成直接顯示商品卡，「走進選品櫥窗」就是那排卡片的
+// 「查看全部」，所以落在〈商品〉分頁（能結帳的那一個），不再是只能看的 curated 清單。
 check(
-  "首頁的選品入口直接落在 curated 分頁",
+  "首頁的選品入口直接落在 products 分頁（商品卡的「查看全部」）",
   strOf(propValue(shopLinkWithTab?.props?.search ?? null, "tab")),
-  "curated",
+  "products",
 );
 
 // =============================================================================

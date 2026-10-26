@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { CoverImage } from "@/components/CoverImage";
+import { HomeProductShelf } from "@/components/shop/HomeProductShelf";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fetchEvents, fetchJourneys, fetchNews, fetchPage, pageText } from "@/lib/cms";
@@ -8,6 +9,7 @@ import { useSiteContent } from "@/lib/site-content";
 import { isEventPast } from "@/lib/event-status";
 import { CARD, featureLayout } from "@/lib/feature-layout";
 import { imageFor } from "@/lib/images";
+import { fetchHomeShelfProducts } from "@/lib/shop";
 import heroImg from "@/assets/hero-mountain.jpg";
 import storefrontImg from "@/assets/storefront.jpg";
 import curatedImg from "@/assets/curated-objects.jpg";
@@ -93,13 +95,15 @@ const SECTION_EYEBROWS = {
 
 export const Route = createFileRoute("/")({
   loader: async () => {
-    const [page, events, journeys, news] = await Promise.all([
+    // shelf：「主理人的選品」那一排商品卡，跟其他讀取平行，不多一段等待。
+    const [page, events, journeys, news, shelf] = await Promise.all([
       fetchPage("index"),
       fetchEvents(),
       fetchJourneys(),
       fetchNews(),
+      fetchHomeShelfProducts(4),
     ]);
-    return { page, events, journeys, news };
+    return { page, events, journeys, news, shelf };
   },
   head: ({ loaderData }) => {
     const p = pageText(loaderData?.page ?? null);
@@ -120,7 +124,8 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const t = useT();
-  const { page, events, journeys, news } = Route.useLoaderData();
+  const { page, events, journeys, news, shelf } = Route.useLoaderData();
+  const shelfProducts = shelf.products;
 
   // 策旅與活動用同一種卡片、同一套版面規則（見 featureLayout），所以這裡也
   // 取到三筆，而不是像以前那樣只挑一筆做成橫幅。
@@ -295,37 +300,67 @@ function Index() {
         </>
       )}
 
-      {/* 主理人選品預告 */}
-      <section className="container-editorial pb-24">
-        <div className="grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <p className="eyebrow text-2xl">{t(ui.nav.curated)}</p>
-            <h2 className="display mt-5 md:text-5xl text-3xl font-mono text-left whitespace-pre-line">
-              {t(p.block("entries.curatedTitle", ENTRIES.curatedTitle))}
-            </h2>
-            <p className="mt-6 max-w-md text-base leading-relaxed text-foreground/75 whitespace-pre-line">
-              {t(p.block("entries.curatedBody", ENTRIES.curatedBody))}
-            </p>
-            {/* 主理人的選品 2026-09-02 併進「選物」的分頁。/curated 仍然轉址得過來，
-                但首頁是站內連結，直接指向新家，不必多繞一次 301。 */}
+      {/* 主理人的選品 —— 2026-10 起右邊那張花瓶大圖換成可以直接買的商品卡。
+          標題與內文仍然是 pages/index 的可編輯區塊（entries.curatedTitle／curatedBody）。
+          選哪幾件 = /shop〈商品〉分頁同一個排序的前 4 件買得到的書籍／選物，店主在後台
+          調商品的「排序」就能換（見 src/lib/shop.ts#fetchHomeShelfProducts）。
+          讀不到任何一件（讀取失敗或全部售完）時退回原本的單張意象圖，不開天窗。 */}
+      {shelfProducts.length > 0 ? (
+        <section className="container-editorial pb-24" data-testid="home-curated">
+          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between md:gap-12">
+            <div>
+              <p className="eyebrow text-2xl">{t(ui.nav.curated)}</p>
+              <h2 className="display mt-5 md:text-5xl text-3xl font-mono text-left whitespace-pre-line">
+                {t(p.block("entries.curatedTitle", ENTRIES.curatedTitle))}
+              </h2>
+              <p className="mt-6 max-w-md text-base leading-relaxed text-foreground/75 whitespace-pre-line">
+                {t(p.block("entries.curatedBody", ENTRIES.curatedBody))}
+              </p>
+            </div>
+            {/* 「查看全部」：卡片是商品，所以落在〈商品〉分頁（能結帳的那一個），
+                不是只能看不能買的〈主理人的選品〉清單。 */}
             <Link
               to="/shop"
-              search={{ tab: "curated" }}
-              className="mt-8 inline-block tracking-widest text-clay hover-underline text-base"
+              search={{ tab: "products" }}
+              className="shrink-0 self-start md:self-end inline-block tracking-widest text-clay hover-underline text-base"
             >
               {t(p.block("entries.curatedCta", ENTRIES.curatedCta))} →
             </Link>
           </div>
-          <div className="aspect-[4/5] overflow-hidden bg-muted">
-            <img
-              src={curatedImg}
-              alt={t(ui.nav.curated)}
-              loading="lazy"
-              className="h-full w-full object-cover"
-            />
+          <div className="mt-12">
+            <HomeProductShelf products={shelfProducts} />
           </div>
-        </div>
-      </section>
+        </section>
+      ) : (
+        <section className="container-editorial pb-24">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div>
+              <p className="eyebrow text-2xl">{t(ui.nav.curated)}</p>
+              <h2 className="display mt-5 md:text-5xl text-3xl font-mono text-left whitespace-pre-line">
+                {t(p.block("entries.curatedTitle", ENTRIES.curatedTitle))}
+              </h2>
+              <p className="mt-6 max-w-md text-base leading-relaxed text-foreground/75 whitespace-pre-line">
+                {t(p.block("entries.curatedBody", ENTRIES.curatedBody))}
+              </p>
+              <Link
+                to="/shop"
+                search={{ tab: "products" }}
+                className="mt-8 inline-block tracking-widest text-clay hover-underline text-base"
+              >
+                {t(p.block("entries.curatedCta", ENTRIES.curatedCta))} →
+              </Link>
+            </div>
+            <div className="aspect-[4/5] overflow-hidden bg-muted">
+              <img
+                src={curatedImg}
+                alt={t(ui.nav.curated)}
+                loading="lazy"
+                className="h-full w-full object-cover"
+              />
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* 來店資訊 */}
       <section className="container-editorial pb-24">

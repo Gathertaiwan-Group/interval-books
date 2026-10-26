@@ -10,7 +10,8 @@
  * 外框比例（aspect-[4/3] 等）與寬度由呼叫端用 className 決定；imgClassName 給前景圖用
  * （例如卡片 hover 的 group-hover:scale-[1.03]）。
  *
- * ⚠️ 商品卡（src/components/shop/*）不用這個：商品照是實拍照片，裁切反而比較整齊。
+ * ⚠️ /shop 的商品卡（ProductsPanel）不用這個：商品照是實拍照片，裁切反而比較整齊。
+ *    例外：首頁的 HomeProductShelf 用它——那一排多半是地方刊物，書封上有字，必須完整。
  */
 import type { ImgHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
