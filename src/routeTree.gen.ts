@@ -36,6 +36,7 @@ import { Route as EventsIndexRouteImport } from './routes/events.index'
 import { Route as EventsSlugRouteImport } from './routes/events.$slug'
 import { Route as EventsCitySalon0922RouteImport } from './routes/events.city-salon-0922'
 import { Route as EventsSoundOfTheSeaRouteImport } from './routes/events.sound-of-the-sea'
+import { Route as OauthAuthorizeRouteImport } from './routes/oauth/authorize'
 import { Route as ShopIndexRouteImport } from './routes/shop.index'
 import { Route as ShopSlugRouteImport } from './routes/shop.$slug'
 import { Route as VendorShellRouteImport } from './routes/vendor/_shell'
@@ -245,6 +246,11 @@ const EventsCitySalon0922Route = EventsCitySalon0922RouteImport.update({
 const EventsSoundOfTheSeaRoute = EventsSoundOfTheSeaRouteImport.update({
   id: '/events/sound-of-the-sea',
   path: '/events/sound-of-the-sea',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OauthAuthorizeRoute = OauthAuthorizeRouteImport.update({
+  id: '/oauth/authorize',
+  path: '/oauth/authorize',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopIndexRoute = ShopIndexRouteImport.update({
@@ -684,6 +690,7 @@ export interface FileRoutesByFullPath {
   '/events/$slug': typeof EventsSlugRoute
   '/events/city-salon-0922': typeof EventsCitySalon0922Route
   '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
+  '/oauth/authorize': typeof OauthAuthorizeRoute
   '/shop/$slug': typeof ShopSlugRoute
   '/vendor': typeof VendorShellRouteWithChildren
   '/vendor/login': typeof VendorLoginRoute
@@ -787,6 +794,7 @@ export interface FileRoutesByTo {
   '/events/$slug': typeof EventsSlugRoute
   '/events/city-salon-0922': typeof EventsCitySalon0922Route
   '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
+  '/oauth/authorize': typeof OauthAuthorizeRoute
   '/shop/$slug': typeof ShopSlugRoute
   '/vendor/login': typeof VendorLoginRoute
   '/vendor/pending': typeof VendorPendingRoute
@@ -887,6 +895,7 @@ export interface FileRoutesById {
   '/events/$slug': typeof EventsSlugRoute
   '/events/city-salon-0922': typeof EventsCitySalon0922Route
   '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
+  '/oauth/authorize': typeof OauthAuthorizeRoute
   '/shop/$slug': typeof ShopSlugRoute
   '/vendor/_shell': typeof VendorShellRouteWithChildren
   '/vendor/login': typeof VendorLoginRoute
@@ -993,6 +1002,7 @@ export interface FileRouteTypes {
     | '/events/$slug'
     | '/events/city-salon-0922'
     | '/events/sound-of-the-sea'
+    | '/oauth/authorize'
     | '/shop/$slug'
     | '/vendor'
     | '/vendor/login'
@@ -1096,6 +1106,7 @@ export interface FileRouteTypes {
     | '/events/$slug'
     | '/events/city-salon-0922'
     | '/events/sound-of-the-sea'
+    | '/oauth/authorize'
     | '/shop/$slug'
     | '/vendor/login'
     | '/vendor/pending'
@@ -1195,6 +1206,7 @@ export interface FileRouteTypes {
     | '/events/$slug'
     | '/events/city-salon-0922'
     | '/events/sound-of-the-sea'
+    | '/oauth/authorize'
     | '/shop/$slug'
     | '/vendor/_shell'
     | '/vendor/login'
@@ -1300,6 +1312,7 @@ export interface RootRouteChildren {
   EventsSlugRoute: typeof EventsSlugRoute
   EventsCitySalon0922Route: typeof EventsCitySalon0922Route
   EventsSoundOfTheSeaRoute: typeof EventsSoundOfTheSeaRoute
+  OauthAuthorizeRoute: typeof OauthAuthorizeRoute
   ShopSlugRoute: typeof ShopSlugRoute
   VendorShellRoute: typeof VendorShellRouteWithChildren
   VendorLoginRoute: typeof VendorLoginRoute
@@ -1498,6 +1511,13 @@ declare module '@tanstack/react-router' {
       path: '/events/sound-of-the-sea'
       fullPath: '/events/sound-of-the-sea'
       preLoaderRoute: typeof EventsSoundOfTheSeaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth/authorize': {
+      id: '/oauth/authorize'
+      path: '/oauth/authorize'
+      fullPath: '/oauth/authorize'
+      preLoaderRoute: typeof OauthAuthorizeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop/': {
@@ -2292,6 +2312,7 @@ const rootRouteChildren: RootRouteChildren = {
   EventsSlugRoute: EventsSlugRoute,
   EventsCitySalon0922Route: EventsCitySalon0922Route,
   EventsSoundOfTheSeaRoute: EventsSoundOfTheSeaRoute,
+  OauthAuthorizeRoute: OauthAuthorizeRoute,
   ShopSlugRoute: ShopSlugRoute,
   VendorShellRoute: VendorShellRouteWithChildren,
   VendorLoginRoute: VendorLoginRoute,

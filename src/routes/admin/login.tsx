@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/form";
 import { signIn } from "@/lib/admin/fns/auth";
 import { backOfficeTypeScaleStyles } from "@/lib/admin/type-scale";
+import { safeLoginRedirect } from "@/lib/admin/login-redirect";
 
 const loginSchema = z.object({
   email: z.string().trim().min(1, "請輸入電子郵件").email("電子郵件格式不正確"),
@@ -25,6 +26,10 @@ const loginSchema = z.object({
 type LoginValues = z.infer<typeof loginSchema>;
 
 export const Route = createFileRoute("/admin/login")({
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
+    const redirect = safeLoginRedirect(search.redirect);
+    return redirect ? { redirect } : {};
+  },
   head: () => ({
     meta: [{ title: "管理員登入｜小時光書店後台" }],
     styles: backOfficeTypeScaleStyles(),
@@ -34,6 +39,7 @@ export const Route = createFileRoute("/admin/login")({
 
 function AdminLoginPage() {
   const navigate = useNavigate();
+  const { redirect: returnTo } = Route.useSearch();
   const [submitting, setSubmitting] = useState(false);
 
   const form = useForm<LoginValues>({
@@ -50,6 +56,13 @@ function AdminLoginPage() {
       const { noteAdminIdentityChange } = await import("@/lib/admin/route-cache");
       noteAdminIdentityChange();
       toast.success("登入成功");
+      // 從 MCP 連接器授權頁過來的：不論角色都送回去（門市人員會在那裡看到婉拒說明）。
+      // 整頁導覽而不是 navigate，讓授權頁在伺服器端用新的 cookie 重新判斷一次。
+      const back = safeLoginRedirect(returnTo);
+      if (back) {
+        window.location.assign(back);
+        return;
+      }
       // 每個角色送去他真的看得到的第一頁。店員被送去儀表板會撞上
       // adminFnMiddleware —— 擋得對，但不該是他每天上班第一眼看到的東西。
       if (role === "pending") {

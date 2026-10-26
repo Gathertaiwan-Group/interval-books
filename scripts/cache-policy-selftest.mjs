@@ -156,6 +156,8 @@ const SENSITIVE_ROUTES = [
   "/vendor",
   "/api/whatever",
   "/_serverFn/someRpc",
+  // MCP 的 OAuth 同意頁（2026-10-26）。
+  "/oauth/authorize",
 ];
 for (const p of SENSITIVE_ROUTES) {
   check(
@@ -244,9 +246,9 @@ check(
   ["/journeys", "/publications"].sort(),
 );
 check(
-  "SENSITIVE_PREFIXES 逐字等於 checkout/account/admin/vendor/api/_serverFn 六條",
+  "SENSITIVE_PREFIXES 逐字等於 checkout/account/admin/vendor/api/_serverFn/oauth 七條",
   [...__TEST_ONLY__.SENSITIVE_PREFIXES].sort(),
-  ["/_serverFn", "/account", "/admin", "/api", "/checkout", "/vendor"].sort(),
+  ["/_serverFn", "/account", "/admin", "/api", "/checkout", "/vendor", "/oauth"].sort(),
 );
 
 // =============================================================================

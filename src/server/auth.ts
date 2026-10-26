@@ -216,6 +216,21 @@ export async function requireAdmin() {
   return { userId: profile.id, email: profile.email ?? session.email };
 }
 
+/**
+ * MCP OAuth（src/server/mcp/oauth*.ts、http.ts）用：這個 user id **現在**還是不是 admin。
+ *
+ * 沒有 cookie 可讀 —— token 裡只有 user id —— 所以直接查 profiles。與 requireAdmin() 同一條
+ * 規矩：每次都重查，role 被改掉的下一個請求就失效。查詢出錯一律丟例外（fail closed），
+ * 呼叫端不可以把錯誤當成「大概是 admin」。
+ */
+export async function isActiveAdmin(
+  userId: string,
+): Promise<{ userId: string; email: string } | null> {
+  const profile = await loadAdminProfile(userId);
+  if (!profile) return null;
+  return { userId: profile.id, email: profile.email ?? "" };
+}
+
 /** Non-throwing variant for UI concerns (nav state, redirect decisions). */
 export async function getAdminOrNull() {
   try {

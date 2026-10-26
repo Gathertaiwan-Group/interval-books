@@ -954,9 +954,15 @@ check(
 // （isOAuthDiscoveryPath，MCP 沒有 authorization server，一律 404）。它也是 dynamic
 // import，所以 dynamic import 的條數是「表的條數 + 1」。
 checkTrue("OAuth discovery 路徑有被攔", /if \(isOAuthDiscoveryPath\(pathname\)\)/.test(serverCode));
+// 2026-10-26：MCP 的 OAuth 端點（/oauth/register、/oauth/token、/oauth/revoke）是一張小表
+// OAUTH_ENDPOINT_PATHS，用 includes 攔 —— 同樣是 dynamic import，所以是「表的條數 + 2」。
+checkTrue(
+  "OAuth 端點（register／token／revoke）有被攔",
+  /if \(OAUTH_ENDPOINT_PATHS\.includes\(pathname\)\)/.test(serverCode),
+);
 checkTrue(
   "每條路徑都用 dynamic import（service_role 不在模組載入時被拉進來）",
-  (serverCode.match(/await import\("@\/server\//g) ?? []).length === paths.length + 1,
+  (serverCode.match(/await import\("@\/server\//g) ?? []).length === paths.length + 2,
 );
 // 檔頭那張表要說明為什麼它不能用 createServerFn 表達（src/server.ts L21-24 的規矩）。
 checkTrue(

@@ -55,7 +55,16 @@ const CACHEABLE_OPEN_PREFIXES = ["/journeys", "/publications"];
  * 的 schema.js 預設值是 "/_serverFn"，不是 "/api"）——兩個都擋，字面需求與這個
  * 框架的實際路徑都不漏。
  */
-const SENSITIVE_PREFIXES = ["/checkout", "/account", "/admin", "/vendor", "/api", "/_serverFn"];
+const SENSITIVE_PREFIXES = [
+  "/checkout",
+  "/account",
+  "/admin",
+  "/vendor",
+  "/api",
+  "/_serverFn",
+  // MCP 的 OAuth 同意頁（2026-10-26）：帶後台登入態，而且畫面綁著某一位 admin 的 CSRF token。
+  "/oauth",
+];
 
 /** s-maxage=60（後台改完最多一分鐘才反映）+ swr=600（過期後 10 分鐘內仍可先吐舊的，背景重新整理）。 */
 const CACHEABLE_HEADER = "public, max-age=0, s-maxage=60, stale-while-revalidate=600";

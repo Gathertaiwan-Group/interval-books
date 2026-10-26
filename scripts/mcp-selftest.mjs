@@ -6,8 +6,9 @@
  * 真的呼叫閘門、真的跑一次 MCP 協定的 initialize → tools/list。不碰資料庫、不打翻譯：
  * tools.ts 的 repo 都是在 handler 裡 dynamic import，列工具時不會載入。
  *
- *   [1] 閘門：沒設 token＝404、Origin 不對＝403、token 缺／錯＝401（只有裸 Bearer，
- *       沒有 resource_metadata）、/.well-known/oauth-* 一律 404
+ *   [1] 閘門：沒設 token＝404、Origin 不對＝403、token 缺／錯＝401（沒開 OAuth 時只有裸
+ *       Bearer，沒有 resource_metadata）、沒開 OAuth 時 /.well-known/oauth-* 一律 404
+ *       （開了 OAuth 之後的行為在 mcp-oauth-selftest.mjs）
  *   [2] 輸出截斷：超過 200k 字截斷並明講
  *   [3] 差異：只列真的有變的欄位、三語物件 key 順序不影響
  *   [4] 三語補齊：齊全不翻、缺的才翻、沒金鑰明講、長文不自動翻
@@ -118,6 +119,7 @@ const core = await import(join(SRC, "server/mcp/core.ts"));
 const tools = await import(join(SRC, "server/mcp/tools.ts"));
 const http = await import(join(SRC, "server/mcp/http.ts"));
 const handlerMod = await import(join(SRC, "server/mcp/handler.ts"));
+const oauthMod = await import(join(SRC, "server/mcp/oauth.ts"));
 
 // -----------------------------------------------------------------------------
 // [1] 閘門
@@ -166,7 +168,7 @@ const req = (headers = {}, path = "/api/mcp") =>
   const missing = core.gateMcpRequest(req(), TOKEN);
   check("沒帶 Authorization → 401", missing?.status, 401);
   check(
-    "🔴 401 的 WWW-Authenticate 只有裸 Bearer（沒有 resource_metadata）",
+    "🔴 沒開 OAuth 時，401 的 WWW-Authenticate 只有裸 Bearer（沒有 resource_metadata）",
     missing?.headers.get("www-authenticate"),
     "Bearer",
   );
@@ -197,7 +199,21 @@ const req = (headers = {}, path = "/api/mcp") =>
     core.isOAuthDiscoveryPath("/.well-known/security.txt"),
     false,
   );
-  check("handleOAuthDiscovery() 回 404", http.handleOAuthDiscovery().status, 404);
+  // 2026-10-26 起 discovery 交給 oauth.ts：**沒設 MCP_OAUTH_SECRET 時**仍然 404（OAuth 那一半
+  // 的行為在 scripts/mcp-oauth-selftest.mjs）。
+  const savedSecret = process.env.MCP_OAUTH_SECRET;
+  delete process.env.MCP_OAUTH_SECRET;
+  for (const p of [
+    "/.well-known/oauth-authorization-server",
+    "/.well-known/oauth-protected-resource",
+  ]) {
+    check(
+      `沒設 MCP_OAUTH_SECRET：handleOAuthDiscovery(${p}) 回 404`,
+      oauthMod.handleOAuthDiscovery(new Request(`https://www.intervalbooks.tw${p}`), p).status,
+      404,
+    );
+  }
+  if (savedSecret !== undefined) process.env.MCP_OAUTH_SECRET = savedSecret;
 }
 {
   const saved = process.env.MCP_TOKEN;

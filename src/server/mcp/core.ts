@@ -7,15 +7,26 @@
  *
  * 🔴 從快樂手那一支（happyhand/apps/web/app/api/mcp/route.ts）搬過來、不能改的規矩：
  *   · 靜態 bearer token，自己用 timingSafeEqual 比對。**不用 mcp-handler 的 withMcpAuth**
- *     —— 它失敗時回 RFC 9728 的 OAuth challenge（resource_metadata），會把 OAuth-first
- *     的客戶端引進一條走不通的 discovery。
- *   · `/.well-known/oauth-*` 一律 404；401 只帶裸的 `Bearer`。
- *   · 沒設 MCP_TOKEN ＝整支關閉（回 404，跟這條路徑不存在長得一樣），不是「沒設就放行」。
+ *     （它的 OAuth challenge 指向一個 mcp-handler 自己不提供的 authorization server）。
+ *   · 2026-10-26 起多了一條路：OAuth access token（oauth-core.ts）。**只有設了
+ *     MCP_OAUTH_SECRET 時**，`/.well-known/oauth-*` 才回 metadata、401 才帶
+ *     resource_metadata；沒設就與之前一模一樣（discovery 404、401 只帶裸 `Bearer`）。
+ *     ⚠️ 代價：有回報 Cursor 看到 OAuth discovery 會忽略設定的 header 硬走 OAuth。
+ *     Claude Code 帶對 header 就不會收到 401，所以不受影響。
+ *   · 兩個都沒設 ＝整支關閉（回 404，跟這條路徑不存在長得一樣），不是「沒設就放行」。
  *   · Origin 自己檢查（規範 MUST，createMcpHandler 不做）。沒帶 Origin 是正常的。
  *   · 輸出超過 200k 字就截斷並明講 —— Vercel 4.5MB 上限連回應方向也算。
  */
 import { timingSafeEqual } from "node:crypto";
 import { isIP } from "node:net";
+import {
+  bearerChallenge,
+  oauthBaseUrl,
+  oauthEnabled,
+  TOKEN_PREFIX,
+  verifyAccessToken,
+  type AccessPayload,
+} from "./oauth-core";
 
 export const MCP_PATH = "/api/mcp";
 
@@ -55,8 +66,8 @@ export function originAllowed(origin: string | null): boolean {
 }
 
 /**
- * OAuth／OIDC discovery 的路徑。這個 server 沒有 authorization server，這些路徑
- * **必須** 404 —— 有客戶端（Cursor）看到 discovery 就會忽略設定的 header 硬走 OAuth。
+ * OAuth／OIDC discovery 的路徑。src/server.ts 一律攔下交給 oauth.ts#handleOAuthDiscovery：
+ * 設了 MCP_OAUTH_SECRET 才回 metadata，否則 404；openid-configuration 永遠 404（不是 OIDC）。
  */
 export function isOAuthDiscoveryPath(pathname: string): boolean {
   return (
@@ -79,7 +90,8 @@ export function notFoundResponse(): Response {
 }
 
 /**
- * 請求進 MCP handler 之前的閘門。回 null ＝放行；否則回一個要直接送出去的 Response。
+ * 請求進 MCP handler 之前的閘門（只看靜態 token 的舊介面；自檢與沒開 OAuth 時用）。
+ * 回 null ＝放行；否則回一個要直接送出去的 Response。
  *
  * 順序是刻意的：
  *   1. 沒設 token → 404。**在看任何請求內容之前**就關掉，讓「功能沒開」跟「這條路徑
@@ -88,18 +100,83 @@ export function notFoundResponse(): Response {
  *   3. token 不對 → 401，只有裸的 `Bearer`，不帶 resource_metadata。
  */
 export function gateMcpRequest(req: Request, expectedToken: string | undefined): Response | null {
-  if (!expectedToken || expectedToken.trim().length < 32) return notFoundResponse();
+  const r = authenticateMcpRequest(req, expectedToken, undefined);
+  return r.kind === "deny" ? r.response : null;
+}
+
+export type McpAuth =
+  | { kind: "static" }
+  | { kind: "oauth"; token: AccessPayload }
+  | { kind: "deny"; response: Response };
+
+function staticTokenUsable(t: string | undefined): t is string {
+  return typeof t === "string" && t.trim().length >= 32;
+}
+
+/**
+ * 完整的閘門：靜態 MCP_TOKEN **或** OAuth access token。
+ *
+ *   1. 兩個都沒設 → 404。
+ *   2. Origin 不在清單 → 403。
+ *   3. 先比靜態 token（固定時間）；不符且看起來是 OAuth token（ibat1. 開頭）才解密驗證
+ *      （到期、audience＝這支 /api/mcp、scope）。
+ *   4. 都不對 → 401。開了 OAuth 時 WWW-Authenticate 帶 resource_metadata（RFC 9728），
+ *      claude.ai 靠它找到 authorization server；沒開就是裸的 `Bearer`。
+ *
+ * ⚠️ OAuth token 通過這裡**還不夠**：http.ts 會再查一次 profiles，確定那個人現在還是 admin。
+ *    這個檔案不碰資料庫，所以那一步不在這裡。
+ */
+export function authenticateMcpRequest(
+  req: Request,
+  staticToken: string | undefined,
+  oauthSecret: string | undefined,
+  now?: number,
+): McpAuth {
+  const staticOn = staticTokenUsable(staticToken);
+  const oauthOn = oauthEnabled(oauthSecret);
+  if (!staticOn && !oauthOn) return { kind: "deny", response: notFoundResponse() };
 
   if (!originAllowed(req.headers.get("origin"))) {
-    return plain(403, "forbidden_origin");
+    return { kind: "deny", response: plain(403, "forbidden_origin") };
   }
+
+  const base = oauthBaseUrl(req.url);
+  const challenge = (invalid: boolean) =>
+    oauthOn
+      ? bearerChallenge(
+          base,
+          invalid ? "invalid_token" : undefined,
+          invalid ? "token is invalid or expired" : undefined,
+        )
+      : "Bearer";
 
   const header = req.headers.get("authorization") ?? "";
   const got = header.startsWith("Bearer ") ? header.slice("Bearer ".length).trim() : "";
-  if (!got || !tokenMatches(got, expectedToken.trim())) {
-    return plain(401, "unauthorized", { "www-authenticate": "Bearer" });
+  if (!got) {
+    return {
+      kind: "deny",
+      response: plain(401, "unauthorized", { "www-authenticate": challenge(false) }),
+    };
   }
-  return null;
+  if (staticOn && tokenMatches(got, staticToken.trim())) return { kind: "static" };
+  if (oauthOn && got.startsWith(TOKEN_PREFIX.access)) {
+    const token = verifyAccessToken(got, oauthSecret, base, now);
+    if (token) return { kind: "oauth", token };
+  }
+  return {
+    kind: "deny",
+    response: plain(401, "unauthorized", { "www-authenticate": challenge(true) }),
+  };
+}
+
+export function unauthorizedOAuthResponse(req: Request): Response {
+  return plain(401, "unauthorized", {
+    "www-authenticate": bearerChallenge(
+      oauthBaseUrl(req.url),
+      "invalid_token",
+      "authorization revoked",
+    ),
+  });
 }
 
 /* ------------------------------------------------------------------ 輸出 */

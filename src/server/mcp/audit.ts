@@ -16,12 +16,17 @@
  *     工具結果會把這個狀態原樣告訴呼叫端。
  *
  * ── actor ──────────────────────────────────────────────────────────────────
- * 這張表**沒有** actor_id 欄位，也不指向 auth.users。機器身分不是一個使用者，塞一個假
- * UUID 進有 FK 的欄位只會被外鍵擋下（快樂手的教訓）。actor_role 固定 'mcp'，由 CHECK
- * 釘死。
+ * 這張表**沒有**指向 auth.users 的欄位。機器身分不是一個使用者，塞一個假 UUID 進有 FK
+ * 的欄位只會被外鍵擋下（快樂手的教訓）。actor_role 固定 'mcp'，由 CHECK 釘死。
+ *
+ * 2026-10-26 起多了 OAuth（claude.ai 連接器）：那時是某一位 admin 授權的。沒有 DDL 權限
+ * 加欄位，所以「是誰」寫進 changes 的保留鍵 `_actor`（{via, user_id, email, client}；
+ * 靜態 token 是 {via:"static_token"}）。changes 只 insert、從不被程式讀回，多一個鍵不影響
+ * 任何地方。之後有正式的欄位再搬。
  */
 import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
+import { currentMcpActor } from "./actor";
 
 export const MCP_AUDIT_TABLE = "mcp_audit_log";
 
@@ -36,7 +41,14 @@ export type McpAuditEntry = {
 export type McpAuditStatus = "recorded" | "log_only";
 
 export async function writeMcpAudit(entry: McpAuditEntry): Promise<McpAuditStatus> {
-  const record = { actor_role: "mcp" as const, ...entry };
+  const actor = currentMcpActor();
+  const changes =
+    actor && entry.changes && typeof entry.changes === "object" && !Array.isArray(entry.changes)
+      ? { ...(entry.changes as Record<string, unknown>), _actor: actor }
+      : actor
+        ? { value: entry.changes, _actor: actor }
+        : entry.changes;
+  const record = { actor_role: "mcp" as const, ...entry, changes };
   try {
     console.info(`[mcp-audit] ${JSON.stringify({ at: new Date().toISOString(), ...record })}`);
   } catch {

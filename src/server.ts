@@ -48,13 +48,20 @@
  *                          （Claude Code／claude.ai），說的是 MCP 的 JSON-RPC over HTTP，
  *                          帶的是 Bearer token 不是 cookie —— 同樣是「沒有瀏覽器 session 的
  *                          呼叫者」。沒設 MCP_TOKEN 時回 404（整支關閉）。
- *   /.well-known/oauth-*   一律 404。MCP 走靜態 token、沒有 authorization server；有客戶端
- *                          看到 OAuth discovery 就會忽略設定的 header 硬走 OAuth。
+ *   /.well-known/oauth-*   MCP 的 OAuth discovery（RFC 9728／8414）。呼叫者同樣是 AI 客戶端
+ *                          （claude.ai 的伺服器），沒有 cookie。沒設 MCP_OAUTH_SECRET 時 404。
+ *   OAUTH_ENDPOINT_PATHS   /oauth/register、/oauth/token、/oauth/revoke（src/server/mcp/oauth.ts）。
+ *                          OAuth 客戶端照 RFC 送 form-urlencoded／JSON POST，打不到
+ *                          createServerFn 的 RPC 協定，也沒有瀏覽器 session。
+ *                          ⚠️ /oauth/authorize **不在這裡**：那是老闆的瀏覽器、要讀後台 cookie、
+ *                          要畫同意頁 —— 它是一般的 TanStack 頁面（src/routes/oauth/authorize.tsx），
+ *                          只在下面補上防 iframe 的標頭。
  */
 import { createStartHandler, defaultStreamHandler } from "@tanstack/react-start/server";
 import { BLACKCAT_APN_PATH, BLACKCAT_RETURN_PATH } from "@/server/blackcat";
 import { cacheControlFor } from "@/server/cache-policy";
 import { isOAuthDiscoveryPath, MCP_PATH } from "@/server/mcp/core";
+import { OAUTH_ENDPOINT_PATHS } from "@/server/mcp/oauth-paths";
 import { PAYUNI_WEBHOOK_PATH } from "@/server/payuni";
 import {
   INVOICE_TASK_PATH,
@@ -104,8 +111,13 @@ export default {
     }
 
     if (isOAuthDiscoveryPath(pathname)) {
-      const { handleOAuthDiscovery } = await import("@/server/mcp/http");
-      return handleOAuthDiscovery();
+      const { handleOAuthDiscovery } = await import("@/server/mcp/oauth");
+      return handleOAuthDiscovery(request, pathname);
+    }
+
+    if (OAUTH_ENDPOINT_PATHS.includes(pathname)) {
+      const { handleOAuthEndpoint } = await import("@/server/mcp/oauth");
+      return handleOAuthEndpoint(request, pathname);
     }
 
     if (pathname === NOTIFY_TASK_PATH) {
@@ -123,9 +135,17 @@ export default {
     // 規矩不適用），是在 startFetch 已經算出真正的回應之後，只換掉 Cache-Control
     // 這一個標頭。body 直接原封傳遞（不 buffer、不解析），SSR streaming 不受影響。
     const cacheControl = cacheControlFor(pathname, request.method, response.status);
-    if (cacheControl === null) return response;
+    // /oauth/authorize（同意頁）：不准被別人的網頁用 iframe 框起來騙點「允許」（clickjacking），
+    // 也不把網址（含 state）經 Referer 帶給別的網站。
+    const isOAuthPage = pathname === "/oauth" || pathname.startsWith("/oauth/");
+    if (cacheControl === null && !isOAuthPage) return response;
     const headers = new Headers(response.headers);
-    headers.set("cache-control", cacheControl);
+    if (cacheControl !== null) headers.set("cache-control", cacheControl);
+    if (isOAuthPage) {
+      headers.set("content-security-policy", "frame-ancestors 'none'");
+      headers.set("x-frame-options", "DENY");
+      headers.set("referrer-policy", "no-referrer");
+    }
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
