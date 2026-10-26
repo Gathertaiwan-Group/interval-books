@@ -523,6 +523,11 @@ export const curatedItemSchema = z.object({
   note: localizedSchema,
   is_published: z.boolean(),
   sort_order: z.number().int("排序必須是整數"),
+  /**
+   * 連到的商品（curated_items.product_id，0041）。null＝只展示；沒給＝不動這一欄。
+   * 只能是書籍／選物——伺服器端 fns/curated.ts#upsertCuratedItem 會再查一次那件商品的類型。
+   */
+  product_id: z.string().trim().min(1).max(200).nullable().optional(),
 });
 export type CuratedItemFormValues = z.infer<typeof curatedItemSchema>;
 

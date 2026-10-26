@@ -1,5 +1,5 @@
 /**
- * /admin/products/curated/$id —— 選品一項（名稱、備註三語、發布狀態）。
+ * /admin/products/curated/$id —— 選品一項（名稱、備註三語、發布狀態、連結商品〔0041〕）。
  *
  * 2026-10-25 從兩個彈窗改成這一個內頁（業主：「不要用彈窗，直接顯示內頁＆回到上一頁」）：
  * /admin/products 選品分頁的「編輯」，與 /admin/products/curated-themes 主題頁品項的
@@ -31,7 +31,7 @@ import type { CuratedItemFormValues } from "@/lib/admin/schemas";
 export const Route = createFileRoute("/admin/_shell/products_/curated/$id")({
   loader: async ({ params }) => {
     const id = parseCuratedItemId(params.id);
-    if (id === null) return { item: null, themeTitle: null };
+    if (id === null) return { item: null, themeTitle: null, linkSupported: false, linkOptions: [] };
     const { getCuratedItemEditPageData } = await import("@/lib/admin/fns/products");
     return await getCuratedItemEditPageData({ data: { id } });
   },
@@ -72,7 +72,7 @@ function CuratedEditPending() {
 }
 
 function CuratedEditPage() {
-  const { item, themeTitle } = Route.useLoaderData();
+  const { item, themeTitle, linkSupported, linkOptions } = Route.useLoaderData();
 
   if (!item) {
     return <AdminDetailNotFound {...BACK} message="找不到這個選品，可能已被刪除或網址有誤。" />;
@@ -86,7 +86,8 @@ function CuratedEditPage() {
       meta={
         <>
           {themeTitle ? `主題：${themeTitle}・` : ""}
-          選品只展示、不販售。主題本身與排序在「主題與排序」頁調整。
+          連結商品之後，首頁那一排會優先放它、/shop
+          選品卡可以直接買；沒連結就只展示。主題本身與排序在「主題與排序」頁調整。
         </>
       }
       {...BACK}
@@ -104,6 +105,8 @@ function CuratedEditPage() {
           defaultValues={toCuratedValues(item)}
           onSubmit={slot.onSubmit}
           onDirtyChange={slot.onDirtyChange}
+          linkOptions={linkOptions}
+          linkSupported={linkSupported}
         />
       )}
     </ProductFormPage>

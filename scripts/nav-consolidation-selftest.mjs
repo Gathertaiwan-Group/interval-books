@@ -445,7 +445,11 @@ const PANEL_WIRING = [
     name: "PublicationsPanel",
     props: { page: "publicationsPage", list: "publications", catalogue: "catalogue" },
   },
-  { name: "CuratedPanel", props: { page: "curatedPage", curatedThemes: "curatedThemes" } },
+  // 2026-10-26：選品可連商品（0041）之後，CuratedPanel 也接同一份 catalogue 判斷買不買得到。
+  {
+    name: "CuratedPanel",
+    props: { page: "curatedPage", curatedThemes: "curatedThemes", catalogue: "catalogue" },
+  },
 ];
 
 for (const panel of PANEL_WIRING) {

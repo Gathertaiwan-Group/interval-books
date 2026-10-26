@@ -11,12 +11,16 @@
  *
  * 2026-10-25 從彈窗改成內頁（/admin/products/curated/$id、/new）：送出鈕改在內頁的
  * 動作列（<Button type="submit" form={formId}>），表單本身不再帶 DialogFooter。
+ *
+ * 2026-10-26 多一格「連結商品」（curated_items.product_id，0041）：`linkOptions` 有傳才顯示，
+ * 見 CuratedProductPicker。`linkSupported=false`（0041 還沒套用）時那一格停用並說明。
  */
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -31,8 +35,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LocalizedField } from "@/components/admin/LocalizedField";
+import { CuratedProductPicker } from "@/components/admin/products/CuratedProductPicker";
 import { useReportDirty } from "@/components/admin/products/useReportDirty";
 import { curatedItemSchema, type CuratedItemFormValues } from "@/lib/admin/schemas";
+import type { CuratedLinkOption } from "@/lib/admin/unified-products";
 
 export type CuratedItemFormProps = {
   /** <form id>：內頁動作列的送出鈕用 form={formId} 指到這張表單。 */
@@ -43,6 +49,10 @@ export type CuratedItemFormProps = {
   onDirtyChange?: (dirty: boolean) => void;
   /** 有傳才顯示「所屬主題」下拉。 */
   themes?: { id: string; title: { zh: string } }[];
+  /** 有傳才顯示「連結商品」。 */
+  linkOptions?: CuratedLinkOption[];
+  /** 0041 的欄位在不在；false 時「連結商品」停用並說明。 */
+  linkSupported?: boolean;
 };
 
 export function CuratedItemForm({
@@ -51,12 +61,15 @@ export function CuratedItemForm({
   onSubmit,
   onDirtyChange,
   themes,
+  linkOptions,
+  linkSupported = true,
 }: CuratedItemFormProps) {
   const form = useForm<CuratedItemFormValues>({
     resolver: zodResolver(curatedItemSchema),
     defaultValues,
   });
   useReportDirty(form.control, onDirtyChange);
+  const name = useWatch({ control: form.control, name: "name" });
 
   return (
     <Form {...form}>
@@ -90,6 +103,30 @@ export function CuratedItemForm({
 
         <LocalizedField name="name" label="品項名稱" />
         <LocalizedField name="note" label="備註" multiline />
+
+        {linkOptions ? (
+          <FormField
+            control={form.control}
+            name="product_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>連結商品</FormLabel>
+                <FormDescription>
+                  連了商品的選品，會優先出現在首頁「主理人的選品」那一排，/shop
+                  的選品卡也會出現價格與加入購物車。
+                </FormDescription>
+                <CuratedProductPicker
+                  value={field.value}
+                  onChange={(id) => field.onChange(id)}
+                  options={linkOptions}
+                  supported={linkSupported}
+                  itemName={name ?? { zh: "", en: "", ja: "" }}
+                />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        ) : null}
 
         <FormField
           control={form.control}

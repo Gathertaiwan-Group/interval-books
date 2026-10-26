@@ -45,6 +45,14 @@
  */
 import { supabase } from "@/lib/supabase";
 import type { Localized } from "@/i18n/types";
+import {
+  isMissingColumnError,
+  orderedCuratedProductIds,
+  selectHomeShelf,
+  SHELF_PRODUCT_TYPES,
+  type CuratedShelfItem,
+  type CuratedShelfTheme,
+} from "@/lib/home-shelf";
 
 /** Mirrors the product_type CHECK in 0004_commerce_products.sql. */
 export type ShopProductType = "goods" | "book" | "event" | "journey";
@@ -753,22 +761,31 @@ export async function fetchActiveProductsForList(): Promise<ShopListCardResult> 
 /**
  * 首頁「主理人的選品」那一排商品卡（src/components/shop/HomeProductShelf.tsx）。
  *
- * 選哪幾件：跟 /shop〈商品〉分頁**同一個排序**——後台商品的「排序（數字越小越
- * 前面）」，同分再比 id——取前面幾件**現在買得到**的書籍／選物。所以店主想讓哪一
- * 本上首頁，就在後台把那件商品的排序調小；下架（status 不是 active）或售完的會
- * 自動讓位給下一件，不需要另一個「精選」欄位（也沒有 DDL 權限加）。
+ * 選哪幾件（2026-10-26 起，規則本身在 src/lib/home-shelf.ts#selectHomeShelf）：
+ *   1. 先放主理人在後台「選品」裡**連結了商品**的那幾件（curated_items.product_id，
+ *      0041），照主題順序、主題內品項順序；只算 active、書籍／選物、沒售完的，去重。
+ *   2. 不滿 limit 件，再用原本的規則補：跟 /shop〈商品〉分頁**同一個排序**——後台商品
+ *      的「排序」，同分再比 id——取前面幾件**現在買得到**的書籍／選物。
+ *   3. 連了 limit 件以上就全部是選品。
+ *
+ * 🔴 0041 還沒套用（curated_items 沒有 product_id，PostgREST 回 42703）或選品那段讀
+ *    失敗時，**不要**讓首頁跟著壞：那一段當作「沒有任何連結」，整排退回原本的規則。
+ *    CLAUDE.md：「程式碼不可以早於 migration 上線」——這裡是萬一順序弄錯時的保險，
+ *    不是可以先上程式碼的許可。
  *
  * 為什麼不直接用 fetchActiveProductsForList() 再 slice：
  *   - 那一支撈整份目錄（含 23+ 件的三語 summary）塞進首頁的 SSR payload，首頁只
  *     畫 4 張；
  *   - 它還要 attachSessions() → attachPlans() 兩段**序列**查詢，那是給
  *     event/journey 用的，書與選物用不到——首頁 loader 會被多拖一段往返。
- * 這裡只查 goods/book、limit 一個小量，然後只做 attachAvailability()（判斷售完要用）。
+ * 這裡：補位清單（goods/book、limit×4 件）與選品的連結**平行**讀；選品指到的商品
+ * 多半已經在補位清單裡，不在的才多查一次（只查那幾個 id）；最後一次
+ * attachAvailability()（判斷售完要用）。
  *
  * 活動／策旅不在這裡：它們在首頁上面各有自己的一區，而且要先選場次才能加購物車。
  *
- * 失敗語意同 fetchActiveProductsForList()：讀壞回 unavailable:true，首頁那一區
- * 會退回原本的單張意象圖，不會開天窗。
+ * 失敗語意同 fetchActiveProductsForList()：讀壞（而且連選品那段也沒東西可放）回
+ * unavailable:true，首頁那一區會退回原本的單張意象圖，不會開天窗。
  */
 export async function fetchHomeShelfProducts(limit = 4): Promise<ShopListCardResult> {
   const db = supabase;
@@ -778,33 +795,119 @@ export async function fetchHomeShelfProducts(limit = 4): Promise<ShopListCardRes
   }
   try {
     // 多撈幾件當備胎：售完的要跳過，但「售完」要等 attachAvailability() 才知道。
-    const { data, error } = await db
-      .from("products")
-      .select(CARD_COLUMNS)
-      .eq("status", "active")
-      .in("product_type", ["goods", "book"])
-      .order("sort_order", { ascending: true })
-      .order("id", { ascending: true })
-      .limit(limit * 4);
+    const [fallbackRes, curatedIds] = await Promise.all([
+      db
+        .from("products")
+        .select(CARD_COLUMNS)
+        .eq("status", "active")
+        .in("product_type", [...SHELF_PRODUCT_TYPES])
+        .order("sort_order", { ascending: true })
+        .order("id", { ascending: true })
+        .limit(limit * 4),
+      fetchCuratedShelfProductIds(),
+    ]);
 
-    if (error || !Array.isArray(data)) {
-      logFailure("home shelf", error?.message ?? "unexpected response shape");
-      return { products: [], unavailable: true };
+    const fallbackFailed = !!fallbackRes.error || !Array.isArray(fallbackRes.data);
+    if (fallbackFailed) {
+      logFailure("home shelf", fallbackRes.error?.message ?? "unexpected response shape");
+      if (curatedIds.length === 0) return { products: [], unavailable: true };
     }
 
-    const candidates: ShopProductCard[] = [];
-    for (const row of data as unknown as Row[]) {
+    const fallback: ShopProductCard[] = [];
+    for (const row of (fallbackFailed ? [] : fallbackRes.data) as unknown as Row[]) {
       const p = toProductCard(row);
-      if (p) candidates.push(p);
+      if (p) fallback.push(p);
     }
-    await attachAvailability(candidates);
-    return {
-      products: candidates.filter((p) => !isSoldOut(p)).slice(0, limit),
-      unavailable: false,
-    };
+
+    const byId = new Map(fallback.map((p) => [p.id, p]));
+    // 選品指到、但不在補位清單裡的商品才另外查。上限 limit×4 個 id：售完的要跳過，
+    // 跟補位清單多撈幾件是同一個理由。
+    const missing = curatedIds.filter((id) => !byId.has(id)).slice(0, limit * 4);
+    if (missing.length > 0) {
+      const { data, error } = await db
+        .from("products")
+        .select(CARD_COLUMNS)
+        .eq("status", "active")
+        .in("product_type", [...SHELF_PRODUCT_TYPES])
+        .in("id", missing);
+      if (error || !Array.isArray(data)) {
+        // 只少了選品那幾件，補位清單照常——不讓一次讀失敗把整排弄空。
+        logFailure("home shelf curated products", error?.message ?? "unexpected response shape");
+      } else {
+        for (const row of data as unknown as Row[]) {
+          const p = toProductCard(row);
+          if (p) byId.set(p.id, p);
+        }
+      }
+    }
+
+    await attachAvailability([...byId.values()]);
+    const products = selectHomeShelf({
+      curatedIds,
+      productsById: byId,
+      fallback,
+      limit,
+      isSoldOut,
+    });
+    if (products.length === 0 && fallbackFailed) return { products: [], unavailable: true };
+    return { products, unavailable: false };
   } catch (err) {
     logFailure("home shelf", err instanceof Error ? err.message : String(err));
     return { products: [], unavailable: true };
+  }
+}
+
+/**
+ * 選品裡有連結商品的那幾件，照前台順序的商品 id（src/lib/home-shelf.ts#orderedCuratedProductIds）。
+ *
+ * **永遠不丟例外、讀壞回 []**：這一段只決定「先放哪幾件」，讀不到就是沒有偏好，整排
+ * 退回原本的排序規則。42703（0041 還沒套用、沒有 product_id 這一欄）特別記一筆，
+ * 讓 log 看得出是 migration 順序的問題而不是網路。
+ */
+async function fetchCuratedShelfProductIds(): Promise<string[]> {
+  const db = supabase;
+  if (!db) return [];
+  try {
+    const [themesRes, itemsRes] = await Promise.all([
+      db.from("curated_themes").select("id, sort_order"),
+      db
+        .from("curated_items")
+        .select("id, theme_id, product_id, sort_order")
+        .not("product_id", "is", null),
+    ]);
+    if (itemsRes.error) {
+      if (isMissingColumnError(itemsRes.error)) {
+        logFailure("home shelf curated links", "curated_items.product_id 不存在（0041 尚未套用）");
+      } else {
+        logFailure("home shelf curated links", itemsRes.error.message);
+      }
+      return [];
+    }
+    if (themesRes.error || !Array.isArray(themesRes.data) || !Array.isArray(itemsRes.data)) {
+      logFailure(
+        "home shelf curated themes",
+        themesRes.error?.message ?? "unexpected response shape",
+      );
+      return [];
+    }
+    const themes: CuratedShelfTheme[] = [];
+    for (const r of themesRes.data as unknown as Row[]) {
+      if (typeof r.id === "string") themes.push({ id: r.id, sort_order: int(r.sort_order, 0) });
+    }
+    const items: CuratedShelfItem[] = [];
+    for (const r of itemsRes.data as unknown as Row[]) {
+      if (typeof r.theme_id !== "string") continue;
+      items.push({
+        id: int(r.id, 0),
+        theme_id: r.theme_id,
+        product_id: nullableStr(r.product_id),
+        sort_order: int(r.sort_order, 0),
+      });
+    }
+    return orderedCuratedProductIds(themes, items);
+  } catch (err) {
+    logFailure("home shelf curated links", err instanceof Error ? err.message : String(err));
+    return [];
   }
 }
 

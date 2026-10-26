@@ -305,8 +305,9 @@ function Index() {
 
       {/* 主理人的選品 —— 2026-10 起右邊那張花瓶大圖換成可以直接買的商品卡。
           標題與內文仍然是 pages/index 的可編輯區塊（entries.curatedTitle／curatedBody）。
-          選哪幾件 = /shop〈商品〉分頁同一個排序的前 4 件買得到的書籍／選物，店主在後台
-          調商品的「排序」就能換（見 src/lib/shop.ts#fetchHomeShelfProducts）。
+          選哪幾件（2026-10-26 起）= 先放後台「選品」裡連結了商品的那幾件（主題順序、品項
+          順序，買得到的書籍／選物才算），不滿 4 件再用 /shop〈商品〉分頁同一個排序補
+          （見 src/lib/shop.ts#fetchHomeShelfProducts、src/lib/home-shelf.ts）。
           讀不到任何一件（讀取失敗或全部售完）時退回原本的單張意象圖，不開天窗。 */}
       {shelfProducts.length > 0 ? (
         <section className="container-editorial pb-24" data-testid="home-curated">

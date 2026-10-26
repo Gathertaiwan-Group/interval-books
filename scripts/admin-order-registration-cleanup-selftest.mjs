@@ -192,7 +192,10 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 是 orders.discount 從恆為 0 變成「推薦折扣」（只對選品／書籍、最多 50%），而
   // total = subtotal + shipping_fee − discount 仍是金流、信件、發票唯一使用的金額
   // （發票本來就把 discount 開成負數列）。這支自檢的斷言重讀過，原樣成立。
-  reviewedThrough: "0040_referral_program.sql",
+  // 0041（選品連結商品）只在 curated_items 加一個 references public.products(id) on delete
+  // set null 的 nullable 欄位——帳本因此標了 products_availability。它不改 products 的任何
+  // 欄位、約束、函式或 RLS，不碰庫存、名額、訂單或報名；這支自檢的斷言重讀過，原樣成立。
+  reviewedThrough: "0041_curated_item_product_link.sql",
 });
 
 // =============================================================================

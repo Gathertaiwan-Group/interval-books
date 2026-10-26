@@ -8,6 +8,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { adminFnMiddleware } from "@/lib/admin/middleware";
 import { curatedThemeSchema, curatedItemSchema } from "@/lib/admin/schemas";
+import { isCuratedLinkableType } from "@/lib/admin/unified-products";
 
 export const listCuratedThemes = createServerFn({ method: "GET" })
   .middleware([adminFnMiddleware])
@@ -61,6 +62,17 @@ export const upsertCuratedItem = createServerFn({ method: "POST" })
   .middleware([adminFnMiddleware])
   .inputValidator(curatedItemSchema)
   .handler(async ({ data }) => {
+    // 連結商品只接受書籍／選物（活動與策旅票券要先選場次，前台不能直接加購物車）。
+    // 後台的選擇器本來就只列這兩類（unified-products.ts#curatedLinkOptions）；這裡是
+    // 伺服器端的同一條規則，不信任瀏覽器送來的 id。
+    if (data.product_id) {
+      const { getProductById } = await import("@/server/repos/products");
+      const product = await getProductById(data.product_id);
+      if (!product) throw new Error("找不到要連結的商品，可能已被刪除。");
+      if (!isCuratedLinkableType(product.product_type)) {
+        throw new Error("選品只能連結書籍或一般商品，不能連結活動／策旅票券。");
+      }
+    }
     const { upsertCuratedItem } = await import("@/server/repos/curated");
     return await upsertCuratedItem(data);
   });

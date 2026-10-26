@@ -568,9 +568,10 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
     // 0039（MCP 寫入稽核表 mcp_audit_log）是一張獨立的新表，不碰訂單、付款或報名的任何
     // 一張表與函式（帳本 touches 只有 mcp_audit），這一支守的訂單不變式不受影響。
     // 0040（推薦分潤）對 orders 只加三個 nullable 歸屬欄位與一個部分索引。
-    "supabase/migrations 剛好 40 個 .sql 檔（0001–0039 原封不動 + 0040 推薦分潤新增）",
+    // 0041（選品連結商品）只在 curated_items 加 product_id，不碰訂單、付款或報名。
+    "supabase/migrations 剛好 41 個 .sql 檔（0001–0040 原封不動 + 0041 選品連結商品新增）",
     migFiles.length,
-    40,
+    41,
   );
 }
 

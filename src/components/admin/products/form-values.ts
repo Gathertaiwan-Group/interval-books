@@ -61,5 +61,8 @@ export function toCuratedValues(row: CuratedItemRow): CuratedItemFormValues {
     note: row.note,
     is_published: row.is_published,
     sort_order: row.sort_order,
+    // 一定要帶上：商品頁的上下架開關（_shell.products.tsx）拿這一份整筆回寫，少了這一欄
+    // 不會解除連結（undefined＝不動），但帶上才讓「表單看到的」與「存回去的」是同一份。
+    product_id: row.product_id ?? null,
   };
 }

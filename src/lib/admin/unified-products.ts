@@ -10,7 +10,8 @@
  * ── 四種品項，四張表，一條規則：不重複列 ────────────────────────────────────
  *   goods        一般商品  products.product_type ∈ goods/book，**且沒有刊物指向它**
  *   publication  地方刊物  publications 每一本一列；連到商品的那本，價格／可售量跟著帶過來
- *   curated      選品      curated_items 每一項一列（只有名稱與備註，**不販售**）
+ *   curated      選品      curated_items 每一項一列（名稱與備註；0041 起可連到一件書籍／選物，
+ *                          連了的那一列帶出那件商品的名稱、價格、可售量）
  *   ticket       活動票券  products.product_type ∈ event/journey
  *
  * 刊物連上庫存後，publications.product_id 指向一件 slug 為 `pub-…` 的 book 商品。
@@ -96,6 +97,8 @@ export type UPCuratedItem = {
   name: L;
   is_published: boolean;
   updated_at: string;
+  /** 0041：連到的商品。沒有這個 key（舊資料形狀）與 null 一樣＝沒連結。 */
+  product_id?: string | null;
 };
 
 /** inv_listed_products 的一列：連到進銷存的商品，可售量由 view 算好。 */
@@ -161,7 +164,7 @@ function ticketHref(p: UPProduct): string | null {
   return null;
 }
 
-function productStock(p: UPProduct, listed: UPListed | undefined) {
+export function productStock(p: UPProduct, listed: UPListed | undefined) {
   if (p.product_type === "event" || p.product_type === "journey") {
     return { stock: null, stockNote: "按場次" };
   }
@@ -264,28 +267,48 @@ export function buildUnifiedRows(input: {
     };
   });
 
-  const curated: UnifiedRow[] = input.curatedItems.map((item) => ({
-    key: `curated:${item.id}`,
-    kind: "curated",
-    id: item.id,
-    name: item.name.zh,
-    subtitle: themeTitle.get(item.theme_id) ?? "",
-    imageKey: null,
-    productId: null,
-    price: null,
-    comparePrice: null,
-    published: item.is_published,
-    statusLabel: item.is_published ? "展出中" : "已下架",
-    stock: null,
-    stockNote: "不販售",
-    invName: null,
-    updatedAt: item.updated_at,
-    editable: true,
-    priceEditable: false,
-    externalEditHref: null,
-    eventId: null,
-    searchText: lower(item.name.zh, item.name.en, item.name.ja, themeTitle.get(item.theme_id)),
-  }));
+  // 選品連到的商品（0041）：帶出那件商品的名稱、價格、可售量。連到的商品讀不到（被刪、
+  // 不在清單裡）就當成沒連結。價格不在這一列改——那是那件商品自己的價格，去商品那一列改，
+  // 否則同一個價格有兩個地方能改。
+  const curated: UnifiedRow[] = input.curatedItems.map((item) => {
+    const product = item.product_id ? productById.get(item.product_id) : undefined;
+    const listed = product ? listedByProduct.get(product.id) : undefined;
+    const theme = themeTitle.get(item.theme_id) ?? "";
+    return {
+      key: `curated:${item.id}`,
+      kind: "curated",
+      id: item.id,
+      name: item.name.zh,
+      subtitle: product ? [theme, `連結：${product.title.zh}`].filter(Boolean).join("・") : theme,
+      imageKey: product ? product.image_key : null,
+      productId: product ? product.id : null,
+      price: product ? product.price : null,
+      comparePrice: product ? product.compare_at_price : null,
+      published: item.is_published,
+      statusLabel: item.is_published
+        ? product
+          ? product.status === "active"
+            ? "展出・可買"
+            : `展出・商品${PRODUCT_STATUS_LABEL[product.status]}`
+          : "展出中"
+        : "已下架",
+      ...(product ? productStock(product, listed) : { stock: null, stockNote: "不販售" }),
+      invName: listed?.inv_name ?? null,
+      updatedAt: item.updated_at,
+      editable: true,
+      priceEditable: false,
+      externalEditHref: null,
+      eventId: null,
+      searchText: lower(
+        item.name.zh,
+        item.name.en,
+        item.name.ja,
+        theme,
+        product?.title.zh,
+        product?.slug,
+      ),
+    };
+  });
 
   return [...goods, ...publications, ...curated, ...tickets];
 }
@@ -476,7 +499,7 @@ export const CREATE_OPTIONS: readonly {
     key: "curated",
     kind: "curated",
     label: "選品",
-    hint: "主理人選品清單上的一項（只展示、不販售）。",
+    hint: "主理人選品清單上的一項；可連結一件書籍／商品，首頁那一排會優先放它。",
     href: null,
   },
   {
@@ -544,4 +567,107 @@ export function parseCuratedItemId(value: unknown): number | null {
 /** 金額顯示（列表、改價提示共用）。 */
 export function formatTWD(n: number): string {
   return `NT$${n.toLocaleString("zh-Hant-TW")}`;
+}
+
+// ---------------------------------------------------------------------------
+// 選品 → 連結商品（0041，2026-10-26）
+// ---------------------------------------------------------------------------
+/*
+ * 業主：首頁「主理人的選品」那一排要放主理人挑的那幾件。選品編輯頁多一格「連結商品」，
+ * 這一段是那一格的純邏輯：能選哪些、怎麼搜、「自動配對」建議哪幾件。
+ *
+ * 能選的只有**書籍與一般商品**（含地方刊物連到庫存的那件 book 商品），狀態是上架中或草稿。
+ *   · 活動／策旅票券不能選：前台要先選場次才能買，從選品卡片直接加購物車會產生沒有場次
+ *     的一行（結帳會拒收）。伺服器端 fns/curated.ts#upsertCuratedItem 用
+ *     isCuratedLinkableType() 再擋一次。
+ *   · 已下架（archived）不列：連了也買不到。草稿可以先連，上架那天首頁自動出現。
+ */
+
+/** 選品能連的商品類型。前台（src/lib/home-shelf.ts#isShelfProductType）同一條規則。 */
+export function isCuratedLinkableType(t: unknown): boolean {
+  return t === "goods" || t === "book";
+}
+
+export type CuratedLinkOption = {
+  productId: string;
+  name: string;
+  /** 「書籍」「商品」「地方刊物」 */
+  kindLabel: string;
+  status: UPProduct["status"];
+  statusLabel: string;
+  price: number;
+  comparePrice: number | null;
+  stock: number | null;
+  stockNote: string;
+  /** 比對用：三語標題（商品與連到它的刊物）。 */
+  titles: L[];
+  searchText: string;
+};
+
+export function curatedLinkOptions(input: {
+  products: UPProduct[];
+  publications: Pick<UPPublication, "title" | "product_id">[];
+  listed: UPListed[];
+}): CuratedLinkOption[] {
+  const listedByProduct = new Map(input.listed.map((l) => [l.product_id, l]));
+  const pubByProduct = new Map<string, Pick<UPPublication, "title" | "product_id">>();
+  for (const pub of input.publications) {
+    if (pub.product_id && !pubByProduct.has(pub.product_id)) pubByProduct.set(pub.product_id, pub);
+  }
+  const out: CuratedLinkOption[] = [];
+  for (const p of input.products) {
+    if (!isCuratedLinkableType(p.product_type)) continue;
+    if (p.status !== "active" && p.status !== "draft") continue;
+    const pub = pubByProduct.get(p.id);
+    const listed = listedByProduct.get(p.id);
+    const titles = pub ? [p.title, pub.title] : [p.title];
+    out.push({
+      productId: p.id,
+      name: p.title.zh,
+      kindLabel: pub ? "地方刊物" : p.product_type === "book" ? "書籍" : "商品",
+      status: p.status,
+      statusLabel: PRODUCT_STATUS_LABEL[p.status],
+      price: p.price,
+      comparePrice: p.compare_at_price,
+      ...productStock(p, listed),
+      titles,
+      searchText: lower(...titles.flatMap((t) => [t.zh, t.en, t.ja]), p.slug, listed?.inv_name),
+    });
+  }
+  return out;
+}
+
+/** 搜尋框：空字串＝全部；否則比對三語標題、代稱、進銷存品名（不分大小寫）。 */
+export function filterCuratedLinkOptions(
+  options: CuratedLinkOption[],
+  query: string,
+): CuratedLinkOption[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return options;
+  return options.filter((o) => o.searchText.includes(q));
+}
+
+/**
+ * 比對用的正規化：轉小寫、只留字母與數字（中日文算字母）。與
+ * src/lib/admin/publication-name-match.ts#normalizeListingName 同一條規則（那支是刊物連
+ * 進銷存用的）——空白、標點、書名號（《》「」〈〉）一律不算。
+ */
+export function normalizeCuratedName(s: string | null | undefined): string {
+  if (typeof s !== "string") return "";
+  return s.toLowerCase().replace(/[^\p{Alphabetic}\p{Nd}]/gu, "");
+}
+
+/**
+ * 「自動配對」：選品名稱（任一語言）正規化之後與商品標題（任一語言，含連到它的刊物標題）
+ * **完全相同**的那幾件。刻意不做模糊比對——猜錯的連結會讓客人在首頁買到另一件東西，
+ * 所以這只是建議，主理人按「採用」才會填進表單，按儲存才會寫進資料庫。
+ */
+export function suggestCuratedLinks(name: L, options: CuratedLinkOption[]): CuratedLinkOption[] {
+  const keys = new Set(
+    [name.zh, name.en, name.ja].map(normalizeCuratedName).filter((k) => k.length > 0),
+  );
+  if (keys.size === 0) return [];
+  return options.filter((o) =>
+    o.titles.some((t) => [t.zh, t.en, t.ja].some((v) => keys.has(normalizeCuratedName(v)))),
+  );
 }

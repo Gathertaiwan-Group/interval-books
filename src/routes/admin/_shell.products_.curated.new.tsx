@@ -30,7 +30,7 @@ export const Route = createFileRoute("/admin/_shell/products_/curated/new")({
 });
 
 function CuratedNewPage() {
-  const { themes, itemOrders } = Route.useLoaderData();
+  const { themes, itemOrders, linkSupported, linkOptions } = Route.useLoaderData();
   const { theme } = Route.useSearch();
   const fromThemes = theme !== undefined && themes.some((t) => t.id === theme);
 
@@ -38,7 +38,7 @@ function CuratedNewPage() {
     <ProductFormPage<CuratedItemFormValues>
       formId="curated-new-form"
       title="新增選品"
-      meta="選品只展示、不販售。"
+      meta="沒連結商品就只展示；連了商品，首頁那一排會優先放它。"
       backTo="/admin/products"
       backSearch={{ type: "curated" }}
       backAlso={["/admin/products/curated-themes"]}
@@ -70,8 +70,11 @@ function CuratedNewPage() {
               note: { zh: "", en: "", ja: "" },
               is_published: fromThemes,
               sort_order: 0,
+              product_id: null,
             }}
             themes={themes}
+            linkOptions={linkOptions}
+            linkSupported={linkSupported}
             onSubmit={slot.onSubmit}
             onDirtyChange={slot.onDirtyChange}
           />

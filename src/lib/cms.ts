@@ -236,7 +236,12 @@ export type CuratedThemeEntry = {
   id: string;
   title: Localized;
   description: Localized;
-  items: { name: Localized; note: Localized }[];
+  /**
+   * productId：這一件連到的商品（curated_items.product_id，0041）。null／沒有＝只展示。
+   * 有值也不代表一定買得到——商品可能下架或是票券，前台拿 /shop 的 catalogue 去對，
+   * 對不到就照舊只展示（見 src/components/shop/CuratedPanel.tsx）。
+   */
+  items: { name: Localized; note: Localized; productId?: string | null }[];
 };
 
 export type CollaborationEntry = {
@@ -1127,21 +1132,34 @@ export async function fetchNewsTicker(
   return liveNews(mapped, taipeiToday(now)).slice(0, limit);
 }
 
+/**
+ * 選品品項。先帶 product_id（0041）讀；讀不到（最常見的是 0041 還沒套用、PostgREST 回
+ * 42703）就退回不帶那一欄的舊查詢——選品分頁照舊只展示，而不是整頁變成內建文案。
+ * CLAUDE.md：「程式碼不可以早於 migration 上線」——這是萬一順序弄錯時的保險。
+ */
+async function selectCuratedItems(): Promise<Row[] | null> {
+  const withLink = await select("curated_items", "theme_id,name,note,sort_order,product_id", {
+    order: "sort_order",
+  });
+  if (withLink) return withLink;
+  return select("curated_items", "theme_id,name,note,sort_order", { order: "sort_order" });
+}
+
 export async function fetchCuratedThemes(): Promise<CuratedThemeEntry[]> {
   const [themeRows, itemRows] = await Promise.all([
     select("curated_themes", "id,title,description,sort_order", { order: "sort_order" }),
-    select("curated_items", "theme_id,name,note,sort_order", { order: "sort_order" }),
+    selectCuratedItems(),
   ]);
   if (!themeRows || !themeRows.length) return FALLBACK_CURATED_THEMES;
 
-  const itemsByTheme = new Map<string, { name: Localized; note: Localized }[]>();
+  const itemsByTheme = new Map<string, CuratedThemeEntry["items"]>();
   for (const r of itemRows ?? []) {
     const themeId = str(r.theme_id);
     const name = loc(r.name);
     const note = loc(r.note);
     if (!themeId || !name || !note) continue;
     const bucket = itemsByTheme.get(themeId) ?? [];
-    bucket.push({ name, note });
+    bucket.push({ name, note, productId: nullableStr(r.product_id) });
     itemsByTheme.set(themeId, bucket);
   }
 

@@ -5,9 +5,9 @@
  *
  *   商品        20 件，**可以結帳**            src/components/shop/ProductsPanel.tsx
  *   地方刊物    126 本，其中極少數連得到商品    src/components/shop/PublicationsPanel.tsx
- *   主理人的選品 3 主題 × 18 件，**完全買不到**  src/components/shop/CuratedPanel.tsx
+ *   主理人的選品 3 主題 × 18 件，連了商品的才買得到  src/components/shop/CuratedPanel.tsx
  *
- * ⚠️ 三者刻意不合併成一份清單。curated_items 只有 name/note，publications 有 126 筆
+ * ⚠️ 三者刻意不合併成一份清單。curated_items 大多只有 name/note（0041 起可連商品），publications 有 126 筆
  *    但對得上商品的是 0 筆 —— 把買不到的 144 項跟 20 件商品排進同一個格狀清單，客人
  *    會以為那些都是商品。分頁的意義就是讓「這個能買、那個不能」看得出來。
  *
@@ -190,7 +190,7 @@ function Shop() {
         {active === "publications" ? (
           <PublicationsPanel page={publicationsPage} list={publications} catalogue={catalogue} />
         ) : active === "curated" ? (
-          <CuratedPanel page={curatedPage} curatedThemes={curatedThemes} />
+          <CuratedPanel page={curatedPage} curatedThemes={curatedThemes} catalogue={catalogue} />
         ) : (
           <ProductsPanel page={page} catalogue={catalogue} heroAlt={t(p.title(PAGE.title))} />
         )}

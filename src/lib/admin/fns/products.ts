@@ -148,10 +148,33 @@ export const getCuratedItemEditPageData = createServerFn({ method: "GET" })
   .inputValidator(z.object({ id: z.number().int().positive() }))
   .handler(async ({ data }) => {
     const { getCuratedItemById, getCuratedThemeById } = await import("@/server/repos/curated");
-    const item = await getCuratedItemById(data.id);
+    const [item, link] = await Promise.all([getCuratedItemById(data.id), loadCuratedLinkData()]);
     const theme = item ? await getCuratedThemeById(item.theme_id) : null;
-    return { item, themeTitle: theme?.title.zh ?? null };
+    return { item, themeTitle: theme?.title.zh ?? null, ...link };
   });
+
+/**
+ * 選品編輯／新增頁的「連結商品」那一格要的資料（0041）：能選的商品（書籍／一般商品，
+ * 上架中或草稿；規則在 unified-products.ts#curatedLinkOptions）與 0041 的欄位在不在。
+ * 欄位不在（migration 還沒套用）時那一格會停用並說明，表單其餘照常能存。
+ */
+async function loadCuratedLinkData() {
+  const { isCuratedLinkSupported } = await import("@/server/repos/curated");
+  const { listProducts } = await import("@/server/repos/products");
+  const { listPublications } = await import("@/server/repos/publications");
+  const { listListedInventoryProducts } = await import("@/server/repos/inventory-listing");
+  const { curatedLinkOptions } = await import("@/lib/admin/unified-products");
+  const [linkSupported, products, publications, listed] = await Promise.all([
+    isCuratedLinkSupported(),
+    listProducts(),
+    listPublications(),
+    listListedInventoryProducts(),
+  ]);
+  return {
+    linkSupported,
+    linkOptions: curatedLinkOptions({ products, publications, listed }),
+  };
+}
 
 /**
  * /admin/products/curated/new —— 新增選品要選主題，sort_order 是「該主題目前最大值 + 1」
@@ -162,10 +185,11 @@ export const getCuratedItemNewPageData = createServerFn({ method: "GET" })
   .middleware([adminFnMiddleware])
   .handler(async () => {
     const { listCuratedThemes, listCuratedItemsByThemes } = await import("@/server/repos/curated");
-    const themes = await listCuratedThemes();
+    const [themes, link] = await Promise.all([listCuratedThemes(), loadCuratedLinkData()]);
     const items = await listCuratedItemsByThemes(themes.map((t) => t.id));
     return {
       themes: themes.map((t) => ({ id: t.id, title: t.title })),
       itemOrders: items.map((i) => ({ theme_id: i.theme_id, sort_order: i.sort_order })),
+      ...link,
     };
   });

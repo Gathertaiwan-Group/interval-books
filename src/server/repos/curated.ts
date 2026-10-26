@@ -18,7 +18,36 @@ import { supabaseAdmin } from "@/server/supabase-admin";
 import type { Localized } from "@/i18n/types";
 
 const THEME_COLUMNS = "id, title, description, is_published, sort_order, created_at, updated_at";
-const ITEM_COLUMNS = "id, theme_id, name, note, is_published, sort_order, created_at, updated_at";
+const BASE_ITEM_COLUMNS =
+  "id, theme_id, name, note, is_published, sort_order, created_at, updated_at";
+/** product_id 是 0041 加的（選品連結商品）。 */
+const ITEM_COLUMNS = `${BASE_ITEM_COLUMNS}, product_id`;
+
+/**
+ * PostgREST 回 42703（undefined_column）＝0041 還沒套用到這個資料庫。
+ *
+ * CLAUDE.md：「程式碼不可以早於 migration 上線」——src/server/repos/events.ts 被「先 select
+ * 了還沒 migrate 的欄位」弄壞過三次，整個後台頁直接掛掉。這一檔的讀取因此一律「先帶
+ * product_id 讀，42703 就退回不帶它再讀一次、把 product_id 補成 null」：順序萬一弄錯，
+ * 後台選品照舊能看能改，只是不能連結商品（編輯頁會說明為什麼）。
+ */
+function isMissingLinkColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === "42703") return true;
+  return /product_id/.test(error.message ?? "") && /does not exist/.test(error.message ?? "");
+}
+
+function withNullLink<T>(rows: T[]): T[] {
+  return rows.map((r) => ({ product_id: null, ...r }));
+}
+
+/** 0041 的欄位在不在。編輯／新增頁拿來決定「連結商品」那一格能不能用。 */
+export async function isCuratedLinkSupported(): Promise<boolean> {
+  const { error } = await supabaseAdmin().from("curated_items").select("product_id").limit(1);
+  if (!error) return true;
+  if (isMissingLinkColumn(error)) return false;
+  throw new Error(`[repo/curated] 檢查連結欄位失敗：${error.message}`);
+}
 
 export type CuratedThemeRow = {
   id: string;
@@ -48,9 +77,14 @@ export type CuratedItemRow = {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  /** 連到的商品（0041）。null＝只展示。0041 還沒套用時一律是 null。 */
+  product_id: string | null;
 };
 
-/** Shape accepted by upsertCuratedItem. `id` omitted means "create". */
+/**
+ * Shape accepted by upsertCuratedItem. `id` omitted means "create".
+ * `product_id` 沒給（undefined）＝不動這一欄；null＝解除連結。
+ */
 export type CuratedItemUpsertInput = {
   id?: number;
   theme_id: string;
@@ -58,6 +92,7 @@ export type CuratedItemUpsertInput = {
   note: Localized;
   is_published: boolean;
   sort_order: number;
+  product_id?: string | null;
 };
 
 export async function listCuratedThemes(): Promise<CuratedThemeRow[]> {
@@ -121,15 +156,21 @@ export async function removeCuratedTheme(id: string): Promise<void> {
 }
 
 export async function listCuratedItemsByTheme(themeId: string): Promise<CuratedItemRow[]> {
-  const { data, error } = await supabaseAdmin()
-    .from("curated_items")
-    .select(ITEM_COLUMNS)
-    .eq("theme_id", themeId)
-    .order("sort_order", { ascending: true })
-    .order("id", { ascending: true });
+  const run = (columns: string) =>
+    supabaseAdmin()
+      .from("curated_items")
+      .select(columns)
+      .eq("theme_id", themeId)
+      .order("sort_order", { ascending: true })
+      .order("id", { ascending: true });
 
+  let { data, error } = await run(ITEM_COLUMNS);
+  if (isMissingLinkColumn(error)) {
+    ({ data, error } = await run(BASE_ITEM_COLUMNS));
+    if (!error) data = withNullLink((data ?? []) as unknown as Record<string, unknown>[]) as never;
+  }
   if (error) throw new Error(`[repo/curated] listItems 失敗：${error.message}`);
-  return (data ?? []) as CuratedItemRow[];
+  return (data ?? []) as unknown as CuratedItemRow[];
 }
 
 /** Supabase PostgREST 的 db-max-rows 預設值。 */
@@ -144,16 +185,22 @@ export async function listCuratedItemsByThemes(
   themeIds: readonly string[],
 ): Promise<CuratedItemRow[]> {
   if (themeIds.length === 0) return [];
-  const { data, error } = await supabaseAdmin()
-    .from("curated_items")
-    .select(ITEM_COLUMNS)
-    .in("theme_id", [...themeIds])
-    .order("sort_order", { ascending: true })
-    .order("id", { ascending: true })
-    .limit(5000);
+  const run = (columns: string) =>
+    supabaseAdmin()
+      .from("curated_items")
+      .select(columns)
+      .in("theme_id", [...themeIds])
+      .order("sort_order", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(5000);
 
+  let { data, error } = await run(ITEM_COLUMNS);
+  if (isMissingLinkColumn(error)) {
+    ({ data, error } = await run(BASE_ITEM_COLUMNS));
+    if (!error) data = withNullLink((data ?? []) as unknown as Record<string, unknown>[]) as never;
+  }
   if (error) throw new Error(`[repo/curated] listItems 失敗：${error.message}`);
-  const rows = (data ?? []) as CuratedItemRow[];
+  const rows = (data ?? []) as unknown as CuratedItemRow[];
   // PostgREST 的 db-max-rows（Supabase 預設 1000）會蓋過 .limit()。合併成一次查詢之後，上限從
   // 「每個主題 1000」變成「全部加起來 1000」——碰到上限就退回原本一個主題一次，不靜默截斷。
   if (rows.length >= SUPABASE_MAX_ROWS) {
@@ -170,14 +217,16 @@ export async function listCuratedItemsByThemes(
 }
 
 export async function getCuratedItemById(id: number): Promise<CuratedItemRow | null> {
-  const { data, error } = await supabaseAdmin()
-    .from("curated_items")
-    .select(ITEM_COLUMNS)
-    .eq("id", id)
-    .maybeSingle();
+  const run = (columns: string) =>
+    supabaseAdmin().from("curated_items").select(columns).eq("id", id).maybeSingle();
 
+  let { data, error } = await run(ITEM_COLUMNS);
+  if (isMissingLinkColumn(error)) {
+    ({ data, error } = await run(BASE_ITEM_COLUMNS));
+    if (!error && data) data = { product_id: null, ...(data as object) } as never;
+  }
   if (error) throw new Error(`[repo/curated] getItemById 失敗：${error.message}`);
-  return (data as CuratedItemRow | null) ?? null;
+  return (data as unknown as CuratedItemRow | null) ?? null;
 }
 
 /**
@@ -200,37 +249,46 @@ export async function getCuratedItemById(id: number): Promise<CuratedItemRow | n
  * writes sort_order for an existing row outside that RPC.
  */
 export async function upsertCuratedItem(input: CuratedItemUpsertInput): Promise<CuratedItemRow> {
-  if (input.id != null) {
-    const { data, error } = await supabaseAdmin()
-      .from("curated_items")
-      .update({
-        theme_id: input.theme_id,
-        name: input.name,
-        note: input.note,
-        is_published: input.is_published,
-      })
-      .eq("id", input.id)
-      .select(ITEM_COLUMNS)
-      .single();
+  const base = {
+    theme_id: input.theme_id,
+    name: input.name,
+    note: input.note,
+    is_published: input.is_published,
+  };
+  // product_id 沒給＝不動；給了（含 null＝解除連結）才寫。
+  const link = input.product_id === undefined ? {} : { product_id: input.product_id };
 
-    if (error) throw new Error(`[repo/curated] updateItem 失敗：${error.message}`);
-    return data as CuratedItemRow;
+  const write = (payload: Record<string, unknown>, columns: string) =>
+    input.id != null
+      ? supabaseAdmin()
+          .from("curated_items")
+          .update(payload)
+          .eq("id", input.id)
+          .select(columns)
+          .single()
+      : supabaseAdmin()
+          .from("curated_items")
+          .insert({ ...payload, sort_order: input.sort_order })
+          .select(columns)
+          .single();
+
+  let { data, error } = await write({ ...base, ...link }, ITEM_COLUMNS);
+  if (isMissingLinkColumn(error)) {
+    // 0041 還沒套用。要連結商品就明講做不到（不能靜默把連結丟掉）；沒有要連結就照舊存。
+    if (input.product_id) {
+      throw new Error(
+        "[repo/curated] 資料庫還沒有選品的「連結商品」欄位（migration 0041 尚未套用），暫時不能連結商品。",
+      );
+    }
+    ({ data, error } = await write(base, BASE_ITEM_COLUMNS));
+    if (!error && data) data = { product_id: null, ...(data as object) } as never;
   }
-
-  const { data, error } = await supabaseAdmin()
-    .from("curated_items")
-    .insert({
-      theme_id: input.theme_id,
-      name: input.name,
-      note: input.note,
-      is_published: input.is_published,
-      sort_order: input.sort_order,
-    })
-    .select(ITEM_COLUMNS)
-    .single();
-
-  if (error) throw new Error(`[repo/curated] insertItem 失敗：${error.message}`);
-  return data as CuratedItemRow;
+  if (error) {
+    throw new Error(
+      `[repo/curated] ${input.id != null ? "updateItem" : "insertItem"} 失敗：${error.message}`,
+    );
+  }
+  return data as unknown as CuratedItemRow;
 }
 
 export async function removeCuratedItem(id: number): Promise<void> {

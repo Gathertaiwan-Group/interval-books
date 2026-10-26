@@ -3,14 +3,32 @@
  *
  * 內容逐字搬自舊的 src/routes/curated.tsx（2026-09-02 導覽列合併）。
  *
- * ⚠️ 這裡的每一件都**買不到**：curated_items 只有 name / note，沒有 product_id，
- *    沒有價格也沒有庫存。所以它有自己的分頁、有自己的「詢問與選購」結尾，而不是
- *    跟商品混在同一個格狀清單裡 —— 混在一起客人會以為那些都能加入購物車。
+ * 2026-10-26 起選品可以連到真正的商品（curated_items.product_id，0041；後台在選品編輯頁
+ * 的「連結商品」設定）：
+ *
+ *   沒連結                         → 照舊只展示（名稱＋備註），結尾的「詢問與選購」
+ *   連到 catalogue 裡的書籍／選物   → 卡片多一段價格、加入購物車、查看商品
+ *   連到但 catalogue 對不到         → 也只展示。catalogue 只有 active 的商品，下架、
+ *                                    讀失敗、或（不該發生的）票券都落在這裡——與
+ *                                    PublicationsPanel「product_id 有值但商品讀不到」同一條線
+ *
+ * ⚠️ 仍然是自己的分頁，不跟〈商品〉混在同一個格狀清單：大部分選品還是買不到，混在一起
+ *    客人會以為那些都能加入購物車。
+ *
+ * 🔴 加入購物車只呼叫既有的 useCart().addItem(cartInputFor(product, 1))——與首頁那一排、
+ *    地方刊物分頁同一行，數量上限與售完判斷都在那裡，這裡不另外算。
  */
+import { Link } from "@tanstack/react-router";
+import { useMemo } from "react";
+import { toast } from "sonner";
+import { PriceTag } from "@/components/shop/ShopBits";
 import { useT } from "@/i18n/LanguageContext";
 import type { Localized } from "@/i18n/types";
 import { pageText, type CuratedThemeEntry, type PageContent } from "@/lib/cms";
 import { CARD } from "@/lib/feature-layout";
+import { cartInputFor, useCart } from "@/lib/cart";
+import { isShelfProductType } from "@/lib/home-shelf";
+import { isSoldOut, type ShopListCardResult, type ShopProductCard } from "@/lib/shop";
 import { useSiteContent } from "@/lib/site-content";
 import { PanelIntro } from "./PublicationsPanel";
 
@@ -29,18 +47,51 @@ const COPY = {
   },
   windowLabel: { zh: "Window", en: "Window", ja: "Window" },
   askPurchase: { zh: "詢問與選購", en: "Ask & purchase", ja: "お問合せ・お求め" },
+  addedToast: { zh: "已加入購物車", en: "Added to cart", ja: "カートに入れました" },
+  cappedToast: {
+    zh: "已達可購買數量上限",
+    en: "That is all we have available",
+    ja: "ご購入いただける上限に達しました",
+  },
+  soldOutToast: {
+    zh: "這件商品目前售完",
+    en: "This item is sold out",
+    ja: "この商品は完売しています",
+  },
 } satisfies Record<string, Localized>;
 
 export function CuratedPanel({
   page,
   curatedThemes,
+  catalogue,
 }: {
   page: PageContent | null;
   curatedThemes: CuratedThemeEntry[];
+  /** /shop 的 loader 已經讀好的那一份（與〈商品〉〈地方刊物〉共用），不另外查。 */
+  catalogue: ShopListCardResult;
 }) {
   const t = useT();
   const p = pageText(page);
   const { ui, contactEmail, social } = useSiteContent();
+  const addItem = useCart((s) => s.addItem);
+  const productById = useMemo(
+    () => new Map(catalogue.products.map((prod) => [prod.id, prod])),
+    [catalogue.products],
+  );
+
+  /** 只有書籍／選物算「買得到」：票券要先選場次，不能從這裡加購物車。 */
+  const linkedProduct = (productId: string | null | undefined): ShopProductCard | null => {
+    if (!productId) return null;
+    const prod = productById.get(productId);
+    return prod && isShelfProductType(prod.productType) ? prod : null;
+  };
+
+  const add = (product: ShopProductCard) => {
+    const result = addItem(cartInputFor(product, 1));
+    if (result === "added") toast.success(t(p.block("addedToast", COPY.addedToast)));
+    else if (result === "capped") toast.warning(t(p.block("cappedToast", COPY.cappedToast)));
+    else toast.error(t(p.block("soldOutToast", COPY.soldOutToast)));
+  };
 
   return (
     <>
@@ -69,19 +120,52 @@ export function CuratedPanel({
               </p>
             ) : (
               // 一件一張獨立卡片，外框用前台共用的 CARD（src/lib/feature-layout.ts）；
-              // 不是連結，所以不加 CARD_HOVER。
+              // 卡片本身不是連結，所以不加 CARD_HOVER（可以點的是裡面的購買鈕與商品連結）。
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:gap-8 lg:grid-cols-3">
-                {theme.items.map((item, idx) => (
-                  <article key={idx} className={`${CARD} p-5 md:p-6`}>
-                    <p className="text-[0.65rem] tracking-widest text-muted-foreground">
-                      {String(idx + 1).padStart(2, "0")}
-                    </p>
-                    <h4 className="font-serif text-xl mt-3 leading-snug">{t(item.name)}</h4>
-                    <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                      {t(item.note)}
-                    </p>
-                  </article>
-                ))}
+                {theme.items.map((item, idx) => {
+                  const product = linkedProduct(item.productId);
+                  const soldOut = product !== null && isSoldOut(product);
+                  return (
+                    <article
+                      key={idx}
+                      className={`${CARD} p-5 md:p-6`}
+                      data-testid="curated-item"
+                      data-purchasable={product !== null && !soldOut ? "yes" : "no"}
+                    >
+                      <p className="text-[0.65rem] tracking-widest text-muted-foreground">
+                        {String(idx + 1).padStart(2, "0")}
+                      </p>
+                      <h4 className="font-serif text-xl mt-3 leading-snug">{t(item.name)}</h4>
+                      <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                        {t(item.note)}
+                      </p>
+                      {product && (
+                        <div className="mt-auto pt-6">
+                          <PriceTag price={product.price} compareAtPrice={product.compareAtPrice} />
+                          <div className="mt-4 flex flex-wrap items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => add(product)}
+                              disabled={soldOut}
+                              data-testid="add-to-cart"
+                              className="border border-foreground bg-foreground px-5 py-2.5 text-xs tracking-widest text-primary-foreground transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-muted-foreground disabled:opacity-100"
+                            >
+                              {soldOut ? t(ui.buttons.soldOut) : t(ui.buttons.addToCart)}
+                              <span className="sr-only">（{t(item.name)}）</span>
+                            </button>
+                            <Link
+                              to="/shop/$slug"
+                              params={{ slug: product.slug }}
+                              className="text-xs tracking-widest text-muted-foreground hover-underline hover:text-foreground"
+                            >
+                              {t(ui.buttons.viewProduct)}
+                            </Link>
+                          </div>
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
               </div>
             )}
           </div>

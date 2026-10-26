@@ -268,6 +268,18 @@ export const AREAS = Object.freeze({
     label: "推薦碼、推廣者與分潤月結",
     identifiers: ["referrers", "referral_settings", "referral_settlements"],
   },
+  // 主理人的選品（curated_themes / curated_items）。0041 之前它沒有自己的區域——
+  // 0001 建表、0002 的 admin_reorder_curated_items 之後就沒有任何 migration 再碰它，
+  // 所以一直沒人需要被叫回來。0041 給 curated_items 加了 product_id（連到商品），
+  // 首頁那一排與 /shop〈主理人的選品〉的「可不可以買」從此取決於這一欄，於是開一區，
+  // 讓日後動到這兩張表的 migration 被路由回 curated-link-selftest。
+  // 開區之後偵測器會回頭掃舊的 migration：0001（建表）、0002（reorder RPC）補標了
+  // 這一區——那是實話，不是新的改動。
+  curated: {
+    witness: "0001_init.sql",
+    label: "主理人的選品（主題與品項）",
+    identifiers: ["curated_items", "curated_themes"],
+  },
 });
 
 /**
@@ -286,12 +298,14 @@ export const MIGRATION_LEDGER = Object.freeze([
   {
     file: "0001_init.sql",
     note: "內容層初始 schema：pages / exhibitions / events / site_contents",
-    touches: ["cms", "events_shape", "localized_list"],
+    // curated：0041 開區之後補標（0001 建了 curated_themes / curated_items）。
+    touches: ["cms", "events_shape", "localized_list", "curated"],
   },
   {
     file: "0002_admin.sql",
     note: "/admin 後台需要的身分：profiles、role、is_admin()",
-    touches: ["admin_auth"],
+    // curated：0041 開區之後補標（0002 建了 admin_reorder_curated_items）。
+    touches: ["admin_auth", "curated"],
   },
   {
     file: "0003_storage_site_images.sql",
@@ -707,6 +721,14 @@ export const MIGRATION_LEDGER = Object.freeze([
     // references public.orders 的索引那兩段）、referrals（這一支自己開的區域）。
     // 沒有碰 order_items、products、event_sessions、email_outbox、invoices 或任何函式。
     touches: ["orders_payments", "referrals"],
+  },
+  {
+    file: "0041_curated_item_product_link.sql",
+    note: "主理人的選品連到真正的商品：curated_items 加 nullable product_id text（references public.products(id) on delete set null）與部分索引（where product_id is not null）。不加 unique（同一件商品可以出現在兩個主題櫥窗）；不碰 products 本身的欄位、函式、RLS 或 grant；curated_items 的 grant／RLS 沿用 0001",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：curated（alter table
+    // public.curated_items 與 create index … on public.curated_items）、products_availability
+    // （識別字 products —— references public.products 那一句）。這一支沒有 comment on。
+    touches: ["curated", "products_availability"],
   },
 ]);
 
