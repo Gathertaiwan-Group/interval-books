@@ -43,7 +43,7 @@ event_registrations   ←── /admin/registrations 看得到名單
    0037 建、0038 刪）。當時的理由是那一場是不收錢的審核邀請制，塞進
    `event_registrations` 要生假訂單、要在回覆當下就佔掉名額——那個判斷在「回條」的
    框架下是對的，但它換掉了更重要的東西：**名單不在後台**。
-   `/admin/registrations` 已經有逐位參加者與聯絡方式（會留查閱紀錄）、CSV 匯出、單筆移除；
+   `/admin/registrations` 已經有逐位參加者與聯絡方式、CSV 匯出、單筆移除；
    自製的表一個都沒有，只能下 SQL 看。**多幾個欄位，不值得整套名單工具。**
 
 2. **不要自己算座位數字。** 數量上限一律問 `directSeatLimit()`（它轉給

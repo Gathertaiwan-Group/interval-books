@@ -9,8 +9,8 @@
  * 對話框用這一列既有的 payment_status／on_roster（listSessionRoster() 早就回傳了）
  * 明確示警「這位已經付過錢」，不需要等 RPC 回來才知道。
  *
- * 成功後呼叫 onRemoved：呼叫端從本地名單過濾掉這一列——不整個重打 listSessionRoster()
- * （那會多寫一筆查閱紀錄），再 router.invalidate() 讓列表的「報名」「名額」欄是新的數字。
+ * 成功後呼叫 onRemoved：呼叫端 router.invalidate()，名單頁的 loader 重抓名單（2026-10-26
+ * 起不寫查閱紀錄，重抓沒有副作用），列表的「報名」「名額」欄也是新的數字。
  */
 import { useState } from "react";
 import { toast } from "sonner";
@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { listSessionRoster } from "@/lib/admin/fns/event-registrations";
 
-export type RosterRow = Awaited<ReturnType<typeof listSessionRoster>>["rows"][number];
+export type RosterRow = Awaited<ReturnType<typeof listSessionRoster>>[number];
 
 type Props = {
   rows: RosterRow[];

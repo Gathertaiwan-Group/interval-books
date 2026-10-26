@@ -17,8 +17,8 @@
  * 出貨與聯絡本來就要用到這些，遮罩只是讓店員每次都得另外翻信件。
  *
  * 所以這一支**不需要 migration**：pii_access_log 的白名單沒有 'public.orders'，
- * 也不必有——這條路徑刻意不寫紀錄。與報名名單（event-registrations.ts，會先寫一筆
- * pii_log_access 再讀明文）不同，那是業主另外的決定，兩者不要混為一談。
+ * 也不必有——這條路徑刻意不寫紀錄。（報名名單 2026-10-26 起也不寫了，見
+ * event-registrations.ts；廠商身分證／匯款帳戶仍寫，兩者不要混為一談。）
  *
  * 只有 adminFnMiddleware（role='admin'）的 server fn 會呼叫這裡，門市人員看不到。
  *

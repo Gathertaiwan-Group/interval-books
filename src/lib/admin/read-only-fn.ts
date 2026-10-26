@@ -9,8 +9,7 @@
  * 掛法：`.middleware([staffFnMiddleware(), readOnlyFnMiddleware])`——**放在授權 middleware 後面**，
  * 它只有 client 那一半，不是授權，什麼都不擋。
  *
- * 🔴 只能掛在真的只讀的 fn 上。掛在會寫入（包括寫查閱紀錄，例如 listSessionRoster、
- *    readVendorSensitive）的 fn 上，寫入之後後台快取就不會清，30 秒內會看到舊資料。
+ * 🔴 只能掛在真的只讀的 fn 上。掛在會寫入（包括寫查閱紀錄，例如 readVendorSensitive）的 fn 上，寫入之後後台快取就不會清，30 秒內會看到舊資料。
  */
 import { createMiddleware } from "@tanstack/react-start";
 import { markReadOnlyServerFn } from "@/lib/admin/route-cache";

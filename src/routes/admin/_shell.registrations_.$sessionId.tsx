@@ -8,10 +8,8 @@
  * 授權：getEventSessionPageData 掛 staffFnMiddleware() ＋ event.roster.read，與原本彈窗的
  * 資料來源 getAdminRegistrationsPageData 相同。
  *
- * 🔴 這個 loader **只有場次的非個資資訊**。名單（listSessionRoster，每呼叫一次寫一筆
- *    pii_access_log）不可以放進來：loader 會在預載、過期重抓、每次 invalidate 時重跑。
- *    名單在 SessionRosterPage 掛載時呼叫一次；列表連到名單頁的 Link 是 preload={false}。
- *    scripts/admin-detail-registrations-selftest.mjs 守著。
+ * 這個 loader 只有場次的非個資資訊（/edit 也共用它）。名單在 index route 自己的 loader
+ * （listSessionRoster，業主 2026-10-26 起不寫查閱紀錄，一般 30 秒快取、可預載）。
  */
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { ADMIN_DETAIL_PENDING, AdminDetailPending } from "@/components/admin/AdminDetailPage";

@@ -234,11 +234,9 @@ export const getAdminRegistrationsPageData = createServerFn({ method: "GET" })
  * 回傳場次本身、可選的活動商品（表單下拉選單＋名單頁標題的商品名）、這個場次的票種、
  * 新場次的預設排序。
  *
- * 🔴 **這裡一個參加者的個資都沒有，也不可以加。** 名單（姓名、電話、信箱）只走
- *    fns/event-registrations.ts 的 listSessionRoster()——那支每呼叫一次就先寫一筆
- *    pii_access_log。route loader 會在滑過連結預載、30 秒過期重抓、每次 router.invalidate()
- *    時重跑；把名單放進 loader 等於「沒看也留紀錄、看一次留好幾筆」。名單頁在元件掛載時
- *    呼叫一次 listSessionRoster()（跟原本打開彈窗時一樣），見 SessionRosterPage.tsx。
+ * 這裡沒有參加者的個資：/edit 也共用這個 loader，不需要名單。名單（姓名、電話、信箱）
+ *    走 fns/event-registrations.ts 的 listSessionRoster()，由名單頁（index route）自己的
+ *    loader 呼叫（業主 2026-10-26 起不寫查閱紀錄，所以可以放進 loader）。
  *
  * 權限與 getAdminRegistrationsPageData（原本彈窗的資料來源）**完全一樣**：
  * staffFnMiddleware() ＋ requireRosterRead（event.roster.read）。存檔仍是 adminFnMiddleware

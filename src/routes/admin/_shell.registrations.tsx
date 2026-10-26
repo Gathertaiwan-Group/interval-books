@@ -49,15 +49,9 @@ const STATUS_LABEL: Record<EventSessionFormValues["status"], string> = {
  *   刪除場次的確認仍是這一頁的 AlertDialog。列表本身全靠 loader、沒有篩選，所以不需要
  *   useLoaderBackedList；從內頁回來靠 history.back()（捲動位置原樣）。
  *
- * ⚠️ 名單直接顯示明文電話與信箱（業主 2026-10-25），但每一條明文都留下紀錄：
- *    - 打開一個場次的名單 → listSessionRoster() **先**寫一筆 pii_access_log
- *      （subject 是場次、reason='attendee_contact'），寫成功才讀明文。一次開名單
- *      一筆，不是每位參加者一筆——名單頁一次 30 個人，逐人寫會讓那張表失去
- *      「有沒有人在亂查」這個用途（0019 §1.1）。
- *    - 🔴 所以連到名單頁的 Link 是 preload={false}，名單也不在任何 route loader 裡
- *      （預載、過期重抓、invalidate 都會重跑 loader，見 SessionRosterPage.tsx 檔頭）。
- *    - 「匯出簽到表」→ export_event_roster()，寫**一筆** reason='roster_export'。
- *    - 姓名是全名 —— 遮了現場點不了名。
+ * 名單直接顯示明文電話與信箱與全名（業主 2026-10-25）。業主 2026-10-26 撤掉「每打開一次
+ * 名單就記一筆查看紀錄」：打開名單與匯出簽到表都不再寫 pii_access_log，名單頁的 Link 跟
+ * 其他內頁一樣 preload="intent"。授權（event.roster.read）不變。
  *
  * 名額不在 /admin/products 上了：0020 把 products.capacity 綁成 null，所以那個
  * 欄位已經從商品表單移除，改由這裡按場次維護。
@@ -237,12 +231,10 @@ function AdminRegistrationsPage() {
                       <div className="flex justify-end gap-2">
                         {rosterReady ? (
                           <Button asChild variant="ghost" size="sm">
-                            {/* 🔴 preload={false}：名單頁一打開就寫一筆查閱紀錄（listSessionRoster），
-                                滑過不可以預先跑任何東西。 */}
                             <Link
                               to="/admin/registrations/$sessionId"
                               params={{ sessionId: s.id }}
-                              preload={false}
+                              preload="intent"
                               disabled={rowBusy}
                               onClick={() => rememberAdminPeek("event-session", s.id, s)}
                             >

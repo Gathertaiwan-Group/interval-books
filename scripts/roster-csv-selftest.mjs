@@ -1058,30 +1058,32 @@ check("repo 裡沒有 TypeScript 的 maskTail", /function maskTail/.test(regRepo
 check("repo 裡沒有 TypeScript 的 maskEmail", /function maskEmail/.test(regRepoTs), false);
 check("repo 裡沒有 repeat 星號的遮罩邏輯", /"\*"\.repeat\(/.test(regRepoTs), false);
 checkTrue("repo 改讀 admin_event_roster", /from\("admin_event_roster"\)/.test(regRepoTs));
-// 2026-10-25（業主）：名單頁與店家通知信改顯示明文。直接讀本表的地方剛好兩處：
-// listSessionRoster()（先寫 pii_log_access 才讀）與 loadOrderAttendeesForAdminNotify()
-// （店家通知信，業主決定不留紀錄）。多出第三處就是多一條沒人審過的明文路徑。
+// 2026-10-25（業主）：名單頁與店家通知信改顯示明文；2026-10-26 名單頁與 CSV 匯出不再寫
+// 查看紀錄。直接讀本表的地方剛好三處：listSessionRoster()（名單頁）、loadRosterExport()
+// （CSV）與 loadOrderAttendeesForAdminNotify()（店家通知信）。多出第四處就是多一條沒人
+// 審過的明文路徑。
 {
   const code = stripTs(regRepoTs);
   check(
-    "repo 直接讀 event_registrations 的地方剛好兩處",
+    "repo 直接讀 event_registrations 的地方剛好三處",
     (code.match(/from\("event_registrations"\)/g) ?? []).length,
-    2,
+    3,
   );
   const fnOf = (name) => {
     const at = code.indexOf(`export async function ${name}(`);
-    return at < 0 ? "" : code.slice(at, code.indexOf("\nexport ", at + 10));
+    if (at < 0) return "";
+    const end = code.indexOf("\nexport ", at + 10);
+    return end < 0 ? code.slice(at) : code.slice(at, end);
   };
-  checkTrue(
-    "其中一處在 listSessionRoster（排在 pii_log_access 之後）",
-    fnOf("listSessionRoster").indexOf('from("event_registrations")') >
-      fnOf("listSessionRoster").indexOf('rpc("pii_log_access"') &&
-      fnOf("listSessionRoster").includes('rpc("pii_log_access"'),
-  );
-  checkTrue(
-    "另一處在 loadOrderAttendeesForAdminNotify（店家通知信）",
-    fnOf("loadOrderAttendeesForAdminNotify").includes('from("event_registrations")'),
-  );
+  for (const n of ["listSessionRoster", "loadRosterExport", "loadOrderAttendeesForAdminNotify"]) {
+    checkTrue(`其中一處在 ${n}`, fnOf(n).includes('from("event_registrations")'));
+  }
+  for (const n of ["listSessionRoster", "loadRosterExport"]) {
+    checkTrue(
+      `🔴 ${n} 不寫 pii_access_log（業主 2026-10-26）`,
+      !/pii_log_access|\.rpc\(/.test(fnOf(n)),
+    );
+  }
 }
 // COLUMNS 常數裡不可以有裸的 email / phone。
 const columnsLine = (regRepoTs.match(/const ROSTER_COLUMNS =[\s\S]*?;/) ?? [""])[0];
@@ -1097,20 +1099,17 @@ check(
   false,
 );
 
-// ── 明文只有兩個出口，而且都走 RPC ───────────────────────────────────────
-checkTrue(
-  "repo 有 revealRegistrationContact",
-  /export async function revealRegistrationContact/.test(regRepoTs),
-);
-checkTrue("repo 有 exportEventRoster", /export async function exportEventRoster/.test(regRepoTs));
-checkTrue("reveal 走 rpc", /rpc\("reveal_registration_contact"/.test(regRepoTs));
-checkTrue("export 走 rpc", /rpc\("export_event_roster"/.test(regRepoTs));
+// ── 2026-10-26：repo 不再呼叫任何 RPC ────────────────────────────────────
+// reveal_registration_contact()／export_event_roster() 仍在資料庫裡（沒有 drop），只是
+// 沒人呼叫；接回來就又會每匯出一次寫一筆紀錄。
+check("repo 沒有 revealRegistrationContact", /revealRegistrationContact/.test(regRepoTs), false);
+check("repo 沒有 exportEventRoster", /exportEventRoster/.test(regRepoTs), false);
 check(
-  "repo 的 rpc 呼叫就是那三支（reveal／export／名單頁的 pii_log_access），沒有第四支",
+  "repo 沒有任何 rpc 呼叫（名單／匯出都不寫紀錄）",
   (stripTs(regRepoTs).match(/\.rpc\(/g) ?? []).length,
-  3,
-  "多一支讀明文的路就是多一條不留痕的路",
+  0,
 );
+checkTrue("repo 有 loadRosterExport", /export async function loadRosterExport\(/.test(regRepoTs));
 // 報名資料只由 SQL 函式寫（0020 §2 的不變量在這一期照樣成立）。
 check("repo 沒有 insert", /\.insert\(/.test(regRepoTs), false);
 check("repo 沒有 delete", /\.delete\(/.test(regRepoTs), false);
@@ -1120,9 +1119,10 @@ check("repo 沒有 update", /\.update\(/.test(regRepoTs), false);
 checkTrue("repo 有 loadPaidRoster", /export async function loadPaidRoster/.test(regRepoTs));
 checkTrue("loadPaidRoster 用 on_roster 過濾", /\.eq\("on_roster", true\)/.test(regRepoTs));
 check(
-  "只有一支查詢在過濾 on_roster",
+  // queryPaidRoster（簽到表／提醒信）與 loadRosterExport（CSV）——條件都是 view 的 on_roster。
+  "過濾 on_roster 的查詢剛好兩支（簽到表、CSV），都用 view 的 on_roster",
   (stripTs(regRepoTs).match(/\.eq\("on_roster", true\)/g) ?? []).length,
-  1,
+  2,
 );
 checkTrue(
   "countRegistrationsBySession 也讀 on_roster（不是自己再判斷一次付款狀態）",
@@ -1156,8 +1156,12 @@ check(
 
 // ── server fn 那一層 ─────────────────────────────────────────────────────
 checkTrue(
-  "四支既有 fn 都掛 staffFnMiddleware()",
-  (regFnTs.match(/\.middleware\(\[staffFnMiddleware\(\)\]\)/g) ?? []).length === 4,
+  // 2026-10-26：revealRegistrationContact 已移除；exportSessionRoster 多掛只讀標記。
+  "三支既有 fn 都掛 staffFnMiddleware()（匯出那支另加 readOnlyFnMiddleware）",
+  (regFnTs.match(/\.middleware\(\[staffFnMiddleware\(\)\]\)/g) ?? []).length === 2 &&
+    /exportSessionRoster = createServerFn\(\{ method: "POST" \}\)\s*\.middleware\(\[staffFnMiddleware\(\), readOnlyFnMiddleware\]\)/.test(
+      regFnTs,
+    ),
 );
 // ⚠️ 0035 加了第五支 fn（deleteAdminRegistration），刻意掛 adminFnMiddleware 不是
 // staffFnMiddleware()——移除是會永久改變資料的動作，授權層級與上面四支「查看」不
@@ -1169,7 +1173,11 @@ checkTrue(
 // 兩種方向都會轉紅。
 check(
   "middleware 的掛載數 = 匯出的 server fn 數（staffFnMiddleware() ＋ adminFnMiddleware 一起算）",
-  (regFnTs.match(/\.middleware\(\[(staffFnMiddleware\(\)|adminFnMiddleware)\]\)/g) ?? []).length,
+  (
+    regFnTs.match(
+      /\.middleware\(\[(staffFnMiddleware\(\)(, readOnlyFnMiddleware)?|adminFnMiddleware)\]\)/g,
+    ) ?? []
+  ).length,
   (regFnTs.match(/export const \w+ = createServerFn/g) ?? []).length,
 );
 check(
@@ -1178,9 +1186,9 @@ check(
   1,
 );
 check(
-  "四支既有 fn 都檢查 event.roster.read（移除那支不需要——admin 已經是最高權限）",
+  "三支既有 fn 都檢查 event.roster.read（移除那支不需要——admin 已經是最高權限）",
   (stripTs(regFnTs).match(/requireRosterRead\(context\.staff\.permissions\)/g) ?? []).length,
-  4,
+  3,
 );
 checkTrue(
   "deleteAdminRegistration 沒有呼叫 requireRosterRead（adminFnMiddleware 已經是完整授權）",
@@ -1192,10 +1200,7 @@ checkTrue(
 );
 // ⚠️ 事由由動作決定，不由前端送（0021 §1）。
 check("fn 的 inputValidator 沒有 reason 欄位", /reason:/.test(stripTs(regFnTs)), false);
-checkTrue(
-  "reason 寫死在 repo",
-  /p_reason: "attendee_contact"/.test(regRepoTs) && /p_reason: "roster_export"/.test(regRepoTs),
-);
+check("repo 不再送任何 p_reason（不寫紀錄）", /p_reason:/.test(stripTs(regRepoTs)), false);
 
 // ── CSV 是 server fn，不是 HTTP 路由 ─────────────────────────────────────
 console.log("\n[11] CSV 不是 HTTP 路由");
@@ -1284,12 +1289,16 @@ check(
   /RegistrationRevealDialog/.test(routeTs + rosterPageTs + rosterTableTs + rosterRouteTs),
   false,
 );
-checkTrue("名單說明告訴使用者會留下紀錄", /都會留下一筆刪不掉的存取紀錄/.test(rosterPageTs));
-checkTrue(
-  "名單把這次查閱的 log_id 印出來",
-  /這次查閱的紀錄編號/.test(rosterPageTs) && /setRosterLogId\(log_id\)/.test(rosterPageTs),
+// 2026-10-26（業主撤掉查看紀錄）：畫面不再講「會留下紀錄」、不再印紀錄編號。
+check(
+  "名單頁不再提存取紀錄／紀錄編號／log_id",
+  /存取紀錄|紀錄編號|log_id/.test(stripTs(rosterPageTs)),
+  false,
 );
-checkTrue("匯出成功的 toast 也印 log_id", /紀錄編號 \$\{log_id\}/.test(rosterPageTs));
+checkTrue(
+  "匯出成功的 toast 只講人數",
+  /toast\.success\(`已匯出 \$\{count\} 位`\)/.test(rosterPageTs),
+);
 checkTrue("沒有權限時匯出鈕 disabled", /!canReadRoster/.test(rosterPageTs));
 checkTrue(
   "權限來自 route context 而不是 loader 資料",

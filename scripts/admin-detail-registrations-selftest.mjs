@@ -10,9 +10,9 @@
  *   [1] 三個網址都在、列表連得進去。
  *   [2] loader：每個 route 只叫一支 fn（getEventSessionPageData），GET＋staffFnMiddleware()
  *       ＋event.roster.read（與原本彈窗的資料來源 getAdminRegistrationsPageData 相同）。
- *   [3] 🔴 個資紀錄：listSessionRoster()（每呼叫一次先寫一筆 pii_access_log）不在任何 loader、
- *       不在整頁 fn 裡；只在名單頁元件掛載時呼叫一次；連到名單頁的 Link 一律 preload={false}；
- *       移除報名之後不重打名單。
+ *   [3] 名單（業主 2026-10-26 撤掉查看紀錄）：listSessionRoster() 不寫 pii_access_log，
+ *       放在名單頁（index route）自己的 loader（30 秒快取、Link 滑過預載）；整頁 fn（/edit 也用）
+ *       仍不含個資；權限 staffFnMiddleware()＋event.roster.read 不變；移除報名後 invalidate 重抓。
  *   [4] 表單：useUnsavedChangesGuard＋guard.dialog＋allowLeave；票種對話框改到一半也算 dirty；
  *       只在掛載時初始化（key={sessionId}）；存檔後 invalidate 再回上一頁／列表。
  *   [5] 舊彈窗拆乾淨；列表沒有 loader 資料的 useState 副本；刪除確認仍是 AlertDialog。
@@ -161,10 +161,22 @@ console.log("\n[2] loader：一支 fn、授權與原本相同");
     "layout loader 先檢查 isUuid，不是就回 { data: null }",
     /if \(!isUuid\(params\.sessionId\)\) return \{ data: null \};/.test(src(LAYOUT)),
   );
-  checkTrue(
-    "名單頁與編輯頁沒有自己的 loader（共用 layout）",
-    !/loader:/.test(src(ROSTER)) && !/loader:/.test(src(EDIT)),
-  );
+  checkTrue("編輯頁沒有自己的 loader（共用 layout）", !/loader:/.test(src(EDIT)));
+  {
+    const loader = between(src(ROSTER), "loader: async", "\n  },");
+    const calls = [...loader.matchAll(/await (\w+)\(\{/g)].map((m) => m[1]);
+    check("名單頁的 loader 只叫 listSessionRoster", calls, ["listSessionRoster"]);
+    checkTrue(
+      "名單頁 loader 先檢查 isUuid",
+      /if \(!isUuid\(params\.sessionId\)\) return \{ roster: null, rosterError: null \};/.test(
+        loader,
+      ),
+    );
+    checkTrue(
+      "名單頁 loader 沒有自訂 staleTime（沿用後台 30 秒預設）",
+      !/staleTime/.test(src(ROSTER)),
+    );
+  }
   for (const f of [LAYOUT, NEW])
     checkTrue(`${f}：head() 標題含「小時光書店後台」`, /小時光書店後台/.test(src(f)));
   checkTrue(
@@ -174,7 +186,7 @@ console.log("\n[2] loader：一支 fn、授權與原本相同");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-console.log("\n[3] 🔴 個資紀錄：名單每次打開寫一筆，不被預載／重抓／invalidate 觸發");
+console.log("\n[3] 名單：不寫查看紀錄、放進 loader、權限不變");
 {
   const fns = src(FNS);
   const decl = between(fns, "export const getEventSessionPageData", "\n  });");
@@ -186,12 +198,11 @@ console.log("\n[3] 🔴 個資紀錄：名單每次打開寫一筆，不被預�
     "event_registrations",
   ]) {
     checkTrue(
-      `🔴 整頁 fn 不碰 ${bad}（loader 資料不含個資）`,
+      `整頁 fn 不碰 ${bad}（/edit 共用的 loader 資料不含個資）`,
       decl.length > 200 && !decl.includes(bad),
     );
   }
 
-  // 整個 src/routes 底下沒有任何地方呼叫 listSessionRoster（loader、beforeLoad、元件都不行）。
   const routeFiles = [];
   const walk = (dir) => {
     for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
@@ -200,89 +211,64 @@ console.log("\n[3] 🔴 個資紀錄：名單每次打開寫一筆，不被預�
       else if (/\.tsx?$/.test(e.name)) routeFiles.push(rel);
     }
   };
-  walk("src/routes");
+  walk("src");
   check(
-    "🔴 src/routes 底下沒有任何檔案呼叫 listSessionRoster",
-    routeFiles.filter((f) => /listSessionRoster/.test(src(f))),
-    [],
+    "全站（fns／repo 以外）只有名單頁的 route 呼叫 listSessionRoster()",
+    routeFiles
+      .filter((f) => /listSessionRoster\(\{/.test(src(f)))
+      .filter((f) => !f.startsWith("src/lib/admin/fns/") && !f.startsWith("src/server/")),
+    [ROSTER],
   );
-  const callers = [];
-  const walkAll = (dir) => {
-    for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
-      const rel = `${dir}/${e.name}`;
-      if (e.isDirectory()) walkAll(rel);
-      else if (/\.tsx?$/.test(e.name) && /listSessionRoster\(\{/.test(src(rel))) callers.push(rel);
-    }
-  };
-  walkAll("src");
-  // fns 與 repo 本身（定義與轉呼叫）不算「畫面上的呼叫端」。
-  check(
-    "🔴 全站（fns／repo 以外）只有名單頁呼叫 listSessionRoster()",
-    callers.filter((f) => !f.startsWith("src/lib/admin/fns/") && !f.startsWith("src/server/")),
-    [ROSTER_PAGE],
+
+  const regFns = src("src/lib/admin/fns/event-registrations.ts");
+  const listDecl = between(regFns, "export const listSessionRoster", "\n  });");
+  checkTrue(
+    "🔴 listSessionRoster：GET＋staffFnMiddleware()（只讀，不清後台快取）",
+    /export const listSessionRoster = createServerFn\(\{ method: "GET" \}\)\s*\.middleware\(\[staffFnMiddleware\(\)\]\)/.test(
+      regFns,
+    ),
   );
+  checkTrue(
+    "🔴 listSessionRoster：handler 第一件事是 requireRosterRead（event.roster.read）",
+    /\.handler\(async \(\{ data, context \}\) => \{\s*await requireRosterRead\(context\.staff\.permissions\);/.test(
+      listDecl,
+    ),
+  );
+  const repo = src("src/server/repos/event-registrations.ts");
+  checkTrue("🔴 repo 不再呼叫 pii_log_access", !/pii_log_access/.test(repo));
 
   const page = src(ROSTER_PAGE);
-  check("名單頁只呼叫一次", (page.match(/listSessionRoster\(\{/g) ?? []).length, 1);
-  const effect = between(page, "const startedRef = useRef(false);", "}, []);");
   checkTrue(
-    "🔴 名單在掛載時的 effect 裡讀（deps 是 []）",
-    effect.includes("listSessionRoster({") && page.includes("}, []);"),
+    "名單頁元件自己不打 listSessionRoster（資料從 loader 來）",
+    !/listSessionRoster/.test(page),
   );
+  checkTrue("名單頁沒有掛載時讀名單的 effect", !/useEffect|startedRef/.test(page));
+  checkTrue("畫面不再印紀錄編號", !/log_id|紀錄編號|存取紀錄/.test(page));
   checkTrue(
-    "🔴 startedRef 擋住同一次掛載跑第二次（StrictMode）",
-    /if \(startedRef\.current\) return;\s*startedRef\.current = true;/.test(effect),
-  );
-  checkTrue(
-    "名單頁的 route 用 key={data.session.id}：換場次＝重新掛載＝新的一筆；invalidate 不重新掛載",
+    "名單頁的 route 用 key={data.session.id}",
     /<SessionRosterPage\s+key=\{data\.session\.id\}/.test(src(ROSTER)),
   );
-  checkTrue(
-    "畫面印出這次的紀錄編號",
-    /setRosterLogId\(log_id\)/.test(page) && /這次查閱的紀錄編號/.test(page),
-  );
 
-  // 連到名單頁（不是 /edit）的每一個 Link 都要 preload={false}。
   const linkSources = [];
-  walkAll2("src");
-  function walkAll2(dir) {
-    for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
-      const rel = `${dir}/${e.name}`;
-      if (e.isDirectory()) walkAll2(rel);
-      else if (/\.tsx$/.test(e.name)) {
-        const s = src(rel);
-        for (const m of s.matchAll(
-          /<Link\b[^>]*?to="\/admin\/registrations\/\$sessionId"[^>]*>/g,
-        )) {
-          linkSources.push([rel, m[0]]);
-        }
-      }
+  for (const rel of routeFiles.filter((f) => f.endsWith(".tsx"))) {
+    for (const m of src(rel).matchAll(
+      /<Link\b[^>]*?to="\/admin\/registrations\/\$sessionId"[^>]*>/g,
+    )) {
+      linkSources.push([rel, m[0]]);
     }
   }
   checkTrue("找得到連到名單頁的 Link", linkSources.length >= 1);
   for (const [rel, tag] of linkSources) {
-    checkTrue(`🔴 ${rel}：連到名單頁的 Link 是 preload={false}`, /preload=\{false\}/.test(tag));
+    checkTrue(
+      `${rel}：連到名單頁的 Link 滑過就預載（preload="intent"）`,
+      /preload="intent"/.test(tag),
+    );
   }
-  checkTrue(
-    "沒有用 navigate／redirect 自動帶進名單頁（只有人點才開）",
-    !routeFiles.some((f) =>
-      /(navigate|redirect)\(\{\s*to: "\/admin\/registrations\/\$sessionId",/.test(src(f)),
-    ),
-  );
 
-  // 移除報名之後：本地濾掉＋invalidate，不重打名單。
-  const onRemoved = between(page, "onRemoved={async (registrationId) => {", "}}");
+  const onRemoved = between(page, "onRemoved={async () => {", "}}");
   checkTrue(
-    "移除後本地濾掉那一列",
-    /prev\.filter\(\(r\) => r\.registration_id !== registrationId\)/.test(onRemoved),
-  );
-  checkTrue(
-    "移除後 router.invalidate()（列表數字更新）",
+    "移除後 router.invalidate()（loader 重抓名單＋列表數字）",
     /await router\.invalidate\(\)/.test(onRemoved),
-  );
-  checkTrue(
-    "🔴 移除後不重打 listSessionRoster",
-    onRemoved.length > 30 && !/listSessionRoster/.test(onRemoved),
   );
   checkTrue(
     "移除確認仍是 AlertDialog",

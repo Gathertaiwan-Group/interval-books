@@ -1126,32 +1126,45 @@ checkTrue(
     /\$\{error\.code\} \$\{error\.message\}/.test(regRepoTs),
 );
 
-// --- 名單頁的明文一定先留紀錄（業主 2026-10-25）-----------------------------
-// 名單頁從「遮罩＋單筆揭露」改成直接顯示明文。守的事變成：listSessionRoster()
-// **先**呼叫 pii_log_access()、成功了才讀 event_registrations 的明文。
-console.log("\n[13] 名單頁的明文一定先留紀錄");
+// --- 名單頁與 CSV 匯出不寫查看紀錄（業主 2026-10-26）--------------------------
+// 業主：「報名名單每打開一次就記一筆查看紀錄 >> 這功能移除」。守的事變成：名單頁與
+// 匯出都直接讀明文、不碰 pii_log_access／export_event_roster，但權限檢查一個都沒少。
+console.log("\n[13] 名單頁與 CSV 匯出不寫查看紀錄、權限不變");
 {
   const code = stripTs(regRepoTs);
   const fnStart = code.indexOf("export async function listSessionRoster(");
   checkTrue("反空殼：找得到 listSessionRoster", fnStart > 0);
   const fnBody = code.slice(fnStart, code.indexOf("\nexport ", fnStart + 10));
-  const logAt = fnBody.indexOf('rpc("pii_log_access"');
-  const plainAt = fnBody.indexOf('from("event_registrations")');
-  checkTrue("🔴 listSessionRoster 呼叫 pii_log_access", logAt > 0);
-  checkTrue("listSessionRoster 讀 event_registrations 的明文", plainAt > 0);
-  checkTrue("🔴 紀錄寫在讀明文之前", logAt > 0 && plainAt > logAt);
   checkTrue(
-    "🔴 紀錄寫失敗就 throw（不會繼續讀明文）",
-    /if \(logError[\s\S]{0,400}throw new Error/.test(fnBody.slice(logAt, plainAt)),
+    "listSessionRoster 讀 event_registrations 的明文",
+    /from\("event_registrations"\)/.test(fnBody),
   );
+  checkTrue("🔴 listSessionRoster 不呼叫 pii_log_access", !/pii_log_access|\.rpc\(/.test(fnBody));
+  const exStart = code.indexOf("export async function loadRosterExport(");
+  checkTrue("反空殼：找得到 loadRosterExport", exStart > 0);
+  const exBody = code.slice(exStart);
   checkTrue(
-    "紀錄的對象是場次、事由 attendee_contact",
-    /p_subject_table: "public\.event_sessions"/.test(fnBody) &&
-      /p_reason: "attendee_contact"/.test(fnBody),
+    "🔴 loadRosterExport 不寫紀錄、不走 export_event_roster",
+    !/pii_log_access|\.rpc\(/.test(exBody),
   );
+  checkTrue("loadRosterExport 只取 on_roster", /\.eq\("on_roster", true\)/.test(exBody));
+  checkTrue("🔴 repo 整個檔案不再有 rpc 呼叫", !/\.rpc\(/.test(code));
+  const fnCode = stripTs(regFnTs);
+  for (const n of ["listSessionRoster", "exportSessionRoster", "countRegistrationsBySession"]) {
+    const d = fnCode.slice(fnCode.indexOf(`export const ${n} =`));
+    checkTrue(
+      `🔴 ${n}：staffFnMiddleware()＋handler 第一件事 requireRosterRead`,
+      /^export const \w+ = createServerFn\(\{ method: "\w+" \}\)\s*\.middleware\(\[staffFnMiddleware\(\)/.test(
+        d,
+      ) &&
+        /\.handler\(async \(\{[^}]*context[^}]*\}\) => \{\s*await requireRosterRead\(context\.staff\.permissions\);/.test(
+          d.slice(0, 600),
+        ),
+    );
+  }
   checkTrue(
-    "actor 由 fn 從 session 帶進來（context.staff）",
-    /actorUserId: context\.staff\.userId/.test(regFnTs),
+    "revealRegistrationContact 已移除（沒有畫面在用）",
+    !/revealRegistrationContact/.test(fnCode + code),
   );
 }
 // RegistrationRosterRow 這個對外型別現在**有**明文 email / phone（讀之前已寫紀錄）。
@@ -1170,23 +1183,13 @@ checkTrue("反空殼：切出來的片段包含最後一個欄位", /on_roster/.
 checkTrue("對外型別有明文 email 欄位", /^\s+email: string \| null;/m.test(rosterType));
 checkTrue("對外型別有明文 phone 欄位", /^\s+phone: string \| null;/m.test(rosterType));
 
-// ── 0021 開了那兩條明文出口 ────────────────────────────────────────────────
-//
-// ⚠️ 這兩條在 Phase 1 是反過來寫的（`, false`），而那就是當時的設計意圖：
-//    **明文出口不可以在沒有 pii_access_log 的情況下先上線。** 0021 §5／§6 建了那
-//    兩支會留痕的函式、§1 加了對應的 reason，所以現在翻面。
-//
-//    翻面之後這兩條仍然有意義：它們守著「repo 真的走那兩支 SQL 函式」，而不是
-//    某天有人加一條 `.select("email, phone")` 就把明文撈出來 —— 那條路不會留痕。
-//    下面「明文只有兩個出口」那一段是同一件事的另一半。
+// ── 0021 的兩支 SQL 出口（reveal_registration_contact／export_event_roster）──────
+// 2026-10-26 起程式不再呼叫（業主撤掉名單查看紀錄；資料庫裡的函式沒有 drop）。
 checkTrue(
-  "0021 之後有 reveal 出口（會留痕）",
-  /reveal_registration_contact/.test(stripTs(regRepoTs)),
+  "repo 不呼叫 reveal_registration_contact／export_event_roster",
+  !/reveal_registration_contact|export_event_roster/.test(stripTs(regRepoTs)),
 );
-checkTrue(
-  "0021 之後有 CSV 匯出（會留痕）",
-  /export_event_roster/.test(stripTs(regRepoTs)) && /roster-csv/.test(stripTs(regFnTs)),
-);
+checkTrue("CSV 仍由 roster-csv 組", /roster-csv/.test(stripTs(regFnTs)));
 // 報名資料只由 SQL 函式寫，repo 不可以有 insert/delete。
 check("registrations repo 沒有 insert", /\.insert\(/.test(regRepoTs), false);
 check("registrations repo 沒有 delete", /\.delete\(/.test(regRepoTs), false);
@@ -1204,7 +1207,7 @@ check("registrations repo 沒有 delete", /\.delete\(/.test(regRepoTs), false);
 checkTrue(
   // stripTs 先把註解拿掉：檔頭那段講「Phase 1 掛的是 adminFnMiddleware」的說明
   // 不算掛載，但字面上會命中。
-  "registrations 既有四支 fn 掛 staffFnMiddleware",
+  "registrations 既有三支 fn 掛 staffFnMiddleware",
   /staffFnMiddleware/.test(stripTs(regFnTs)),
 );
 checkTrue(
@@ -1215,7 +1218,11 @@ checkTrue(
 );
 check(
   "middleware 的掛載數 = 匯出的 server fn 數（registrations；staff＋admin 一起算）",
-  (regFnTs.match(/\.middleware\(\[(staffFnMiddleware\(\)|adminFnMiddleware)\]\)/g) ?? []).length,
+  (
+    regFnTs.match(
+      /\.middleware\(\[(staffFnMiddleware\(\)(, readOnlyFnMiddleware)?|adminFnMiddleware)\]\)/g,
+    ) ?? []
+  ).length,
   (regFnTs.match(/export const \w+ = createServerFn/g) ?? []).length,
 );
 check(

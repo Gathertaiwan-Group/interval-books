@@ -65,7 +65,8 @@ const MIG_0035 = join(MIG_DIR, "0035_admin_order_registration_cleanup.sql");
 const SHELL_PATH = join(ROOT, "src/routes/admin/_shell.tsx");
 // 2026-10-25 後台第 2 批：名單從 _shell.registrations.tsx 的彈窗改成內頁
 // /admin/registrations/$sessionId。移除按鈕＋確認框在 SessionRosterTable.tsx，
-// 「成功後從本地名單濾掉＋invalidate」在 SessionRosterPage.tsx。守的不變量不變。
+// 「成功後 invalidate」在 SessionRosterPage.tsx（2026-10-26 名單改由 loader 讀、不寫查閱
+// 紀錄，invalidate 會連名單一起重抓，不再需要本地濾掉）。
 const REG_ROUTE_PATH = join(ROOT, "src/components/admin/SessionRosterTable.tsx");
 const REG_PAGE_PATH = join(ROOT, "src/components/admin/SessionRosterPage.tsx");
 const REG_REPO_PATH = join(ROOT, "src/server/repos/event-registrations.ts");
@@ -560,19 +561,11 @@ console.log("\n[11] 🔴 名單頁的移除按鈕與確認對話框");
     "成功（reason === deleted）時才通知名單頁 onRemoved(這一列)",
     /await onRemoved\(removeTarget\.registration_id\)/.test(deletedBranch),
   );
-  const onRemovedSrc = sliceBetween(regPageSrc, "onRemoved={async (registrationId) => {", "}}");
-  checkTrue("抓得到名單頁的 onRemoved", onRemovedSrc.length > 30);
+  const onRemovedSrc = sliceBetween(regPageSrc, "onRemoved={async () => {", "}}");
+  checkTrue("抓得到名單頁的 onRemoved", onRemovedSrc.length > 10);
   checkTrue(
-    "🔴 成功時把這一列從本地 roster state 濾掉（不整個重打 listSessionRoster）",
-    /prev\.filter\(\(r\) => r\.registration_id !== registrationId\)/.test(onRemovedSrc),
-  );
-  checkTrue(
-    "🔴 成功時 router.invalidate()（外層場次表的名額／報名數要跟著換）",
+    "🔴 成功時 router.invalidate()（名單 loader 與外層場次表的名額／報名數一起重抓）",
     /await router\.invalidate\(\)/.test(onRemovedSrc),
-  );
-  checkTrue(
-    "🔴 移除後不重打 listSessionRoster（不多寫一筆查閱紀錄）",
-    !/listSessionRoster/.test(onRemovedSrc),
   );
 
   const alertSrc = sliceBetween(regRouteSrc, "open={removeTarget !== null}", "</AlertDialog>");

@@ -14,9 +14,9 @@
  *    型別是 type-only import（編譯後整行消失），所以它不會把 server 端的模組
  *    圖拉進 client bundle。
  *
- * ⚠️ 這份資料是**明文**。它的來源只有一個：public.export_event_roster()，而那一支
- *    在同一個交易裡先寫了一筆 pii_access_log 才把值交出來（0021 §6）。這個檔案
- *    本身不做任何授權，也不該做 —— 它拿到列的時候，紀錄已經寫下去了。
+ * ⚠️ 這份資料是**明文**。它的來源只有一個：repos/event-registrations.ts 的
+ *    loadRosterExport()（業主 2026-10-26 起不寫查閱紀錄）。這個檔案本身不做任何授權，
+ *    也不該做 —— 授權在 fns/event-registrations.ts 的 requireRosterRead()。
  */
 import type { CsvColumn } from "@/lib/csv";
 import type { RosterExportRow } from "@/server/repos/event-registrations";

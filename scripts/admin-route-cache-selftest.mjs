@@ -438,6 +438,8 @@ console.log("\n[3b] 只讀的 POST fn 標記（readOnlyFnMiddleware）");
       "listProductMovements",
     ],
     "inv-combos": ["listAdminComboSets"],
+    // 2026-10-26：業主撤掉報名名單的查看紀錄，CSV 匯出（POST、按鈕觸發）變成只讀。
+    "event-registrations": ["exportSessionRoster"],
     "inv-purchases": ["listAdminPurchases", "getPurchaseSummary", "searchPurchaseProducts"],
     pos: ["findPosProductByBarcode", "listPosSales", "listStockAlerts"],
   };
@@ -473,10 +475,13 @@ console.log("\n[3b] 只讀的 POST fn 標記（readOnlyFnMiddleware）");
   const expected = Object.entries(READ_ONLY)
     .flatMap(([f, ns]) => ns.map((n) => `${f}:${n}:POST:after-auth`))
     .sort();
-  check("🔴 只有這 15 支只讀 fn 掛了標記（放在授權 middleware 後面）", all.sort(), expected);
-  for (const n of ["listSessionRoster", "readVendorSensitive"]) {
-    checkTrue(`🔴 ${n}（會寫查閱紀錄）沒有標成只讀`, !all.some((x) => x.includes(`:${n}:`)));
-  }
+  check("🔴 只有這 16 支只讀 fn 掛了標記（放在授權 middleware 後面）", all.sort(), expected);
+  // readVendorSensitive 仍會寫查閱紀錄（廠商身分證／匯款帳戶），不可以標成只讀。
+  // listSessionRoster 2026-10-26 起不寫紀錄，改成 GET（不需要標記）。
+  checkTrue(
+    "🔴 readVendorSensitive（會寫查閱紀錄）沒有標成只讀",
+    !all.some((x) => x.includes(":readVendorSensitive:")),
+  );
   C.resetAdminRouteCacheForTests();
   check("沒登記過的 fn 不算只讀", C.isReadOnlyServerFn("abc"), false);
   C.markReadOnlyServerFn("abc");

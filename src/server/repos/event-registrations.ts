@@ -16,21 +16,19 @@
  *      （順帶：Phase 1 那份 TS 遮罩有一個真 bug。`v.slice(-keepTail)` 在
  *      keepTail=0 時等於 `v.slice(0)`，`ab@x.com` 會遮成 `a*ab@x.com`。0021 §2 有寫。）
  *
- *   2. **明文的出口，每一個都一定留下紀錄。**（業主 2026-10-25：名單頁直接顯示明文）
- *      listSessionRoster()         → 先 public.pii_log_access()（場次、attendee_contact），
- *                                    成功了才讀 event_registrations 的 email／phone
- *      revealRegistrationContact() → public.reveal_registration_contact()
- *      exportEventRoster()         → public.export_event_roster()
- *      後兩支 SQL 函式都在同一個交易裡**先寫一筆 public.pii_access_log 再組值**
- *      （0019 §4.1 的形狀）；listSessionRoster() 在 TypeScript 這一側照同一個順序：
- *      紀錄寫失敗就 throw，明文那句查詢根本不會發出去。
+ *   2. **名單頁與 CSV 匯出直接讀明文，不寫查閱紀錄。**（業主 2026-10-26：「報名名單每打開
+ *      一次就記一筆查看紀錄 >> 這功能移除」）
+ *      listSessionRoster()  → 直接讀 admin_event_roster＋event_registrations 的 email／phone
+ *      loadRosterExport()   → 同上，只取 on_roster 的列，給 CSV 匯出
+ *      授權（staffFnMiddleware＋event.roster.read）仍在 src/lib/admin/fns/event-registrations.ts。
  *
- *      唯一不寫紀錄的明文讀取是 loadOrderAttendeesForAdminNotify()：那是系統把參加者
- *      資料寫進**店家自己的通知信**，不是有人在後台查這個人（0019 §1.1 的線），業主
- *      2026-10-25 明確決定通知信不留紀錄。
+ *      ⚠️ 資料庫裡的 public.export_event_roster() 與 public.reveal_registration_contact()
+ *         還在（沒有 DDL 權限、也不需要 drop），只是程式不再呼叫——**不要接回來**，
+ *         接回來就又會每匯出一次寫一筆 pii_access_log。
+ *      ⚠️ 廠商那一側（repos/inv-vendors.ts 的身分證／匯款帳戶「完整號碼」）**照舊**先寫
+ *         pii_access_log 再讀，業主這次只撤了報名名單。
  *
- *      ⚠️ **不要在這個檔案裡再加一支讀明文的函式而不寫紀錄。** 稽核軌跡只要有一條
- *         旁路就等於沒有（0019 對 repos/inv-vendors.ts 的原話）。
+ *      店家通知信 loadOrderAttendeesForAdminNotify() 本來就不寫紀錄（業主 2026-10-25）。
  *
  *   3. **console.error 只印 error.code 與 error.message，不印整包 error。**
  *      PostgREST 會把 Postgres 的 `DETAIL: Failing row contains (…)` 一路傳回來，
@@ -59,8 +57,8 @@
  *
  * 三個消費端，各自走哪裡（**不要寫成「三邊都走 loadPaidRoster」，那不是實話**）：
  *
- *   名單頁     → listSessionRoster()：回**全部**報名（明文，先寫一筆紀錄），畫面自己用 on_roster 分。
- *   CSV 匯出   → SQL 的 export_event_roster()：它自己 `where v.on_roster`。
+ *   名單頁     → listSessionRoster()：回**全部**報名（明文），畫面自己用 on_roster 分。
+ *   CSV 匯出   → loadRosterExport()：`.eq("on_roster", true)`。
  *   Phase 3    → loadPaidRoster()：目前**零呼叫端**，是為提醒信預留的。
  *   店家通知信 → loadOrderAttendeesForAdminNotify()：一張訂單的**全部**報名（明文），
  *               不篩 on_roster（待收款那封寄出時還沒付款）。不是簽到表。
@@ -105,7 +103,7 @@ export type RosterViewRow = {
   on_roster: boolean;
 };
 
-/** 名單頁看得到的一列。**email／phone 是明文**（業主 2026-10-25），讀之前已寫紀錄。 */
+/** 名單頁看得到的一列。**email／phone 是明文**（業主 2026-10-25；2026-10-26 起不寫紀錄）。 */
 export type RegistrationRosterRow = {
   registration_id: string;
   session_id: string;
@@ -129,19 +127,7 @@ export type RegistrationRosterRow = {
   on_roster: boolean;
 };
 
-/** reveal_registration_contact() 的回傳。**這裡面是明文。** */
-export type RegistrationContact = {
-  registration_id: string;
-  session_id: string;
-  seat_no: number;
-  /** 這一次查閱的 pii_access_log id。畫面會把它印出來。 */
-  log_id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-};
-
-/** export_event_roster() 回的一列。**這裡面是明文。** */
+/** CSV 匯出的一列（欄位與舊的 SQL export_event_roster() 相同）。**這裡面是明文。** */
 export type RosterExportRow = {
   registration_id: string;
   seat_no: number;
@@ -154,84 +140,36 @@ export type RosterExportRow = {
   created_at: string;
 };
 
-/** export_event_roster() 的整包回傳。 */
+/** loadRosterExport() 的整包回傳。 */
 export type RosterExport = {
   session_id: string;
   session_title: Localized;
   starts_at: string;
   capacity: number;
   seats_taken: number;
-  log_id: string;
   rows: RosterExportRow[];
 };
 
 /**
- * 一個場次的名單，**明文**聯絡方式。
- *
- * 🔴 順序是結構：**先**呼叫 public.pii_log_access() 寫一筆紀錄（subject 是場次
- *    public.event_sessions、reason 'attendee_contact'、fields name／email／phone，與
- *    export_event_roster() 同一個粒度：一次開名單＝一筆，不是每位參加者一筆），
- *    紀錄寫成功之後才發出讀 event_registrations 明文的那句查詢。紀錄寫失敗就
- *    throw，明文一個字都不會讀出來。
+ * 一個場次的名單，**明文**聯絡方式。不寫 pii_access_log（業主 2026-10-26）。
  *
  * ⚠️ 回的是**所有**報名，包含未付款與已取消的訂單，而且每一列都帶著
  *    `payment_status` 與 `on_roster` 讓畫面自己分 —— 後台需要看得到「有 3 個位子
  *    被未付款的訂單押著」。
  *
  * 權限檢查不在這裡，在 src/lib/admin/fns/event-registrations.ts（那一層才拿得到
- * session，actor 只認 context.staff）。
+ * session）。
  */
-export async function listSessionRoster(input: {
-  actorUserId: string;
-  actorEmail: string;
-  sessionId: string;
-}): Promise<{ rows: RegistrationRosterRow[]; log_id: string }> {
+export async function listSessionRoster(sessionId: string): Promise<RegistrationRosterRow[]> {
   const db = supabaseAdmin();
-
-  // 紀錄的 subject_label 抄一份場次名稱（同 export_event_roster()）：場次哪天被改名或
-  // 刪了，稽核軌跡還讀得懂是哪一場。場次表沒有個資，先讀它不違反「先記再讀」。
-  const { data: sessionRow, error: sessionError } = await db
-    .from("event_sessions")
-    .select("title")
-    .eq("id", input.sessionId)
-    .maybeSingle();
-  if (sessionError) {
-    console.error(
-      `[repo/event-registrations] roster 讀場次失敗：${sessionError.code} ${sessionError.message}`,
-    );
-    throw new Error(`[repo/event-registrations] roster 讀場次失敗：${sessionError.code}`);
-  }
-  const sessionTitle = (sessionRow as { title?: { zh?: unknown } } | null)?.title?.zh;
-
-  const { data: logId, error: logError } = await db.rpc("pii_log_access", {
-    p_actor_user_id: input.actorUserId,
-    p_actor_email: input.actorEmail,
-    p_subject_table: "public.event_sessions",
-    p_subject_id: input.sessionId,
-    p_subject_label: typeof sessionTitle === "string" ? sessionTitle : null,
-    // 與 export_event_roster() 相同：畫面上顯示的就是這三欄。
-    p_fields: ["name", "email", "phone"],
-    p_reason: "attendee_contact",
-    p_access_kind: "staff",
-  });
-  if (logError || typeof logId !== "string" || logId === "") {
-    if (logError) {
-      console.error(
-        `[repo/event-registrations] roster 稽核紀錄寫入失敗：${logError.code} ${logError.message}`,
-      );
-    }
-    throw new Error("[repo/event-registrations] 稽核紀錄寫入失敗，名單未讀取");
-  }
-
-  // 紀錄已經寫了，才讀明文。兩句互不相依，一起送。
   const [viewRes, plainRes] = await Promise.all([
     db
       .from("admin_event_roster")
       .select(ROSTER_COLUMNS)
-      .eq("session_id", input.sessionId)
+      .eq("session_id", sessionId)
       .order("created_at", { ascending: true })
       .order("seat_no", { ascending: true }),
-    db.from("event_registrations").select("id, email, phone").eq("session_id", input.sessionId),
+    db.from("event_registrations").select("id, email, phone").eq("session_id", sessionId),
   ]);
 
   if (viewRes.error) {
@@ -256,7 +194,7 @@ export async function listSessionRoster(input: {
     contact.set(r.id, { email: blankToNull(r.email), phone: blankToNull(r.phone) });
   }
 
-  const rows = ((viewRes.data ?? []) as unknown as RosterViewRow[]).map((v) => {
+  return ((viewRes.data ?? []) as unknown as RosterViewRow[]).map((v) => {
     const c = contact.get(v.registration_id);
     return {
       registration_id: v.registration_id,
@@ -275,7 +213,6 @@ export async function listSessionRoster(input: {
       on_roster: v.on_roster,
     };
   });
-  return { rows, log_id: logId };
 }
 
 function blankToNull(v: unknown): string | null {
@@ -296,13 +233,11 @@ function blankToNull(v: unknown): string | null {
  *   兩邊一致才不會發生『有人收到提醒卻不在簽到表上』。」
  * 那句話在那邊是註解，在這裡是結構。
  *
- * 回的仍然是**遮罩過的**列：知道「有誰」不需要看到聯絡方式。要明文就走
- * exportEventRoster()，而那會留下一筆紀錄。
+ * 回的仍然是**遮罩過的**列：知道「有誰」不需要看到聯絡方式。
  *
  * ⚠️ Phase 3 的信**不需要**明文 —— 排信只送 registration_id 進去，地址由
  *    0022 §7 的 enqueue_registration_emails() 在資料庫裡 join。所以「寄信」這件事
- *    完全不必經過那兩個會寫 pii_access_log 的出口，而那是對的：系統為了寄信而
- *    使用地址，與「有人在查這個人的資料」不是同一件事（0019 §1.1 的線）。
+ *    完全不必經過名單頁或 CSV 匯出。
  */
 async function queryPaidRoster(
   column: "session_id" | "order_id",
@@ -327,9 +262,8 @@ async function queryPaidRoster(
  * 簽到表：這一場**會來的人**。活動前 24 小時的提醒信用這一支決定寄給誰
  * （src/server/notify.ts 的 runSessionReminders）。
  *
- * 畫面走 listSessionRoster()（它要看得到未付款的列），CSV 走 SQL 的
- * export_event_roster()（它自己 `where v.on_roster`）。三邊共用的是 view 上那個
- * on_roster 欄位。
+ * 畫面走 listSessionRoster()（它要看得到未付款的列），CSV 走 loadRosterExport()
+ * （`.eq("on_roster", true)`）。三邊共用的是 view 上那個 on_roster 欄位。
  */
 export async function loadPaidRoster(sessionId: string): Promise<RosterViewRow[]> {
   return queryPaidRoster("session_id", sessionId);
@@ -430,72 +364,95 @@ export async function countRegistrationsBySession(): Promise<
 }
 
 /**
- * 一位參加者的完整聯絡方式。
+ * 整場的明文名單（只含 on_roster 的列），給 CSV 匯出用。不寫 pii_access_log
+ * （業主 2026-10-26）。
  *
- * ⚠️ **呼叫這一支就等於留下一筆 pii_access_log。** 那不是副作用，是它一半的工作：
- *    0021 §5 的函式先寫紀錄再組值，兩件事在同一個交易裡。
- *
- * ⚠️ 權限檢查不在這裡，在 src/lib/admin/fns/event-registrations.ts（那一層才拿得到
- *    session）。這一層假設呼叫端已經檢查過 —— 與 src/server/repos/** 的整體約定
- *    一致（見 lib/admin/middleware.ts 檔頭）。
- *
- * ⚠️ 錯誤訊息**不轉譯也不吞**，但也不印回傳值：這支函式回的東西就是個資本身。
- */
-export async function revealRegistrationContact(input: {
-  actorUserId: string;
-  actorEmail: string;
-  registrationId: string;
-}): Promise<RegistrationContact> {
-  const { data, error } = await supabaseAdmin().rpc("reveal_registration_contact", {
-    p_actor_user_id: input.actorUserId,
-    p_actor_email: input.actorEmail,
-    p_registration_id: input.registrationId,
-    p_reason: "attendee_contact",
-  });
-
-  if (error) {
-    console.error(`[repo/event-registrations] reveal 失敗：${error.code} ${error.message}`);
-    throw new Error(speak(error.message, "聯絡方式讀取失敗"));
-  }
-  return data as unknown as RegistrationContact;
-}
-
-/**
- * 整場的明文名單（只含 on_roster 的列），給 CSV 匯出用。
- *
- * ⚠️ 一次呼叫 = **一筆** pii_access_log，subject 是**場次**不是每一位參加者
- *    （0021 §0.1）。拆成每人一筆會讓「有人一次帶走了整場名單」這個真正重要的
- *    資訊在稽核畫面上看不見。
+ * 欄位、排序（created_at, seat_no）、只取 on_roster、姓名取 event_registrations 本表，
+ * 都與資料庫裡那支已經不用的 public.export_event_roster() 一致，CSV 一欄都沒變。
  *
  * ⚠️ 整份名單會進到這個 Node 行程的記憶體。那是「CSV 做成 server fn 而不是 HTTP
- *    路由」的代價，而書店一場 20–60 人可以忽略。換來的是
- *    src/lib/admin/fns/event-registrations.ts 檔頭那一段：登入頁的 HTML 被存成
- *    roster.csv 這件事在結構上不可能發生。
+ *    路由」的代價，而書店一場 20–60 人可以忽略。
  */
-export async function exportEventRoster(input: {
-  actorUserId: string;
-  actorEmail: string;
-  sessionId: string;
-}): Promise<RosterExport> {
-  const { data, error } = await supabaseAdmin().rpc("export_event_roster", {
-    p_actor_user_id: input.actorUserId,
-    p_actor_email: input.actorEmail,
-    p_session_id: input.sessionId,
-    p_reason: "roster_export",
-  });
+export async function loadRosterExport(sessionId: string): Promise<RosterExport> {
+  const db = supabaseAdmin();
+  const [sessionRes, viewRes, plainRes] = await Promise.all([
+    db
+      .from("event_sessions")
+      .select("id, title, starts_at, capacity, seats_taken")
+      .eq("id", sessionId)
+      .maybeSingle(),
+    db
+      .from("admin_event_roster")
+      .select("registration_id, seat_no, notice_ack_at, order_no, paid_at, created_at")
+      .eq("session_id", sessionId)
+      .eq("on_roster", true)
+      .order("created_at", { ascending: true })
+      .order("seat_no", { ascending: true }),
+    db.from("event_registrations").select("id, name, email, phone").eq("session_id", sessionId),
+  ]);
 
-  if (error) {
-    console.error(`[repo/event-registrations] export 失敗：${error.code} ${error.message}`);
-    throw new Error(speak(error.message, "名單匯出失敗"));
+  for (const [label, res] of [
+    ["場次", sessionRes],
+    ["名單", viewRes],
+    ["聯絡方式", plainRes],
+  ] as const) {
+    if (res.error) {
+      console.error(
+        `[repo/event-registrations] export ${label}失敗：${res.error.code} ${res.error.message}`,
+      );
+      throw new Error("名單匯出失敗");
+    }
   }
-  return data as unknown as RosterExport;
-}
+  const session = sessionRes.data as {
+    id: string;
+    title: Localized;
+    starts_at: string;
+    capacity: number;
+    seats_taken: number;
+  } | null;
+  if (!session) throw new Error("找不到這個場次");
 
-/**
- * 把 PL/pgSQL 的 `PREFIX: 中文訊息` 剝成給店員看的那一句（與 repos/inv-vendors.ts
- * 的同名函式一模一樣，刻意沒有共用 —— 兩個檔案的錯誤前綴各自演進）。
- */
-function speak(message: string, fallback: string): string {
-  const m = /[A-Z_]+:\s*(.+)/.exec(message ?? "");
-  return m ? m[1].trim() : fallback;
+  const plain = new Map<string, { name: string; email: string | null; phone: string | null }>();
+  for (const r of (plainRes.data ?? []) as {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+  }[]) {
+    plain.set(r.id, { name: r.name, email: r.email, phone: r.phone });
+  }
+
+  const rows: RosterExportRow[] = [];
+  for (const v of (viewRes.data ?? []) as unknown as {
+    registration_id: string;
+    seat_no: number;
+    notice_ack_at: string | null;
+    order_no: string;
+    paid_at: string | null;
+    created_at: string;
+  }[]) {
+    // SQL 版是 inner join：event_registrations 沒有對應的列就不出現。
+    const p = plain.get(v.registration_id);
+    if (!p) continue;
+    rows.push({
+      registration_id: v.registration_id,
+      seat_no: v.seat_no,
+      name: p.name,
+      email: p.email,
+      phone: p.phone,
+      notice_ack_at: v.notice_ack_at,
+      order_no: v.order_no,
+      paid_at: v.paid_at,
+      created_at: v.created_at,
+    });
+  }
+
+  return {
+    session_id: session.id,
+    session_title: session.title,
+    starts_at: session.starts_at,
+    capacity: session.capacity,
+    seats_taken: session.seats_taken,
+    rows,
+  };
 }

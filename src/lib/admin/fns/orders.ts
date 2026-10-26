@@ -39,8 +39,8 @@ export const getAdminOrderDetail = createServerFn({ method: "GET" })
 /**
  * 標記一張訂單已收款（呼叫 0034 §5 的 admin_mark_order_paid()）。
  *
- * p_actor_id 只認 context.admin.userId —— 與 event-registrations.ts 的
- * revealRegistrationContact() 同一個立場：「是誰做的」不能由呼叫端在 data 裡宣稱，
+ * p_actor_id 只認 context.admin.userId —— 與 inv-vendors.ts 的
+ * readVendorSensitive() 同一個立場：「是誰做的」不能由呼叫端在 data 裡宣稱，
  * 只能從已經驗證過的 session 讀。data 裡因此**沒有** actorId 這個欄位。
  *
  * 只有 reason==='marked' 才代表這一次呼叫真的讓一筆新的付款生效，才順手觸發付款
