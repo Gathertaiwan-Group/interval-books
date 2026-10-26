@@ -63,6 +63,11 @@ export type OutgoingEmail = {
   subject: string;
   text: string;
   html: string;
+  /**
+   * 這一封信自己的回信地址，蓋過 MAIL_REPLY_TO。目前只有異業合作表單用
+   * （src/server/partnership.ts：店家按「回覆」要直接寄給填表人）。沒給就跟過去一樣。
+   */
+  replyTo?: string;
 };
 
 /** 寄件人。⚠️ 網域必須在 Resend 驗證過（intervalbooks.tw 已 verified）。 */
@@ -109,7 +114,7 @@ export async function sendEmail(message: OutgoingEmail): Promise<SendResult> {
     return { outcome: "dry_run", id: null, error: null };
   }
 
-  const replyTo = mailReplyTo();
+  const replyTo = (message.replyTo ?? "").trim() || mailReplyTo();
 
   try {
     const response = await fetch(RESEND_ENDPOINT, {

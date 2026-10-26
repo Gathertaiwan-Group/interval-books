@@ -615,7 +615,11 @@ checkTrue("p.title() 仍然被用到（header_title 沒有變成後台改了沒�
 
 // /about 上不可以再有指回 /contact 的連結（/contact 現在轉回 /about，會變成按了回到自己）
 const aboutLinkTargets = jsxElements(ast.about, "Link").map((e) => strOf(e.props.to));
-check("/about 上沒有任何 <Link>（聯絡改成直接開信）", aboutLinkTargets, []);
+// 2026-10-26：/about 多了一顆連到 /partnership（異業合作）的 <Link>。這條守的是「不要
+// 指回 /contact」，所以白名單只放那一個目標，其他任何 <Link> 仍然會紅。
+check("/about 上的 <Link> 只有異業合作入口（沒有指回 /contact）", aboutLinkTargets, [
+  "/partnership",
+]);
 let mailtoFound = false;
 walk(ast.about.program, (n) => {
   if (n.type !== "TemplateLiteral") return;
@@ -635,6 +639,7 @@ check("/about 區塊順序：我們是誰 → 怎麼來找我們", testIds, [
   "about-story",
   "about-work",
   "about-space",
+  "about-partnership",
   "about-map",
   "about-address",
   "about-transport",

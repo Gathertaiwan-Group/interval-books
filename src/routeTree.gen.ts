@@ -18,6 +18,7 @@ import { Route as CuratedRouteImport } from './routes/curated'
 import { Route as CurationRouteImport } from './routes/curation'
 import { Route as JourneysRouteImport } from './routes/journeys'
 import { Route as NewsRouteImport } from './routes/news'
+import { Route as PartnershipRouteImport } from './routes/partnership'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PublicationsRouteImport } from './routes/publications'
 import { Route as VisitRouteImport } from './routes/visit'
@@ -154,6 +155,11 @@ const JourneysRoute = JourneysRouteImport.update({
 const NewsRoute = NewsRouteImport.update({
   id: '/news',
   path: '/news',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PartnershipRoute = PartnershipRouteImport.update({
+  id: '/partnership',
+  path: '/partnership',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -662,6 +668,7 @@ export interface FileRoutesByFullPath {
   '/curation': typeof CurationRoute
   '/journeys': typeof JourneysRoute
   '/news': typeof NewsRoute
+  '/partnership': typeof PartnershipRoute
   '/privacy': typeof PrivacyRoute
   '/publications': typeof PublicationsRoute
   '/visit': typeof VisitRoute
@@ -765,6 +772,7 @@ export interface FileRoutesByTo {
   '/curation': typeof CurationRoute
   '/journeys': typeof JourneysRoute
   '/news': typeof NewsRoute
+  '/partnership': typeof PartnershipRoute
   '/privacy': typeof PrivacyRoute
   '/publications': typeof PublicationsRoute
   '/visit': typeof VisitRoute
@@ -863,6 +871,7 @@ export interface FileRoutesById {
   '/curation': typeof CurationRoute
   '/journeys': typeof JourneysRoute
   '/news': typeof NewsRoute
+  '/partnership': typeof PartnershipRoute
   '/privacy': typeof PrivacyRoute
   '/publications': typeof PublicationsRoute
   '/visit': typeof VisitRoute
@@ -968,6 +977,7 @@ export interface FileRouteTypes {
     | '/curation'
     | '/journeys'
     | '/news'
+    | '/partnership'
     | '/privacy'
     | '/publications'
     | '/visit'
@@ -1071,6 +1081,7 @@ export interface FileRouteTypes {
     | '/curation'
     | '/journeys'
     | '/news'
+    | '/partnership'
     | '/privacy'
     | '/publications'
     | '/visit'
@@ -1168,6 +1179,7 @@ export interface FileRouteTypes {
     | '/curation'
     | '/journeys'
     | '/news'
+    | '/partnership'
     | '/privacy'
     | '/publications'
     | '/visit'
@@ -1272,6 +1284,7 @@ export interface RootRouteChildren {
   CurationRoute: typeof CurationRoute
   JourneysRoute: typeof JourneysRoute
   NewsRoute: typeof NewsRoute
+  PartnershipRoute: typeof PartnershipRoute
   PrivacyRoute: typeof PrivacyRoute
   PublicationsRoute: typeof PublicationsRoute
   VisitRoute: typeof VisitRoute
@@ -1359,6 +1372,13 @@ declare module '@tanstack/react-router' {
       path: '/news'
       fullPath: '/news'
       preLoaderRoute: typeof NewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/partnership': {
+      id: '/partnership'
+      path: '/partnership'
+      fullPath: '/partnership'
+      preLoaderRoute: typeof PartnershipRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -2256,6 +2276,7 @@ const rootRouteChildren: RootRouteChildren = {
   CurationRoute: CurationRoute,
   JourneysRoute: JourneysRoute,
   NewsRoute: NewsRoute,
+  PartnershipRoute: PartnershipRoute,
   PrivacyRoute: PrivacyRoute,
   PublicationsRoute: PublicationsRoute,
   VisitRoute: VisitRoute,

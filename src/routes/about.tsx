@@ -25,7 +25,7 @@
  *
  * header_title 沒有變成死欄位：它下移成故事段的標題，仍然是後台改了就會變的那一行。
  */
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { PageShell, PageHeader } from "@/components/PageShell";
 import { useT } from "@/i18n/LanguageContext";
@@ -97,6 +97,19 @@ const PAGE = {
   },
   workTitle: { zh: "我們做的事", en: "What we do", ja: "わたしたちのしごと" },
   spaceTitle: { zh: "空間特色", en: "Inside the space", ja: "空間" },
+  /** 2026-10-26：異業合作頁的入口（不進主導覽列）。 */
+  partnerEyebrow: { zh: "Partnership", en: "Partnership", ja: "Partnership" },
+  partnerTitle: {
+    zh: "想和小時光一起合作？",
+    en: "Want to work with us?",
+    ja: "小時光と協働しませんか？",
+  },
+  partnerBody: {
+    zh: "活動、展覽、選物寄賣、品牌聯名、企業包場、講座與工作坊——歡迎填表告訴我們你的想法。",
+    en: "Events, exhibitions, consignment, brand collaborations, private bookings, talks and workshops — tell us your idea.",
+    ja: "イベント、展示、委託販売、ブランドコラボ、貸切、講座・ワークショップ。アイデアをお聞かせください。",
+  },
+  partnerCta: { zh: "異業合作洽詢", en: "Partnership inquiry", ja: "協働のご相談" },
 };
 
 /**
@@ -362,6 +375,27 @@ function About() {
               </figcaption>
             </figure>
           ))}
+        </div>
+      </section>
+
+      {/* 3.5) 異業合作入口 */}
+      <section className="container-editorial pb-24" data-testid="about-partnership">
+        <div className="border border-border bg-[oklch(0.97_0.012_82)] p-8 md:p-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="max-w-xl">
+            <p className="eyebrow text-2xl">{t(p.block("partnerEyebrow", PAGE.partnerEyebrow))}</p>
+            <h2 className="display mt-3 text-2xl md:text-3xl">
+              {t(p.block("partnerTitle", PAGE.partnerTitle))}
+            </h2>
+            <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+              {t(p.block("partnerBody", PAGE.partnerBody))}
+            </p>
+          </div>
+          <Link
+            to="/partnership"
+            className="self-start md:self-center shrink-0 border border-foreground bg-foreground text-primary-foreground px-6 py-3 text-xs tracking-widest hover:opacity-90 transition-opacity"
+          >
+            {t(p.block("partnerCta", PAGE.partnerCta))}
+          </Link>
         </div>
       </section>
 

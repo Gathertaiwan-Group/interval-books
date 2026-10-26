@@ -91,12 +91,15 @@ export function SiteFooter() {
           <p>
             © {new Date().getFullYear()} {t(ui.footer.rights)}
           </p>
-          <div className="flex gap-5">
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
             <Link to="/account" className="hover-underline">
               {t(ui.footer.account)}
             </Link>
             <Link to="/curation" className="hover-underline">
               {t(ui.nav.curation)}
+            </Link>
+            <Link to="/partnership" className="hover-underline">
+              {t(ui.nav.partnership)}
             </Link>
             <Link to="/privacy" className="hover-underline">
               {t(ui.nav.privacy)}

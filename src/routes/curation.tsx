@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageShell, PageHeader } from "@/components/PageShell";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
@@ -30,6 +30,12 @@ const PAGE = {
     ja: "キュレーションとは並べることではなく、人と物と空間がしばらくのあいだ互いに見つめ合うこと。",
   },
   contactEyebrow: { zh: "Contact", en: "Contact", ja: "Contact" },
+  /** 2026-10-26：合作洽詢改走 /partnership 的表單，Email 留作第二個選項。 */
+  partnershipCta: {
+    zh: "填寫異業合作表單",
+    en: "Start a partnership inquiry",
+    ja: "協働のご相談フォームへ",
+  },
   contact: {
     zh: "合作邀請請以 Email 聯繫，我們會親自回覆。",
     en: "For collaboration, please reach us by email — we'll reply personally.",
@@ -124,12 +130,21 @@ function Curation() {
           <p className="mt-5 text-lg leading-relaxed text-foreground/80">
             {t(p.block("contact", PAGE.contact))}
           </p>
-          <a
-            href={`mailto:${contactEmail}`}
-            className="mt-8 inline-block border border-foreground px-6 py-3 text-xs tracking-widest hover:bg-foreground hover:text-primary-foreground transition-colors"
-          >
-            {contactEmail}
-          </a>
+          <div className="mt-8 flex flex-wrap items-center gap-4">
+            <Link
+              to="/partnership"
+              className="inline-block border border-foreground bg-foreground px-6 py-3 text-xs tracking-widest text-primary-foreground hover:opacity-90 transition-opacity"
+              data-testid="curation-partnership-cta"
+            >
+              {t(p.block("partnershipCta", PAGE.partnershipCta))}
+            </Link>
+            <a
+              href={`mailto:${contactEmail}`}
+              className="inline-block border border-foreground px-6 py-3 text-xs tracking-widest hover:bg-foreground hover:text-primary-foreground transition-colors"
+            >
+              {contactEmail}
+            </a>
+          </div>
         </div>
       </section>
     </PageShell>

@@ -39,6 +39,10 @@ export const UI = {
     // 與上面「九格 → 五格」同一條理由：新 key，不改寫既有的。頭首導覽走圖示
     // （見 SiteHeader.tsx），這個字串目前只當作該圖示的 aria-label／title。
     account: { zh: "我的帳號", en: "My Account", ja: "マイページ" },
+
+    // ── 異業合作頁（2026-10-26）—— 新 key，理由同上。不進主導覽列，只在 footer、
+    //    /about 與 /curation 出現。
+    partnership: { zh: "異業合作", en: "Partnership", ja: "協働のご相談" },
   },
 
   footer: {
