@@ -33,6 +33,7 @@
  * 在信裡變成「上午 11 點」。
  */
 import type { Lang, Localized } from "@/i18n/types";
+import { formatTaipeiDate, formatTaipeiDateTime } from "./taipei-time.ts";
 
 // -----------------------------------------------------------------------------
 // 型別
@@ -511,8 +512,11 @@ const TIME_ZONE = "Asia/Taipei";
 export function formatDateTime(iso: string, lang: Lang): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  const locale = lang === "ja" ? "ja-JP" : lang === "en" ? "en-US" : "zh-TW";
-  return new Intl.DateTimeFormat(locale, {
+  // 中文／日文：「2026/11/06 14:00」由 taipei-time 自己拼，不交給 ICU。
+  // Intl 在 Node 25（ICU 78）日期與時間之間給的是 THIN SPACE（U+2009），其他
+  // runtime 給一般空白——收信的人看不出來，但同一封信在不同機器上排出不同的字。
+  if (lang !== "en") return formatTaipeiDateTime(iso);
+  return new Intl.DateTimeFormat("en-US", {
     timeZone: TIME_ZONE,
     year: "numeric",
     month: "2-digit",
@@ -523,10 +527,27 @@ export function formatDateTime(iso: string, lang: Lang): string {
   }).format(d);
 }
 
-/** 開始～結束。沒有結束時間就只印開始（0020：ends_at 是選填的）。 */
-function formatRange(session: SessionBrief, lang: Lang): string {
+/**
+ * 開始～結束。沒有結束時間就只印開始（0020：ends_at 是選填的）。
+ *
+ * - **同一天（台北）**：結束只印時間 →「2026/11/06 14:00–16:00」。
+ *   業主 2026-10：原本印成「2026/11/06 14:00 – 2026/11/06 16:00」，同一個日期出現兩次。
+ * - **跨日（含跨午夜）**：兩個日期都留 →「2026/11/06 22:00 – 2026/11/07 01:00」，
+ *   只印「22:00–01:00」會讓人以為是同一天凌晨。
+ *
+ * 「同一天」用 formatTaipeiDate 比，時區寫死台北（不看執行環境）；結束時間的
+ * HH:mm 也從 formatTaipeiDateTime 取，它把部分 runtime 午夜給的 "24" 正規化成 "00"。
+ * 任一端解不開就退回舊的完整格式。
+ */
+export function formatRange(session: SessionBrief, lang: Lang): string {
   const start = formatDateTime(session.startsAt, lang);
   if (!session.endsAt) return start;
+  const startDay = formatTaipeiDate(session.startsAt);
+  const endDay = formatTaipeiDate(session.endsAt);
+  const endFull = formatTaipeiDateTime(session.endsAt);
+  if (/^\d{4}\/\d{2}\/\d{2}$/.test(startDay) && startDay === endDay) {
+    return `${start}–${endFull.slice(11)}`;
+  }
   return `${start} – ${formatDateTime(session.endsAt, lang)}`;
 }
 

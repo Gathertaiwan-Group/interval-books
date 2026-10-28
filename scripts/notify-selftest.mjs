@@ -1165,6 +1165,70 @@ if (tpl) {
   );
   check("壞掉的日期回原字串", tpl.formatDateTime("not-a-date", "zh"), "not-a-date");
 
+  // 場次區間（業主 2026-10）：同一天只印一次日期，跨日／跨午夜兩個日期都留。
+  const rangeOf = (startsAt, endsAt, lang = "zh") =>
+    tpl.formatRange({ title: {}, location: {}, startsAt, endsAt }, lang);
+  check(
+    "同一天：2026/11/06 14:00–16:00",
+    rangeOf("2026-11-06T06:00:00Z", "2026-11-06T08:00:00Z"),
+    "2026/11/06 14:00–16:00",
+    "原本印成「2026/11/06 14:00 – 2026/11/06 16:00」，日期重複",
+  );
+  check(
+    "同一天（+08:00 輸入）",
+    rangeOf("2026-10-01T11:00:00+08:00", "2026-10-01T13:00:00+08:00"),
+    "2026/10/01 11:00–13:00",
+  );
+  check(
+    "同一天但 UTC 已跨日（台北 07:00–09:00 = UTC 前一天 23:00 起）：仍算同一天",
+    rangeOf("2026-11-05T23:00:00Z", "2026-11-06T01:00:00Z"),
+    "2026/11/06 07:00–09:00",
+    "要用台北日期比，不是 UTC 日期",
+  );
+  check(
+    "跨午夜：兩個日期都留",
+    rangeOf("2026-11-06T14:00:00Z", "2026-11-06T17:00:00Z"),
+    "2026/11/06 22:00 – 2026/11/07 01:00",
+    "只印 22:00–01:00 會被讀成同一天凌晨",
+  );
+  check(
+    "多日：兩個日期都留",
+    rangeOf("2026-11-06T01:00:00Z", "2026-11-08T09:00:00Z"),
+    "2026/11/06 09:00 – 2026/11/08 17:00",
+  );
+  check("沒有結束時間：只印開始", rangeOf("2026-11-06T06:00:00Z", null), "2026/11/06 14:00");
+  check(
+    "結束時間解不開：退回完整格式，不吞掉原值",
+    rangeOf("2026-11-06T06:00:00Z", "not-a-date"),
+    "2026/11/06 14:00 – not-a-date",
+  );
+  checkTrue(
+    "en 同一天也只印一次日期",
+    /^11\/06\/2026,\s14:00–16:00$/.test(
+      rangeOf("2026-11-06T06:00:00Z", "2026-11-06T08:00:00Z", "en"),
+    ),
+  );
+  {
+    const sameDayTicket = tpl.renderRegistrationTicketEmail(
+      {
+        participantName: "測試",
+        seatNo: 1,
+        orderNo: "IB-202600000002",
+        session: {
+          title: { zh: "海的聲音" },
+          location: { zh: "書店" },
+          startsAt: "2026-11-06T06:00:00Z",
+          endsAt: "2026-11-06T08:00:00Z",
+        },
+      },
+      undefined,
+      "zh",
+    );
+    checkTrue("報名成功信 text 用同日格式", sameDayTicket.text.includes("2026/11/06 14:00–16:00"));
+    checkTrue("報名成功信 html 用同日格式", sameDayTicket.html.includes("2026/11/06 14:00–16:00"));
+    check("報名成功信不再出現重複日期", sameDayTicket.text.includes("2026/11/06 16:00"), false);
+  }
+
   // 三封信都產得出 subject / text / html，而且都不是空的。
   const session = {
     title: { zh: "場次<A>", en: "S<A>", ja: "S<A>" },
@@ -1293,9 +1357,11 @@ check(
 const tplImports = [...stripTs(tplTs).matchAll(/^import\s+(type\s+)?.*from\s+"([^"]+)"/gm)];
 checkTrue("反空殼：抓得到 import 行", tplImports.length >= 1);
 for (const m of tplImports) {
+  // 值 import 只允許同目錄、帶 .ts 副檔名的純函式模組（./taipei-time.ts）：
+  // Node 的 type stripping 解析得到相對路徑，解析不到 @/。
   checkTrue(
-    `email-templates 的 import「${m[2]}」是 type-only`,
-    Boolean(m[1]),
+    `email-templates 的 import「${m[2]}」是 type-only，或是相對路徑的 .ts`,
+    Boolean(m[1]) || /^\.\/[\w-]+\.ts$/.test(m[2]),
     "值 import 會讓 Node 的 type stripping 真的去解析 @/ 路徑",
   );
 }
