@@ -34,6 +34,7 @@
  */
 import type { Lang, Localized } from "@/i18n/types";
 import { formatTaipeiDate, formatTaipeiDateTime } from "./taipei-time.ts";
+import { invoiceStatusLabel } from "./invoice-alerts.ts";
 
 // -----------------------------------------------------------------------------
 // 型別
@@ -1223,4 +1224,154 @@ export function renderOrderShippedEmail(
   });
 
   return { subject: fill(pick(T.subject, lang), vars), text, html };
+}
+
+// -----------------------------------------------------------------------------
+// 發票開不出來的告警（寄給店家，業主 2026-10-28 核准）
+// -----------------------------------------------------------------------------
+
+/**
+ * 一張發票開不出來的訂單。**只有店家看得到的東西**：訂單編號、付款時間、金額、
+ * 最後一次錯誤、嘗試次數、後台連結。不放客人姓名與聯絡方式——要處理的人點進後台
+ * 就看得到，信裡少一份個資副本。
+ */
+export type InvoiceAlertOrder = {
+  orderNo: string;
+  paidAt: string | null;
+  total: number;
+  status: string;
+  retryCount: number;
+  errorMessage: string | null;
+  /** /admin/orders/<id> 的完整網址；SITE_URL 組不出來時為 null。 */
+  adminUrl: string | null;
+};
+
+export type InvoiceAlertInput = {
+  orders: InvoiceAlertOrder[];
+  maxRetries: number;
+  /** 這一封沒列到、下一輪再寄的張數（一封最多列 MAX_ORDERS_PER_ALERT 張）。 */
+  remaining?: number;
+  /** /admin/orders?scope=invoice_problem 的完整網址；組不出來時為 null。 */
+  listUrl: string | null;
+};
+
+/** 錯誤訊息進信件之前：壓成一行、截斷。是給人看的線索，不是完整 log。 */
+function errorSummary(msg: string | null): string {
+  const flat = (msg ?? "").replace(/\s+/g, " ").trim();
+  if (!flat) return "（沒有錯誤訊息）";
+  return flat.length > 200 ? `${flat.slice(0, 200)}…` : flat;
+}
+
+function invoiceAlertRows(o: InvoiceAlertOrder, maxRetries: number, withLink: boolean): Row[] {
+  const rows: Row[] = [
+    { label: "訂單編號", value: o.orderNo },
+    { label: "付款時間", value: o.paidAt ? formatTaipeiDateTime(o.paidAt) : "（未記錄）" },
+    { label: "金額", value: formatMoney(o.total) },
+    { label: "發票狀態", value: invoiceStatusLabel(o.status, o.retryCount, maxRetries) },
+    { label: "已嘗試", value: `${o.retryCount} / ${maxRetries} 次` },
+    { label: "最後錯誤", value: errorSummary(o.errorMessage) },
+  ];
+  if (withLink) {
+    rows.push({ label: "後台", value: o.adminUrl ?? "請登入後台「訂單」搜尋這個編號" });
+  }
+  return rows;
+}
+
+/**
+ * 「處理方式」是一個區塊而不是 outro：outro 的 <p> 沒有 pre-line，換行在 HTML 裡會
+ * 被吃掉；區塊的每一列是獨立的 <tr>。
+ */
+const INVOICE_ALERT_WHAT_TO_DO: { title: string; rows: Row[] } = {
+  title: "處理方式",
+  rows: [
+    {
+      label: "1.",
+      value:
+        "先看「最後錯誤」。出現「IP 錯誤」「unexpected_response」「transport」代表是系統連線設定的問題（光貿白名單或發票中繼），請先請技術人員修好，否則重開也會再失敗。",
+    },
+    {
+      label: "2.",
+      value:
+        "修好之後，到後台這張訂單的內頁，在「發票」區塊按「重新開立發票」。系統會先向光貿查詢這張訂單是否其實已經開過，開過就直接補登號碼，不會重複開立。",
+    },
+    { label: "3.", value: "若是金額不符、統編或載具錯誤，請先確認訂單資料再重新開立。" },
+    {
+      label: "4.",
+      value:
+        "請不要到光貿後台用別的訂單編號手動開同一筆，那樣會開出兩張發票。若已經手動開過，請不要再按重新開立，並告知技術人員補登發票號碼。",
+    },
+  ],
+};
+
+/**
+ * 「發票開立失敗」——自動重試已經停了的那一刻寄。一輪排程最多一封；多張合在一起。
+ * dedupe_key 由 src/lib/invoice-alerts.ts 的 planTerminalAlert() 決定。
+ */
+export function renderInvoiceFailedAdminEmail(input: InvoiceAlertInput): RenderedEmail {
+  const n = input.orders.length;
+  const first = input.orders[0]?.orderNo ?? "";
+  const single = n === 1;
+  const subject = single
+    ? `【小時光書店】發票開立失敗：${first}`
+    : `【小時光書店】發票開立失敗：${first} 等 ${n} 張`;
+  const heading = single
+    ? `訂單 ${first} 的電子發票開不出來`
+    : `${n} 張已付款訂單的電子發票開不出來`;
+  const intro =
+    (single ? "這張訂單已經付款，" : "這些訂單已經付款，") +
+    `但電子發票連續開立失敗，系統已經停止自動重試（上限 ${input.maxRetries} 次）。不處理的話，這${single ? "張" : "些"}訂單會一直沒有發票。` +
+    (input.remaining && input.remaining > 0
+      ? `另外還有 ${input.remaining} 張，會在下一封信列出。`
+      : "");
+
+  const { text, html } = layout({
+    heading,
+    intro,
+    rows: single ? invoiceAlertRows(input.orders[0], input.maxRetries, false) : [],
+    blocks: [
+      ...(single
+        ? []
+        : input.orders.map((o) => ({
+            title: `訂單 ${o.orderNo}`,
+            rows: invoiceAlertRows(o, input.maxRetries, true),
+          }))),
+      INVOICE_ALERT_WHAT_TO_DO,
+    ],
+    link: single
+      ? input.orders[0].adminUrl
+        ? { label: "到後台處理這張訂單", url: input.orders[0].adminUrl }
+        : undefined
+      : input.listUrl
+        ? { label: "到後台查看發票尚未開立的訂單", url: input.listUrl }
+        : undefined,
+    outro: "",
+    signature: "小時光書店後台系統",
+    footerNote:
+      "本信件由系統自動發送給後台「全站設定」的通知收件人，不會寄給客人。同一次失敗只會通知一次；每天早上 9 點另有一封尚未處理清單的提醒。",
+  });
+  return { subject, text, html };
+}
+
+/** 每日彙整——台北 09:00–09:59 的排程，一天最多一封。 */
+export function renderInvoiceDigestAdminEmail(input: InvoiceAlertInput): RenderedEmail {
+  const n = input.orders.length;
+  const subject = `【小時光書店】每日提醒：${n} 張已付款訂單的發票尚未開立`;
+  const { text, html } = layout({
+    heading: `${n} 張已付款訂單的發票尚未開立`,
+    intro:
+      "以下訂單已經付款，但電子發票到現在還沒有開出來（自動重試已停止，或付款超過 24 小時）。處理完之前，每天早上都會收到這封提醒。",
+    rows: [],
+    blocks: [
+      ...input.orders.map((o) => ({
+        title: `訂單 ${o.orderNo}`,
+        rows: invoiceAlertRows(o, input.maxRetries, true),
+      })),
+      INVOICE_ALERT_WHAT_TO_DO,
+    ],
+    link: input.listUrl ? { label: "到後台查看發票尚未開立的訂單", url: input.listUrl } : undefined,
+    outro: "",
+    signature: "小時光書店後台系統",
+    footerNote: "本信件由系統自動發送給後台「全站設定」的通知收件人，不會寄給客人。",
+  });
+  return { subject, text, html };
 }

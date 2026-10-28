@@ -314,3 +314,68 @@ export async function reclaimStaleInvoices(
     stuckSince: (r.stuck_since as string | null) ?? null,
   }));
 }
+
+export type InvoiceReissueState = {
+  orderNo: string;
+  paymentStatus: string;
+  total: number;
+  /** invoices 沒有那一列時是 'missing'（claim 會補建）。 */
+  invoiceStatus: string;
+  retryCount: number;
+};
+
+/** 後台重新開立前的檢查用。查無訂單回 null，資料庫錯誤回 "db_error"。 */
+export async function getInvoiceStateForReissue(
+  orderId: string,
+): Promise<InvoiceReissueState | null | "db_error"> {
+  const { data, error } = await supabaseAdmin()
+    .from("orders")
+    .select("order_no, payment_status, total, invoices(status, retry_count)")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (error) {
+    console.error(`[invoices] reissue state 讀取失敗：${error.code} ${error.message}`);
+    return "db_error";
+  }
+  if (!data) return null;
+  const row = data as unknown as {
+    order_no: string;
+    payment_status: string;
+    total: number | string | null;
+    invoices:
+      | { status: string; retry_count: number | null }
+      | { status: string; retry_count: number | null }[]
+      | null;
+  };
+  const inv = Array.isArray(row.invoices) ? row.invoices[0] : row.invoices;
+  return {
+    orderNo: row.order_no,
+    paymentStatus: row.payment_status,
+    total: Number(row.total ?? 0),
+    invoiceStatus: inv?.status ?? "missing",
+    retryCount: Number(inv?.retry_count ?? 0),
+  };
+}
+
+/**
+ * 後台「重新開立發票」：把 failed 的 retry_count 設回 1，讓 claim 重新放行。
+ *
+ * 只動 status = 'failed' 的那一列（conditional update），所以不會碰到已開立／正在
+ * 開立的列。這**不是第二套鎖**——放不放行打 Amego 仍然只由 claim_invoice_issue()
+ * 決定；這裡只是把「已經停止重試」這個狀態撥回「還可以重試」。設 1 而不是 0 的理由
+ * 見 src/server/invoice-issuer.ts 的 reissueInvoiceForOrder()。
+ *
+ * 回 false 代表資料庫錯誤。0 列受影響（別人剛好已經把它開好或撥回）不算錯誤。
+ */
+export async function resetInvoiceRetriesForReissue(orderId: string): Promise<boolean> {
+  const { error } = await supabaseAdmin()
+    .from("invoices")
+    .update({ retry_count: 1 })
+    .eq("order_id", orderId)
+    .eq("status", "failed");
+  if (error) {
+    console.error(`[invoices] reset retry_count 失敗：${error.code} ${error.message}`);
+    return false;
+  }
+  return true;
+}

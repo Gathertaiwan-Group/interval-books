@@ -100,7 +100,15 @@ export async function handleInvoiceTask(req: Request): Promise<Response> {
   }
 
   const result = await runInvoiceBacklog(20);
-  return json({ ok: true, reclaimed: reclaimed.length, ...result });
+
+  // 補開完之後才檢查告警：這一輪剛燒到上限的單，同一輪就寄得出去（業主 2026-10-28：
+  // 「只要有已付款但發票開不出來的訂單，就寄信通知管理員」）。只寄給店家
+  // （site_settings.notify_emails），去重與每日一封的規則在 src/lib/invoice-alerts.ts。
+  // runInvoiceAlerts() 永不 throw，告警壞掉不影響上面已經做完的補開。
+  const { runInvoiceAlerts } = await import("@/server/invoice-alerts");
+  const alerts = await runInvoiceAlerts();
+
+  return json({ ok: true, reclaimed: reclaimed.length, ...result, alerts });
 }
 
 // ---------------------------------------------------------------------------

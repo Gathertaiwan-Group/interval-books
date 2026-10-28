@@ -13,10 +13,13 @@ export const getAdminTodo = createServerFn({ method: "GET" })
   .handler(async () => {
     const { getAdminTodoCounts, listUpcomingSessions } = await import("@/server/repos/admin-todo");
     const { taipeiWeekWindow } = await import("@/lib/admin/todo");
+    const { loadInvoiceAttentionRows } = await import("@/server/invoice-alerts");
     const { fromIso, toIso } = taipeiWeekWindow(new Date());
-    const [counts, sessions] = await Promise.all([
+    const [counts, sessions, invoiceRows] = await Promise.all([
       getAdminTodoCounts(),
       listUpcomingSessions(fromIso, toIso),
+      // 「N 張已付款訂單的發票尚未開立」橫幅（業主 2026-10-28）。null＝讀取失敗。
+      loadInvoiceAttentionRows(),
     ]);
-    return { counts, sessions };
+    return { counts, sessions, invoiceProblems: invoiceRows === null ? null : invoiceRows.length };
   });

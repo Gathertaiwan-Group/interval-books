@@ -10,17 +10,19 @@
  * 純函式、零 import：selftest 可以直接 import() 這個檔案本人。
  */
 
-export type OrderListScope = "transfer_pending" | "to_ship" | "all";
+export type OrderListScope = "transfer_pending" | "to_ship" | "all" | "invoice_problem";
 
 /**
  * 列表頁的篩選條件，也是詳情頁「回訂單列表」要帶回去的網址參數。
  * transfer_pending 是預設分頁，網址上不寫；archived 只在打開時寫 `archived=1`。
  */
-export type OrderListSearch = { scope?: "to_ship" | "all"; archived?: 1 };
+export type OrderListSearch = { scope?: "to_ship" | "all" | "invoice_problem"; archived?: 1 };
 
 export function parseOrderListSearch(search: Record<string, unknown>): OrderListSearch {
   const out: OrderListSearch = {};
-  if (search.scope === "to_ship" || search.scope === "all") out.scope = search.scope;
+  if (search.scope === "to_ship" || search.scope === "all" || search.scope === "invoice_problem") {
+    out.scope = search.scope;
+  }
   const a = search.archived;
   if (a === 1 || a === "1" || a === true || a === "true") out.archived = 1;
   return out;

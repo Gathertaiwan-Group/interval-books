@@ -37,6 +37,8 @@ import {
 import {
   claimInvoiceIssue,
   failInvoiceIssue,
+  getInvoiceStateForReissue,
+  resetInvoiceRetriesForReissue,
   finishInvoiceIssue,
   getInvoicePrefs,
   getOrderForInvoice,
@@ -212,7 +214,23 @@ export function resolveBuyer(
  * order_post_payment_log.error_message），所以呼叫端不需要另外記；它只需要決定要不要
  * 因此改變自己的回應（webhook 的答案是「不要」）。
  */
-export async function issueInvoiceForOrder(orderId: string): Promise<IssueOutcome> {
+export type IssueOptions = {
+  /**
+   * 後台「重新開立發票」用：不管 attempt 是多少，打 Amego 之前**一定**先查一次這張
+   * 訂單是不是已經開過；查詢本身失敗，**這一次**就不開（記一次可重試的失敗）。
+   *
+   * ⚠️ 這個保證只涵蓋按鈕那一次。之後排程接手時 attempt > 0，同樣會先查，但查詢失敗
+   *    時排程照舊會開——那條路徑的最後一道保險是 Amego 的 OrderId 唯一性（3040171，
+   *    見下面「OrderId 重複」那一段會認領回來），與按鈕之前的自動重試完全相同。
+   *    自動路徑（webhook／排程）不帶這個選項，行為不變。
+   */
+  requireLookup?: boolean;
+};
+
+export async function issueInvoiceForOrder(
+  orderId: string,
+  options: IssueOptions = {},
+): Promise<IssueOutcome> {
   if (!amegoConfigured()) {
     // 刻意不 claim：沒有設定不是這張訂單的問題，claim 下去只會把 retry_count 燒掉，
     // 讓設定補上之後反而開不出來。留在 backlog 裡等設定到位。
@@ -236,7 +254,7 @@ export async function issueInvoiceForOrder(orderId: string): Promise<IssueOutcom
 
   // 拿到 claim 之後，任何路徑都必須走到 finish 或 fail。
   try {
-    return await issueWithClaim(orderId, claim.attempt);
+    return await issueWithClaim(orderId, claim.attempt, options);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[amego] 開票途中發生未預期例外 order=${orderId}`, err);
@@ -245,7 +263,11 @@ export async function issueInvoiceForOrder(orderId: string): Promise<IssueOutcom
   }
 }
 
-async function issueWithClaim(orderId: string, attempt: number): Promise<IssueOutcome> {
+async function issueWithClaim(
+  orderId: string,
+  attempt: number,
+  options: IssueOptions = {},
+): Promise<IssueOutcome> {
   const loaded = await getOrderForInvoice(orderId);
   if (!loaded) {
     await failInvoiceIssue({ orderId, error: "order_not_found", permanent: true });
@@ -259,8 +281,8 @@ async function issueWithClaim(orderId: string, attempt: number): Promise<IssueOu
   }
 
   // ---- 重試前先問 Amego：上一次是不是其實開成功了 ----------------------------
-  // attempt > 0 才問，第一次開票不需要多這一次往返。
-  if (attempt > 0) {
+  // attempt > 0 才問，第一次開票不需要多這一次往返。後台重新開立（requireLookup）一律問。
+  if (attempt > 0 || options.requireLookup) {
     const found = await findInvoiceByOrderId(order.orderNo);
     if (found.ok && found.hit && found.hit.invoiceNumber) {
       console.warn(
@@ -272,6 +294,14 @@ async function issueWithClaim(orderId: string, attempt: number): Promise<IssueOu
         randomCode: found.hit.randomNumber || null,
       });
       return { ok: true, invoiceNumber: found.hit.invoiceNumber, adopted: true };
+    }
+    // 後台重新開立：查不到「有沒有開過」就不開。記一次可重試的失敗、釋放 claim，
+    // 排程下一輪（attempt > 0）會先查再開。
+    if (!found.ok && options.requireLookup) {
+      const msg = `reissue_lookup_failed: ${found.msg}`;
+      console.warn(`[amego] order=${order.orderNo} 重新開立前查詢失敗，這一次不開（${found.msg}）`);
+      await failInvoiceIssue({ orderId, error: msg, permanent: false });
+      return { ok: false, reason: msg, permanent: false };
     }
     // 查詢失敗不阻斷：真的重複開了，Amego 會用 3040171 擋下來，下面有處理。
     if (!found.ok) {
@@ -480,4 +510,75 @@ export async function runInvoiceBacklog(limit = 20): Promise<BacklogRunResult> {
   }
 
   return out;
+}
+
+export type ReissueOutcome =
+  | { reason: "issued" | "adopted"; orderNo: string; invoiceNumber: string }
+  | { reason: "failed"; orderNo: string; message: string; permanent: boolean }
+  /**
+   * 發票**已經開出去了**，只是寫回資料庫失敗。絕不可以讓人以為「沒開成」而去光貿後台
+   * 手動再開一張：這張單會停在 issuing，5 分鐘後被 reclaim 撥回 failed，排程重試時
+   * attempt > 0 會先查到那張發票並補登號碼。
+   */
+  | { reason: "issued_unrecorded"; orderNo: string }
+  | { reason: "locked"; orderNo: string }
+  | {
+      reason: "already_issued" | "voided" | "not_paid" | "zero_total";
+      orderNo: string;
+    }
+  | { reason: "order_not_found" | "not_configured" | "db_error" };
+
+/**
+ * 後台「重新開立發票」——**只給 admin 按**（src/lib/admin/fns/invoices.ts 掛
+ * adminFnMiddleware）。業主 2026-10-28 核准，用來補 2026-09 那 5 張停止重試的單。
+ *
+ * 做三件事，順序是固定的：
+ *   1. 擋掉不該開的：未付款、金額 0（0028）、已開立、已作廢、正在開立中。
+ *   2. failed 的把 retry_count 設回 **1**（不是 0）。設 1 的理由：之後不論是這一次、
+ *      還是排程接手（排程在 attempt > 0 時也會先查），claim 拿到的 attempt 都 > 0，
+ *      **每一條路徑在打 Amego 之前都會先問「是不是已經開過了」**。設 0 的話，排程若
+ *      剛好搶先 claim，會跳過查詢直接開——那時只剩 Amego 的 OrderId 唯一性一道保險。
+ *      自動重試額度因此是 4 次而不是 5 次，可以接受。
+ *   3. 走跟排程**完全相同**的 issueInvoiceForOrder()（claim → 查詢 → 開立 → 記結果），
+ *      只多帶 requireLookup：查不到有沒有開過就不開。
+ *
+ * 冪等：連按兩次、兩個分頁同時按——第二次在 claim 拿到 locked 或 already_issued，
+ * 不會打第二次 Amego。已經開過的單（Amego 那邊有、我們沒記到）會被查詢認回來補登號碼。
+ */
+export async function reissueInvoiceForOrder(
+  orderId: string,
+  actorId: string,
+): Promise<ReissueOutcome> {
+  if (!amegoConfigured()) return { reason: "not_configured" };
+
+  const state = await getInvoiceStateForReissue(orderId);
+  if (state === "db_error") return { reason: "db_error" };
+  if (!state) return { reason: "order_not_found" };
+  const { orderNo } = state;
+
+  if (state.paymentStatus !== "paid") return { reason: "not_paid", orderNo };
+  if (!(state.total > 0)) return { reason: "zero_total", orderNo };
+  if (state.invoiceStatus === "issued") return { reason: "already_issued", orderNo };
+  if (state.invoiceStatus === "voided") return { reason: "voided", orderNo };
+
+  console.warn(
+    `[amego] 後台重新開立 order=${orderNo} actor=${actorId} status=${state.invoiceStatus} retry=${state.retryCount}`,
+  );
+
+  if (state.invoiceStatus === "failed") {
+    const reset = await resetInvoiceRetriesForReissue(orderId);
+    if (!reset) return { reason: "db_error" };
+  }
+
+  const outcome = await issueInvoiceForOrder(orderId, { requireLookup: true });
+  if (outcome.ok) {
+    return {
+      reason: outcome.adopted ? "adopted" : "issued",
+      orderNo,
+      invoiceNumber: outcome.invoiceNumber,
+    };
+  }
+  if (outcome.reason === "locked") return { reason: "locked", orderNo };
+  if (outcome.reason === "issued_but_not_recorded") return { reason: "issued_unrecorded", orderNo };
+  return { reason: "failed", orderNo, message: outcome.reason, permanent: outcome.permanent };
 }

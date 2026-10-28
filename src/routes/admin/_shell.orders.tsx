@@ -27,6 +27,7 @@
 import { createFileRoute, Link, redirect, useRouter, useRouterState } from "@tanstack/react-router";
 import { Landmark, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { InvoiceProblemBanner } from "@/components/admin/InvoiceProblemBanner";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -85,17 +86,25 @@ export const Route = createFileRoute("/admin/_shell/orders")({
   loaderDeps: ({ search }) => ({ scope: scopeOf(search), archived: search.archived === 1 }),
   loader: async ({ deps }) => {
     const { listAdminOrders } = await import("@/lib/admin/fns/orders");
-    const orders = await listAdminOrders({
-      data: { scope: deps.scope, includeArchived: deps.archived },
-    });
-    return { orders, scope: deps.scope, archived: deps.archived };
+    const { getInvoiceProblemSummary } = await import("@/lib/admin/fns/invoices");
+    const [orders, invoiceSummary] = await Promise.all([
+      listAdminOrders({ data: { scope: deps.scope, includeArchived: deps.archived } }),
+      // 橫幅讀失敗不讓整個列表掛掉：回 null，橫幅顯示「讀取失敗」。
+      getInvoiceProblemSummary().catch(() => ({ count: null })),
+    ]);
+    return {
+      orders,
+      scope: deps.scope,
+      archived: deps.archived,
+      invoiceProblems: invoiceSummary.count,
+    };
   },
   head: () => ({ meta: [{ title: "訂單｜小時光書店後台" }] }),
   component: AdminOrdersPage,
 });
 
 function AdminOrdersPage() {
-  const { orders, scope, archived } = Route.useLoaderData();
+  const { orders, scope, archived, invoiceProblems } = Route.useLoaderData();
   const navigate = Route.useNavigate();
   const router = useRouter();
   // 換分頁／切開關時，loader 正在跑的那一段顯示讀取中。
@@ -136,6 +145,9 @@ function AdminOrdersPage() {
         </p>
       </div>
 
+      {/* 已經在「發票尚未開立」分頁上就不再重複一條指向自己的橫幅。 */}
+      {scope === "invoice_problem" ? null : <InvoiceProblemBanner count={invoiceProblems} />}
+
       <div className="flex flex-wrap items-center justify-between gap-4">
         <Tabs
           value={scope}
@@ -147,9 +159,19 @@ function AdminOrdersPage() {
             <TabsTrigger value="transfer_pending">待收款的匯款訂單</TabsTrigger>
             <TabsTrigger value="to_ship">待出貨</TabsTrigger>
             <TabsTrigger value="all">全部訂單</TabsTrigger>
+            <TabsTrigger value="invoice_problem">
+              發票尚未開立{invoiceProblems ? `（${invoiceProblems}）` : ""}
+            </TabsTrigger>
           </TabsList>
         </Tabs>
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+        {/* 「發票尚未開立」本來就不看封存（發票照樣得開），開關在那一頁沒有作用，不顯示。 */}
+        <label
+          className={
+            scope === "invoice_problem"
+              ? "hidden"
+              : "flex items-center gap-2 text-sm text-muted-foreground"
+          }
+        >
           <Switch
             checked={archived}
             onCheckedChange={(v) =>
@@ -188,7 +210,9 @@ function AdminOrdersPage() {
                     ? "目前沒有待收款的匯款訂單"
                     : scope === "to_ship"
                       ? "目前沒有待出貨的訂單"
-                      : "目前沒有訂單"}
+                      : scope === "invoice_problem"
+                        ? "目前沒有發票尚未開立的已付款訂單"
+                        : "目前沒有訂單"}
                 </TableCell>
               </TableRow>
             ) : (

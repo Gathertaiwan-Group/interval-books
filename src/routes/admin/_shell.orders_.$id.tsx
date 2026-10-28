@@ -30,7 +30,7 @@
  */
 import { useState, type ReactNode } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { Archive, ArchiveRestore, Landmark, PackageCheck, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Landmark, PackageCheck, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminDetailNotFound, AdminDetailPage } from "@/components/admin/AdminDetailPage";
 import { Badge } from "@/components/ui/badge";
@@ -78,6 +78,7 @@ import {
   statusBadgeVariant,
   type OrderListSearch,
 } from "@/lib/admin/order-labels";
+import { invoiceStatusLabel } from "@/lib/invoice-alerts";
 // ⚠️ type-only：編譯後整行消失，不會把 server-only 的 repo 模組拉進瀏覽器 bundle。
 import type { AdminOrderDetail } from "@/server/repos/orders-admin";
 
@@ -139,6 +140,9 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
 
   const [fulfillAction, setFulfillAction] = useState<FulfillmentAction | null>(null);
   const [fulfilling, setFulfilling] = useState(false);
+
+  const [reissueConfirmOpen, setReissueConfirmOpen] = useState(false);
+  const [reissuing, setReissuing] = useState(false);
 
   /** 動作做完之後重跑 loader。失敗只代表畫面沒跟上，不是動作失敗。 */
   async function refresh() {
@@ -253,6 +257,71 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
     } finally {
       setDeleting(false);
     }
+  }
+
+  /**
+   * 重新開立發票（業主 2026-10-28）。伺服器那一側（reissueInvoiceForOrder）會先向
+   * Amego 查這張訂單是不是已經開過，開過就補登號碼、不會重開；claim 擋住連按與
+   * 兩個分頁同時按。每一種 reason 各自對應一句話。
+   */
+  async function submitReissue() {
+    setReissuing(true);
+    try {
+      const { reissueInvoiceAdmin } = await import("@/lib/admin/fns/invoices");
+      const r = await reissueInvoiceAdmin({ data: { orderId: detail.id } });
+      switch (r.reason) {
+        case "issued":
+          toast.success(`訂單 ${r.orderNo} 的發票已開立：${r.invoiceNumber}`);
+          break;
+        case "adopted":
+          toast.success(
+            `訂單 ${r.orderNo} 其實已經開過發票（${r.invoiceNumber}），已補登號碼，沒有重複開立`,
+          );
+          break;
+        case "already_issued":
+          toast.info(`訂單 ${r.orderNo} 的發票已經開立，沒有重複處理`);
+          break;
+        case "locked":
+          toast.info(`訂單 ${r.orderNo} 的發票正在開立中，請稍後重新整理查看結果`);
+          break;
+        case "failed":
+          toast.error(
+            `訂單 ${r.orderNo} 的發票仍然開立失敗：${r.message}` +
+              (r.permanent ? "（需要先修正資料或設定）" : "（系統會在 10 分鐘內自動再試）"),
+          );
+          break;
+        case "issued_unrecorded":
+          toast.warning(
+            `訂單 ${r.orderNo} 的發票已經開出，但號碼還沒寫回系統。系統會在 15 分鐘內自動補登，` +
+              "請不要到光貿後台手動再開一張。",
+          );
+          break;
+        case "voided":
+          toast.error(`訂單 ${r.orderNo} 的發票已作廢，不會自動重開`);
+          break;
+        case "not_paid":
+          toast.error(`訂單 ${r.orderNo} 尚未付款，不能開立發票`);
+          break;
+        case "zero_total":
+          toast.error(`訂單 ${r.orderNo} 金額為 0，不開立發票`);
+          break;
+        case "not_configured":
+          toast.error("發票服務尚未設定（光貿金鑰），請聯絡技術人員");
+          break;
+        case "order_not_found":
+          toast.error("找不到這張訂單，可能已被刪除");
+          break;
+        default:
+          toast.error("讀取發票狀態失敗，請稍後再試");
+      }
+      setReissueConfirmOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "重新開立失敗，請稍後再試");
+      return;
+    } finally {
+      setReissuing(false);
+    }
+    await refresh();
   }
 
   /** 封存／取消封存一張已付款訂單（0035，admin_archive_order()）。 */
@@ -393,6 +462,11 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
       </Section>
 
       <Section title="發票">
+        <InvoiceStatusBlock
+          detail={detail}
+          busy={reissuing}
+          onReissue={() => setReissueConfirmOpen(true)}
+        />
         {detail.invoice ? (
           <dl className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-1 text-sm">
             <dt className="text-muted-foreground">類型</dt>
@@ -655,6 +729,37 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog
+        open={reissueConfirmOpen}
+        onOpenChange={(open) => {
+          if (!reissuing) setReissueConfirmOpen(open);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定要重新開立這張訂單的發票？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {`訂單 ${detail.order_no}，金額 ${money(detail.total)}。` +
+                "系統會先向光貿查詢這張訂單是否已經開過發票：開過就直接補登號碼，不會重複開立；" +
+                "沒開過才會開立一張新的電子發票。" +
+                "如果你已經在光貿後台用別的編號手動開過這一筆，請不要按，改請技術人員補登號碼。"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={reissuing}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={reissuing}
+              onClick={(e) => {
+                e.preventDefault();
+                void submitReissue();
+              }}
+            >
+              {reissuing ? "開立中…" : "確定重新開立"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -728,5 +833,84 @@ function FulfillmentSection({
         {ACTION_BUTTON_LABEL[action]}
       </Button>
     </section>
+  );
+}
+
+/**
+ * 發票的開立狀態，以及（需要時）「重新開立發票」按鈕。
+ *
+ * 按鈕只在 detail.invoice_can_reissue（伺服器用 canReissueInvoice() 算）為 true 時出現（已付款、金額 > 0、開立失敗，或付款超過
+ * 24 小時還沒開出來）。真正的邊界在伺服器：reissueInvoiceAdmin 掛 adminFnMiddleware，
+ * reissueInvoiceForOrder 會再擋一次付款狀態、金額與已開立。
+ */
+function InvoiceStatusBlock({
+  detail,
+  busy,
+  onReissue,
+}: {
+  detail: AdminOrderDetail;
+  busy: boolean;
+  onReissue: () => void;
+}) {
+  if (detail.payment_status !== "paid") return null;
+  if (!(detail.total > 0)) {
+    return <p className="text-sm text-muted-foreground">金額為 0 的訂單不開立發票。</p>;
+  }
+  const inv = detail.invoice;
+  const status = inv?.status ?? "missing";
+  const retry = inv?.retry_count ?? 0;
+  const max = detail.invoice_max_retries;
+  // 伺服器算好的（src/server/repos/orders-admin.ts）。不在 render 裡 new Date()：
+  // SSR 與瀏覽器的時鐘不同步時，跨過 24 小時門檻那一刻會 hydration mismatch。
+  const showButton = detail.invoice_can_reissue;
+  const problem = status !== "issued" && status !== "voided";
+
+  return (
+    <div
+      className={
+        showButton
+          ? "mb-3 space-y-2 rounded-md border border-destructive/50 bg-destructive/5 p-3"
+          : "mb-2"
+      }
+    >
+      <dl className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-1 text-sm">
+        <dt className="text-muted-foreground">開立狀態</dt>
+        <dd className={problem ? "font-medium text-destructive" : undefined}>
+          {invoiceStatusLabel(status, retry, max)}
+        </dd>
+        {inv?.invoice_number ? (
+          <>
+            <dt className="text-muted-foreground">發票號碼</dt>
+            <dd className="font-mono">{inv.invoice_number}</dd>
+          </>
+        ) : null}
+        {problem ? (
+          <>
+            <dt className="text-muted-foreground">已嘗試</dt>
+            <dd>
+              {retry} / {max} 次
+            </dd>
+          </>
+        ) : null}
+        {problem && inv?.error_message ? (
+          <>
+            <dt className="text-muted-foreground">最後錯誤</dt>
+            <dd className="break-all font-mono text-xs">{inv.error_message}</dd>
+          </>
+        ) : null}
+      </dl>
+      {showButton ? (
+        <>
+          <p className="text-xs text-muted-foreground">
+            先確認「最後錯誤」的原因已經排除（例如 IP
+            錯誤、中繼設定），再按重新開立。系統會先查詢光貿是否已開過，不會重複開立。
+          </p>
+          <Button variant="destructive" className="gap-1.5" disabled={busy} onClick={onReissue}>
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            重新開立發票
+          </Button>
+        </>
+      ) : null}
+    </div>
   );
 }

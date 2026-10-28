@@ -53,12 +53,14 @@ import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
 import type { Localized } from "@/i18n/types";
 import { TO_SHIP_FILTER } from "@/lib/admin/order-fulfillment";
+import { canReissueInvoice } from "@/lib/invoice-alerts";
+import { INVOICE_MAX_RETRIES } from "@/server/repos/invoices";
 
 // ---------------------------------------------------------------------------
 // 列表
 // ---------------------------------------------------------------------------
 
-export type AdminOrderListScope = "transfer_pending" | "to_ship" | "all";
+export type AdminOrderListScope = "transfer_pending" | "to_ship" | "all" | "invoice_problem";
 
 export type AdminOrderListFilter = {
   scope: AdminOrderListScope;
@@ -118,6 +120,30 @@ const LIST_LIMIT = 300;
 export async function listAdminOrders(filter: AdminOrderListFilter): Promise<AdminOrderListRow[]> {
   let query = supabaseAdmin().from("orders").select(LIST_COLUMNS);
 
+  if (filter.scope === "invoice_problem") {
+    // 發票尚未開立（業主 2026-10-28）：與橫幅、每日彙整信**同一個**定義
+    // （src/lib/invoice-alerts.ts 的 needsInvoiceAttention），橫幅寫 5 張、點進來
+    // 也剛好 5 張。**不看封存**：封存只是把訂單從列表移開，發票照樣得開。
+    const { loadInvoiceAttentionRows } = await import("@/server/invoice-alerts");
+    const rows = await loadInvoiceAttentionRows();
+    if (rows === null) throw new Error("[repo/orders-admin] 發票狀態讀取失敗");
+    if (rows.length === 0) return [];
+    const { data, error } = await query
+      .in(
+        "id",
+        rows.map((r) => r.orderId),
+      )
+      .order("created_at", { ascending: false })
+      .limit(LIST_LIMIT);
+    if (error) {
+      console.error(
+        `[repo/orders-admin] list(invoice_problem) 失敗：${error.code} ${error.message}`,
+      );
+      throw new Error(`[repo/orders-admin] 訂單列表讀取失敗：${error.code}`);
+    }
+    return (data ?? []) as unknown as AdminOrderListRow[];
+  }
+
   if (filter.scope === "transfer_pending") {
     query = query.eq("payment_method", "transfer").neq("payment_status", "paid");
   } else if (filter.scope === "to_ship") {
@@ -160,7 +186,8 @@ const DETAIL_SELECT =
   ORDER_COLUMNS +
   ", order_items(id, name, unit_price, quantity, subtotal, product_type, session_id, event_sessions(title, starts_at))" +
   ", order_addresses(type, recipient, phone, postal_code, city, district, street, cvs_store_id, cvs_store_name, cvs_address, cvs_sub_type)" +
-  ", invoices(invoice_type, tax_id, company_title, carrier_type, carrier_number, love_code)";
+  ", invoices(invoice_type, tax_id, company_title, carrier_type, carrier_number, love_code, " +
+  "status, invoice_number, retry_count, error_message, updated_at)";
 
 export type AdminOrderItemRow = {
   id: number;
@@ -201,9 +228,26 @@ export type AdminOrderInvoice = {
   carrier_type: string | null;
   carrier_number: string | null;
   love_code: string | null;
+  /** pending／issuing／issued／voided／failed（0005 CHECK）。 */
+  status: string;
+  invoice_number: string | null;
+  /** 已嘗試次數；到 INVOICE_MAX_RETRIES 就停止自動重試。 */
+  retry_count: number;
+  /** 最後一次開立失敗的訊息（成功後清空）。 */
+  error_message: string | null;
+  updated_at: string | null;
 };
 
 export type AdminOrderDetail = {
+  /**
+   * 「重新開立發票」按鈕要不要出現——在伺服器算（canReissueInvoice，
+   * src/lib/invoice-alerts.ts），不在畫面 render 裡 new Date()，免得 SSR 與瀏覽器
+   * 時鐘不同步時跨過 24 小時門檻而 hydration mismatch。真正的邊界仍在
+   * reissueInvoiceForOrder()。
+   */
+  invoice_can_reissue: boolean;
+  /** = INVOICE_MAX_RETRIES，畫面顯示「已嘗試 n / 5 次」用。 */
+  invoice_max_retries: number;
   id: string;
   order_no: string;
   created_at: string;
@@ -284,6 +328,11 @@ type InvoiceRawRow = {
   carrier_type: string | null;
   carrier_number: string | null;
   love_code: string | null;
+  status: string;
+  invoice_number: string | null;
+  retry_count: number | null;
+  error_message: string | null;
+  updated_at: string | null;
 };
 
 type OrderDetailRawRow = {
@@ -378,10 +427,24 @@ export async function getAdminOrderDetail(orderId: string): Promise<AdminOrderDe
         carrier_type: blankToNull(inv.carrier_type),
         carrier_number: blankToNull(inv.carrier_number),
         love_code: blankToNull(inv.love_code),
+        status: inv.status,
+        invoice_number: blankToNull(inv.invoice_number),
+        retry_count: Number(inv.retry_count ?? 0),
+        error_message: blankToNull(inv.error_message),
+        updated_at: inv.updated_at ?? null,
       }
     : null;
 
   return {
+    invoice_can_reissue: canReissueInvoice(
+      { paymentStatus: o.payment_status, total: Number(o.total ?? 0), paidAt: o.paid_at },
+      invoice
+        ? { status: invoice.status, retryCount: invoice.retry_count, updatedAt: invoice.updated_at }
+        : null,
+      new Date(),
+      INVOICE_MAX_RETRIES,
+    ),
+    invoice_max_retries: INVOICE_MAX_RETRIES,
     archived_at: o.archived_at,
     id: o.id,
     order_no: o.order_no,
