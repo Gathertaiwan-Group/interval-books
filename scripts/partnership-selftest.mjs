@@ -23,6 +23,7 @@ import {
   singleLine,
   fieldErrorText,
   PARTNERSHIP_TYPES,
+  PARTNERSHIP_BUDGETS,
 } from "../src/lib/partnership.ts";
 import { partnershipSubject, renderPartnershipEmail } from "../src/lib/partnership-email.ts";
 import {
@@ -412,6 +413,86 @@ checkTrue("footer 有入口", read("src/components/SiteFooter.tsx").includes('to
 checkTrue("/about 有入口", read("src/routes/about.tsx").includes('to="/partnership"'));
 checkTrue("/curation 有入口", read("src/routes/curation.tsx").includes('to="/partnership"'));
 checkTrue("/partnership 連回 /curation", route.includes('to="/curation"'));
+
+console.log("\n[8] 收件匣（0042 partnership_inquiries、/admin/partnerships）");
+{
+  const inbox = await import(join(ROOT, "src/lib/partnership-inbox.ts"));
+  const mig = read("supabase/migrations/0042_partnership_inquiries.sql");
+  const repo = read("src/server/repos/partnership-inquiries.ts");
+  const adminFns = read("src/lib/admin/fns/partnerships.ts");
+  const typeList = (mig.match(/type in \(([^)]*)\)/) ?? [])[1] ?? "";
+  check(
+    "migration 的 type CHECK 與 PARTNERSHIP_TYPES 一致",
+    [...typeList.matchAll(/'([^']+)'/g)].map((m) => m[1]),
+    [...PARTNERSHIP_TYPES],
+  );
+  const budgetList = (mig.match(/budget in \(([^)]*)\)/) ?? [])[1] ?? "";
+  check(
+    "migration 的 budget CHECK 與 '' ＋ PARTNERSHIP_BUDGETS 一致",
+    [...budgetList.matchAll(/'([^']*)'/g)].map((m) => m[1]),
+    ["", ...PARTNERSHIP_BUDGETS],
+  );
+  for (const [col, max] of [
+    ["company", LIMITS.company],
+    ["contact_name", LIMITS.name],
+    ["phone", LIMITS.phone],
+    ["website", LIMITS.website],
+    ["timeframe", LIMITS.timeframe],
+  ]) {
+    checkTrue(
+      `migration 的 ${col} 長度上限 = LIMITS（${max}）`,
+      new RegExp(`char_length\\(${col}\\) (between 1 and|<=) ${max}\\s*\\)`).test(mig),
+    );
+  }
+  checkTrue(
+    "migration：message 上限 2000、下限放寬成 1（見檔頭）",
+    mig.includes("char_length(message) between 1 and 2000"),
+  );
+  checkTrue(
+    "migration：RLS 開、anon/authenticated 全收回",
+    mig.includes("enable row level security") && mig.includes("from anon, authenticated"),
+  );
+  check("migration：沒有任何 policy", /create policy/i.test(mig), false);
+
+  // 送出流程：先存、再寄、寄信結果寫回；任一個成功就回 ok。
+  const iInsert = server.indexOf("insertInquiry(values");
+  const iSend = server.indexOf("const sent = await notifyStore(");
+  const iRecord = server.indexOf("recordEmailResult(inquiryId");
+  checkTrue("server：先 insert 再寄信再寫回", iInsert > 0 && iInsert < iSend && iSend < iRecord);
+  checkTrue(
+    "server：資料落地或信寄出任一個成功就回 ok",
+    server.includes("if (sent.ok || inquiryId) return { ok: true };"),
+  );
+  checkTrue("server：insert 失敗只記 log、照樣寄信", /存進收件匣失敗，改為只寄信/.test(server));
+  checkTrue(
+    "server：蜜罐在 insert 之前就 return（機器人不落地）",
+    server.indexOf("honeypotTripped(") < iInsert,
+  );
+  checkTrue(
+    "repo：admin_note／status 只由後台更新",
+    repo.includes("export async function updateInquiry("),
+  );
+  check(
+    "admin fns：每一支都掛 adminFnMiddleware",
+    (adminFns.match(/createServerFn\(/g) ?? []).length,
+    (adminFns.match(/\.middleware\(\[adminFnMiddleware\]\)/g) ?? []).length,
+  );
+
+  check("篩選：不帶 → 未處理", inbox.parseInquiryFilter(undefined), "new");
+  check("篩選：亂值 → 未處理", inbox.parseInquiryFilter("drop table"), "new");
+  check("篩選：all", inbox.parseInquiryFilter("all"), "all");
+  check(
+    "回信 mailto：主旨預填且編碼",
+    inbox.replyMailto({ email: "a.b+c@example.com", type: "event", company: "山與海" }),
+    `mailto:a.b+c@example.com?subject=${encodeURIComponent("Re: 【異業合作】活動合作｜山與海")}`,
+  );
+  check(
+    "回信 mailto：地址帶 ? & 之類會改寫參數的字元 → 不產生",
+    inbox.replyMailto({ email: "x@example.com?cc=evil@example.com", type: "event", company: "a" }),
+    null,
+  );
+  check("預算標籤：空字串＝未填", inbox.inquiryBudgetLabel(""), "未填");
+}
 
 console.log(`\n${"─".repeat(52)}`);
 console.log(`##SELFTEST## file=${SELF} pass=${pass} fail=${fail}`);

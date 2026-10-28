@@ -16,6 +16,8 @@ import {
   ClipboardList,
   FileText,
   Handshake,
+  Inbox,
+  KeyRound,
   Landmark,
   LayoutDashboard,
   LogOut,
@@ -211,6 +213,9 @@ const NAV_GROUPS = [
       // lucide's `Route` icon would collide with this file's `export const Route`.
       { to: "/admin/journeys", label: "策旅", icon: Tent, staff: false },
       { to: "/admin/collaborations", label: "合作", icon: Handshake, staff: false },
+      // /partnership 表單的收件匣（0042）。staff: false，真正擋人的是
+      // src/lib/admin/fns/partnerships.ts 的 adminFnMiddleware。
+      { to: "/admin/partnerships", label: "異業合作", icon: Inbox, staff: false },
       { to: "/admin/categories", label: "活動分類", icon: Tags, staff: false },
       { to: "/admin/pages", label: "頁面文案", icon: FileText, staff: false },
     ],
@@ -266,6 +271,8 @@ const NAV_GROUPS = [
       // （見 _shell.staff.tsx 檔頭）；這裡只是不要給店員一個一按就跳錯誤頁
       // 的連結。
       { to: "/admin/staff", label: "後台人員", icon: Users, staff: false },
+      // 誰在 Claude 連著這個後台（MCP OAuth，0043）。同樣是「誰能用這個後台」，所以放這一組。
+      { to: "/admin/mcp-connections", label: "Claude 連線授權", icon: KeyRound, staff: false },
     ],
   },
 ] as const;

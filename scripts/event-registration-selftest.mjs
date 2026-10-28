@@ -378,7 +378,12 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 0041（選品連結商品）只在 curated_items 加一個 references public.products(id) on delete
   // set null 的 nullable 欄位——帳本因此標了 products_availability。它不改 products 的任何
   // 欄位、約束、函式或 RLS，不碰庫存、名額、訂單或報名；這支自檢的斷言重讀過，原樣成立。
-  reviewedThrough: "0041_curated_item_product_link.sql",
+  // 0042（異業合作收件匣）不碰這支自檢依賴的任何區域。
+  // 0043（MCP OAuth 狀態）在 cron_jobs 區只**新增**一個 job ib_mcp_oauth_used_codes_purge
+  // （'17 3 * * *'，只刪 public.mcp_oauth_used_codes 的過期列）。既有的 expire-unpaid-orders、
+  // dispatch-invoice-task、dispatch-notify-task 的名稱、排程與指令都沒動；第 17 分鐘也不在
+  // */5 與 3-53/10、6-56/10 任何一個 tick 上。這支自檢的斷言重讀過，原樣成立。
+  reviewedThrough: "0043_mcp_oauth_state.sql",
 });
 for (const f of [
   "0004_commerce_products.sql",

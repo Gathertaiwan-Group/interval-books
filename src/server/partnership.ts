@@ -2,17 +2,21 @@
  * 異業合作表單（/partnership）的伺服器端：發 token、驗證、限流、寄信給店家。
  *
  * ── 送出的流程 ────────────────────────────────────────────────────────────
- *   蜜罐有填        → 假裝成功（回 ok，不寄、不告訴機器人哪裡露餡），log 一行
+ *   蜜罐有填        → 假裝成功（回 ok，不寄、不存、不告訴機器人哪裡露餡），log 一行
  *   token 不對／太舊 → expired（請重新整理）
  *   不到 3 秒       → too_fast
  *   同 IP 10 分鐘內第 4 次 → rate_limited；整個 instance 一小時第 31 次也是
  *   欄位不合格      → invalid（只回欄位名稱）
- *   沒有收件人／寄失敗／這個環境沒設 Resend → send_failed，log `[partnership]`
- *   寄出            → ok
+ *   通過            → **先存進 partnership_inquiries（0042）**，再寄信給店家，寄信結果
+ *                     （email_status／email_id／email_error）寫回同一列
  *
- * ⚠️ 只有「Resend 回 2xx」才算成功。dry run（沒有 RESEND_API_KEY 或 MAIL_FROM）在
- *    這裡算**失敗**——交易信走 outbox，dry run 記成 skipped 之後還看得到；這裡不落地，
- *    回 ok 就等於告訴客人「已收到」而店家什麼都沒收到。
+ *   回 ok 的條件：**資料落地了，或信寄出去了**（任一個）。
+ *     · 存成功、信沒寄出 → ok（後台 /admin/partnerships 看得到，email_status=failed）
+ *     · 存失敗、信寄出   → ok（不丟 lead；log `[partnership]`）
+ *     · 兩個都失敗       → send_failed，log `[partnership]`
+ *
+ * ⚠️ 只有「Resend 回 2xx」才算寄出。dry run（沒有 RESEND_API_KEY 或 MAIL_FROM）在這裡算
+ *    **沒寄出**——資料也沒存到的話，回 ok 就等於告訴客人「已收到」而店家什麼都沒收到。
  *
  * ── 收件人 ───────────────────────────────────────────────────────────────
  * site_settings.notify_emails（後台 /admin/settings「通知信收件人」，逗號分隔），與
@@ -23,9 +27,9 @@
  * `@resend.dev`**（Resend 的測試信箱）時，改寄給它，不寄店家。不是 @resend.dev 的值
  * 一律忽略——這個開關不能被拿來把表單導去別的真實信箱。
  *
- * ── 之後要加後台收件匣 ────────────────────────────────────────────────────
- * 有 DDL 權限時：建一張 partnership_inquiries（RLS 開、anon 全關），在寄信**之前**
- * insert，寄信結果寫回同一列；/admin 加一頁列表。寄信失敗時仍可回 ok（資料已落地）。
+ * ── 後台收件匣 ────────────────────────────────────────────────────────────
+ * /admin/partnerships（只有 admin）。資料表 partnership_inquiries：RLS 開、anon／
+ * authenticated 全關，只有這裡（service role）寫得進去。
  */
 import "@tanstack/react-start/server-only";
 import { getRequestHeader } from "@tanstack/react-start/server";
@@ -33,7 +37,11 @@ import { adminSessionSecret } from "@/server/env";
 import { emailConfigured, sendEmail } from "@/server/email";
 import { getSiteSettings } from "@/server/repos/site-settings";
 import { maskEmail } from "@/lib/email-templates";
-import { partnershipSchema, type PartnershipSubmitResult } from "@/lib/partnership";
+import {
+  partnershipSchema,
+  type PartnershipFormValues,
+  type PartnershipSubmitResult,
+} from "@/lib/partnership";
 import { renderPartnershipEmail } from "@/lib/partnership-email";
 import type { Lang } from "@/i18n/types";
 import {
@@ -90,9 +98,48 @@ export async function submitPartnership(
     return { ok: false, error: "rate_limited" };
   }
 
+  // 先落地。失敗不擋寄信（不丟 lead），但要留下 log 讓人知道收件匣少一列。
+  let inquiryId: string | null = null;
+  try {
+    const { insertInquiry } = await import("@/server/repos/partnership-inquiries");
+    inquiryId = await insertInquiry(values, { lang: input.lang, pageUrl: input.pageUrl });
+  } catch (err) {
+    console.error(
+      `[partnership] 存進收件匣失敗，改為只寄信：${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  const sent = await notifyStore(values, input);
+
+  if (inquiryId) {
+    try {
+      const { recordEmailResult } = await import("@/server/repos/partnership-inquiries");
+      await recordEmailResult(inquiryId, {
+        status: sent.ok ? "sent" : "failed",
+        emailId: sent.ok ? sent.id : null,
+        error: sent.ok ? null : sent.reason,
+      });
+    } catch (err) {
+      console.error(
+        `[partnership] 寫回寄信結果失敗 id=${inquiryId}：${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  if (sent.ok || inquiryId) return { ok: true };
+  return { ok: false, error: "send_failed" };
+}
+
+type NotifyResult = { ok: true; id: string | null } | { ok: false; reason: string };
+
+/** 寄通知信給店家。不丟例外；失敗的原因只寫 log 與回傳值（會存進 email_error）。 */
+async function notifyStore(
+  values: PartnershipFormValues,
+  input: RawPartnershipInput,
+): Promise<NotifyResult> {
   if (!emailConfigured()) {
     console.error("[partnership] 這個環境沒有設定 RESEND_API_KEY／MAIL_FROM，無法寄出");
-    return { ok: false, error: "send_failed" };
+    return { ok: false, reason: "email_not_configured" };
   }
 
   let notifyEmails = "";
@@ -102,7 +149,7 @@ export async function submitPartnership(
     console.error(
       `[partnership] 讀不到 site_settings：${err instanceof Error ? err.message : String(err)}`,
     );
-    return { ok: false, error: "send_failed" };
+    return { ok: false, reason: "site_settings_unavailable" };
   }
 
   const { to, test } = resolvePartnershipRecipients(
@@ -111,7 +158,7 @@ export async function submitPartnership(
   );
   if (to.length === 0) {
     console.error("[partnership] site_settings.notify_emails 是空的，沒有人可以收信");
-    return { ok: false, error: "send_failed" };
+    return { ok: false, reason: "no_recipients" };
   }
 
   const mail = renderPartnershipEmail(values, {
@@ -120,23 +167,31 @@ export async function submitPartnership(
     pageUrl: input.pageUrl,
   });
 
-  const result = await sendEmail({
-    to: to.join(", "),
-    subject: mail.subject,
-    text: mail.text,
-    html: mail.html,
-    replyTo: values.email,
-  });
+  let result: Awaited<ReturnType<typeof sendEmail>>;
+  try {
+    result = await sendEmail({
+      to: to.join(", "),
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html,
+      replyTo: values.email,
+    });
+  } catch (err) {
+    console.error(
+      `[partnership] 寄送丟出例外：${err instanceof Error ? err.message : String(err)}`,
+    );
+    return { ok: false, reason: "send_threw" };
+  }
 
   if (result.outcome !== "sent") {
     console.error(
       `[partnership] 寄送失敗 outcome=${result.outcome} to=${maskEmail(to.join(", "))} ${result.error ?? ""}`,
     );
-    return { ok: false, error: "send_failed" };
+    return { ok: false, reason: `${result.outcome}${result.error ? `: ${result.error}` : ""}` };
   }
 
   console.info(
     `[partnership] 已寄出 id=${result.id ?? "(no id)"} recipients=${to.length}${test ? "（測試收件人）" : ""}`,
   );
-  return { ok: true };
+  return { ok: true, id: result.id ?? null };
 }

@@ -224,7 +224,11 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 是 orders.discount 從恆為 0 變成「推薦折扣」（只對選品／書籍、最多 50%），而
   // total = subtotal + shipping_fee − discount 仍是金流、信件、發票唯一使用的金額
   // （發票本來就把 discount 開成負數列）。這支自檢的斷言重讀過，原樣成立。
-  reviewedThrough: "0040_referral_program.sql",
+  // 0042（異業合作收件匣）在 cms 區只做了一件事：on conflict do nothing 種一列
+  // pages('partnership')（內容與 /partnership 的內建後備相同）。不碰 site_settings、
+  // 不改 pages 的欄位、約束、policy 或 grant；這支自檢的斷言重讀過，原樣成立。
+  // 0043（MCP OAuth 狀態）不碰這支自檢依賴的任何區域。
+  reviewedThrough: "0043_mcp_oauth_state.sql",
 });
 
 // =============================================================================

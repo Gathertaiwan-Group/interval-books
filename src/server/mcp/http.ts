@@ -5,13 +5,15 @@
  *   · 靜態 MCP_TOKEN（Claude Code 的 header 設定）—— 與之前一模一樣。
  *   · OAuth access token（claude.ai／桌面版／手機的自訂連接器，見 oauth-core.ts）——
  *     解密驗證通過後**每一次請求都再查一次 profiles**：那個人被降成門市人員或移除，
- *     下一個請求就 401（token 還沒到期也一樣）。
+ *     下一個請求就 401（token 還沒到期也一樣）。0043 起還會確認 token 所屬的授權鏈沒被
+ *     撤銷、撤銷 epoch 沒被加過（oauth-core.ts#accessTokenActive，每個 instance 快取 ≤60 秒）。
  *
  * MCP_TOKEN 與 MCP_OAUTH_SECRET 都沒設（或短於 32 字）→ 404，整支關閉。
  */
 import "@tanstack/react-start/server-only";
 import { authenticateMcpRequest, unauthorizedOAuthResponse } from "./core";
 import type { McpActor } from "./actor";
+import { accessTokenActive, type OAuthStore } from "./oauth-core";
 
 type AdminLookup = (userId: string) => Promise<{ userId: string; email: string } | null>;
 
@@ -21,7 +23,7 @@ type AdminLookup = (userId: string) => Promise<{ userId: string; email: string }
  */
 export async function handleMcpRequest(
   request: Request,
-  deps: { isActiveAdmin?: AdminLookup } = {},
+  deps: { isActiveAdmin?: AdminLookup; oauthStore?: OAuthStore } = {},
 ): Promise<Response> {
   const auth = authenticateMcpRequest(request, process.env.MCP_TOKEN, process.env.MCP_OAUTH_SECRET);
   if (auth.kind === "deny") return auth.response;
@@ -30,8 +32,13 @@ export async function handleMcpRequest(
   if (auth.kind === "oauth") {
     const isActiveAdmin = deps.isActiveAdmin ?? (await import("@/server/auth")).isActiveAdmin;
     let admin: Awaited<ReturnType<AdminLookup>>;
+    let active = false;
     try {
       admin = await isActiveAdmin(auth.token.sub);
+      if (admin) {
+        const store = deps.oauthStore ?? (await import("./oauth-store")).dbOAuthStore;
+        active = await accessTokenActive(auth.token, store);
+      }
     } catch {
       // 查不到 profiles 不等於「不是 admin」，但也絕不放行；回 503 讓客戶端稍後重試，
       // 不要讓它以為 token 壞了而把老闆踢去重新授權。
@@ -44,7 +51,7 @@ export async function handleMcpRequest(
         },
       });
     }
-    if (!admin) return unauthorizedOAuthResponse(request);
+    if (!admin || !active) return unauthorizedOAuthResponse(request);
     actor = { via: "oauth", user_id: admin.userId, email: admin.email, client: auth.token.cid };
   }
 

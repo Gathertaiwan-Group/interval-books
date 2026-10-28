@@ -56,9 +56,11 @@ import { Route as AdminShellInventoryProductsRouteImport } from './routes/admin/
 import { Route as AdminShellInventoryPurchasesRouteImport } from './routes/admin/_shell.inventory-purchases'
 import { Route as AdminShellInventoryVendorsRouteImport } from './routes/admin/_shell.inventory-vendors'
 import { Route as AdminShellJourneysRouteImport } from './routes/admin/_shell.journeys'
+import { Route as AdminShellMcpConnectionsRouteImport } from './routes/admin/_shell.mcp-connections'
 import { Route as AdminShellNewsRouteImport } from './routes/admin/_shell.news'
 import { Route as AdminShellOrdersRouteImport } from './routes/admin/_shell.orders'
 import { Route as AdminShellPagesRouteImport } from './routes/admin/_shell.pages'
+import { Route as AdminShellPartnershipsRouteImport } from './routes/admin/_shell.partnerships'
 import { Route as AdminShellPhonesRouteImport } from './routes/admin/_shell.phones'
 import { Route as AdminShellPosRouteImport } from './routes/admin/_shell.pos'
 import { Route as AdminShellProductsRouteImport } from './routes/admin/_shell.products'
@@ -92,6 +94,7 @@ import { Route as AdminShellNewsIdRouteImport } from './routes/admin/_shell.news
 import { Route as AdminShellNewsNewRouteImport } from './routes/admin/_shell.news_.new'
 import { Route as AdminShellOrdersIdRouteImport } from './routes/admin/_shell.orders_.$id'
 import { Route as AdminShellPagesSlugRouteImport } from './routes/admin/_shell.pages.$slug'
+import { Route as AdminShellPartnershipsIdRouteImport } from './routes/admin/_shell.partnerships_.$id'
 import { Route as AdminShellProductsCuratedThemesRouteImport } from './routes/admin/_shell.products_.curated-themes'
 import { Route as AdminShellReferralsIdRouteImport } from './routes/admin/_shell.referrals_.$id'
 import { Route as AdminShellReferralsNewRouteImport } from './routes/admin/_shell.referrals_.new'
@@ -356,6 +359,12 @@ const AdminShellJourneysRoute = AdminShellJourneysRouteImport.update({
   path: '/journeys',
   getParentRoute: () => AdminShellRoute,
 } as any)
+const AdminShellMcpConnectionsRoute =
+  AdminShellMcpConnectionsRouteImport.update({
+    id: '/mcp-connections',
+    path: '/mcp-connections',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
 const AdminShellNewsRoute = AdminShellNewsRouteImport.update({
   id: '/news',
   path: '/news',
@@ -369,6 +378,11 @@ const AdminShellOrdersRoute = AdminShellOrdersRouteImport.update({
 const AdminShellPagesRoute = AdminShellPagesRouteImport.update({
   id: '/pages',
   path: '/pages',
+  getParentRoute: () => AdminShellRoute,
+} as any)
+const AdminShellPartnershipsRoute = AdminShellPartnershipsRouteImport.update({
+  id: '/partnerships',
+  path: '/partnerships',
   getParentRoute: () => AdminShellRoute,
 } as any)
 const AdminShellPhonesRoute = AdminShellPhonesRouteImport.update({
@@ -547,6 +561,12 @@ const AdminShellPagesSlugRoute = AdminShellPagesSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => AdminShellPagesRoute,
 } as any)
+const AdminShellPartnershipsIdRoute =
+  AdminShellPartnershipsIdRouteImport.update({
+    id: '/partnerships_/$id',
+    path: '/partnerships/$id',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
 const AdminShellProductsCuratedThemesRoute =
   AdminShellProductsCuratedThemesRouteImport.update({
     id: '/products_/curated-themes',
@@ -711,9 +731,11 @@ export interface FileRoutesByFullPath {
   '/admin/inventory-purchases': typeof AdminShellInventoryPurchasesRoute
   '/admin/inventory-vendors': typeof AdminShellInventoryVendorsRoute
   '/admin/journeys': typeof AdminShellJourneysRoute
+  '/admin/mcp-connections': typeof AdminShellMcpConnectionsRoute
   '/admin/news': typeof AdminShellNewsRoute
   '/admin/orders': typeof AdminShellOrdersRoute
   '/admin/pages': typeof AdminShellPagesRouteWithChildren
+  '/admin/partnerships': typeof AdminShellPartnershipsRoute
   '/admin/phones': typeof AdminShellPhonesRoute
   '/admin/pos': typeof AdminShellPosRoute
   '/admin/products': typeof AdminShellProductsRoute
@@ -748,6 +770,7 @@ export interface FileRoutesByFullPath {
   '/admin/news/new': typeof AdminShellNewsNewRoute
   '/admin/orders/$id': typeof AdminShellOrdersIdRoute
   '/admin/pages/$slug': typeof AdminShellPagesSlugRoute
+  '/admin/partnerships/$id': typeof AdminShellPartnershipsIdRoute
   '/admin/products/curated-themes': typeof AdminShellProductsCuratedThemesRoute
   '/admin/referrals/$id': typeof AdminShellReferralsIdRoute
   '/admin/referrals/new': typeof AdminShellReferralsNewRoute
@@ -814,9 +837,11 @@ export interface FileRoutesByTo {
   '/admin/inventory-purchases': typeof AdminShellInventoryPurchasesRoute
   '/admin/inventory-vendors': typeof AdminShellInventoryVendorsRoute
   '/admin/journeys': typeof AdminShellJourneysRoute
+  '/admin/mcp-connections': typeof AdminShellMcpConnectionsRoute
   '/admin/news': typeof AdminShellNewsRoute
   '/admin/orders': typeof AdminShellOrdersRoute
   '/admin/pages': typeof AdminShellPagesRouteWithChildren
+  '/admin/partnerships': typeof AdminShellPartnershipsRoute
   '/admin/phones': typeof AdminShellPhonesRoute
   '/admin/pos': typeof AdminShellPosRoute
   '/admin/products': typeof AdminShellProductsRoute
@@ -848,6 +873,7 @@ export interface FileRoutesByTo {
   '/admin/news/new': typeof AdminShellNewsNewRoute
   '/admin/orders/$id': typeof AdminShellOrdersIdRoute
   '/admin/pages/$slug': typeof AdminShellPagesSlugRoute
+  '/admin/partnerships/$id': typeof AdminShellPartnershipsIdRoute
   '/admin/products/curated-themes': typeof AdminShellProductsCuratedThemesRoute
   '/admin/referrals/$id': typeof AdminShellReferralsIdRoute
   '/admin/referrals/new': typeof AdminShellReferralsNewRoute
@@ -916,9 +942,11 @@ export interface FileRoutesById {
   '/admin/_shell/inventory-purchases': typeof AdminShellInventoryPurchasesRoute
   '/admin/_shell/inventory-vendors': typeof AdminShellInventoryVendorsRoute
   '/admin/_shell/journeys': typeof AdminShellJourneysRoute
+  '/admin/_shell/mcp-connections': typeof AdminShellMcpConnectionsRoute
   '/admin/_shell/news': typeof AdminShellNewsRoute
   '/admin/_shell/orders': typeof AdminShellOrdersRoute
   '/admin/_shell/pages': typeof AdminShellPagesRouteWithChildren
+  '/admin/_shell/partnerships': typeof AdminShellPartnershipsRoute
   '/admin/_shell/phones': typeof AdminShellPhonesRoute
   '/admin/_shell/pos': typeof AdminShellPosRoute
   '/admin/_shell/products': typeof AdminShellProductsRoute
@@ -953,6 +981,7 @@ export interface FileRoutesById {
   '/admin/_shell/news_/new': typeof AdminShellNewsNewRoute
   '/admin/_shell/orders_/$id': typeof AdminShellOrdersIdRoute
   '/admin/_shell/pages/$slug': typeof AdminShellPagesSlugRoute
+  '/admin/_shell/partnerships_/$id': typeof AdminShellPartnershipsIdRoute
   '/admin/_shell/products_/curated-themes': typeof AdminShellProductsCuratedThemesRoute
   '/admin/_shell/referrals_/$id': typeof AdminShellReferralsIdRoute
   '/admin/_shell/referrals_/new': typeof AdminShellReferralsNewRoute
@@ -1023,9 +1052,11 @@ export interface FileRouteTypes {
     | '/admin/inventory-purchases'
     | '/admin/inventory-vendors'
     | '/admin/journeys'
+    | '/admin/mcp-connections'
     | '/admin/news'
     | '/admin/orders'
     | '/admin/pages'
+    | '/admin/partnerships'
     | '/admin/phones'
     | '/admin/pos'
     | '/admin/products'
@@ -1060,6 +1091,7 @@ export interface FileRouteTypes {
     | '/admin/news/new'
     | '/admin/orders/$id'
     | '/admin/pages/$slug'
+    | '/admin/partnerships/$id'
     | '/admin/products/curated-themes'
     | '/admin/referrals/$id'
     | '/admin/referrals/new'
@@ -1126,9 +1158,11 @@ export interface FileRouteTypes {
     | '/admin/inventory-purchases'
     | '/admin/inventory-vendors'
     | '/admin/journeys'
+    | '/admin/mcp-connections'
     | '/admin/news'
     | '/admin/orders'
     | '/admin/pages'
+    | '/admin/partnerships'
     | '/admin/phones'
     | '/admin/pos'
     | '/admin/products'
@@ -1160,6 +1194,7 @@ export interface FileRouteTypes {
     | '/admin/news/new'
     | '/admin/orders/$id'
     | '/admin/pages/$slug'
+    | '/admin/partnerships/$id'
     | '/admin/products/curated-themes'
     | '/admin/referrals/$id'
     | '/admin/referrals/new'
@@ -1227,9 +1262,11 @@ export interface FileRouteTypes {
     | '/admin/_shell/inventory-purchases'
     | '/admin/_shell/inventory-vendors'
     | '/admin/_shell/journeys'
+    | '/admin/_shell/mcp-connections'
     | '/admin/_shell/news'
     | '/admin/_shell/orders'
     | '/admin/_shell/pages'
+    | '/admin/_shell/partnerships'
     | '/admin/_shell/phones'
     | '/admin/_shell/pos'
     | '/admin/_shell/products'
@@ -1264,6 +1301,7 @@ export interface FileRouteTypes {
     | '/admin/_shell/news_/new'
     | '/admin/_shell/orders_/$id'
     | '/admin/_shell/pages/$slug'
+    | '/admin/_shell/partnerships_/$id'
     | '/admin/_shell/products_/curated-themes'
     | '/admin/_shell/referrals_/$id'
     | '/admin/_shell/referrals_/new'
@@ -1653,6 +1691,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminShellJourneysRouteImport
       parentRoute: typeof AdminShellRoute
     }
+    '/admin/_shell/mcp-connections': {
+      id: '/admin/_shell/mcp-connections'
+      path: '/mcp-connections'
+      fullPath: '/admin/mcp-connections'
+      preLoaderRoute: typeof AdminShellMcpConnectionsRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
     '/admin/_shell/news': {
       id: '/admin/_shell/news'
       path: '/news'
@@ -1672,6 +1717,13 @@ declare module '@tanstack/react-router' {
       path: '/pages'
       fullPath: '/admin/pages'
       preLoaderRoute: typeof AdminShellPagesRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/partnerships': {
+      id: '/admin/_shell/partnerships'
+      path: '/partnerships'
+      fullPath: '/admin/partnerships'
+      preLoaderRoute: typeof AdminShellPartnershipsRouteImport
       parentRoute: typeof AdminShellRoute
     }
     '/admin/_shell/phones': {
@@ -1904,6 +1956,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/pages/$slug'
       preLoaderRoute: typeof AdminShellPagesSlugRouteImport
       parentRoute: typeof AdminShellPagesRoute
+    }
+    '/admin/_shell/partnerships_/$id': {
+      id: '/admin/_shell/partnerships_/$id'
+      path: '/partnerships/$id'
+      fullPath: '/admin/partnerships/$id'
+      preLoaderRoute: typeof AdminShellPartnershipsIdRouteImport
+      parentRoute: typeof AdminShellRoute
     }
     '/admin/_shell/products_/curated-themes': {
       id: '/admin/_shell/products_/curated-themes'
@@ -2156,9 +2215,11 @@ interface AdminShellRouteChildren {
   AdminShellInventoryPurchasesRoute: typeof AdminShellInventoryPurchasesRoute
   AdminShellInventoryVendorsRoute: typeof AdminShellInventoryVendorsRoute
   AdminShellJourneysRoute: typeof AdminShellJourneysRoute
+  AdminShellMcpConnectionsRoute: typeof AdminShellMcpConnectionsRoute
   AdminShellNewsRoute: typeof AdminShellNewsRoute
   AdminShellOrdersRoute: typeof AdminShellOrdersRoute
   AdminShellPagesRoute: typeof AdminShellPagesRouteWithChildren
+  AdminShellPartnershipsRoute: typeof AdminShellPartnershipsRoute
   AdminShellPhonesRoute: typeof AdminShellPhonesRoute
   AdminShellPosRoute: typeof AdminShellPosRoute
   AdminShellProductsRoute: typeof AdminShellProductsRoute
@@ -2189,6 +2250,7 @@ interface AdminShellRouteChildren {
   AdminShellNewsIdRoute: typeof AdminShellNewsIdRoute
   AdminShellNewsNewRoute: typeof AdminShellNewsNewRoute
   AdminShellOrdersIdRoute: typeof AdminShellOrdersIdRoute
+  AdminShellPartnershipsIdRoute: typeof AdminShellPartnershipsIdRoute
   AdminShellProductsCuratedThemesRoute: typeof AdminShellProductsCuratedThemesRoute
   AdminShellReferralsIdRoute: typeof AdminShellReferralsIdRoute
   AdminShellReferralsNewRoute: typeof AdminShellReferralsNewRoute
@@ -2217,9 +2279,11 @@ const AdminShellRouteChildren: AdminShellRouteChildren = {
   AdminShellInventoryPurchasesRoute: AdminShellInventoryPurchasesRoute,
   AdminShellInventoryVendorsRoute: AdminShellInventoryVendorsRoute,
   AdminShellJourneysRoute: AdminShellJourneysRoute,
+  AdminShellMcpConnectionsRoute: AdminShellMcpConnectionsRoute,
   AdminShellNewsRoute: AdminShellNewsRoute,
   AdminShellOrdersRoute: AdminShellOrdersRoute,
   AdminShellPagesRoute: AdminShellPagesRouteWithChildren,
+  AdminShellPartnershipsRoute: AdminShellPartnershipsRoute,
   AdminShellPhonesRoute: AdminShellPhonesRoute,
   AdminShellPosRoute: AdminShellPosRoute,
   AdminShellProductsRoute: AdminShellProductsRoute,
@@ -2253,6 +2317,7 @@ const AdminShellRouteChildren: AdminShellRouteChildren = {
   AdminShellNewsIdRoute: AdminShellNewsIdRoute,
   AdminShellNewsNewRoute: AdminShellNewsNewRoute,
   AdminShellOrdersIdRoute: AdminShellOrdersIdRoute,
+  AdminShellPartnershipsIdRoute: AdminShellPartnershipsIdRoute,
   AdminShellProductsCuratedThemesRoute: AdminShellProductsCuratedThemesRoute,
   AdminShellReferralsIdRoute: AdminShellReferralsIdRoute,
   AdminShellReferralsNewRoute: AdminShellReferralsNewRoute,

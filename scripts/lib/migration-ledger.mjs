@@ -280,6 +280,21 @@ export const AREAS = Object.freeze({
     label: "主理人的選品（主題與品項）",
     identifiers: ["curated_items", "curated_themes"],
   },
+  // 異業合作收件匣（0042）。自成一區：與訂單、名單、交易信 outbox 都沒有關係（沒有外鍵、
+  // 不被任何函式讀），只被 src/server/partnership.ts 與 /admin/partnerships 讀寫。
+  partnership: {
+    witness: "0042_partnership_inquiries.sql",
+    label: "異業合作收件匣",
+    identifiers: ["partnership_inquiries"],
+  },
+  // MCP OAuth 的狀態（0043）：授權鏈、用過的授權碼、每人的撤銷 epoch。與 mcp_audit 分開——
+  // 稽核是「做了什麼」，這一區是「誰還能進來」；日後動到它的 migration 被路由回
+  // mcp-oauth-selftest。
+  mcp_oauth: {
+    witness: "0043_mcp_oauth_state.sql",
+    label: "MCP OAuth 授權鏈與撤銷",
+    identifiers: ["mcp_oauth_grants", "mcp_oauth_used_codes", "mcp_oauth_user_epochs"],
+  },
 });
 
 /**
@@ -729,6 +744,21 @@ export const MIGRATION_LEDGER = Object.freeze([
     // public.curated_items 與 create index … on public.curated_items）、products_availability
     // （識別字 products —— references public.products 那一句）。這一支沒有 comment on。
     touches: ["curated", "products_availability"],
+  },
+  {
+    file: "0042_partnership_inquiries.sql",
+    note: "異業合作收件匣：新表 partnership_inquiries（類型／公司／聯絡人／Email／電話／官網／時間／預算／內容／語言／來源網址、status new→replied→archived、email_status pending/sent/failed、email_id、email_error、admin_note），CHECK 與 src/lib/partnership.ts 的值域與長度上限一致（message 下限放寬成 1，見檔頭）。RLS 開、零 policy、anon/authenticated 全收回、service_role 只有 select/insert/update/delete。另外 on conflict do nothing 種一列 pages('partnership')，內容與 /partnership 的內建後備逐字相同",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：partnership（這一支自己
+    // 開的區域）、cms（識別字 pages —— insert into public.pages 那一句）。沒有 comment on。
+    touches: ["cms", "partnership"],
+  },
+  {
+    file: "0043_mcp_oauth_state.sql",
+    note: "MCP OAuth 從無狀態升級：新表 mcp_oauth_grants（一次允許＝一條 refresh 鏈，current_refresh_jti 做輪替的 compare-and-swap、revoked_at／revoked_reason）、mcp_oauth_used_codes（用過的授權碼與升級前舊 refresh token 的 jti，主鍵擋重放）、mcp_oauth_user_epochs（每人一個撤銷 epoch）。三張表 RLS 開、零 policy、anon/authenticated 全收回、service_role 只有必要的權限。pg_cron 新增 ib_mcp_oauth_used_codes_purge（每天 03:17 清過期一天以上的已用授權碼），沒有 pg_cron 時只印 warning",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：mcp_oauth（這一支自己開的
+    // 區域）、cron_jobs（cron.schedule 與 to_regprocedure）。auth.users 不屬於任何區域；沒有
+    // comment on；沒有碰 mcp_audit_log、profiles 或任何既有表。
+    touches: ["cron_jobs", "mcp_oauth"],
   },
 ]);
 

@@ -7,15 +7,15 @@
  *
  * ── 文案從哪裡來 ──────────────────────────────────────────────────────────
  * 與其他頁同一套：fetchPage("partnership") 讀 pages／page_blocks／page_list_items，
- * 每一段都有下面的內建文案當後備。⚠️ 正式庫目前**沒有** pages/'partnership' 這一列
- * （pages 的 insert 只開給 service_role，見 src/server/repos/pages.ts 檔頭），所以現在
- * 整頁都是內建文案；種一列 pages＋對應的 page_blocks／page_list_items 之後，後台
- * /admin/pages/partnership 就能改，前台不必改程式。block_key／list_key 就是下面
- * p.block()／p.rows() 用的那些字串。
+ * 每一段都有下面的內建文案當後備。pages/'partnership' 這一列由 0042 種下（內容與下面的
+ * PAGE 常數相同），所以後台 /admin/pages/partnership 改得到標題、引言與 meta；其餘段落
+ * 在後台加對應的 page_blocks／page_list_items 就會蓋過後備，前台不必改程式。
+ * block_key／list_key 就是下面 p.block()／p.rows() 用的那些字串。
  *
  * ── 表單 ─────────────────────────────────────────────────────────────────
  * 驗證規則前後台同一份（src/lib/partnership.ts），送出走 src/lib/partnership-fns.ts。
- * 不存資料庫：寄一封信給 site_settings.notify_emails，詳見 src/server/partnership.ts。
+ * 先存進 partnership_inquiries（後台 /admin/partnerships），再寄一封信給
+ * site_settings.notify_emails，詳見 src/server/partnership.ts。
  */
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";

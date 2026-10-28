@@ -569,9 +569,11 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
     // 一張表與函式（帳本 touches 只有 mcp_audit），這一支守的訂單不變式不受影響。
     // 0040（推薦分潤）對 orders 只加三個 nullable 歸屬欄位與一個部分索引。
     // 0041（選品連結商品）只在 curated_items 加 product_id，不碰訂單、付款或報名。
-    "supabase/migrations 剛好 41 個 .sql 檔（0001–0040 原封不動 + 0041 選品連結商品新增）",
+    // 0042（異業合作收件匣＋種 pages 一列）與 0043（MCP OAuth 狀態＋一個新的清理排程）
+    // 都是新表，不碰訂單、付款或報名。
+    "supabase/migrations 剛好 43 個 .sql 檔（0001–0041 原封不動 + 0042 合作收件匣 + 0043 MCP OAuth 狀態新增）",
     migFiles.length,
-    41,
+    43,
   );
 }
 

@@ -5,7 +5,7 @@
  *   GET  /.well-known/oauth-authorization-server[/api/mcp] RFC 8414
  *   POST /oauth/register                                   RFC 7591（公開、限流）
  *   POST /oauth/token                                      authorization_code／refresh_token
- *   POST /oauth/revoke                                     RFC 7009（無狀態，見 oauth-core.ts 檔頭）
+ *   POST /oauth/revoke                                     RFC 7009（撤銷整條授權鏈，0043 起）
  *
  * /oauth/authorize 不在這裡：它要讀後台的 session cookie、要畫同意頁，所以是一般的
  * TanStack 頁面（src/routes/oauth/authorize.tsx）＋ server fn（src/lib/oauth-fns.ts）。
@@ -31,6 +31,7 @@ import {
   protectedResourceMetadata,
   rateLimit,
   registerClient,
+  revokeToken,
 } from "./oauth-core";
 import { MCP_PATH } from "./core";
 
@@ -181,12 +182,15 @@ export async function handleOAuthEndpoint(request: Request, pathname: string): P
       }
       const params = await readParams(request);
       const { isActiveAdmin } = await import("@/server/auth");
+      const { dbOAuthStore } = await import("./oauth-store");
       const tokens = await exchangeToken(
         params,
         request.headers.get("authorization"),
         secret,
         base,
         async (userId) => (await isActiveAdmin(userId)) !== null,
+        undefined,
+        dbOAuthStore,
       );
       console.info(`[mcp-oauth] token ok grant=${params.get("grant_type")}`);
       return json(200, tokens);
@@ -195,9 +199,17 @@ export async function handleOAuthEndpoint(request: Request, pathname: string): P
     if (pathname === OAUTH_REVOKE_PATH) {
       if (!rateLimit(`revoke:${ip}`, 60, 60)) return json(429, { error: "rate_limited" });
       const params = await readParams(request);
-      authenticateClient(params, request.headers.get("authorization"), secret);
-      // RFC 7009 §2.2：不論 token 存不存在都回 200。無狀態設計下這裡撤不掉任何東西 ——
-      // 撤銷個人＝改 profiles.role；全部撤銷＝換 MCP_OAUTH_SECRET（見 oauth-core.ts 檔頭）。
+      const client = authenticateClient(params, request.headers.get("authorization"), secret);
+      // RFC 7009 §2.2：不論 token 存不存在、是不是這個 client 的，都回 200。有授權鏈的 token
+      // 撤銷整條鏈；升級前的舊 refresh 燒掉（見 oauth-core.ts#revokeToken）。
+      const { dbOAuthStore } = await import("./oauth-store");
+      const outcome = await revokeToken(
+        params.get("token"),
+        client.client_id,
+        secret,
+        dbOAuthStore,
+      );
+      console.info(`[mcp-oauth] revoke ${outcome}`);
       return json(200, {});
     }
   } catch (err) {

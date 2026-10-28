@@ -14,6 +14,9 @@
  *       每次呼叫重查角色；查不到 → 503 不放行
  *   [7] 同意頁 CSRF token、HTTP 端點（register／token／revoke）的狀態碼與標頭、限流
  *   [8] 掛載與原始碼守門（不記 token、frame-ancestors、/admin/login 的 redirect 只收授權頁）
+ *   [9] 0043 的狀態層（OAuthStore，記憶體版替身）：授權碼跨 instance 只能用一次、refresh
+ *       重用 → 整條鏈撤銷、/oauth/revoke 真的撤銷、access token 查鏈與 epoch、升級前簽發的
+ *       舊 token（沒有 gid）向下相容（舊 refresh 用一次就搬進新鏈）、store 出錯 fail closed
  */
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -815,7 +818,7 @@ async function codeFor(client, redirectUri, userId = ADMIN, now) {
   };
   const viaStatic = await http.handleMcpRequest(
     mcpReq(`Bearer ${STATIC}`, { "mcp-protocol-version": "2025-11-25" }),
-    { isActiveAdmin: fakeAdmin },
+    { isActiveAdmin: fakeAdmin, oauthStore: oc.__TEST_ONLY__.defaultStore() },
   );
   check(
     "handleMcpRequest：靜態 token → tools/list 30 支",
@@ -825,7 +828,7 @@ async function codeFor(client, redirectUri, userId = ADMIN, now) {
   check("靜態 token 不查 profiles", lookups.length, 0);
   const viaOauth = await http.handleMcpRequest(
     mcpReq(`Bearer ${r1.access_token}`, { "mcp-protocol-version": "2025-11-25" }),
-    { isActiveAdmin: fakeAdmin },
+    { isActiveAdmin: fakeAdmin, oauthStore: oc.__TEST_ONLY__.defaultStore() },
   );
   check(
     "handleMcpRequest：OAuth token → tools/list 30 支",
@@ -836,6 +839,7 @@ async function codeFor(client, redirectUri, userId = ADMIN, now) {
   admins.delete(ADMIN);
   const revoked = await http.handleMcpRequest(mcpReq(`Bearer ${r1.access_token}`), {
     isActiveAdmin: fakeAdmin,
+    oauthStore: oc.__TEST_ONLY__.defaultStore(),
   });
   check("🔴 被降成非 admin → 下一次呼叫就 401（token 還沒到期）", revoked.status, 401);
   checkTrue(
@@ -847,6 +851,7 @@ async function codeFor(client, redirectUri, userId = ADMIN, now) {
     isActiveAdmin: async () => {
       throw new Error("db down");
     },
+    oauthStore: oc.__TEST_ONLY__.defaultStore(),
   });
   check("🔴 查不到 profiles → 503（fail closed，不放行）", dbDown.status, 503);
   if (savedTok === undefined) delete process.env.MCP_TOKEN;
@@ -1168,6 +1173,341 @@ console.log("\n[9] 安全審查（2026-10-26）的修正");
   );
   const auditSrc = readFile(join(SRC, "server/mcp/audit.ts"));
   checkTrue("稽核 _actor 放最後（不會被同名欄位蓋掉）", auditSrc.includes("_actor: actor }"));
+}
+
+// -----------------------------------------------------------------------------
+console.log("\n[9] 0043 狀態層：單次授權碼、refresh 重用偵測、撤銷、舊 token 相容");
+{
+  const store = oc.createMemoryOAuthStore();
+  const ex = (p, now) => oc.exchangeToken(tokenParams(p), null, SECRET, BASE, isAdmin, now, store);
+  const codeParams = (c) => ({
+    grant_type: "authorization_code",
+    client_id: claudeClient.client_id,
+    redirect_uri: CLAUDE_CB,
+    code: c.code,
+    code_verifier: c.verifier,
+  });
+  const refreshParams = (rt, client = claudeClient) => ({
+    grant_type: "refresh_token",
+    client_id: client.client_id,
+    refresh_token: rt,
+  });
+
+  // ---- 授權碼
+  const c1 = await codeFor(claudeClient, CLAUDE_CB);
+  const t1 = await ex(codeParams(c1));
+  const a1 = oc.verifyAccessToken(t1.access_token, SECRET, BASE);
+  checkTrue("換碼 → access token 帶 gid（uuid）", oc.isGrantId(a1?.gid));
+  check("換碼 → 建一條授權鏈", store.grants.size, 1);
+  const g1 = store.grants.get(a1.gid);
+  check(
+    "授權鏈記下 user、client 名稱、redirect_uri、封頂＝at0+90 天",
+    [
+      g1.userId,
+      g1.clientName,
+      g1.redirectUri,
+      g1.expiresAt - oc.unseal("code", c1.code, SECRET).at0,
+    ],
+    [ADMIN, claudeClient.client_name, CLAUDE_CB, oc.REFRESH_ABSOLUTE_MAX_SECONDS],
+  );
+  check(
+    "同一個 instance 重放授權碼 → invalid_grant",
+    await rejectsWith(() => ex(codeParams(c1))),
+    "invalid_grant",
+  );
+  oc.__TEST_ONLY__.resetLocalUsedCodes();
+  check(
+    "🔴 換了 instance（記憶體清空）重放授權碼 → 仍然 invalid_grant（store 擋）",
+    await rejectsWith(() => ex(codeParams(c1))),
+    "invalid_grant",
+  );
+  check("重放不會多建授權鏈", store.grants.size, 1);
+
+  // ---- store 出錯 → fail closed，碼沒被燒掉
+  const c2 = await codeFor(claudeClient, CLAUDE_CB);
+  const broken = {
+    ...store,
+    consumeOnce: async () => {
+      throw new Error("db down");
+    },
+  };
+  let threw = false;
+  try {
+    await oc.exchangeToken(
+      tokenParams(codeParams(c2)),
+      null,
+      SECRET,
+      BASE,
+      isAdmin,
+      undefined,
+      broken,
+    );
+  } catch (e) {
+    threw = !(e instanceof oc.OAuthError);
+  }
+  checkTrue("🔴 store 寫不進去 → 丟例外（500），不發 token", threw);
+  const t2 = await ex(codeParams(c2));
+  checkTrue("store 恢復後同一張碼可以重試成功", t2.access_token.startsWith("ibat1."));
+
+  // ---- refresh 輪替 + 重用偵測
+  const r1 = await ex(refreshParams(t1.refresh_token));
+  const r1a = oc.verifyAccessToken(r1.access_token, SECRET, BASE);
+  check("refresh → 同一條鏈（gid 不變）", r1a.gid, a1.gid);
+  check(
+    "拿錯 client 試 refresh → invalid_grant，但**不**撤銷正牌的鏈",
+    [
+      await rejectsWith(() => ex(refreshParams(r1.refresh_token, localClient))),
+      store.grants.get(a1.gid).revokedAt,
+    ],
+    ["invalid_grant", null],
+  );
+  const r2 = await ex(refreshParams(r1.refresh_token));
+  checkTrue("新的那張 refresh 可以繼續輪替", r2.refresh_token.startsWith("ibrt1."));
+  check(
+    "剛被換掉（寬限期內）的那張重送 → invalid_grant，但**不**撤銷（網路重送／併發 refresh）",
+    [
+      await rejectsWith(() => ex(refreshParams(r1.refresh_token))),
+      store.grants.get(a1.gid).revokedAt,
+    ],
+    ["invalid_grant", null],
+  );
+  check(
+    "🔴 同一張過了寬限期才又出現 → 視為重用",
+    await rejectsWith(() =>
+      ex(refreshParams(r1.refresh_token), oc.nowSeconds() + oc.REFRESH_REUSE_GRACE_SECONDS + 5),
+    ),
+    "invalid_grant",
+  );
+  checkTrue("🔴 過了寬限期的重用 → 整條鏈撤銷", store.grants.get(a1.gid).revokedAt !== null);
+  store.grants.get(a1.gid).revokedAt = null; // 復原，繼續測「更舊的那張」
+  check(
+    "🔴 用已被換掉的舊 refresh → invalid_grant",
+    await rejectsWith(() => ex(refreshParams(t1.refresh_token))),
+    "invalid_grant",
+  );
+  checkTrue("🔴 重用 → 整條鏈撤銷", store.grants.get(a1.gid).revokedAt !== null);
+  check(
+    "🔴 撤銷之後，連最新那張 refresh 也不能用",
+    await rejectsWith(() => ex(refreshParams(r2.refresh_token))),
+    "invalid_grant",
+  );
+  check(
+    "🔴 撤銷之後，access token 立刻不能用（accessTokenActive=false）",
+    await oc.accessTokenActive(oc.verifyAccessToken(r2.access_token, SECRET, BASE), store),
+    false,
+  );
+  check(
+    "另一條鏈不受影響",
+    await oc.accessTokenActive(oc.verifyAccessToken(t2.access_token, SECRET, BASE), store),
+    true,
+  );
+
+  // ---- /oauth/revoke（revokeToken）
+  check(
+    "revoke 別的 client 的 token → ignored",
+    await oc.revokeToken(t2.refresh_token, localClient.client_id, SECRET, store),
+    "ignored",
+  );
+  check(
+    "revoke 解不開的字串 → ignored",
+    await oc.revokeToken("ibrt1.garbage", claudeClient.client_id, SECRET, store),
+    "ignored",
+  );
+  check(
+    "revoke 自己的 access token → 撤銷整條鏈",
+    await oc.revokeToken(t2.access_token, claudeClient.client_id, SECRET, store),
+    "revoked",
+  );
+  check(
+    "被 revoke 的鏈：refresh → invalid_grant",
+    await rejectsWith(() => ex(refreshParams(t2.refresh_token))),
+    "invalid_grant",
+  );
+
+  // ---- epoch（全部撤銷）
+  const c3 = await codeFor(claudeClient, CLAUDE_CB);
+  const t3 = await ex(codeParams(c3));
+  const a3 = oc.verifyAccessToken(t3.access_token, SECRET, BASE);
+  check("新 token 帶 ep＝目前 epoch（0）", a3.ep, 0);
+  store.epochs.set(ADMIN, { epoch: 1, since: 0 });
+  check("🔴 epoch 加一 → access 失效", await oc.accessTokenActive(a3, store), false);
+  check(
+    "🔴 epoch 加一 → refresh 失效",
+    await rejectsWith(() => ex(refreshParams(t3.refresh_token))),
+    "invalid_grant",
+  );
+  const c4 = await codeFor(claudeClient, CLAUDE_CB);
+  const t4 = await ex(codeParams(c4));
+  check(
+    "epoch 加一之後重新授權 → 新 token 帶 ep=1 且有效",
+    [
+      oc.verifyAccessToken(t4.access_token, SECRET, BASE).ep,
+      await oc.accessTokenActive(oc.verifyAccessToken(t4.access_token, SECRET, BASE), store),
+    ],
+    [1, true],
+  );
+  // 審查 2026-10-28 #4：「全部撤銷」之前簽出、還沒兌換的授權碼也作廢。
+  const c5 = await codeFor(claudeClient, CLAUDE_CB, ADMIN, oc.nowSeconds() - 10);
+  store.epochs.set(ADMIN, { epoch: 2, since: oc.nowSeconds() - 5 });
+  check(
+    "🔴 全部撤銷之前簽出的授權碼 → invalid_grant",
+    await rejectsWith(() => ex(codeParams(c5))),
+    "invalid_grant",
+  );
+  store.epochs.delete(ADMIN);
+
+  // ---- 升級前簽發的舊 token（沒有 gid、沒有 ep）：老闆現在連著的那一條
+  const now = oc.nowSeconds();
+  const cid = oc.clientHash(claudeClient.client_id);
+  const legacyAccess = oc.seal(
+    "access",
+    { exp: now + 3000, iat: now - 600, sub: ADMIN, cid, sc: "mcp", aud: RESOURCE },
+    SECRET,
+  );
+  const legacyRefresh = oc.seal(
+    "refresh",
+    {
+      exp: now + 20 * 86400,
+      iat: now - 600,
+      sub: ADMIN,
+      cid,
+      sc: "mcp",
+      aud: RESOURCE,
+      at0: now - 2 * 86400,
+      jti: "legacyJti123456",
+    },
+    SECRET,
+  );
+  const la = oc.verifyAccessToken(legacyAccess, SECRET, BASE);
+  checkTrue("舊 access token（沒有 gid）仍通過密碼學驗證", la !== null && la.gid === undefined);
+  check(
+    "🔴 舊 access token 在到期前照常可用（向下相容）",
+    await oc.accessTokenActive(la, store),
+    true,
+  );
+  const before = store.grants.size;
+  const mig = await ex(refreshParams(legacyRefresh));
+  const ma = oc.verifyAccessToken(mig.access_token, SECRET, BASE);
+  checkTrue(
+    "🔴 舊 refresh token 第一次 refresh → 成功（連接器不會被踢掉）",
+    mig.refresh_token.startsWith("ibrt1."),
+  );
+  check(
+    "舊 refresh → 搬進一條新的授權鏈",
+    [store.grants.size - before, oc.isGrantId(ma.gid)],
+    [1, true],
+  );
+  const mg = store.grants.get(ma.gid);
+  check(
+    "搬進來的鏈：at0 沿用（90 天封頂不延長）、redirect_uri 取 client 註冊的",
+    [mg.expiresAt, mg.redirectUri, oc.unseal("refresh", mig.refresh_token, SECRET).at0],
+    [
+      now - 2 * 86400 + oc.REFRESH_ABSOLUTE_MAX_SECONDS,
+      claudeClient.redirect_uris[0],
+      now - 2 * 86400,
+    ],
+  );
+  check(
+    "🔴 同一張舊 refresh 再用一次 → invalid_grant",
+    await rejectsWith(() => ex(refreshParams(legacyRefresh))),
+    "invalid_grant",
+  );
+  check("（寬限期內的重送不撤銷搬進來的新鏈）", store.grants.get(ma.gid).revokedAt, null);
+  const mig2 = await ex(refreshParams(mig.refresh_token));
+  checkTrue("搬進來之後照新規則繼續輪替", mig2.refresh_token !== mig.refresh_token);
+  // 審查 2026-10-28 #1：同一條舊鏈裡**早就被輪替掉的另一張**（同 at0、不同 jti）不能再開第二條鏈。
+  const olderSibling = oc.seal(
+    "refresh",
+    {
+      exp: now + 10 * 86400,
+      iat: now - 20 * 86400,
+      sub: ADMIN,
+      cid,
+      sc: "mcp",
+      aud: RESOURCE,
+      at0: now - 2 * 86400,
+      jti: "legacySibling0001",
+    },
+    SECRET,
+  );
+  const grantsBefore = store.grants.size;
+  check(
+    "🔴 同一條舊鏈的另一張舊 refresh（被輪替掉的那種）→ invalid_grant、不另開新鏈",
+    [
+      await rejectsWith(() => ex(refreshParams(olderSibling), now + 60)),
+      store.grants.size - grantsBefore,
+    ],
+    ["invalid_grant", 0],
+  );
+  checkTrue(
+    "🔴 過了寬限期 → 視為重用，撤銷搬進來的那條鏈",
+    store.grants.get(ma.gid).revokedAt !== null,
+  );
+  check(
+    "撤銷之後，搬進來那條鏈最新的 refresh 也不能用",
+    await rejectsWith(() => ex(refreshParams(mig2.refresh_token))),
+    "invalid_grant",
+  );
+  check(
+    "legacyChainKey 長度在 used_codes 的 CHECK（8–80）之內",
+    oc.legacyChainKey(ADMIN, cid, now).length <= 80,
+    true,
+  );
+  const legacyRefresh2 = oc.seal(
+    "refresh",
+    {
+      exp: now + 20 * 86400,
+      iat: now - 600,
+      sub: ADMIN,
+      cid,
+      sc: "mcp",
+      aud: RESOURCE,
+      at0: now - 86400,
+      jti: "legacyJtiABCDEFG",
+    },
+    SECRET,
+  );
+  check(
+    "revoke 舊 refresh → burned",
+    await oc.revokeToken(legacyRefresh2, claudeClient.client_id, SECRET, store),
+    "burned",
+  );
+  check(
+    "被 burned 的舊 refresh → invalid_grant",
+    await rejectsWith(() => ex(refreshParams(legacyRefresh2))),
+    "invalid_grant",
+  );
+  store.epochs.set(ADMIN, { epoch: 1, since: 0 });
+  check(
+    "🔴「全部撤銷」（epoch+1）連舊 access token 也失效",
+    await oc.accessTokenActive(la, store),
+    false,
+  );
+  store.epochs.delete(ADMIN);
+
+  // ---- 原始碼守門：正式路徑一律注入資料庫版 store
+  const oauthSrc = readFile(join(SRC, "server/mcp/oauth.ts"));
+  check(
+    "🔴 /oauth/token 注入 dbOAuthStore（不是預設的記憶體版）",
+    (oauthSrc.match(/dbOAuthStore,\n/g) ?? []).length,
+    2,
+  );
+  const httpSrc = readFile(join(SRC, "server/mcp/http.ts"));
+  checkTrue(
+    "🔴 /api/mcp 驗 access token 走 accessTokenActive（查鏈與 epoch）",
+    httpSrc.includes("accessTokenActive(auth.token, store)") &&
+      httpSrc.includes("!admin || !active"),
+  );
+  const storeSrc = readFile(join(SRC, "server/mcp/oauth-store.ts"));
+  checkTrue(
+    "store：主鍵衝突（23505）＝看過，其他錯誤丟例外",
+    storeSrc.includes('error.code === "23505"') && storeSrc.includes('fail("consumeOnce"'),
+  );
+  checkTrue(
+    "store：輪替是以 current_refresh_jti 為條件的 compare-and-swap",
+    storeSrc.includes('.eq("current_refresh_jti", oldJti)'),
+  );
+  checkTrue("🔴 store 不印 jti／token", !/console\./.test(storeSrc));
 }
 
 console.log(`\n${"─".repeat(52)}`);

@@ -358,7 +358,12 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 是 orders.discount 從恆為 0 變成「推薦折扣」（只對選品／書籍、最多 50%），而
   // total = subtotal + shipping_fee − discount 仍是金流、信件、發票唯一使用的金額
   // （發票本來就把 discount 開成負數列）。這支自檢的斷言重讀過，原樣成立。
-  reviewedThrough: "0040_referral_program.sql",
+  // 0042（異業合作收件匣）不碰這支自檢依賴的任何區域。
+  // 0043（MCP OAuth 狀態）在 cron_jobs 區只**新增**一個 job ib_mcp_oauth_used_codes_purge
+  // （'17 3 * * *'，只刪 public.mcp_oauth_used_codes 的過期列）。既有的 expire-unpaid-orders、
+  // dispatch-invoice-task、dispatch-notify-task 的名稱、排程與指令都沒動；第 17 分鐘也不在
+  // */5 與 3-53/10、6-56/10 任何一個 tick 上。這支自檢的斷言重讀過，原樣成立。
+  reviewedThrough: "0043_mcp_oauth_state.sql",
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
