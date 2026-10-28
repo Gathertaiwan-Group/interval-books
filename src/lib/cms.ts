@@ -18,6 +18,8 @@ import type { Localized } from "@/i18n/types";
 import { EVENT_LIST_FIELDS, type EventListField } from "@/lib/event-blocks";
 import { excludeJourneyEvents } from "@/lib/journey-events";
 import { latestSessionEndDate } from "@/lib/event-status";
+import { liveNews } from "@/lib/news-expiry";
+import { taipeiToday } from "@/lib/taipei-time";
 import { eventProductSlug } from "@/lib/shop";
 import {
   UI,
@@ -1062,7 +1064,16 @@ export async function fetchJourneys(): Promise<JourneyEntry[]> {
   return mapped.length ? mapped : FALLBACK_JOURNEYS;
 }
 
-export async function fetchNews(): Promise<NewsEntry[]> {
+/**
+ * /news 用。**已過期的消息不回傳**（display_date 推得出結束日、且早於今天台北 —— 規則見
+ * src/lib/news-expiry.ts）。過濾放在「退回內建消息」之後：全部過期時回空陣列（頁面顯示空狀態），
+ * 不能因為過濾完沒東西就誤退回內建消息。
+ */
+export async function fetchNews(now: Date = new Date()): Promise<NewsEntry[]> {
+  return liveNews(await fetchAllNews(), taipeiToday(now));
+}
+
+async function fetchAllNews(): Promise<NewsEntry[]> {
   const rows = await select("news", "id,title,summary,description,display_date,sort_order", {
     order: "sort_order",
   });
@@ -1098,19 +1109,22 @@ export type NewsTickerEntry = Pick<NewsEntry, "id" | "title" | "date">;
  * 首頁用不到就不要搬。讀取失敗時退回內建消息（與 fetchNews 一致），所以 /news 與首頁看到的
  * 是同一批。
  */
-export async function fetchNewsTicker(limit = 6): Promise<NewsTickerEntry[]> {
+export async function fetchNewsTicker(
+  limit = 6,
+  now: Date = new Date(),
+): Promise<NewsTickerEntry[]> {
   const rows = await select("news", "id,title,display_date,sort_order", { order: "sort_order" });
-  const fallback = () =>
-    FALLBACK_NEWS.slice(0, limit).map(({ id, title, date }) => ({ id, title, date }));
-  if (!rows || !rows.length) return fallback();
-  const mapped: NewsTickerEntry[] = [];
-  for (const r of rows) {
+  const fallback = () => FALLBACK_NEWS.map(({ id, title, date }) => ({ id, title, date }));
+  let mapped: NewsTickerEntry[] = [];
+  for (const r of rows ?? []) {
     const title = loc(r.title);
     if (!title) continue;
     mapped.push({ id: str(r.id), title, date: str(r.display_date) });
-    if (mapped.length >= limit) break;
   }
-  return mapped.length ? mapped : fallback();
+  if (!mapped.length) mapped = fallback();
+  // 與 fetchNews 同一條過期規則；先過濾再取前 limit 則，過期的不佔名額。全部過期 → []，
+  // NewsTicker 沒東西就整條不出現。
+  return liveNews(mapped, taipeiToday(now)).slice(0, limit);
 }
 
 export async function fetchCuratedThemes(): Promise<CuratedThemeEntry[]> {

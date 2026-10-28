@@ -111,3 +111,18 @@ export function taipeiMonthBounds(period: string): { startIso: string; endIso: s
   const end = Date.UTC(Number(next[1]), Number(next[2]) - 1, 1) - 8 * 3600 * 1000;
   return { startIso: new Date(start).toISOString(), endIso: new Date(end).toISOString() };
 }
+
+// ---------------------------------------------------------------------------
+// 今天（台北）
+// ---------------------------------------------------------------------------
+
+/**
+ * 現在是台北的哪一天，"YYYY-MM-DD"。字典序等於時間序，可以直接拿字串比大小。
+ * 最新消息的「過期隱藏」用這一支（src/lib/news-expiry.ts）。
+ */
+export function taipeiToday(now: Date = new Date()): string {
+  const p: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {};
+  for (const part of TAIPEI_PARTS.formatToParts(now)) p[part.type] = part.value;
+  const two = (v: string | undefined) => (v ?? "").padStart(2, "0");
+  return `${p.year}-${two(p.month)}-${two(p.day)}`;
+}

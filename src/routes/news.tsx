@@ -24,6 +24,12 @@ const PAGE = {
     en: "Short notes and updates — exhibitions, events, and hours.",
     ja: "短いお知らせ。展覧、イベント、営業時間など。",
   },
+  // 過期的消息不在前台顯示（src/lib/news-expiry.ts）；全部過期或還沒有消息時顯示這一段。
+  empty: {
+    zh: "目前沒有新的消息。歡迎看看近期活動，或隨時來店裡坐坐。",
+    en: "No news at the moment. Have a look at our upcoming events, or drop by the shop anytime.",
+    ja: "現在、新しいお知らせはありません。イベント情報もぜひご覧ください。",
+  },
 };
 
 export const Route = createFileRoute("/news")({
@@ -66,6 +72,11 @@ function News() {
       />
 
       <section className="container-editorial pb-32">
+        {news.length === 0 && (
+          <p className="border border-border bg-background/40 px-6 py-12 text-center text-sm leading-relaxed text-muted-foreground">
+            {t(PAGE.empty)}
+          </p>
+        )}
         <ul className={layout.grid}>
           {news.map((n) => (
             // id：首頁跑馬燈每一則都連到 /news#news-<id>（沒有逐則的內頁）；scroll-mt 讓錨點

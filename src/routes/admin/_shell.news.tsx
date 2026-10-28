@@ -33,6 +33,8 @@ import {
 import type { listNews } from "@/lib/admin/fns/news";
 import { formatUpdatedAt } from "@/lib/admin/format";
 import { rememberAdminPeek } from "@/lib/admin/list-memory";
+import { isNewsExpired } from "@/lib/news-expiry";
+import { taipeiToday } from "@/lib/taipei-time";
 
 type NewsRow = Awaited<ReturnType<typeof listNews>>[number];
 
@@ -51,6 +53,8 @@ export const Route = createFileRoute("/admin/_shell/news")({
 function AdminNewsPage() {
   const { news } = Route.useLoaderData();
   const router = useRouter();
+  // 後台照樣列出全部；過期的（前台已自動隱藏）只多一個標記。規則見 src/lib/news-expiry.ts。
+  const today = taipeiToday();
 
   const [deleteTarget, setDeleteTarget] = useState<NewsRow | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -93,7 +97,7 @@ function AdminNewsPage() {
               <TableHead className="w-16">排序</TableHead>
               <TableHead>標題</TableHead>
               <TableHead>顯示日期</TableHead>
-              <TableHead className="w-24">狀態</TableHead>
+              <TableHead className="w-40">狀態</TableHead>
               <TableHead className="w-36">最後更新</TableHead>
               <TableHead className="w-36 text-right">操作</TableHead>
             </TableRow>
@@ -114,9 +118,20 @@ function AdminNewsPage() {
                     <TableCell className="max-w-sm truncate font-medium">{n.title.zh}</TableCell>
                     <TableCell className="text-muted-foreground">{n.display_date}</TableCell>
                     <TableCell>
-                      <Badge variant={n.is_published ? "default" : "secondary"}>
-                        {n.is_published ? "已發布" : "草稿"}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge variant={n.is_published ? "default" : "secondary"}>
+                          {n.is_published ? "已發布" : "草稿"}
+                        </Badge>
+                        {isNewsExpired(n.display_date, today) && (
+                          <Badge
+                            variant="outline"
+                            className="whitespace-nowrap text-muted-foreground"
+                            title="顯示日期的結束日已過，前台自動隱藏"
+                          >
+                            已過期・前台不顯示
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
                       {formatUpdatedAt(n.updated_at)}

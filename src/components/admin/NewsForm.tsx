@@ -32,6 +32,8 @@ import { useUnsavedChangesGuard } from "@/components/admin/UnsavedChangesGuard";
 import { useFormDirty } from "@/lib/admin/form-dirty";
 import { newsSchema, type NewsFormValues } from "@/lib/admin/schemas";
 import type { NewsRow } from "@/server/repos/news";
+import { parseNewsEndDate } from "@/lib/news-expiry";
+import { taipeiToday } from "@/lib/taipei-time";
 
 const EMPTY_LOCALIZED = { zh: "", en: "", ja: "" };
 
@@ -123,7 +125,10 @@ export function NewsForm({ news, nextSortOrder = 0, onSaved }: Props) {
                 <FormControl>
                   <Input placeholder="例如 2026.05.22–05.24" {...field} />
                 </FormControl>
-                <FormDescription>自由文字，不會被當成日期解析，直接顯示在網站上。</FormDescription>
+                <FormDescription>
+                  照原樣顯示在網站上。結束日期過後，前台自動隱藏；日期無法辨識時一律顯示。
+                </FormDescription>
+                <EndDatePreview text={field.value} />
                 <FormMessage />
               </FormItem>
             )}
@@ -182,4 +187,27 @@ export function NewsForm({ news, nextSortOrder = 0, onSaved }: Props) {
       {guard.dialog}
     </AdminDetailPage>
   );
+}
+
+/**
+ * 「顯示用日期文字」底下的即時預覽：店員一邊打，一邊看到系統讀出來的結束日
+ * （與前台過期隱藏同一支 parseNewsEndDate，src/lib/news-expiry.ts）。
+ */
+function EndDatePreview({ text }: { text: string }) {
+  if (!text.trim()) return null;
+  const end = parseNewsEndDate(text);
+  if (!end) {
+    return (
+      <p className="text-xs text-muted-foreground">讀不出日期 → 前台會一直顯示（不會自動隱藏）。</p>
+    );
+  }
+  const shown = end.replaceAll("-", "/");
+  if (end < taipeiToday()) {
+    return (
+      <p className="text-xs text-amber-700 dark:text-amber-400">
+        結束日期：{shown} → 已過期・前台不顯示
+      </p>
+    );
+  }
+  return <p className="text-xs text-muted-foreground">結束日期：{shown}（這天過後前台自動隱藏）</p>;
 }
