@@ -8,8 +8,8 @@
  * ── 文案從哪裡來 ──────────────────────────────────────────────────────────
  * 與其他頁同一套：fetchPage("partnership") 讀 pages／page_blocks／page_list_items，
  * 每一段都有下面的內建文案當後備。pages/'partnership' 這一列由 0042 種下（內容與下面的
- * PAGE 常數相同），所以後台 /admin/pages/partnership 改得到標題、引言與 meta；其餘段落
- * 在後台加對應的 page_blocks／page_list_items 就會蓋過後備，前台不必改程式。
+ * PAGE 常數相同），改那一列就改得到標題、引言與 meta（後台「頁面文案」2026-10-29 已移除，
+ * 現在走 MCP 的 update_page_blocks 或直接改資料）；其餘段落加對應的 page_blocks／page_list_items 就會蓋過後備，前台不必改程式。
  * block_key／list_key 就是下面 p.block()／p.rows() 用的那些字串。
  *
  * ── 表單 ─────────────────────────────────────────────────────────────────

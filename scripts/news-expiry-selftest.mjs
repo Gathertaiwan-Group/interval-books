@@ -4,13 +4,14 @@
  *
  * 業主：「過期的最新消息，就不顯示了」。news 表沒有結束日欄位，從 display_date 推：
  *
- *   [純函式] src/lib/news-expiry.ts：parseNewsEndDate / isNewsExpired / liveNews
+ *   [純函式] src/lib/news-expiry.ts：parseNewsEndDate / isNewsExpired
  *            · 三種分隔、區間五種寫法、省略年／年月、跨年、取最後一個日期
  *            · 不合法日期、讀不懂、空白 → null（永不過期）
  *            · 台北日界：結束日當天 23:59:59 仍顯示，隔天 00:00 隱藏
  *   [純函式] src/lib/taipei-time.ts：taipeiToday
- *   [靜態]   fetchNews／fetchNewsTicker 套用 liveNews，且過濾在退回內建消息之後；
- *            /news 有三語空狀態；後台列表有「已過期・前台不顯示」、表單有規則說明與即時預覽
+ *   [靜態]   後台列表有「已過期・前台不顯示」、表單有規則說明與即時預覽
+ *            （2026-10-29 前台最新消息移除：liveNews、fetchNews、fetchNewsTicker、/news 頁都已刪，
+ *            改成檢查它們確實不在了、/news 只剩轉址）
  *
  * 不碰任何資料庫。
  */
@@ -113,61 +114,15 @@ check(
   true,
 );
 
-console.log("\n[5] liveNews（正式庫 2026-10-28 的四則）");
-const prod = [
-  { id: "b51ec822", date: "2026.10.20~11.7" },
-  { id: "n-1", date: "2026.04.28" },
-  { id: "n-2", date: "2026.05.02" },
-  { id: "n-3", date: "2026.05.22–05.24" },
-];
-check(
-  "2026-10-28 只剩《海的聲音》",
-  N.liveNews(prod, "2026-10-28").map((n) => n.id),
-  ["b51ec822"],
-);
-check("2026-11-08 全部過期 → []", N.liveNews(prod, "2026-11-08"), []);
-check(
-  "讀不懂的保留、順序不變",
-  N.liveNews(
-    [
-      { id: "a", date: "即將公告" },
-      { id: "b", date: "2020.01.01" },
-      { id: "c", date: "" },
-    ],
-    "2026-10-28",
-  ).map((n) => n.id),
-  ["a", "c"],
-);
-
 console.log("\n[6] 呼叫端");
 const cms = stripComments(readFile("src/lib/cms.ts"));
-const fn = (name) => {
-  const at = cms.indexOf(`export async function ${name}(`);
-  return cms.slice(at, cms.indexOf("\n}\n", at));
-};
+check("cms.ts 不再有前台讀消息（fetchNews／fetchNewsTicker）", /fetchNews/.test(cms), false);
+check("news-expiry 不再匯出 liveNews", "liveNews" in N, false);
+const newsPage = stripComments(readFile("src/routes/news.tsx"));
 check(
-  "fetchNews 回傳 liveNews(...)",
-  /return liveNews\(await fetchAllNews\(\), taipeiToday\(now\)\)/.test(fn("fetchNews")),
-  true,
-);
-const allNews = cms.slice(cms.indexOf("async function fetchAllNews("));
-check(
-  "fetchAllNews 裡面不過濾（過濾在退回內建消息之後）",
-  allNews.slice(0, allNews.indexOf("\n}\n")).includes("liveNews"),
-  false,
-);
-const ticker = fn("fetchNewsTicker");
-check(
-  "fetchNewsTicker 先 liveNews 再取前 limit 則",
-  /liveNews\(mapped, taipeiToday\(now\)\)\.slice\(0, limit\)/.test(ticker),
-  true,
-);
-check("fetchNewsTicker 過濾後不再退回內建消息", /liveNews[\s\S]*fallback\(\)/.test(ticker), false);
-const newsPage = readFile("src/routes/news.tsx");
-check("/news 空狀態：news.length === 0", newsPage.includes("news.length === 0"), true);
-check(
-  "/news 空狀態三語齊備",
-  /empty: \{\s*zh: "[^"]+",\s*en: "[^"]+",\s*ja: "[^"]+"/.test(newsPage),
+  "/news 只剩 301 轉址回首頁",
+  newsPage.includes('throw redirect({ to: "/", statusCode: 301 })') &&
+    !newsPage.includes("component"),
   true,
 );
 const adminList = readFile("src/routes/admin/_shell.news.tsx");

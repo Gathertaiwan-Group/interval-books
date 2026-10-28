@@ -77,7 +77,7 @@ const DETAIL = { zh: "活動詳情", en: "Event details", ja: "イベント詳�
  * 空了的時候使用者還有地方可以去（過去辦過的活動），「已結束」空了則沒有。
  *
  * 同一頁其他文案的慣例照舊 —— 三語常數當退路，實際顯示走 p.block() 讓
- * /admin/pages/events 可以改字。
+ * pages/'events' 的區塊（MCP update_page_blocks）可以改字。
  */
 const EMPTY_UPCOMING = {
   zh: "目前沒有開放報名的活動。新的場次公布前，歡迎先看看我們辦過什麼。",

@@ -87,7 +87,6 @@ export const UI = {
     thisMonth: { zh: "本月精選", en: "This Month", ja: "今月の特集" },
     featuredEvents: { zh: "精選活動", en: "Featured Events", ja: "特選イベント" },
     featuredJourney: { zh: "精選策旅", en: "Featured Journey", ja: "特選の旅" },
-    latestNews: { zh: "最新消息", en: "Latest News", ja: "お知らせ" },
   },
 } as const;
 

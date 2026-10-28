@@ -14,7 +14,6 @@ import {
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
-  FileText,
   Handshake,
   Inbox,
   KeyRound,
@@ -217,7 +216,6 @@ const NAV_GROUPS = [
       // src/lib/admin/fns/partnerships.ts 的 adminFnMiddleware。
       { to: "/admin/partnerships", label: "異業合作", icon: Inbox, staff: false },
       { to: "/admin/categories", label: "活動分類", icon: Tags, staff: false },
-      { to: "/admin/pages", label: "頁面文案", icon: FileText, staff: false },
     ],
   },
   {
@@ -329,7 +327,7 @@ function AdminShell() {
                   {group.items.map((item) => (
                     <SidebarMenuItem key={item.to}>
                       {/* 亮不亮由 isNavItemActive() 決定，不是 `pathname === item.to`。
-                          完全相符的那個寫法在有子頁的模組（/admin/pages/$slug、
+                          完全相符的那個寫法在有子頁的模組（/admin/news/$id、
                           /admin/events/$id）會讓**整條側欄都不亮**；直接換成
                           startsWith 又會讓「儀表板」在每一個子頁跟著亮，因為 /admin
                           是所有後台網址的前綴。兩件事的處理都在那支純函式裡，

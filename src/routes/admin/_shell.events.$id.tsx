@@ -10,8 +10,8 @@
  *
  * 原本這一切住在 /admin/events 的一個十一欄 Dialog 裡。Dialog 塞不下這個形狀 ——
  * 它沒有「上下順序」這個概念，也沒有地方放「這一段留空前台就不畫」這種說明。所以拆成
- * 列表頁（_shell.events.tsx）＋ 這一支獨立的組裝器路由，形狀照抄 repo 既有的先例
- * `_shell.pages.tsx` + `_shell.pages.$slug.tsx`。
+ * 列表頁（_shell.events.tsx）＋ 這一支獨立的組裝器路由，形狀照抄當時 repo 既有的先例
+ * 「頁面文案」的列表＋內頁（_shell.pages*.tsx，2026-10-29 隨該功能移除）。
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * 段號 1–11 從第一天就連號
@@ -838,7 +838,7 @@ function AdminEventAssemblerPage() {
                 <FormLabel>活動圖片（選填）</FormLabel>
                 {/* 🔴 雷 5：ImageField **不可以**包在 <FormControl>（Radix Slot）裡。
                     它是複合元件，不是 forwardRef 的原生元件，Slot 的 ref cloning 只會
-                    噴 warning。與 _shell.pages.$slug.tsx、_shell.exhibitions.tsx 同一個寫法。 */}
+                    噴 warning。與 _shell.exhibitions.tsx 同一個寫法。 */}
                 <ImageField
                   value={field.value ?? null}
                   onChange={field.onChange}

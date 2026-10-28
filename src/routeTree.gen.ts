@@ -36,6 +36,7 @@ import { Route as EventsIndexRouteImport } from './routes/events.index'
 import { Route as EventsSlugRouteImport } from './routes/events.$slug'
 import { Route as EventsCitySalon0922RouteImport } from './routes/events.city-salon-0922'
 import { Route as EventsSoundOfTheSeaRouteImport } from './routes/events.sound-of-the-sea'
+import { Route as NewsSplatRouteImport } from './routes/news.$'
 import { Route as OauthAuthorizeRouteImport } from './routes/oauth/authorize'
 import { Route as ShopIndexRouteImport } from './routes/shop.index'
 import { Route as ShopSlugRouteImport } from './routes/shop.$slug'
@@ -93,7 +94,7 @@ import { Route as AdminShellJourneysNewRouteImport } from './routes/admin/_shell
 import { Route as AdminShellNewsIdRouteImport } from './routes/admin/_shell.news_.$id'
 import { Route as AdminShellNewsNewRouteImport } from './routes/admin/_shell.news_.new'
 import { Route as AdminShellOrdersIdRouteImport } from './routes/admin/_shell.orders_.$id'
-import { Route as AdminShellPagesSlugRouteImport } from './routes/admin/_shell.pages.$slug'
+import { Route as AdminShellPagesSplatRouteImport } from './routes/admin/_shell.pages.$'
 import { Route as AdminShellPartnershipsIdRouteImport } from './routes/admin/_shell.partnerships_.$id'
 import { Route as AdminShellProductsCuratedThemesRouteImport } from './routes/admin/_shell.products_.curated-themes'
 import { Route as AdminShellReferralsIdRouteImport } from './routes/admin/_shell.referrals_.$id'
@@ -250,6 +251,11 @@ const EventsSoundOfTheSeaRoute = EventsSoundOfTheSeaRouteImport.update({
   id: '/events/sound-of-the-sea',
   path: '/events/sound-of-the-sea',
   getParentRoute: () => rootRouteImport,
+} as any)
+const NewsSplatRoute = NewsSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => NewsRoute,
 } as any)
 const OauthAuthorizeRoute = OauthAuthorizeRouteImport.update({
   id: '/oauth/authorize',
@@ -556,9 +562,9 @@ const AdminShellOrdersIdRoute = AdminShellOrdersIdRouteImport.update({
   path: '/orders/$id',
   getParentRoute: () => AdminShellRoute,
 } as any)
-const AdminShellPagesSlugRoute = AdminShellPagesSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
+const AdminShellPagesSplatRoute = AdminShellPagesSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
   getParentRoute: () => AdminShellPagesRoute,
 } as any)
 const AdminShellPartnershipsIdRoute =
@@ -693,7 +699,7 @@ export interface FileRoutesByFullPath {
   '/curated': typeof CuratedRoute
   '/curation': typeof CurationRoute
   '/journeys': typeof JourneysRoute
-  '/news': typeof NewsRoute
+  '/news': typeof NewsRouteWithChildren
   '/partnership': typeof PartnershipRoute
   '/privacy': typeof PrivacyRoute
   '/publications': typeof PublicationsRoute
@@ -710,6 +716,7 @@ export interface FileRoutesByFullPath {
   '/events/$slug': typeof EventsSlugRoute
   '/events/city-salon-0922': typeof EventsCitySalon0922Route
   '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
+  '/news/$': typeof NewsSplatRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/shop/$slug': typeof ShopSlugRoute
   '/vendor': typeof VendorShellRouteWithChildren
@@ -769,7 +776,7 @@ export interface FileRoutesByFullPath {
   '/admin/news/$id': typeof AdminShellNewsIdRoute
   '/admin/news/new': typeof AdminShellNewsNewRoute
   '/admin/orders/$id': typeof AdminShellOrdersIdRoute
-  '/admin/pages/$slug': typeof AdminShellPagesSlugRoute
+  '/admin/pages/$': typeof AdminShellPagesSplatRoute
   '/admin/partnerships/$id': typeof AdminShellPartnershipsIdRoute
   '/admin/products/curated-themes': typeof AdminShellProductsCuratedThemesRoute
   '/admin/referrals/$id': typeof AdminShellReferralsIdRoute
@@ -801,7 +808,7 @@ export interface FileRoutesByTo {
   '/curated': typeof CuratedRoute
   '/curation': typeof CurationRoute
   '/journeys': typeof JourneysRoute
-  '/news': typeof NewsRoute
+  '/news': typeof NewsRouteWithChildren
   '/partnership': typeof PartnershipRoute
   '/privacy': typeof PrivacyRoute
   '/publications': typeof PublicationsRoute
@@ -817,6 +824,7 @@ export interface FileRoutesByTo {
   '/events/$slug': typeof EventsSlugRoute
   '/events/city-salon-0922': typeof EventsCitySalon0922Route
   '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
+  '/news/$': typeof NewsSplatRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/shop/$slug': typeof ShopSlugRoute
   '/vendor/login': typeof VendorLoginRoute
@@ -872,7 +880,7 @@ export interface FileRoutesByTo {
   '/admin/news/$id': typeof AdminShellNewsIdRoute
   '/admin/news/new': typeof AdminShellNewsNewRoute
   '/admin/orders/$id': typeof AdminShellOrdersIdRoute
-  '/admin/pages/$slug': typeof AdminShellPagesSlugRoute
+  '/admin/pages/$': typeof AdminShellPagesSplatRoute
   '/admin/partnerships/$id': typeof AdminShellPartnershipsIdRoute
   '/admin/products/curated-themes': typeof AdminShellProductsCuratedThemesRoute
   '/admin/referrals/$id': typeof AdminShellReferralsIdRoute
@@ -904,7 +912,7 @@ export interface FileRoutesById {
   '/curated': typeof CuratedRoute
   '/curation': typeof CurationRoute
   '/journeys': typeof JourneysRoute
-  '/news': typeof NewsRoute
+  '/news': typeof NewsRouteWithChildren
   '/partnership': typeof PartnershipRoute
   '/privacy': typeof PrivacyRoute
   '/publications': typeof PublicationsRoute
@@ -921,6 +929,7 @@ export interface FileRoutesById {
   '/events/$slug': typeof EventsSlugRoute
   '/events/city-salon-0922': typeof EventsCitySalon0922Route
   '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
+  '/news/$': typeof NewsSplatRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/shop/$slug': typeof ShopSlugRoute
   '/vendor/_shell': typeof VendorShellRouteWithChildren
@@ -980,7 +989,7 @@ export interface FileRoutesById {
   '/admin/_shell/news_/$id': typeof AdminShellNewsIdRoute
   '/admin/_shell/news_/new': typeof AdminShellNewsNewRoute
   '/admin/_shell/orders_/$id': typeof AdminShellOrdersIdRoute
-  '/admin/_shell/pages/$slug': typeof AdminShellPagesSlugRoute
+  '/admin/_shell/pages/$': typeof AdminShellPagesSplatRoute
   '/admin/_shell/partnerships_/$id': typeof AdminShellPartnershipsIdRoute
   '/admin/_shell/products_/curated-themes': typeof AdminShellProductsCuratedThemesRoute
   '/admin/_shell/referrals_/$id': typeof AdminShellReferralsIdRoute
@@ -1031,6 +1040,7 @@ export interface FileRouteTypes {
     | '/events/$slug'
     | '/events/city-salon-0922'
     | '/events/sound-of-the-sea'
+    | '/news/$'
     | '/oauth/authorize'
     | '/shop/$slug'
     | '/vendor'
@@ -1090,7 +1100,7 @@ export interface FileRouteTypes {
     | '/admin/news/$id'
     | '/admin/news/new'
     | '/admin/orders/$id'
-    | '/admin/pages/$slug'
+    | '/admin/pages/$'
     | '/admin/partnerships/$id'
     | '/admin/products/curated-themes'
     | '/admin/referrals/$id'
@@ -1138,6 +1148,7 @@ export interface FileRouteTypes {
     | '/events/$slug'
     | '/events/city-salon-0922'
     | '/events/sound-of-the-sea'
+    | '/news/$'
     | '/oauth/authorize'
     | '/shop/$slug'
     | '/vendor/login'
@@ -1193,7 +1204,7 @@ export interface FileRouteTypes {
     | '/admin/news/$id'
     | '/admin/news/new'
     | '/admin/orders/$id'
-    | '/admin/pages/$slug'
+    | '/admin/pages/$'
     | '/admin/partnerships/$id'
     | '/admin/products/curated-themes'
     | '/admin/referrals/$id'
@@ -1241,6 +1252,7 @@ export interface FileRouteTypes {
     | '/events/$slug'
     | '/events/city-salon-0922'
     | '/events/sound-of-the-sea'
+    | '/news/$'
     | '/oauth/authorize'
     | '/shop/$slug'
     | '/vendor/_shell'
@@ -1300,7 +1312,7 @@ export interface FileRouteTypes {
     | '/admin/_shell/news_/$id'
     | '/admin/_shell/news_/new'
     | '/admin/_shell/orders_/$id'
-    | '/admin/_shell/pages/$slug'
+    | '/admin/_shell/pages/$'
     | '/admin/_shell/partnerships_/$id'
     | '/admin/_shell/products_/curated-themes'
     | '/admin/_shell/referrals_/$id'
@@ -1333,7 +1345,7 @@ export interface RootRouteChildren {
   CuratedRoute: typeof CuratedRoute
   CurationRoute: typeof CurationRoute
   JourneysRoute: typeof JourneysRoute
-  NewsRoute: typeof NewsRoute
+  NewsRoute: typeof NewsRouteWithChildren
   PartnershipRoute: typeof PartnershipRoute
   PrivacyRoute: typeof PrivacyRoute
   PublicationsRoute: typeof PublicationsRoute
@@ -1550,6 +1562,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/events/sound-of-the-sea'
       preLoaderRoute: typeof EventsSoundOfTheSeaRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/news/$': {
+      id: '/news/$'
+      path: '/$'
+      fullPath: '/news/$'
+      preLoaderRoute: typeof NewsSplatRouteImport
+      parentRoute: typeof NewsRoute
     }
     '/oauth/authorize': {
       id: '/oauth/authorize'
@@ -1950,11 +1969,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminShellOrdersIdRouteImport
       parentRoute: typeof AdminShellRoute
     }
-    '/admin/_shell/pages/$slug': {
-      id: '/admin/_shell/pages/$slug'
-      path: '/$slug'
-      fullPath: '/admin/pages/$slug'
-      preLoaderRoute: typeof AdminShellPagesSlugRouteImport
+    '/admin/_shell/pages/$': {
+      id: '/admin/_shell/pages/$'
+      path: '/$'
+      fullPath: '/admin/pages/$'
+      preLoaderRoute: typeof AdminShellPagesSplatRouteImport
       parentRoute: typeof AdminShellPagesRoute
     }
     '/admin/_shell/partnerships_/$id': {
@@ -2107,6 +2126,16 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface NewsRouteChildren {
+  NewsSplatRoute: typeof NewsSplatRoute
+}
+
+const NewsRouteChildren: NewsRouteChildren = {
+  NewsSplatRoute: NewsSplatRoute,
+}
+
+const NewsRouteWithChildren = NewsRoute._addFileChildren(NewsRouteChildren)
+
 interface AdminShellEventsRouteChildren {
   AdminShellEventsIdRoute: typeof AdminShellEventsIdRoute
 }
@@ -2119,11 +2148,11 @@ const AdminShellEventsRouteWithChildren =
   AdminShellEventsRoute._addFileChildren(AdminShellEventsRouteChildren)
 
 interface AdminShellPagesRouteChildren {
-  AdminShellPagesSlugRoute: typeof AdminShellPagesSlugRoute
+  AdminShellPagesSplatRoute: typeof AdminShellPagesSplatRoute
 }
 
 const AdminShellPagesRouteChildren: AdminShellPagesRouteChildren = {
-  AdminShellPagesSlugRoute: AdminShellPagesSlugRoute,
+  AdminShellPagesSplatRoute: AdminShellPagesSplatRoute,
 }
 
 const AdminShellPagesRouteWithChildren = AdminShellPagesRoute._addFileChildren(
@@ -2360,7 +2389,7 @@ const rootRouteChildren: RootRouteChildren = {
   CuratedRoute: CuratedRoute,
   CurationRoute: CurationRoute,
   JourneysRoute: JourneysRoute,
-  NewsRoute: NewsRoute,
+  NewsRoute: NewsRouteWithChildren,
   PartnershipRoute: PartnershipRoute,
   PrivacyRoute: PrivacyRoute,
   PublicationsRoute: PublicationsRoute,

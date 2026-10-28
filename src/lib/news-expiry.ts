@@ -17,8 +17,9 @@
  *   · 看不懂／空白 → null = 永不過期
  *   · 過期 = 結束日 < 今天（台北）。結束日當天整天都還顯示。
  *
- * 只有前台（/news、首頁跑馬燈）套用；後台一律全部列出並標「已過期・前台不顯示」，
- * MCP 讀取也不受影響。
+ * 原本前台（/news、首頁跑馬燈）用 liveNews() 過濾；2026-10-29 前台最新消息整個移除，
+ * liveNews 隨之刪掉。現在只剩後台用：列表標「已過期」（isNewsExpired）、表單即時預覽
+ * （parseNewsEndDate）。MCP 讀取不受影響。
  */
 import { taipeiToday } from "./taipei-time.ts";
 
@@ -103,12 +104,4 @@ export function isNewsExpired(
 ): boolean {
   const end = parseNewsEndDate(text);
   return end !== null && end < today;
-}
-
-/** 前台用：拿掉已過期的消息，順序不變。 */
-export function liveNews<T extends { date: string }>(
-  items: readonly T[],
-  today: string = taipeiToday(),
-): T[] {
-  return items.filter((n) => !isNewsExpired(n.date, today));
 }

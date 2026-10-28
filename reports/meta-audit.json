@@ -1,15 +1,17 @@
 {
-  "generatedAt": "2026-10-26T08:26:53.669Z",
+  "generatedAt": "2026-10-28T17:01:02.443Z",
   "summary": {
-    "routesAudited": 26,
-    "redirectRoutes": 4,
+    "routesAudited": 27,
+    "redirectRoutes": 6,
     "redirectRouteList": [
       "/contact",
       "/curated",
+      "/news.$",
+      "/news",
       "/publications",
       "/visit"
     ],
-    "metaAudited": 22,
+    "metaAudited": 21,
     "languages": [
       "zh",
       "en",
@@ -31,7 +33,7 @@
         "ogTitle",
         "ogDescription"
       ],
-      "approxChecks": 264
+      "approxChecks": 252
     }
   },
   "routes": {
@@ -149,10 +151,16 @@
       "redirect": false,
       "issues": []
     },
+    "/news.$": {
+      "file": "src/routes/news.$.tsx",
+      "ok": true,
+      "redirect": true,
+      "issues": []
+    },
     "/news": {
       "file": "src/routes/news.tsx",
       "ok": true,
-      "redirect": false,
+      "redirect": true,
       "issues": []
     },
     "/partnership": {

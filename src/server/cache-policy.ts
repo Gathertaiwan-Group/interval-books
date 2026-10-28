@@ -27,13 +27,8 @@
 
 /**
  * 逐字精確比對的路徑（不含結尾斜線、不含 query string）。
- *
- * /news（2026-10-26 加入）：最新消息只有一頁列表、沒有 /news/$slug，內容是後台發布的公開文字
- * （fetchNews 用 anon 公開讀取），不帶任何登入態或個資——與 /about、/privacy 同一類。後台改完
- * 最多一分鐘反映（s-maxage=60），與其他白名單頁相同；這個專案沒有主動清 CDN 的機制，失效就是
- * 那 60 秒。沒列進來之前每一次都要整頁 SSR（正式站量到 1 秒上下）。
  */
-const CACHEABLE_EXACT_PATHS = ["/", "/events", "/shop", "/about", "/privacy", "/news"];
+const CACHEABLE_EXACT_PATHS = ["/", "/events", "/shop", "/about", "/privacy"];
 
 /**
  * `/events/$slug` 與 `/shop/$slug`——只有這兩個路由真的有單一動態區段

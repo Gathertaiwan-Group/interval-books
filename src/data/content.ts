@@ -34,14 +34,6 @@ export interface JourneyItem {
   paymentEnabled: boolean;
 }
 
-export interface NewsItem {
-  id: string;
-  title: Localized;
-  summary: Localized;
-  description: Localized;
-  date: string;
-}
-
 export interface CuratedItem {
   name: Localized;
   note: Localized;
@@ -59,66 +51,6 @@ export interface CuratedTheme {
 export const events: EventItem[] = [];
 
 export const journeys: JourneyItem[] = [];
-
-export const news: NewsItem[] = [
-  {
-    id: "n-1",
-    title: {
-      zh: "夏季展覽預告｜「安靜的物件」\n 媽媽的味道 即將開幕\n",
-      en: "Summer preview: 'Quiet Objects' opens soon",
-      ja: "夏の展覧予告｜「静かな物たち」開幕",
-    },
-    summary: {
-      zh: "我們將於5月推出新一檔策展，邀請三位設計師共同呈現日用之美。",
-      en: "A new July show with three designers presenting the beauty of daily wares.",
-      ja: "七月、三名のデザイナーと日用の美を呈する新展を開きます。",
-    },
-    description: {
-      zh: "展期 2025.07.05 – 2025.08.31，更多細節將陸續釋出。",
-      en: "On view 2025.07.05 – 2025.08.31. More details to follow.",
-      ja: "会期 2025.07.05 – 2025.08.31。詳細は順次公開します。",
-    },
-    date: "2026.04.28",
-  },
-  {
-    id: "n-2",
-    title: {
-      zh: "公告｜5/2, 5/16 包場，不對外開放",
-      en: "Notice: Adjusted hours for the Dragon Boat holiday",
-      ja: "営業時間のお知らせ｜端午節連休",
-    },
-    summary: {
-      zh: "這2天沒有對外開放，敬請留意！\n需要訂書的朋友，請以官方Line聯繫。",
-      en: "May 31 – Jun 2: closing at 17:00.",
-      ja: "5/31 – 6/2 は 17:00 閉店となります。",
-    },
-    description: {
-      zh: "其餘時間維持原 11:00 – 19:00 營業。",
-      en: "Otherwise open as usual, 11:00 – 19:00.",
-      ja: "それ以外は通常通り 11:00 – 19:00 営業します。",
-    },
-    date: "2026.05.02",
-  },
-  {
-    id: "n-3",
-    title: {
-      zh: "策旅招募｜台東風土三日，04/30開放報名",
-      en: "Journey open: Alishan three-day, signup May 15",
-      ja: "旅の募集｜阿里山風土三日 5/15 受付開始",
-    },
-    summary: {
-      zh: "由主理人帶隊，與在地職人、書寫者一同踏訪山海大地。",
-      en: "Led by our owner with local tea makers and writers.",
-      ja: "店主が引率、地元の茶人と書き手とともに山道を歩きます。",
-    },
-    description: {
-      zh: "限額 12 人，詳情請見策旅頁面。",
-      en: "Limited to 12 guests. See Journeys for details.",
-      ja: "定員12名。詳細は「旅」のページへ。",
-    },
-    date: "2026.05.22–05.24",
-  },
-];
 
 export const curatedThemes: CuratedTheme[] = [
   {

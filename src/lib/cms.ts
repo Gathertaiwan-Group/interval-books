@@ -18,7 +18,6 @@ import type { Localized } from "@/i18n/types";
 import { EVENT_LIST_FIELDS, type EventListField } from "@/lib/event-blocks";
 import { excludeJourneyEvents } from "@/lib/journey-events";
 import { latestSessionEndDate } from "@/lib/event-status";
-import { liveNews } from "@/lib/news-expiry";
 import { taipeiToday } from "@/lib/taipei-time";
 import { eventProductSlug } from "@/lib/shop";
 import {
@@ -33,7 +32,6 @@ import {
 import {
   events as staticEvents,
   journeys as staticJourneys,
-  news as staticNews,
   curatedThemes as staticCuratedThemes,
   collaborations as staticCollaborations,
 } from "@/data/content";
@@ -224,14 +222,6 @@ export type JourneyEntry = {
   externalUrl: string;
 };
 
-export type NewsEntry = {
-  id: string;
-  title: Localized;
-  summary: Localized;
-  description: Localized;
-  date: string;
-};
-
 export type CuratedThemeEntry = {
   id: string;
   title: Localized;
@@ -335,14 +325,6 @@ export const FALLBACK_JOURNEYS: JourneyEntry[] = staticJourneys.map((j) => ({
   days: j.days,
   theme: j.theme,
   externalUrl: j.externalUrl,
-}));
-
-export const FALLBACK_NEWS: NewsEntry[] = staticNews.map((n) => ({
-  id: n.id,
-  title: n.title,
-  summary: n.summary,
-  description: n.description,
-  date: n.date,
 }));
 
 export const FALLBACK_CURATED_THEMES: CuratedThemeEntry[] = staticCuratedThemes.map((c) => ({
@@ -1067,69 +1049,6 @@ export async function fetchJourneys(): Promise<JourneyEntry[]> {
     });
   }
   return mapped.length ? mapped : FALLBACK_JOURNEYS;
-}
-
-/**
- * /news 用。**已過期的消息不回傳**（display_date 推得出結束日、且早於今天台北 —— 規則見
- * src/lib/news-expiry.ts）。過濾放在「退回內建消息」之後：全部過期時回空陣列（頁面顯示空狀態），
- * 不能因為過濾完沒東西就誤退回內建消息。
- */
-export async function fetchNews(now: Date = new Date()): Promise<NewsEntry[]> {
-  return liveNews(await fetchAllNews(), taipeiToday(now));
-}
-
-async function fetchAllNews(): Promise<NewsEntry[]> {
-  const rows = await select("news", "id,title,summary,description,display_date,sort_order", {
-    order: "sort_order",
-  });
-  if (!rows || !rows.length) return FALLBACK_NEWS;
-  const mapped: NewsEntry[] = [];
-  for (const r of rows) {
-    const title = loc(r.title);
-    const summary = loc(r.summary);
-    const description = loc(r.description);
-    if (!title || !summary || !description) continue;
-    mapped.push({
-      id: str(r.id),
-      title,
-      summary,
-      description,
-      date: str(r.display_date),
-    });
-  }
-  return mapped.length ? mapped : FALLBACK_NEWS;
-}
-
-/** /news 列表上每一則的錨點 id；首頁跑馬燈連到 `/news#${newsAnchorId(id)}`。 */
-export function newsAnchorId(id: string): string {
-  return `news-${id}`;
-}
-
-/** 首頁跑馬燈的一則：只要標題與日期，不帶摘要／內文。 */
-export type NewsTickerEntry = Pick<NewsEntry, "id" | "title" | "date">;
-
-/**
- * 首頁「最新消息」跑馬燈用。與 fetchNews() 同一張表、同一個排序、同一套公開可見規則
- * （RLS 只放行已發布的），但只 select 跑馬燈畫得到的欄位——摘要與內文常常是好幾百字，
- * 首頁用不到就不要搬。讀取失敗時退回內建消息（與 fetchNews 一致），所以 /news 與首頁看到的
- * 是同一批。
- */
-export async function fetchNewsTicker(
-  limit = 6,
-  now: Date = new Date(),
-): Promise<NewsTickerEntry[]> {
-  const rows = await select("news", "id,title,display_date,sort_order", { order: "sort_order" });
-  const fallback = () => FALLBACK_NEWS.map(({ id, title, date }) => ({ id, title, date }));
-  let mapped: NewsTickerEntry[] = [];
-  for (const r of rows ?? []) {
-    const title = loc(r.title);
-    if (!title) continue;
-    mapped.push({ id: str(r.id), title, date: str(r.display_date) });
-  }
-  if (!mapped.length) mapped = fallback();
-  // 與 fetchNews 同一條過期規則；先過濾再取前 limit 則，過期的不佔名額。全部過期 → []，
-  // NewsTicker 沒東西就整條不出現。
-  return liveNews(mapped, taipeiToday(now)).slice(0, limit);
 }
 
 /**

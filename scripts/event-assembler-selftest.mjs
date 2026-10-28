@@ -306,13 +306,13 @@ check(
   false,
 );
 check(
-  "🔴 既有的同一個 bug：/admin/pages/visit 讓「頁面文案」亮",
-  isNavItemActive("/admin/pages/visit", "/admin/pages"),
+  "🔴 既有的同一個 bug：/admin/news/abc 讓「最新消息」亮",
+  isNavItemActive("/admin/news/abc", "/admin/news"),
   true,
 );
 check(
-  "🔴 /admin/pages/visit 不會讓「儀表板」跟著亮",
-  isNavItemActive("/admin/pages/visit", "/admin"),
+  "🔴 /admin/news/abc 不會讓「儀表板」跟著亮",
+  isNavItemActive("/admin/news/abc", "/admin"),
   false,
 );
 check("/admin 本人讓「儀表板」亮", isNavItemActive("/admin", "/admin"), true);
@@ -348,7 +348,9 @@ checkTrue(
 );
 checkTrue("清單裡有「儀表板」/admin", NAV_TARGETS.includes("/admin"));
 checkTrue("清單裡有「活動」/admin/events", NAV_TARGETS.includes("/admin/events"));
-checkTrue("清單裡有「頁面文案」/admin/pages", NAV_TARGETS.includes("/admin/pages"));
+checkTrue("清單裡有「最新消息」/admin/news", NAV_TARGETS.includes("/admin/news"));
+// 2026-10-29 業主要求移除後台「頁面文案」；側欄不該再有 /admin/pages。
+checkTrue("清單裡已經沒有「頁面文案」/admin/pages", !NAV_TARGETS.includes("/admin/pages"));
 
 function activeItemsAt(pathname) {
   return NAV_TARGETS.filter((to) => isNavItemActive(pathname, to));
@@ -357,11 +359,9 @@ function activeItemsAt(pathname) {
 check("🔴 /admin/events/abc 時剛好一項亮，而且是「活動」", activeItemsAt("/admin/events/abc"), [
   "/admin/events",
 ]);
-check(
-  "🔴 /admin/pages/visit 時剛好一項亮，而且是「頁面文案」",
-  activeItemsAt("/admin/pages/visit"),
-  ["/admin/pages"],
-);
+check("🔴 /admin/news/abc 時剛好一項亮，而且是「最新消息」", activeItemsAt("/admin/news/abc"), [
+  "/admin/news",
+]);
 check("/admin 時剛好一項亮，而且是「儀表板」", activeItemsAt("/admin"), ["/admin"]);
 check("/admin/events 時剛好一項亮", activeItemsAt("/admin/events"), ["/admin/events"]);
 for (const to of NAV_TARGETS) {

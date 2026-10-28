@@ -93,7 +93,7 @@ export function PublicationForm({
             <FormItem>
               {/* 不包在 <FormControl>（Radix Slot）裡：ImageField 是複合元件，
                   不是 forwardRef 的原生元件，Slot 的 ref cloning 只會噴 warning。
-                  與 _shell.exhibitions.tsx、_shell.pages.$slug.tsx 同一個寫法；
+                  與 _shell.exhibitions.tsx 同一個寫法；
                   scripts/event-assembler-selftest.mjs 用 AST 掃整個 src/ 守著它。 */}
               <ImageField
                 label="封面"

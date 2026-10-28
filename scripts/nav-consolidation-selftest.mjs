@@ -522,7 +522,7 @@ walk(aboutLoader, (n) => {
     if (s) aboutSlugs.add(s);
   }
 });
-// 只讀 about 那一列的話，後台 /admin/pages/visit 的每一次編輯都會變成靜默無效。
+// 只讀 about 那一列的話，對 page_slug='visit' 的每一次修改都會變成靜默無效。
 check("/about loader 同時讀 about 與 visit 兩列", sorted(aboutSlugs), ["about", "visit"]);
 
 const aboutLoaderNames = new Set();

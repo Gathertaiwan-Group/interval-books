@@ -28,7 +28,7 @@ import { formatUpdatedAt } from "@/lib/admin/format";
 type EventRow = Awaited<ReturnType<typeof listEvents>>[number];
 
 /**
- * /admin/events 的**列表**，並且——與 src/routes/admin/_shell.pages.tsx 完全同一個
+ * /admin/events 的**列表**，並且——與當年的「頁面文案」列表（已移除）同一個
  * 理由——也是 src/routes/admin/_shell.events.$id.tsx 的結構性父層：TanStack Router 的
  * flat-routes 會把 routeId 前綴更長的檔案掛在最近的既有路由底下，而
  * "/admin/_shell/events/$id" 對 "/admin/_shell/events" 的前綴比對比對 "/admin/_shell"

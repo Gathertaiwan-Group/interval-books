@@ -4,8 +4,7 @@ import { CoverImage } from "@/components/CoverImage";
 import { HomeProductShelf } from "@/components/shop/HomeProductShelf";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
-import { fetchEvents, fetchJourneys, fetchNewsTicker, fetchPage, pageText } from "@/lib/cms";
-import { NewsTicker } from "@/components/NewsTicker";
+import { fetchEvents, fetchJourneys, fetchPage, pageText } from "@/lib/cms";
 import { useSiteContent } from "@/lib/site-content";
 import { isEventPast } from "@/lib/event-status";
 import { featureLayout } from "@/lib/feature-layout";
@@ -96,16 +95,13 @@ const SECTION_EYEBROWS = {
 export const Route = createFileRoute("/")({
   loader: async () => {
     // shelf：「主理人的選品」那一排商品卡，跟其他讀取平行，不多一段等待。
-    // news：頁首下方的「最新消息」跑馬燈（2026-10-26 取代原本頁底那三張長卡片），
-    //       只讀標題與日期，最多 6 則。
-    const [page, events, journeys, news, shelf] = await Promise.all([
+    const [page, events, journeys, shelf] = await Promise.all([
       fetchPage("index"),
       fetchEvents(),
       fetchJourneys(),
-      fetchNewsTicker(6),
       fetchHomeShelfProducts(4),
     ]);
-    return { page, events, journeys, news, shelf };
+    return { page, events, journeys, shelf };
   },
   head: ({ loaderData }) => {
     const p = pageText(loaderData?.page ?? null);
@@ -126,7 +122,7 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const t = useT();
-  const { page, events, journeys, news, shelf } = Route.useLoaderData();
+  const { page, events, journeys, shelf } = Route.useLoaderData();
   const shelfProducts = shelf.products;
 
   // 策旅與活動用同一種卡片、同一套版面規則（見 featureLayout），所以這裡也
@@ -153,9 +149,6 @@ function Index() {
 
   return (
     <PageShell>
-      {/* 最新消息跑馬燈：緊貼頁首下方、只在首頁出現；沒有任何一則就整條不出現 */}
-      <NewsTicker items={news} />
-
       {/* Hero */}
       <section className="container-editorial pt-16 md:pt-24 pb-20">
         <div className="grid lg:grid-cols-12 gap-10 lg:gap-16 items-end">

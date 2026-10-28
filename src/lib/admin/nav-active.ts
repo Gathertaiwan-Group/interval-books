@@ -3,8 +3,8 @@
  *
  * ── 為什麼這是一個檔案，而不是側欄裡的一行 ──────────────────────────────────
  * 原本的寫法是 `isActive={pathname === item.to}`：完全相符才亮。那條規則在每一個
- * 模組都只有一頁的時候是對的，但只要有一個模組長出子頁（/admin/pages/$slug，
- * 現在再加上 /admin/events/$id），它就會**整條側欄都不亮** —— 使用者站在一個深層
+ * 模組都只有一頁的時候是對的，但只要有一個模組長出子頁（當年是
+ * /admin/pages/$slug——2026-10-29 已移除，現在是 /admin/events/$id、/admin/news/$id），它就會**整條側欄都不亮** —— 使用者站在一個深層
  * 編輯頁裡，側欄看起來像「不在任何模組內」。
  *
  * 換成 `pathname.startsWith(item.to)` 會換到另一個更糟的 bug：`/admin` 是每一個
@@ -35,7 +35,7 @@ function normalize(pathname: string): string {
  * · `/admin`（儀表板）—— **只有**完全相符才亮。它是所有後台網址的前綴，用前綴比對
  *   會讓它在每一個子頁跟著亮，於是側欄同時有兩項亮著。
  * · 其他項目 —— 自己那一頁，以及它底下的子頁（`/admin/events/abc` 讓「活動」亮）。
- *   比對到 `${to}/` 而不是 `to`，是為了不讓 `/admin/pages` 因為 `/admin/pages-x`
+ *   比對到 `${to}/` 而不是 `to`，是為了不讓 `/admin/news` 因為 `/admin/news-x`
  *   這種**別的模組**而亮。
  */
 export function isNavItemActive(pathname: string, to: string): boolean {
