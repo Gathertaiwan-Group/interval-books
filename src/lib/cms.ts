@@ -793,6 +793,39 @@ async function fetchAllEventRows(): Promise<EventEntry[]> {
 }
 
 /**
+ * /journeys「過往策旅」用：每場活動判斷「已結束」與畫卡片所需的最少欄位。
+ *
+ * journeys 表沒有日期，一趟策旅的日期與場次在它指向的那一列 events 上（見
+ * src/lib/journey-events.ts、src/lib/past-shelf.ts）。只 select 用得到的欄位，
+ * 場次結束日與 fetchEvents() 同一支 attachLastSessionDates()（同一條「已結束」規則）。
+ * 讀取失敗 → 空陣列：沒有任何策旅會被判成已結束，/journeys 退回原本的樣子。
+ */
+export type JourneyEventDateRow = {
+  slug: string;
+  externalUrl: string;
+  date: string;
+  isoDate: string | null;
+  imageKey: string | null;
+  lastSessionDate: string | null;
+};
+
+export async function fetchJourneyEventDates(): Promise<JourneyEventDateRow[]> {
+  const rows = await select("events", "slug,external_url,display_date,iso_date,image_key");
+  if (!rows || !rows.length) return [];
+  const mapped: JourneyEventDateRow[] = rows
+    .map((r) => ({
+      slug: str(r.slug),
+      externalUrl: str(r.external_url),
+      date: str(r.display_date),
+      isoDate: nullableStr(r.iso_date),
+      imageKey: nullableStr(r.image_key),
+      lastSessionDate: null,
+    }))
+    .filter((r) => r.slug);
+  return await attachLastSessionDates(mapped);
+}
+
+/**
  * 替每場活動補上 lastSessionDate —— 一次查詢：售票商品（`event-<slug>`）連同它的
  * 場次一起 embed 回來（event_sessions.product_id → products.id 的外鍵）。
  *
@@ -800,7 +833,9 @@ async function fetchAllEventRows(): Promise<EventEntry[]> {
  * 讀取失敗 → 原樣回傳（lastSessionDate 全是 null），也就是退回 iso_date 的舊規則：
  * 這一步只能讓活動**多留**在報名中，所以失敗不需要比舊行為更保守。
  */
-async function attachLastSessionDates(events: EventEntry[]): Promise<EventEntry[]> {
+async function attachLastSessionDates<T extends { slug: string; lastSessionDate: string | null }>(
+  events: T[],
+): Promise<T[]> {
   const bySlug = new Map(events.map((e) => [eventProductSlug(e.slug), e]));
   const rows = await select("products", "slug,event_sessions(starts_at,ends_at)", {
     in: ["slug", [...bySlug.keys()]],

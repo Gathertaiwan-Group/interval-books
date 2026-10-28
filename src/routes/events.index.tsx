@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { isEventPast } from "@/lib/event-status";
 import { PageShell, PageHeader } from "@/components/PageShell";
 import { CoverImage } from "@/components/CoverImage";
+import { PastShelf } from "@/components/PastShelf";
+import { newestEndedFirst } from "@/lib/past-shelf";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { eyebrowOf, fetchEventCategories, fetchEvents, fetchPage, pageText } from "@/lib/cms";
@@ -93,6 +95,18 @@ const SEE_PAST = {
   ja: "過去のイベントを見る",
 };
 
+/**
+ * 「過往活動」卡片區（2026-10-28 店長：「這邊下方，幫我多一區，用卡片的形式，去展現
+ * 已經辦過的活動」）。畫在「報名中」列表下方，訪客不必切分頁就看得到辦過什麼；
+ * 「查看全部」切到既有的「已結束」分頁（那一格本身不動）。資料就是同一份 events，
+ * 不多查一次。
+ */
+const PAST_SHELF = {
+  eyebrow: { zh: "PAST EVENTS", en: "PAST EVENTS", ja: "PAST EVENTS" },
+  title: { zh: "過往活動", en: "Past events", ja: "これまでのイベント" },
+  cta: { zh: "查看全部已結束活動", en: "See all past events", ja: "終了したイベントをすべて見る" },
+};
+
 export const Route = createFileRoute("/events/")({
   loader: async () => {
     const [page, events, categories] = await Promise.all([
@@ -160,6 +174,12 @@ function Events() {
   // 2 場兩欄，3 場以上 md 兩欄／lg 三欄。算的是「目前這一格」的筆數，切到
   // 「已結束」會跟著重算。0 場不畫格線，走下面的空狀態。
   const layout = featureLayout(list.length);
+  const pastShelf = newestEndedFirst(events);
+  const filtersRef = useRef<HTMLElement>(null);
+  const showAllPast = () => {
+    setFilter(PAST_FILTER);
+    filtersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
     <PageShell>
@@ -180,7 +200,10 @@ function Events() {
         </div>
       </section>
 
-      <section className="container-editorial pb-12 flex flex-wrap gap-3 text-xs tracking-widest">
+      <section
+        ref={filtersRef}
+        className="container-editorial pb-12 flex flex-wrap gap-3 text-xs tracking-widest scroll-mt-24"
+      >
         {filterIds.map((f) => {
           const label =
             f === PAST_FILTER
@@ -292,6 +315,35 @@ function Events() {
           ))}
         </section>
       )}
+
+      {/* 只在「報名中」這一格畫：切到「已結束」時上面的列表就是完整版，再畫一次是重複。 */}
+      {filter !== PAST_FILTER ? (
+        <PastShelf
+          testId="events-past-shelf"
+          eyebrow={t(p.block("past.eyebrow", PAST_SHELF.eyebrow))}
+          title={t(p.block("past.title", PAST_SHELF.title))}
+          badge={t(p.block("filters.pastBadge", PAST_BADGE))}
+          items={pastShelf.map((e) => ({
+            key: e.id,
+            title: t(e.title),
+            category: t(
+              labelById.get(e.category) ?? { zh: e.category, en: e.category, ja: e.category },
+            ),
+            date: e.date,
+            image: e.imageKey ? imageFor(e.imageKey, eventImg) : null,
+            link: { kind: "event", slug: e.slug },
+          }))}
+          cta={
+            <button
+              type="button"
+              onClick={showAllPast}
+              className="inline-block tracking-widest text-clay hover-underline text-base"
+            >
+              {t(p.block("past.cta", PAST_SHELF.cta))} →
+            </button>
+          }
+        />
+      ) : null}
     </PageShell>
   );
 }
