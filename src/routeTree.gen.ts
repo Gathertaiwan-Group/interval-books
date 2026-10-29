@@ -35,6 +35,7 @@ import { Route as CheckoutCompleteRouteImport } from './routes/checkout.complete
 import { Route as EventsIndexRouteImport } from './routes/events.index'
 import { Route as EventsSlugRouteImport } from './routes/events.$slug'
 import { Route as EventsCitySalon0922RouteImport } from './routes/events.city-salon-0922'
+import { Route as EventsKungtungRouteImport } from './routes/events.kungtung'
 import { Route as EventsSoundOfTheSeaRouteImport } from './routes/events.sound-of-the-sea'
 import { Route as NewsSplatRouteImport } from './routes/news.$'
 import { Route as OauthAuthorizeRouteImport } from './routes/oauth/authorize'
@@ -103,6 +104,8 @@ import { Route as AdminShellRegistrationsSessionIdRouteImport } from './routes/a
 import { Route as AdminShellRegistrationsNewRouteImport } from './routes/admin/_shell.registrations_.new'
 import { Route as AdminShellSalesSaleIdRouteImport } from './routes/admin/_shell.sales_.$saleId'
 import { Route as AdminShellStaffIdRouteImport } from './routes/admin/_shell.staff_.$id'
+import { Route as EventsKungtungHostsAliceRouteImport } from './routes/events.kungtung_.hosts.alice'
+import { Route as EventsKungtungHostsFanYishunRouteImport } from './routes/events.kungtung_.hosts.fan-yishun'
 import { Route as AdminShellInventoryCombosIdIndexRouteImport } from './routes/admin/_shell.inventory-combos_.$id.index'
 import { Route as AdminShellInventoryCombosIdEditRouteImport } from './routes/admin/_shell.inventory-combos_.$id.edit'
 import { Route as AdminShellInventoryProductsIdIndexRouteImport } from './routes/admin/_shell.inventory-products_.$id.index'
@@ -245,6 +248,11 @@ const EventsSlugRoute = EventsSlugRouteImport.update({
 const EventsCitySalon0922Route = EventsCitySalon0922RouteImport.update({
   id: '/events/city-salon-0922',
   path: '/events/city-salon-0922',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsKungtungRoute = EventsKungtungRouteImport.update({
+  id: '/events/kungtung',
+  path: '/events/kungtung',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EventsSoundOfTheSeaRoute = EventsSoundOfTheSeaRouteImport.update({
@@ -611,6 +619,18 @@ const AdminShellStaffIdRoute = AdminShellStaffIdRouteImport.update({
   path: '/staff/$id',
   getParentRoute: () => AdminShellRoute,
 } as any)
+const EventsKungtungHostsAliceRoute =
+  EventsKungtungHostsAliceRouteImport.update({
+    id: '/events/kungtung_/hosts/alice',
+    path: '/events/kungtung/hosts/alice',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const EventsKungtungHostsFanYishunRoute =
+  EventsKungtungHostsFanYishunRouteImport.update({
+    id: '/events/kungtung_/hosts/fan-yishun',
+    path: '/events/kungtung/hosts/fan-yishun',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AdminShellInventoryCombosIdIndexRoute =
   AdminShellInventoryCombosIdIndexRouteImport.update({
     id: '/',
@@ -715,6 +735,7 @@ export interface FileRoutesByFullPath {
   '/checkout/complete': typeof CheckoutCompleteRoute
   '/events/$slug': typeof EventsSlugRoute
   '/events/city-salon-0922': typeof EventsCitySalon0922Route
+  '/events/kungtung': typeof EventsKungtungRoute
   '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
   '/news/$': typeof NewsSplatRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
@@ -785,6 +806,8 @@ export interface FileRoutesByFullPath {
   '/admin/registrations/new': typeof AdminShellRegistrationsNewRoute
   '/admin/sales/$saleId': typeof AdminShellSalesSaleIdRoute
   '/admin/staff/$id': typeof AdminShellStaffIdRoute
+  '/events/kungtung/hosts/alice': typeof EventsKungtungHostsAliceRoute
+  '/events/kungtung/hosts/fan-yishun': typeof EventsKungtungHostsFanYishunRoute
   '/admin/inventory-combos/$id/edit': typeof AdminShellInventoryCombosIdEditRoute
   '/admin/inventory-products/$id/edit': typeof AdminShellInventoryProductsIdEditRoute
   '/admin/inventory-vendors/$id/edit': typeof AdminShellInventoryVendorsIdEditRoute
@@ -823,6 +846,7 @@ export interface FileRoutesByTo {
   '/checkout/complete': typeof CheckoutCompleteRoute
   '/events/$slug': typeof EventsSlugRoute
   '/events/city-salon-0922': typeof EventsCitySalon0922Route
+  '/events/kungtung': typeof EventsKungtungRoute
   '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
   '/news/$': typeof NewsSplatRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
@@ -888,6 +912,8 @@ export interface FileRoutesByTo {
   '/admin/registrations/new': typeof AdminShellRegistrationsNewRoute
   '/admin/sales/$saleId': typeof AdminShellSalesSaleIdRoute
   '/admin/staff/$id': typeof AdminShellStaffIdRoute
+  '/events/kungtung/hosts/alice': typeof EventsKungtungHostsAliceRoute
+  '/events/kungtung/hosts/fan-yishun': typeof EventsKungtungHostsFanYishunRoute
   '/admin/inventory-combos/$id/edit': typeof AdminShellInventoryCombosIdEditRoute
   '/admin/inventory-products/$id/edit': typeof AdminShellInventoryProductsIdEditRoute
   '/admin/inventory-vendors/$id/edit': typeof AdminShellInventoryVendorsIdEditRoute
@@ -928,6 +954,7 @@ export interface FileRoutesById {
   '/checkout/complete': typeof CheckoutCompleteRoute
   '/events/$slug': typeof EventsSlugRoute
   '/events/city-salon-0922': typeof EventsCitySalon0922Route
+  '/events/kungtung': typeof EventsKungtungRoute
   '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
   '/news/$': typeof NewsSplatRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
@@ -998,6 +1025,8 @@ export interface FileRoutesById {
   '/admin/_shell/registrations_/new': typeof AdminShellRegistrationsNewRoute
   '/admin/_shell/sales_/$saleId': typeof AdminShellSalesSaleIdRoute
   '/admin/_shell/staff_/$id': typeof AdminShellStaffIdRoute
+  '/events/kungtung_/hosts/alice': typeof EventsKungtungHostsAliceRoute
+  '/events/kungtung_/hosts/fan-yishun': typeof EventsKungtungHostsFanYishunRoute
   '/admin/_shell/inventory-combos_/$id/edit': typeof AdminShellInventoryCombosIdEditRoute
   '/admin/_shell/inventory-products_/$id/edit': typeof AdminShellInventoryProductsIdEditRoute
   '/admin/_shell/inventory-vendors_/$id/edit': typeof AdminShellInventoryVendorsIdEditRoute
@@ -1039,6 +1068,7 @@ export interface FileRouteTypes {
     | '/checkout/complete'
     | '/events/$slug'
     | '/events/city-salon-0922'
+    | '/events/kungtung'
     | '/events/sound-of-the-sea'
     | '/news/$'
     | '/oauth/authorize'
@@ -1109,6 +1139,8 @@ export interface FileRouteTypes {
     | '/admin/registrations/new'
     | '/admin/sales/$saleId'
     | '/admin/staff/$id'
+    | '/events/kungtung/hosts/alice'
+    | '/events/kungtung/hosts/fan-yishun'
     | '/admin/inventory-combos/$id/edit'
     | '/admin/inventory-products/$id/edit'
     | '/admin/inventory-vendors/$id/edit'
@@ -1147,6 +1179,7 @@ export interface FileRouteTypes {
     | '/checkout/complete'
     | '/events/$slug'
     | '/events/city-salon-0922'
+    | '/events/kungtung'
     | '/events/sound-of-the-sea'
     | '/news/$'
     | '/oauth/authorize'
@@ -1212,6 +1245,8 @@ export interface FileRouteTypes {
     | '/admin/registrations/new'
     | '/admin/sales/$saleId'
     | '/admin/staff/$id'
+    | '/events/kungtung/hosts/alice'
+    | '/events/kungtung/hosts/fan-yishun'
     | '/admin/inventory-combos/$id/edit'
     | '/admin/inventory-products/$id/edit'
     | '/admin/inventory-vendors/$id/edit'
@@ -1251,6 +1286,7 @@ export interface FileRouteTypes {
     | '/checkout/complete'
     | '/events/$slug'
     | '/events/city-salon-0922'
+    | '/events/kungtung'
     | '/events/sound-of-the-sea'
     | '/news/$'
     | '/oauth/authorize'
@@ -1321,6 +1357,8 @@ export interface FileRouteTypes {
     | '/admin/_shell/registrations_/new'
     | '/admin/_shell/sales_/$saleId'
     | '/admin/_shell/staff_/$id'
+    | '/events/kungtung_/hosts/alice'
+    | '/events/kungtung_/hosts/fan-yishun'
     | '/admin/_shell/inventory-combos_/$id/edit'
     | '/admin/_shell/inventory-products_/$id/edit'
     | '/admin/_shell/inventory-vendors_/$id/edit'
@@ -1361,6 +1399,7 @@ export interface RootRouteChildren {
   CheckoutCompleteRoute: typeof CheckoutCompleteRoute
   EventsSlugRoute: typeof EventsSlugRoute
   EventsCitySalon0922Route: typeof EventsCitySalon0922Route
+  EventsKungtungRoute: typeof EventsKungtungRoute
   EventsSoundOfTheSeaRoute: typeof EventsSoundOfTheSeaRoute
   OauthAuthorizeRoute: typeof OauthAuthorizeRoute
   ShopSlugRoute: typeof ShopSlugRoute
@@ -1370,6 +1409,8 @@ export interface RootRouteChildren {
   CheckoutIndexRoute: typeof CheckoutIndexRoute
   EventsIndexRoute: typeof EventsIndexRoute
   ShopIndexRoute: typeof ShopIndexRoute
+  EventsKungtungHostsAliceRoute: typeof EventsKungtungHostsAliceRoute
+  EventsKungtungHostsFanYishunRoute: typeof EventsKungtungHostsFanYishunRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1554,6 +1595,13 @@ declare module '@tanstack/react-router' {
       path: '/events/city-salon-0922'
       fullPath: '/events/city-salon-0922'
       preLoaderRoute: typeof EventsCitySalon0922RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/kungtung': {
+      id: '/events/kungtung'
+      path: '/events/kungtung'
+      fullPath: '/events/kungtung'
+      preLoaderRoute: typeof EventsKungtungRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/events/sound-of-the-sea': {
@@ -2032,6 +2080,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminShellStaffIdRouteImport
       parentRoute: typeof AdminShellRoute
     }
+    '/events/kungtung_/hosts/alice': {
+      id: '/events/kungtung_/hosts/alice'
+      path: '/events/kungtung/hosts/alice'
+      fullPath: '/events/kungtung/hosts/alice'
+      preLoaderRoute: typeof EventsKungtungHostsAliceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/kungtung_/hosts/fan-yishun': {
+      id: '/events/kungtung_/hosts/fan-yishun'
+      path: '/events/kungtung/hosts/fan-yishun'
+      fullPath: '/events/kungtung/hosts/fan-yishun'
+      preLoaderRoute: typeof EventsKungtungHostsFanYishunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/_shell/inventory-combos_/$id/': {
       id: '/admin/_shell/inventory-combos_/$id/'
       path: '/'
@@ -2405,6 +2467,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutCompleteRoute: CheckoutCompleteRoute,
   EventsSlugRoute: EventsSlugRoute,
   EventsCitySalon0922Route: EventsCitySalon0922Route,
+  EventsKungtungRoute: EventsKungtungRoute,
   EventsSoundOfTheSeaRoute: EventsSoundOfTheSeaRoute,
   OauthAuthorizeRoute: OauthAuthorizeRoute,
   ShopSlugRoute: ShopSlugRoute,
@@ -2414,6 +2477,8 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutIndexRoute: CheckoutIndexRoute,
   EventsIndexRoute: EventsIndexRoute,
   ShopIndexRoute: ShopIndexRoute,
+  EventsKungtungHostsAliceRoute: EventsKungtungHostsAliceRoute,
+  EventsKungtungHostsFanYishunRoute: EventsKungtungHostsFanYishunRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -64,3 +64,18 @@ export function useLang() {
 export function useT() {
   return useLang().t;
 }
+
+/**
+ * 讓一段子樹固定用某一種語言顯示，不管訪客選了什麼。給「只有中文版」的獨立著陸頁用
+ * （例：events.kungtung.tsx 的報名區），共用的 SessionPicker／PlanPicker 才不會在
+ * 中文頁面裡冒出英文。setLang 原封轉給外層，不改訪客記住的語言偏好。
+ */
+export function FixedLanguage({ lang, children }: { lang: Lang; children: ReactNode }) {
+  const parent = useLang();
+  const t = (entry: Localized) => entry[lang] || entry.zh;
+  return (
+    <LanguageContext.Provider value={{ lang, setLang: parent.setLang, t }}>
+      {children}
+    </LanguageContext.Provider>
+  );
+}

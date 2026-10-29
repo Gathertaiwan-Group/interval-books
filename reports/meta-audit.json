@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-28T17:01:02.443Z",
+  "generatedAt": "2026-10-29T06:06:15.486Z",
   "summary": {
-    "routesAudited": 27,
+    "routesAudited": 30,
     "redirectRoutes": 6,
     "redirectRouteList": [
       "/contact",
@@ -11,7 +11,7 @@
       "/publications",
       "/visit"
     ],
-    "metaAudited": 21,
+    "metaAudited": 24,
     "languages": [
       "zh",
       "en",
@@ -33,7 +33,7 @@
         "ogTitle",
         "ogDescription"
       ],
-      "approxChecks": 252
+      "approxChecks": 288
     }
   },
   "routes": {
@@ -129,6 +129,24 @@
     },
     "/events.index": {
       "file": "src/routes/events.index.tsx",
+      "ok": true,
+      "redirect": false,
+      "issues": []
+    },
+    "/events.kungtung": {
+      "file": "src/routes/events.kungtung.tsx",
+      "ok": true,
+      "redirect": false,
+      "issues": []
+    },
+    "/events.kungtung_.hosts.alice": {
+      "file": "src/routes/events.kungtung_.hosts.alice.tsx",
+      "ok": true,
+      "redirect": false,
+      "issues": []
+    },
+    "/events.kungtung_.hosts.fan-yishun": {
+      "file": "src/routes/events.kungtung_.hosts.fan-yishun.tsx",
       "ok": true,
       "redirect": false,
       "issues": []
