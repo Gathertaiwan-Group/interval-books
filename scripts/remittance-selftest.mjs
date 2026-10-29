@@ -401,7 +401,7 @@ const checkout = await import(pathToFileURL(join(ROOT, "src/lib/checkout.ts")).h
   const full = {
     bankName: "中國信託銀行",
     bankCode: "822",
-    bankAccount: "0000406540362705",
+    bankAccount: "0000123456789012",
     accountName: "好日子股份有限公司",
   };
   check("四欄齊全 → configured", checkout.remittanceConfigured(full), true);
@@ -491,7 +491,7 @@ const tpl = await import(pathToFileURL(join(ROOT, "src/lib/email-templates.ts"))
     total: 1800,
     bankName: "中國信託銀行",
     bankCode: "822",
-    bankAccount: "0000406540362705",
+    bankAccount: "0000123456789012",
     accountName: "好日子股份有限公司",
     dueAt: "2026-09-06T01:00:00.000Z",
     orderUrl: "https://intervalbooks.tw/checkout/complete?token=abc123",
@@ -505,7 +505,7 @@ const tpl = await import(pathToFileURL(join(ROOT, "src/lib/email-templates.ts"))
   checkTrue("有戶名", mail.text.includes("好日子股份有限公司"));
   checkTrue("有銀行", mail.text.includes("中國信託銀行"));
   checkTrue("有銀行代號", mail.text.includes("822"));
-  checkTrue("有帳號", mail.text.includes("0000406540362705"));
+  checkTrue("有帳號", mail.text.includes("0000123456789012"));
   checkTrue("有匯款期限（台北時區）", /2026\/09\/06\s+09:00/.test(mail.text));
   // 🔴 那條「回訂單頁填末五碼」的連結。純文字版要印出整條網址（純文字信裡沒有
   //    可以點的東西，藏起來的網址等於沒有網址）。
@@ -517,7 +517,7 @@ const tpl = await import(pathToFileURL(join(ROOT, "src/lib/email-templates.ts"))
   // 空欄位不印整列 —— 一個「銀行代號：」後面空白的欄位會讓人以為資料掉了。
   const noCode = tpl.renderRemittanceEmail({ ...input, bankCode: "" }, undefined, "zh");
   check("銀行代號是空的就不印那一列", /銀行代號/.test(noCode.text), false);
-  checkTrue("但帳號還在", noCode.text.includes("0000406540362705"));
+  checkTrue("但帳號還在", noCode.text.includes("0000123456789012"));
 
   // 期限算不出來就整列不印。
   const noDue = tpl.renderRemittanceEmail({ ...input, dueAt: null }, undefined, "zh");
@@ -528,7 +528,7 @@ const tpl = await import(pathToFileURL(join(ROOT, "src/lib/email-templates.ts"))
   for (const lang of ["zh", "en", "ja"]) {
     const m = tpl.renderRemittanceEmail(input, undefined, lang);
     checkTrue(`${lang} 渲染得出來`, m.subject.length > 0 && m.text.length > 0);
-    checkTrue(`${lang} 帳號還在`, m.text.includes("0000406540362705"));
+    checkTrue(`${lang} 帳號還在`, m.text.includes("0000123456789012"));
   }
   const en = tpl.renderRemittanceEmail(input, undefined, "en");
   checkTrue("en 用的是英文標籤", en.text.includes("Account name"));
@@ -1365,7 +1365,7 @@ if (!PG_URL) {
         `
         update public.site_settings
            set bank_name = '中國信託銀行', bank_code = '822',
-               bank_account = '0000406540362705', bank_account_name = '好日子股份有限公司'
+               bank_account = '0000123456789012', bank_account_name = '好日子股份有限公司'
          where id = 1;
       `,
         false,
@@ -1415,7 +1415,7 @@ if (!PG_URL) {
         "A：匯款信內文有可用的回填連結",
         bodyA.includes(`https://intervalbooks.tw/checkout/complete?token=`),
       );
-      checkTrue("A：匯款信內文有帳號", bodyA.includes("0000406540362705"));
+      checkTrue("A：匯款信內文有帳號", bodyA.includes("0000123456789012"));
 
       // ── 情況 B：SITE_URL 沒設 → 匯款信**不寄**，店家那封照寄 ──────────────
       // 🔴 這正是 IB-202600001191 那次事故的環境狀態（SITE_URL 從來沒設在 Vercel）。

@@ -57,6 +57,7 @@ import { Route as AdminShellInventoryListingRouteImport } from './routes/admin/_
 import { Route as AdminShellInventoryProductsRouteImport } from './routes/admin/_shell.inventory-products'
 import { Route as AdminShellInventoryPurchasesRouteImport } from './routes/admin/_shell.inventory-purchases'
 import { Route as AdminShellInventoryVendorsRouteImport } from './routes/admin/_shell.inventory-vendors'
+import { Route as AdminShellJourneyWishesRouteImport } from './routes/admin/_shell.journey-wishes'
 import { Route as AdminShellJourneysRouteImport } from './routes/admin/_shell.journeys'
 import { Route as AdminShellMcpConnectionsRouteImport } from './routes/admin/_shell.mcp-connections'
 import { Route as AdminShellNewsRouteImport } from './routes/admin/_shell.news'
@@ -90,6 +91,7 @@ import { Route as AdminShellInventoryPurchasesIdRouteImport } from './routes/adm
 import { Route as AdminShellInventoryPurchasesNewRouteImport } from './routes/admin/_shell.inventory-purchases_.new'
 import { Route as AdminShellInventoryVendorsIdRouteImport } from './routes/admin/_shell.inventory-vendors_.$id'
 import { Route as AdminShellInventoryVendorsNewRouteImport } from './routes/admin/_shell.inventory-vendors_.new'
+import { Route as AdminShellJourneyWishesIdRouteImport } from './routes/admin/_shell.journey-wishes_.$id'
 import { Route as AdminShellJourneysIdRouteImport } from './routes/admin/_shell.journeys_.$id'
 import { Route as AdminShellJourneysNewRouteImport } from './routes/admin/_shell.journeys_.new'
 import { Route as AdminShellNewsIdRouteImport } from './routes/admin/_shell.news_.$id'
@@ -368,6 +370,11 @@ const AdminShellInventoryVendorsRoute =
     path: '/inventory-vendors',
     getParentRoute: () => AdminShellRoute,
   } as any)
+const AdminShellJourneyWishesRoute = AdminShellJourneyWishesRouteImport.update({
+  id: '/journey-wishes',
+  path: '/journey-wishes',
+  getParentRoute: () => AdminShellRoute,
+} as any)
 const AdminShellJourneysRoute = AdminShellJourneysRouteImport.update({
   id: '/journeys',
   path: '/journeys',
@@ -543,6 +550,12 @@ const AdminShellInventoryVendorsNewRoute =
   AdminShellInventoryVendorsNewRouteImport.update({
     id: '/inventory-vendors_/new',
     path: '/inventory-vendors/new',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
+const AdminShellJourneyWishesIdRoute =
+  AdminShellJourneyWishesIdRouteImport.update({
+    id: '/journey-wishes_/$id',
+    path: '/journey-wishes/$id',
     getParentRoute: () => AdminShellRoute,
   } as any)
 const AdminShellJourneysIdRoute = AdminShellJourneysIdRouteImport.update({
@@ -758,6 +771,7 @@ export interface FileRoutesByFullPath {
   '/admin/inventory-products': typeof AdminShellInventoryProductsRoute
   '/admin/inventory-purchases': typeof AdminShellInventoryPurchasesRoute
   '/admin/inventory-vendors': typeof AdminShellInventoryVendorsRoute
+  '/admin/journey-wishes': typeof AdminShellJourneyWishesRoute
   '/admin/journeys': typeof AdminShellJourneysRoute
   '/admin/mcp-connections': typeof AdminShellMcpConnectionsRoute
   '/admin/news': typeof AdminShellNewsRoute
@@ -792,6 +806,7 @@ export interface FileRoutesByFullPath {
   '/admin/inventory-purchases/new': typeof AdminShellInventoryPurchasesNewRoute
   '/admin/inventory-vendors/$id': typeof AdminShellInventoryVendorsIdRouteWithChildren
   '/admin/inventory-vendors/new': typeof AdminShellInventoryVendorsNewRoute
+  '/admin/journey-wishes/$id': typeof AdminShellJourneyWishesIdRoute
   '/admin/journeys/$id': typeof AdminShellJourneysIdRoute
   '/admin/journeys/new': typeof AdminShellJourneysNewRoute
   '/admin/news/$id': typeof AdminShellNewsIdRoute
@@ -868,6 +883,7 @@ export interface FileRoutesByTo {
   '/admin/inventory-products': typeof AdminShellInventoryProductsRoute
   '/admin/inventory-purchases': typeof AdminShellInventoryPurchasesRoute
   '/admin/inventory-vendors': typeof AdminShellInventoryVendorsRoute
+  '/admin/journey-wishes': typeof AdminShellJourneyWishesRoute
   '/admin/journeys': typeof AdminShellJourneysRoute
   '/admin/mcp-connections': typeof AdminShellMcpConnectionsRoute
   '/admin/news': typeof AdminShellNewsRoute
@@ -899,6 +915,7 @@ export interface FileRoutesByTo {
   '/admin/inventory-purchases/$id': typeof AdminShellInventoryPurchasesIdRoute
   '/admin/inventory-purchases/new': typeof AdminShellInventoryPurchasesNewRoute
   '/admin/inventory-vendors/new': typeof AdminShellInventoryVendorsNewRoute
+  '/admin/journey-wishes/$id': typeof AdminShellJourneyWishesIdRoute
   '/admin/journeys/$id': typeof AdminShellJourneysIdRoute
   '/admin/journeys/new': typeof AdminShellJourneysNewRoute
   '/admin/news/$id': typeof AdminShellNewsIdRoute
@@ -977,6 +994,7 @@ export interface FileRoutesById {
   '/admin/_shell/inventory-products': typeof AdminShellInventoryProductsRoute
   '/admin/_shell/inventory-purchases': typeof AdminShellInventoryPurchasesRoute
   '/admin/_shell/inventory-vendors': typeof AdminShellInventoryVendorsRoute
+  '/admin/_shell/journey-wishes': typeof AdminShellJourneyWishesRoute
   '/admin/_shell/journeys': typeof AdminShellJourneysRoute
   '/admin/_shell/mcp-connections': typeof AdminShellMcpConnectionsRoute
   '/admin/_shell/news': typeof AdminShellNewsRoute
@@ -1011,6 +1029,7 @@ export interface FileRoutesById {
   '/admin/_shell/inventory-purchases_/new': typeof AdminShellInventoryPurchasesNewRoute
   '/admin/_shell/inventory-vendors_/$id': typeof AdminShellInventoryVendorsIdRouteWithChildren
   '/admin/_shell/inventory-vendors_/new': typeof AdminShellInventoryVendorsNewRoute
+  '/admin/_shell/journey-wishes_/$id': typeof AdminShellJourneyWishesIdRoute
   '/admin/_shell/journeys_/$id': typeof AdminShellJourneysIdRoute
   '/admin/_shell/journeys_/new': typeof AdminShellJourneysNewRoute
   '/admin/_shell/news_/$id': typeof AdminShellNewsIdRoute
@@ -1091,6 +1110,7 @@ export interface FileRouteTypes {
     | '/admin/inventory-products'
     | '/admin/inventory-purchases'
     | '/admin/inventory-vendors'
+    | '/admin/journey-wishes'
     | '/admin/journeys'
     | '/admin/mcp-connections'
     | '/admin/news'
@@ -1125,6 +1145,7 @@ export interface FileRouteTypes {
     | '/admin/inventory-purchases/new'
     | '/admin/inventory-vendors/$id'
     | '/admin/inventory-vendors/new'
+    | '/admin/journey-wishes/$id'
     | '/admin/journeys/$id'
     | '/admin/journeys/new'
     | '/admin/news/$id'
@@ -1201,6 +1222,7 @@ export interface FileRouteTypes {
     | '/admin/inventory-products'
     | '/admin/inventory-purchases'
     | '/admin/inventory-vendors'
+    | '/admin/journey-wishes'
     | '/admin/journeys'
     | '/admin/mcp-connections'
     | '/admin/news'
@@ -1232,6 +1254,7 @@ export interface FileRouteTypes {
     | '/admin/inventory-purchases/$id'
     | '/admin/inventory-purchases/new'
     | '/admin/inventory-vendors/new'
+    | '/admin/journey-wishes/$id'
     | '/admin/journeys/$id'
     | '/admin/journeys/new'
     | '/admin/news/$id'
@@ -1309,6 +1332,7 @@ export interface FileRouteTypes {
     | '/admin/_shell/inventory-products'
     | '/admin/_shell/inventory-purchases'
     | '/admin/_shell/inventory-vendors'
+    | '/admin/_shell/journey-wishes'
     | '/admin/_shell/journeys'
     | '/admin/_shell/mcp-connections'
     | '/admin/_shell/news'
@@ -1343,6 +1367,7 @@ export interface FileRouteTypes {
     | '/admin/_shell/inventory-purchases_/new'
     | '/admin/_shell/inventory-vendors_/$id'
     | '/admin/_shell/inventory-vendors_/new'
+    | '/admin/_shell/journey-wishes_/$id'
     | '/admin/_shell/journeys_/$id'
     | '/admin/_shell/journeys_/new'
     | '/admin/_shell/news_/$id'
@@ -1751,6 +1776,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminShellInventoryVendorsRouteImport
       parentRoute: typeof AdminShellRoute
     }
+    '/admin/_shell/journey-wishes': {
+      id: '/admin/_shell/journey-wishes'
+      path: '/journey-wishes'
+      fullPath: '/admin/journey-wishes'
+      preLoaderRoute: typeof AdminShellJourneyWishesRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
     '/admin/_shell/journeys': {
       id: '/admin/_shell/journeys'
       path: '/journeys'
@@ -1980,6 +2012,13 @@ declare module '@tanstack/react-router' {
       path: '/inventory-vendors/new'
       fullPath: '/admin/inventory-vendors/new'
       preLoaderRoute: typeof AdminShellInventoryVendorsNewRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
+    '/admin/_shell/journey-wishes_/$id': {
+      id: '/admin/_shell/journey-wishes_/$id'
+      path: '/journey-wishes/$id'
+      fullPath: '/admin/journey-wishes/$id'
+      preLoaderRoute: typeof AdminShellJourneyWishesIdRouteImport
       parentRoute: typeof AdminShellRoute
     }
     '/admin/_shell/journeys_/$id': {
@@ -2305,6 +2344,7 @@ interface AdminShellRouteChildren {
   AdminShellInventoryProductsRoute: typeof AdminShellInventoryProductsRoute
   AdminShellInventoryPurchasesRoute: typeof AdminShellInventoryPurchasesRoute
   AdminShellInventoryVendorsRoute: typeof AdminShellInventoryVendorsRoute
+  AdminShellJourneyWishesRoute: typeof AdminShellJourneyWishesRoute
   AdminShellJourneysRoute: typeof AdminShellJourneysRoute
   AdminShellMcpConnectionsRoute: typeof AdminShellMcpConnectionsRoute
   AdminShellNewsRoute: typeof AdminShellNewsRoute
@@ -2336,6 +2376,7 @@ interface AdminShellRouteChildren {
   AdminShellInventoryPurchasesNewRoute: typeof AdminShellInventoryPurchasesNewRoute
   AdminShellInventoryVendorsIdRoute: typeof AdminShellInventoryVendorsIdRouteWithChildren
   AdminShellInventoryVendorsNewRoute: typeof AdminShellInventoryVendorsNewRoute
+  AdminShellJourneyWishesIdRoute: typeof AdminShellJourneyWishesIdRoute
   AdminShellJourneysIdRoute: typeof AdminShellJourneysIdRoute
   AdminShellJourneysNewRoute: typeof AdminShellJourneysNewRoute
   AdminShellNewsIdRoute: typeof AdminShellNewsIdRoute
@@ -2369,6 +2410,7 @@ const AdminShellRouteChildren: AdminShellRouteChildren = {
   AdminShellInventoryProductsRoute: AdminShellInventoryProductsRoute,
   AdminShellInventoryPurchasesRoute: AdminShellInventoryPurchasesRoute,
   AdminShellInventoryVendorsRoute: AdminShellInventoryVendorsRoute,
+  AdminShellJourneyWishesRoute: AdminShellJourneyWishesRoute,
   AdminShellJourneysRoute: AdminShellJourneysRoute,
   AdminShellMcpConnectionsRoute: AdminShellMcpConnectionsRoute,
   AdminShellNewsRoute: AdminShellNewsRoute,
@@ -2403,6 +2445,7 @@ const AdminShellRouteChildren: AdminShellRouteChildren = {
   AdminShellInventoryVendorsIdRoute:
     AdminShellInventoryVendorsIdRouteWithChildren,
   AdminShellInventoryVendorsNewRoute: AdminShellInventoryVendorsNewRoute,
+  AdminShellJourneyWishesIdRoute: AdminShellJourneyWishesIdRoute,
   AdminShellJourneysIdRoute: AdminShellJourneysIdRoute,
   AdminShellJourneysNewRoute: AdminShellJourneysNewRoute,
   AdminShellNewsIdRoute: AdminShellNewsIdRoute,

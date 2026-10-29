@@ -575,9 +575,10 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
     // 不碰訂單、付款或 admin_delete_order()／admin_archive_order()。
     // 0045 只改 release_session_seat()／expire_unpaid_orders() 退票種的量（照實際刪掉的報名
     // 列數），admin_delete_order() 本體與訂單／付款的處理一個字沒動。
-    "supabase/migrations 剛好 45 個 .sql 檔（0001–0044 原封不動 + 0045 票種依報名列數退）",
+    // 0046（策旅願望收件匣 journey_wishes）是一張獨立的新表，不碰訂單、付款或報名。
+    "supabase/migrations 剛好 46 個 .sql 檔（0001–0045 原封不動 + 0046 策旅願望收件匣）",
     migFiles.length,
-    45,
+    46,
   );
 }
 

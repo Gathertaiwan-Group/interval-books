@@ -29,6 +29,7 @@ import {
   Receipt,
   ScanLine,
   SlidersHorizontal,
+  Sparkles,
   TruckIcon,
   Settings,
   Tags,
@@ -211,6 +212,9 @@ const NAV_GROUPS = [
       { to: "/admin/artists", label: "講者", icon: Mic, staff: false },
       // lucide's `Route` icon would collide with this file's `export const Route`.
       { to: "/admin/journeys", label: "策旅", icon: Tent, staff: false },
+      // 策旅頁「下次，我想這樣玩」願望表單的收件匣（0046），緊接在策旅後面。staff: false，
+      // 真正擋人的是 src/lib/admin/fns/journey-wishes.ts 的 adminFnMiddleware。
+      { to: "/admin/journey-wishes", label: "旅程願望", icon: Sparkles, staff: false },
       { to: "/admin/collaborations", label: "合作", icon: Handshake, staff: false },
       // /partnership 表單的收件匣（0042）。staff: false，真正擋人的是
       // src/lib/admin/fns/partnerships.ts 的 adminFnMiddleware。

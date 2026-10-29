@@ -303,6 +303,14 @@ export const AREAS = Object.freeze({
     label: "後台移除報名的稽核紀錄",
     identifiers: ["registration_removal_log"],
   },
+  // 策旅頁「下次，我想這樣玩」願望表單的收件匣（0046）。自成一區：與報名、訂單、異業合作
+  // 都沒有關係（沒有外鍵、不被任何函式讀），只被 src/server/journey-wish.ts 與
+  // /admin/journey-wishes 讀寫。通用表，source 欄位分辨是哪一頁送來的。
+  journey_wishes: {
+    witness: "0046_journey_wishes.sql",
+    label: "策旅願望收件匣",
+    identifiers: ["journey_wishes"],
+  },
 });
 
 /**
@@ -802,6 +810,13 @@ export const MIGRATION_LEDGER = Object.freeze([
       "session_plans",
       "session_seats",
     ],
+  },
+  {
+    file: "0046_journey_wishes.sql",
+    note: "策旅願望收件匣（通用）：新表 journey_wishes（source 來源頁 key、interests text[]、wish、name、email、join_friends、notify_opt_in、lang、page_url、status new→reviewed→archived、email_status pending/sent/failed、email_id、email_error、admin_note），CHECK：source 格式、interests ≤20 項、interests 與 wish 至少一個非空、長度上限與 src/lib/journey-wish.ts 的 WISH_LIMITS 一致。RLS 開、零 policy、anon/authenticated 全收回、service_role 只有 select/insert/update/delete。uuid 主鍵，沒有 sequence",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：只有 journey_wishes（這一支
+    // 自己開的區域）。沒有 comment on；沒有碰任何既有表、函式或 sequence。
+    touches: ["journey_wishes"],
   },
 ]);
 

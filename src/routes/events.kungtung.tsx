@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SessionPicker, SessionList } from "@/components/shop/SessionPicker";
 import { PlanPicker } from "@/components/shop/PlanPicker";
@@ -12,6 +12,14 @@ import {
   directSoleSession,
 } from "@/lib/direct-checkout";
 import { imageFor } from "@/lib/images";
+import {
+  WISH_FIELD_ERROR_TEXT,
+  WISH_LIMITS,
+  WISH_SOURCES,
+  WISH_SUBMIT_ERROR_TEXT,
+  wishSchema,
+} from "@/lib/journey-wish";
+import { getWishFormToken, submitWishForm } from "@/lib/journey-wish-fns";
 import {
   fetchActiveProductForEventSlug,
   formatPrice,
@@ -59,8 +67,10 @@ import kungtungCss from "@/components/kungtung/kungtung.css?url";
  *
  * 與稿不同的地方（刻意的）：
  *   - 報名區右欄換成場次／票種／人數與「前往結帳」，付款說明寫站上真的有的三種方式。
- *   - 「下次，我想這樣玩」願望募集：站上沒有收這種資料的表，送出改成開啟電子郵件
- *     寄給書店信箱；「會儲存在小時光的後台」那句改寫成實際行為。
+ *   - 「下次，我想這樣玩」願望募集：送出存進 public.journey_wishes（0046，通用表，
+ *     source='kungtung'）並寄通知信給店家，後台 /admin/journey-wishes 看得到。
+ *   - 付款說明不印匯款帳號（原站公開印在費用段與 FAQ）：站上的匯款帳戶只在結帳完成頁
+ *     與匯款資訊信出現，這一頁照那個實際行為寫。
  *   - 原站的 favicon 不搬，沿用全站的。
  */
 
@@ -406,30 +416,23 @@ function Booking({ product }: { product: ShopProduct }) {
         </button>
       )}
       <p className="text-xs leading-relaxed text-muted-foreground">
-        付款方式於下一步選擇：信用卡線上付款、銀行匯款（報名後席次保留 3 天，請於 3
-        天內完成匯款，逾期名額將釋出），或由我們與你聯繫付款。
+        付款方式於下一步選擇：信用卡線上付款、銀行匯款（匯款帳戶於結帳完成後提供，請於下單後 3
+        天內完成，逾期名額將釋出），或由我們與你聯繫付款。
       </p>
     </>
   );
 }
 
-const WISH_OPTIONS = [
-  "秘境建築與文化",
-  "攝影與藝術旅行",
-  "名人作家同行",
-  "山海風土美食",
-  "音樂與生活沙龍",
-  "自然療癒與慢旅",
-  "地方職人深度交流",
-  "一個人的自在旅行",
-];
+const WISH_SOURCE = "kungtung" as const;
+const WISH_OPTIONS = WISH_SOURCES[WISH_SOURCE].interests;
 
 /**
  * 「下次，我想這樣玩」願望募集。版面與欄位照稿。
  *
- * ⚠️ 原站把願望存進它自己的後台；本站沒有收這種資料的表（CLAUDE.md 只准報名走
- *    event_registrations，這不是報名），所以送出時組一封信、用 mailto: 開啟訪客的
- *    電子郵件程式寄到書店信箱。要改成存進後台，得先問店家要不要、誰來看。
+ * 送出存進官網後台（public.journey_wishes，0046，source='kungtung'），並寄一封通知信給
+ * site_settings.notify_emails；後台 /admin/journey-wishes 看得到。驗證是
+ * src/lib/journey-wish.ts 的 wishSchema（前後台同一份），防濫用照 /partnership：蜜罐、
+ * 伺服器簽的表單 token（≥3 秒）、限流、server fn same-origin。
  */
 function NextJourney() {
   const [picked, setPicked] = useState<string[]>([]);
@@ -439,30 +442,70 @@ function NextJourney() {
   const [joinFriends, setJoinFriends] = useState(false);
   const [notify, setNotify] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [sent, setSent] = useState(false);
+  const honeypotRef = useRef<HTMLInputElement>(null);
+
+  // 畫面出現時拿 token（發行時間由伺服器簽）。拿不到就讓送出時回 expired。
+  useEffect(() => {
+    let alive = true;
+    getWishFormToken()
+      .then((r) => alive && setToken(r.token))
+      .catch(() => alive && setToken(""));
+    return () => {
+      alive = false;
+    };
+  }, [sent]);
 
   const toggle = (opt: string) =>
     setPicked((cur) => (cur.includes(opt) ? cur.filter((o) => o !== opt) : [...cur, opt]));
 
-  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (picked.length === 0 && !wish.trim()) {
-      setError("請至少選一項，或寫下你的旅行願望。");
+    const form = {
+      source: WISH_SOURCE,
+      interests: picked,
+      wish,
+      name,
+      email,
+      joinFriends,
+      notifyOptIn: notify,
+    };
+    const local = wishSchema.safeParse(form);
+    if (!local.success) {
+      const code = local.error.issues[0]?.message ?? "empty";
+      setError(WISH_FIELD_ERROR_TEXT[code] ?? WISH_FIELD_ERROR_TEXT.empty);
       return;
     }
     setError(null);
-    const body = [
-      `下一次最想體驗：${picked.length ? picked.join("、") : "（未選）"}`,
-      "",
-      "旅行願望：",
-      wish.trim() || "（未填）",
-      "",
-      `怎麼稱呼：${name.trim() || "（未填）"}`,
-      `電子信箱：${email.trim() || "（未填）"}`,
-      `免費加入小時光知友：${joinFriends ? "是" : "否"}`,
-      `同意接收未來策旅通知：${notify ? "是" : "否"}`,
-    ].join("\n");
-    const subject = "【下次，我想這樣玩】旅行願望（范毅舜公東教堂文化之旅頁面）";
-    window.location.href = `mailto:${EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    setSubmitting(true);
+    try {
+      const result = await submitWishForm({
+        data: {
+          form,
+          token: token ?? "",
+          honeypot: honeypotRef.current?.value ?? "",
+          lang: "zh",
+          pageUrl: typeof window === "undefined" ? "" : window.location.href.slice(0, 300),
+        },
+      });
+      if (result.ok) {
+        setSent(true);
+        setPicked([]);
+        setWish("");
+        setName("");
+        setEmail("");
+        setJoinFriends(false);
+        setNotify(false);
+        return;
+      }
+      setError(WISH_SUBMIT_ERROR_TEXT[result.error]);
+    } catch {
+      setError(WISH_SUBMIT_ERROR_TEXT.send_failed);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -476,100 +519,133 @@ function NextJourney() {
         <p className="kt-wish-disclaimer" role="note">
           這是未來旅程的靈感募集，不影響本次 11/14–11/16 已公布的行程，也不代表主辦方已承諾安排。
         </p>
-        <form className="mt-8 max-w-2xl space-y-6" onSubmit={onSubmit} noValidate>
-          <fieldset>
-            <legend className="mb-3 text-sm font-medium">下一次，你最想體驗什麼？（可複選）</legend>
-            <div className="flex flex-wrap gap-2">
-              {WISH_OPTIONS.map((opt) => {
-                const on = picked.includes(opt);
-                return (
-                  <button
-                    key={opt}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => toggle(opt)}
-                    className={`rounded-full border px-4 py-2 text-sm transition-colors ${on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-foreground hover:border-primary"}`}
-                  >
-                    {opt}
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium">
-              如果可以許一個旅行願望，你會想去哪裡、做什麼？
-            </span>
-            <textarea
-              maxLength={1000}
-              rows={4}
-              value={wish}
-              onChange={(e) => setWish(e.target.value)}
-              placeholder="例如：想去有老建築的小鎮住兩晚、想跟著喜歡的作家走讀、想找個海邊什麼都不做……"
-              className="w-full rounded-sm border border-input bg-background p-3 text-base leading-relaxed"
-            />
-          </label>
-          <fieldset className="space-y-4">
-            <legend className="text-sm font-medium">
-              聯絡方式（完全選填，想讓我們認識你再填就好）
-            </legend>
-            <label className="block">
-              <span className="mb-2 block text-sm">怎麼稱呼你</span>
-              <input
-                type="text"
-                maxLength={100}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-sm border border-input bg-background p-3 text-base"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-sm">電子信箱</span>
-              <input
-                type="email"
-                maxLength={255}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-sm border border-input bg-background p-3 text-base"
-              />
-            </label>
-          </fieldset>
-          <div className="space-y-3">
-            <label className="flex items-start gap-3 text-sm leading-relaxed">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={joinFriends}
-                onChange={(e) => setJoinFriends(e.target.checked)}
-              />
-              <span>免費加入小時光知友</span>
-            </label>
-            <label className="flex items-start gap-3 text-sm leading-relaxed">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={notify}
-                onChange={(e) => setNotify(e.target.checked)}
-              />
-              <span>同意接收未來策旅通知</span>
-            </label>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              兩項都是自由勾選，不勾也不影響送出願望；填寫願望不等於報名本次旅程。
+        {sent ? (
+          <div className="mt-8 max-w-2xl space-y-4" role="status" aria-live="polite">
+            <p className="kt-body-copy">
+              謝謝你，願望已經收到了！我們會好好讀過每一則，作為規劃下一趟文化策旅的參考。
             </p>
+            <button
+              type="button"
+              className={`${BUTTON} kt-journey-button`}
+              onClick={() => setSent(false)}
+            >
+              再寫一個願望
+            </button>
           </div>
-          {error ? (
-            <p className="text-sm text-destructive" role="alert">
-              {error}
+        ) : (
+          <form className="mt-8 max-w-2xl space-y-6" onSubmit={onSubmit} noValidate>
+            {/* 蜜罐：畫面外、不可聚焦、讀屏不唸。人類不會填。 */}
+            <div
+              aria-hidden="true"
+              className="absolute -left-[9999px] top-auto h-px w-px overflow-hidden"
+            >
+              <label>
+                請勿填寫此欄
+                <input
+                  ref={honeypotRef}
+                  type="text"
+                  name="fax_number"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  defaultValue=""
+                />
+              </label>
+            </div>
+            <fieldset>
+              <legend className="mb-3 text-sm font-medium">
+                下一次，你最想體驗什麼？（可複選）
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {WISH_OPTIONS.map((opt) => {
+                  const on = picked.includes(opt);
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => toggle(opt)}
+                      className={`rounded-full border px-4 py-2 text-sm transition-colors ${on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-foreground hover:border-primary"}`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium">
+                如果可以許一個旅行願望，你會想去哪裡、做什麼？
+              </span>
+              <textarea
+                maxLength={WISH_LIMITS.wish}
+                rows={4}
+                value={wish}
+                onChange={(e) => setWish(e.target.value)}
+                placeholder="例如：想去有老建築的小鎮住兩晚、想跟著喜歡的作家走讀、想找個海邊什麼都不做……"
+                className="w-full rounded-sm border border-input bg-background p-3 text-base leading-relaxed"
+              />
+            </label>
+            <fieldset className="space-y-4">
+              <legend className="text-sm font-medium">
+                聯絡方式（完全選填，想讓我們認識你再填就好）
+              </legend>
+              <label className="block">
+                <span className="mb-2 block text-sm">怎麼稱呼你</span>
+                <input
+                  type="text"
+                  maxLength={WISH_LIMITS.name}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full rounded-sm border border-input bg-background p-3 text-base"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm">電子信箱</span>
+                <input
+                  type="email"
+                  maxLength={WISH_LIMITS.email}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-sm border border-input bg-background p-3 text-base"
+                />
+              </label>
+            </fieldset>
+            <div className="space-y-3">
+              <label className="flex items-start gap-3 text-sm leading-relaxed">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={joinFriends}
+                  onChange={(e) => setJoinFriends(e.target.checked)}
+                />
+                <span>免費加入小時光知友</span>
+              </label>
+              <label className="flex items-start gap-3 text-sm leading-relaxed">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={notify}
+                  onChange={(e) => setNotify(e.target.checked)}
+                />
+                <span>同意接收未來策旅通知</span>
+              </label>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                兩項都是自由勾選，不勾也不影響送出願望；填寫願望不等於報名本次旅程。
+              </p>
+            </div>
+            {error ? (
+              <p className="text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <button type="submit" className={BUTTON} disabled={submitting || token === null}>
+              {submitting ? "送出中…" : "送出我的旅行願望"}
+            </button>
+            <p className="kt-privacy-notice">
+              送出後，你的願望與聯絡方式會儲存在小時光的後台，僅供主辦方規劃未來文化策旅時參考，不會公開，也不會提供給第三方。不想留下聯絡方式，也可以只寫願望。
             </p>
-          ) : null}
-          <button type="submit" className={BUTTON}>
-            送出我的旅行願望
-          </button>
-          <p className="kt-privacy-notice">
-            按下送出後，會開啟您的電子郵件程式，把願望與聯絡方式寄到小時光的信箱（{EMAIL}
-            ），僅供主辦方規劃未來文化策旅時參考，不會公開，也不會提供給第三方。不想留下聯絡方式，也可以只寫願望。
-          </p>
-        </form>
+          </form>
+        )}
       </div>
     </section>
   );

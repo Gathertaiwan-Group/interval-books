@@ -24,18 +24,26 @@ import { parseRecipients } from "../lib/email-templates.ts";
 export const MIN_FILL_MS = 3_000;
 export const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
-/** HMAC 的用途標籤：同一把 secret 用在別處時，簽出來的東西不能互相冒用。 */
-const TOKEN_PURPOSE = "ib-partnership-form-v1";
+/**
+ * HMAC 的用途標籤：同一把 secret 用在別處時，簽出來的東西不能互相冒用。
+ * 預設是異業合作表單；策旅願望表單（src/server/journey-wish.ts）傳自己的標籤，
+ * 一張表單的 token 拿去另一張表單一律 invalid。
+ */
+export const TOKEN_PURPOSE = "ib-partnership-form-v1";
 
-function sign(issuedAt: number, secret: string): string {
-  return createHmac("sha256", secret).update(`${TOKEN_PURPOSE}|${issuedAt}`).digest("base64url");
+function sign(issuedAt: number, secret: string, purpose: string): string {
+  return createHmac("sha256", secret).update(`${purpose}|${issuedAt}`).digest("base64url");
 }
 
 /** 「<發行時間 ms>.<簽章>」 */
-export function issueFormToken(secret: string, now: number = Date.now()): string {
+export function issueFormToken(
+  secret: string,
+  now: number = Date.now(),
+  purpose: string = TOKEN_PURPOSE,
+): string {
   if (!secret) throw new Error("[partnership] 沒有簽 token 用的 secret");
   const issuedAt = Math.floor(now);
-  return `${issuedAt}.${sign(issuedAt, secret)}`;
+  return `${issuedAt}.${sign(issuedAt, secret, purpose)}`;
 }
 
 export type TokenCheck = "ok" | "invalid" | "too_fast" | "expired";
@@ -44,12 +52,13 @@ export function checkFormToken(
   token: unknown,
   secret: string,
   now: number = Date.now(),
+  purpose: string = TOKEN_PURPOSE,
 ): TokenCheck {
   if (typeof token !== "string" || token.length > 200 || !secret) return "invalid";
   const m = /^(\d{10,16})\.([A-Za-z0-9_-]{20,100})$/.exec(token);
   if (!m) return "invalid";
   const issuedAt = Number(m[1]);
-  const expected = Buffer.from(sign(issuedAt, secret));
+  const expected = Buffer.from(sign(issuedAt, secret, purpose));
   const given = Buffer.from(m[2]);
   if (expected.length !== given.length || !timingSafeEqual(expected, given)) return "invalid";
   const age = now - issuedAt;
