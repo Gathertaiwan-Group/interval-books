@@ -297,7 +297,12 @@ assertMigrationDependencies(check, MIG_DIR, {
   // pages('partnership')（內容與 /partnership 的內建後備相同）。不碰 site_settings、
   // 不改 pages 的欄位、約束、policy 或 grant；這支自檢的斷言重讀過，原樣成立。
   // 0043（MCP OAuth 狀態）不碰這支自檢依賴的任何區域。
-  reviewedThrough: "0043_mcp_oauth_state.sql",
+  // 0044（移除報名補票種＋稽核）：admin_delete_registration() 簽章與回傳形狀不變，只多讀
+  // order_items.plan_id、場次先票種後加鎖、退 event_session_plans.units_taken、改用
+  // DELETE…RETURNING（沒刪到就不扣 seats_taken）、寫一列新表 registration_removal_log；
+  // 另外校正一個票種的 units_taken。不改 order_items／event_registrations／event_sessions
+  // 的欄位、約束、trigger 或其他函式，不碰訂單、付款、發票、交易信。這支自檢的斷言重讀過，原樣成立。
+  reviewedThrough: "0044_registration_removal_plan_units_audit.sql",
 });
 
 const sql0034 = readFile(MIG_0034);

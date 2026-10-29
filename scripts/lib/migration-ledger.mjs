@@ -295,6 +295,14 @@ export const AREAS = Object.freeze({
     label: "MCP OAuth 授權鏈與撤銷",
     identifiers: ["mcp_oauth_grants", "mcp_oauth_used_codes", "mcp_oauth_user_epochs"],
   },
+  // 後台移除報名的稽核（0044）。自成一區：一次移除一列，只由 admin_delete_registration()
+  // 在同一個交易裡寫入，沒有外鍵、不被任何其他函式讀。掛進 event_registrations 會讓之後
+  // 動到這張稽核表的 migration 把所有盯著座位不變式的自檢叫回來；分開之後兩邊都說實話。
+  registration_removal: {
+    witness: "0044_registration_removal_plan_units_audit.sql",
+    label: "後台移除報名的稽核紀錄",
+    identifiers: ["registration_removal_log"],
+  },
 });
 
 /**
@@ -759,6 +767,21 @@ export const MIGRATION_LEDGER = Object.freeze([
     // 區域）、cron_jobs（cron.schedule 與 to_regprocedure）。auth.users 不屬於任何區域；沒有
     // comment on；沒有碰 mcp_audit_log、profiles 或任何既有表。
     touches: ["cron_jobs", "mcp_oauth"],
+  },
+  {
+    file: "0044_registration_removal_plan_units_audit.sql",
+    note: "admin_delete_registration() 補上票種：被刪那一列的 order_item 有 plan_id 時，鎖序場次先、票種後（for no key update），units_taken 扣 ceil(n_before/spu)-ceil(n_after/spu)（spu=1 恆為 1），greatest(0,…) 下限；改用 DELETE…RETURNING，沒真的刪到就不扣。簽章與 RETURNS TABLE 形狀不變（create or replace），security definer／search_path=''／只 grant service_role 照 0035。新表 registration_removal_log（actor_id=coalesce(p_actor_id, auth.uid())、時間、registration/order/order_item/session/plan id、姓名第一個字、seats_freed、units_freed），RLS 開、零 policy、anon/authenticated 全收回、service_role 只有 select，由函式在同一交易寫入。一次性校正：只有票種 81fc86e3…，units_taken 重算＝現存報名換算的單位數（4→3）",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：registration_removal（這一支
+    // 自己開的區域）、event_registrations（delete／count／join）、session_seats（event_sessions、
+    // seats_taken）、session_plans（event_session_plans、units_taken）、order_expiry（識別字
+    // order_items：讀 plan_id）。comment on 的字串裡只有 registration_removal_log 與 spu。
+    touches: [
+      "event_registrations",
+      "order_expiry",
+      "registration_removal",
+      "session_plans",
+      "session_seats",
+    ],
   },
 ]);
 

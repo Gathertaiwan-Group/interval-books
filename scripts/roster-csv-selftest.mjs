@@ -385,7 +385,12 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 是 orders.discount 從恆為 0 變成「推薦折扣」（只對選品／書籍、最多 50%），而
   // total = subtotal + shipping_fee − discount 仍是金流、信件、發票唯一使用的金額
   // （發票本來就把 discount 開成負數列）。這支自檢的斷言重讀過，原樣成立。
-  reviewedThrough: "0040_referral_program.sql",
+  // 0044（移除報名補票種＋稽核）：admin_delete_registration() 簽章與回傳形狀不變，只多讀
+  // order_items.plan_id、場次先票種後加鎖、退 event_session_plans.units_taken、改用
+  // DELETE…RETURNING（沒刪到就不扣 seats_taken）、寫一列新表 registration_removal_log；
+  // 另外校正一個票種的 units_taken。不改 order_items／event_registrations／event_sessions
+  // 的欄位、約束、trigger 或其他函式，不碰訂單、付款、發票、交易信。這支自檢的斷言重讀過，原樣成立。
+  reviewedThrough: "0044_registration_removal_plan_units_audit.sql",
 });
 // 這一期不准動到既有的 0001–0020，所以它們也必須都還在。
 for (let n = 1; n <= 20; n += 1) {

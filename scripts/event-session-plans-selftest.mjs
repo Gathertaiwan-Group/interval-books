@@ -172,7 +172,12 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 0041（選品連結商品）只在 curated_items 加一個 references public.products(id) on delete
   // set null 的 nullable 欄位——帳本因此標了 products_availability。它不改 products 的任何
   // 欄位、約束、函式或 RLS，不碰庫存、名額、訂單或報名；這支自檢的斷言重讀過，原樣成立。
-  reviewedThrough: "0041_curated_item_product_link.sql",
+  // 0044（移除報名補票種＋稽核）：admin_delete_registration() 簽章與回傳形狀不變，只多讀
+  // order_items.plan_id、場次先票種後加鎖、退 event_session_plans.units_taken、改用
+  // DELETE…RETURNING（沒刪到就不扣 seats_taken）、寫一列新表 registration_removal_log；
+  // 另外校正一個票種的 units_taken。不改 order_items／event_registrations／event_sessions
+  // 的欄位、約束、trigger 或其他函式，不碰訂單、付款、發票、交易信。這支自檢的斷言重讀過，原樣成立。
+  reviewedThrough: "0044_registration_removal_plan_units_audit.sql",
 });
 
 // =============================================================================

@@ -571,9 +571,11 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
     // 0041（選品連結商品）只在 curated_items 加 product_id，不碰訂單、付款或報名。
     // 0042（異業合作收件匣＋種 pages 一列）與 0043（MCP OAuth 狀態＋一個新的清理排程）
     // 都是新表，不碰訂單、付款或報名。
-    "supabase/migrations 剛好 43 個 .sql 檔（0001–0041 原封不動 + 0042 合作收件匣 + 0043 MCP OAuth 狀態新增）",
+    // 0044（移除報名補票種＋稽核）只改 admin_delete_registration() 的本體與新增稽核表，
+    // 不碰訂單、付款或 admin_delete_order()／admin_archive_order()。
+    "supabase/migrations 剛好 44 個 .sql 檔（0001–0043 原封不動 + 0044 移除報名補票種與稽核）",
     migFiles.length,
-    43,
+    44,
   );
 }
 

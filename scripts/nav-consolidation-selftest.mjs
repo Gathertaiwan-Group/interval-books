@@ -347,9 +347,13 @@ for (const r of REDIRECTS) {
 // check-meta 產出的報告要跟磁碟上的路由檔對得起來（報告不是舊的）。
 const metaReport = JSON.parse(readFile(join(ROOT, "reports/meta-audit.json")));
 check("meta 稽核 0 個問題", metaReport.summary.totalIssues, 0);
-check("meta 報告認定的轉址路由就是這四個", [...metaReport.summary.redirectRouteList].sort(), [
+// 44b4933（業主：「把網站最新消息的功能移除」）把 /news 與 /news/$ 改成 301 轉首頁，
+// 所以從四條變成六條；那一支 commit 沒同步這裡，main 的 Tests 因此紅了一次。
+check("meta 報告認定的轉址路由就是這六條", [...metaReport.summary.redirectRouteList].sort(), [
   "/contact",
   "/curated",
+  "/news",
+  "/news.$",
   "/publications",
   "/visit",
 ]);

@@ -363,7 +363,12 @@ assertMigrationDependencies(check, MIG_DIR, {
   // （'17 3 * * *'，只刪 public.mcp_oauth_used_codes 的過期列）。既有的 expire-unpaid-orders、
   // dispatch-invoice-task、dispatch-notify-task 的名稱、排程與指令都沒動；第 17 分鐘也不在
   // */5 與 3-53/10、6-56/10 任何一個 tick 上。這支自檢的斷言重讀過，原樣成立。
-  reviewedThrough: "0043_mcp_oauth_state.sql",
+  // 0044（移除報名補票種＋稽核）：admin_delete_registration() 簽章與回傳形狀不變，只多讀
+  // order_items.plan_id、場次先票種後加鎖、退 event_session_plans.units_taken、改用
+  // DELETE…RETURNING（沒刪到就不扣 seats_taken）、寫一列新表 registration_removal_log；
+  // 另外校正一個票種的 units_taken。不改 order_items／event_registrations／event_sessions
+  // 的欄位、約束、trigger 或其他函式，不碰訂單、付款、發票、交易信。這支自檢的斷言重讀過，原樣成立。
+  reviewedThrough: "0044_registration_removal_plan_units_audit.sql",
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
