@@ -237,18 +237,31 @@ export function Story() {
               <p className="mt-1.5 text-xs text-muted-foreground">德法文化遺產</p>
             </figcaption>
           </figure>
-          <figure className="flex flex-col items-center gap-4 border border-border bg-card px-6 py-8 text-center sm:col-span-2 sm:flex-row sm:justify-center sm:gap-10 sm:text-left">
+          <figure className="flex flex-col items-center justify-center border border-border bg-card px-6 pb-6 pt-8">
             <img
-              src={IMG["coastal_range_swiss_cover"]}
-              alt="《海岸山脈的瑞士人》書封"
-              className="w-32 shrink-0 sm:w-40"
+              src={IMG["coastal_range_swiss_spread"]}
+              alt="《海岸山脈的瑞士人》書封，海岸山脈山景與一封白冷會士的家書"
+              className="mx-auto w-full max-w-[440px]"
+              width={1200}
+              height={898}
               loading="lazy"
             />
-            <figcaption className="min-w-0">
-              <p className="text-base sm:text-lg">《海岸山脈的瑞士人》</p>
-              <p className="mt-1.5 text-xs text-muted-foreground sm:text-sm">
-                用真心付出的動人故事
-              </p>
+            <figcaption className="mt-6 text-center">
+              <p className="text-base">《海岸山脈的瑞士人》</p>
+              <p className="mt-1.5 text-xs text-muted-foreground">用真心付出的動人故事</p>
+            </figcaption>
+          </figure>
+          <figure className="flex flex-col items-center justify-center border border-border bg-card px-6 pb-6 pt-8">
+            <img
+              src={IMG["yetaixi_cover"]}
+              alt="《野台戲》書封"
+              className="mx-auto w-full max-w-[180px] sm:max-w-[200px]"
+              width={803}
+              height={1200}
+              loading="lazy"
+            />
+            <figcaption className="mt-6 text-center">
+              <p className="text-base">《野台戲》</p>
             </figcaption>
           </figure>
         </div>

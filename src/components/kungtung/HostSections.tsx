@@ -117,7 +117,7 @@ export function FanSection2() {
         </article>
         <article>
           <img
-            src={IMG["coastal_range_swiss_cover"]}
+            src={IMG["coastal_range_swiss_cover_3d"]}
             alt="《海岸山脈的瑞士人》書封"
             loading="lazy"
           />
