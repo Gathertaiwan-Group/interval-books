@@ -4,7 +4,7 @@ import { CoverImage } from "@/components/CoverImage";
 import { HomeProductShelf } from "@/components/shop/HomeProductShelf";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
-import { fetchEvents, fetchJourneys, fetchPage, pageText } from "@/lib/cms";
+import { fetchEvents, fetchJourneyEventDates, fetchJourneys, fetchPage, pageText } from "@/lib/cms";
 import { useSiteContent } from "@/lib/site-content";
 import { isEventPast } from "@/lib/event-status";
 import { featureLayout } from "@/lib/feature-layout";
@@ -15,6 +15,7 @@ import storefrontImg from "@/assets/storefront.jpg";
 import curatedImg from "@/assets/curated-objects.jpg";
 import journeyImg from "@/assets/journey-mist.jpg";
 import { journeyLinkProps } from "@/lib/journey-link";
+import { linkedEventFor, splitJourneys } from "@/lib/past-shelf";
 
 /** Fallback copy — used only when the Supabase read fails. */
 const PAGE_META = {
@@ -95,13 +96,16 @@ const SECTION_EYEBROWS = {
 export const Route = createFileRoute("/")({
   loader: async () => {
     // shelf：「主理人的選品」那一排商品卡，跟其他讀取平行，不多一段等待。
-    const [page, events, journeys, shelf] = await Promise.all([
+    // journeyEvents：策旅卡片指著的那幾列 events（日期＋最晚場次＋封面），用來判斷
+    // 「已結束」與決定卡片封面——與 /journeys 同一支查詢、同一套判準。
+    const [page, events, journeys, journeyEvents, shelf] = await Promise.all([
       fetchPage("index"),
       fetchEvents(),
       fetchJourneys(),
+      fetchJourneyEventDates(),
       fetchHomeShelfProducts(4),
     ]);
-    return { page, events, journeys, shelf };
+    return { page, events, journeys, journeyEvents, shelf };
   },
   head: ({ loaderData }) => {
     const p = pageText(loaderData?.page ?? null);
@@ -122,12 +126,17 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const t = useT();
-  const { page, events, journeys, shelf } = Route.useLoaderData();
+  const { page, events, journeys, journeyEvents, shelf } = Route.useLoaderData();
   const shelfProducts = shelf.products;
 
   // 策旅與活動用同一種卡片、同一套版面規則（見 featureLayout），所以這裡也
   // 取到三筆，而不是像以前那樣只挑一筆做成橫幅。
-  const featuredJourneys = journeys.slice(0, 3);
+  //
+  // 已結束的策旅不放精選（2026-10-29 業主：池上那趟 10 月就辦完了還掛在首頁）。判準
+  // 與 /journeys 一模一樣：splitJourneys()（src/lib/past-shelf.ts）＝卡片指著的那場活動
+  // 最後一個場次已結束（台北時間）。結束的只出現在 /journeys 的「過往策旅」。
+  // 今天的日期在每次 render 時才取（splitJourneys 的預設參數），不是 build 時寫死。
+  const featuredJourneys = splitJourneys(journeys, journeyEvents).open.slice(0, 3);
   // 🔴 一趟策旅在資料上是**兩列**（events 負責內頁與報名、journeys 負責策旅區卡片）。
   //    fetchEvents() 已經在資料層把**所有**策旅的那一列濾掉（見 src/lib/journey-events.ts），
   //    所以這裡的 events 只有一般活動，同一趟旅程不會在首頁出現兩次。
@@ -250,10 +259,13 @@ function Index() {
               const link = journeyLinkProps(j.externalUrl);
               const body = (
                 <>
-                  {/* journeys 表沒有 image_key（見 cms.ts#fetchJourneys 選的欄位），
-                      所以這裡用固定的策旅意象圖，而不是活動卡那種 imageFor()。 */}
+                  {/* journeys 表沒有 image_key；封面用卡片指著的那場活動的 events.image_key
+                      （與 /journeys、過往策旅同一個來源），指不到或沒設圖才用固定意象圖。 */}
                   <CoverImage
-                    src={journeyImg}
+                    src={imageFor(
+                      linkedEventFor(j.externalUrl, journeyEvents)?.imageKey,
+                      journeyImg,
+                    )}
                     alt=""
                     loading="lazy"
                     className={`aspect-[4/3] ${journeysLayout.image}`}

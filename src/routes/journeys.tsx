@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageShell, PageHeader } from "@/components/PageShell";
 import { CoverImage } from "@/components/CoverImage";
 import { PastShelf } from "@/components/PastShelf";
-import { splitJourneys } from "@/lib/past-shelf";
+import { linkedEventFor, splitJourneys } from "@/lib/past-shelf";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fetchJourneyEventDates, fetchJourneys, fetchPage, pageText, eyebrowOf } from "@/lib/cms";
@@ -118,10 +118,11 @@ function Journeys() {
             const link = journeyLinkProps(j.externalUrl);
             const body = (
               <>
-                {/* 每一趟策旅都用同一張固定意象圖（journeys 表沒有 image_key），
-                  它不是這趟旅程的照片，所以當裝飾圖（alt=""），標題就在卡片上。 */}
+                {/* journeys 表沒有 image_key；封面用卡片指著的那場活動的 events.image_key
+                  （與首頁精選、下方過往策旅同一個來源），指不到或沒設圖才用固定意象圖。
+                  標題就在卡片上，所以圖當裝飾（alt=""）。 */}
                 <CoverImage
-                  src={journeyImg}
+                  src={imageFor(linkedEventFor(j.externalUrl, journeyEvents)?.imageKey, journeyImg)}
                   alt=""
                   loading="lazy"
                   className={`aspect-[4/3] ${layout.image}`}

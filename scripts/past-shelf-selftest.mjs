@@ -8,6 +8,7 @@
  *   [純函式] src/lib/past-shelf.ts：
  *              · newestEndedFirst：只留已結束、最近結束在前、限筆數；場次延後的不算結束
  *              · splitJourneys：策旅的「已結束」看它指著的那場活動；指不到 → 留在進行中
+ *              · 首頁精選策旅與 /journeys 共用 splitJourneys；卡片封面＝指著的活動 image_key
  *   [靜態]   兩頁都用 PastShelf；/events 不多查一次（沿用 fetchEvents）、
  *            /journeys 在同一個 Promise.all 裡查；卡片圖走 CoverImage + lazy；
  *            日期原樣印出（不用 toLocale*）
@@ -48,9 +49,8 @@ function check(name, actual, expected) {
 }
 const readFile = (rel) => readFileSync(join(ROOT, rel), "utf8");
 
-const { newestEndedFirst, splitJourneys, effectiveEndDate, PAST_SHELF_LIMIT } = await import(
-  pathToFileURL(join(ROOT, "src/lib/past-shelf.ts")).href
-);
+const { newestEndedFirst, splitJourneys, linkedEventFor, effectiveEndDate, PAST_SHELF_LIMIT } =
+  await import(pathToFileURL(join(ROOT, "src/lib/past-shelf.ts")).href);
 
 const TODAY = "2026-10-28";
 
@@ -139,6 +139,58 @@ check(
 );
 check("讀不到活動（空陣列）→ 全部留在進行中", splitJourneys(journeys, [], 8, TODAY).open.length, 4);
 
+// ── 首頁精選策旅（2026-10-29 業主：池上那趟 10 月辦完了還掛在首頁精選）──────
+// 正式庫 2026-10-29 的兩趟：池上最後場次 10/27 結束、公東 11/16 結束。
+const liveEvents = [
+  {
+    slug: "InntervalChishang.1023",
+    externalUrl: "",
+    date: "2026.9.5~2026.10.23",
+    isoDate: "2026-10-23",
+    lastSessionDate: "2026-10-27",
+    imageKey: "storage:chishang.webp",
+  },
+  {
+    slug: "kungtung",
+    externalUrl: "",
+    date: "2026.11.14 (六)~11.16 (一)",
+    isoDate: "2026-11-16",
+    lastSessionDate: "2026-11-16",
+    imageKey: "storage:91c89fe9-1301-4d69-8708-7ff42ffbab94.webp",
+  },
+];
+const liveJourneys = [
+  { id: "j-chishang", externalUrl: "/events/InntervalChishang.1023" },
+  { id: "j-kungtung", externalUrl: "/events/kungtung" },
+];
+const live = splitJourneys(liveJourneys, liveEvents, 8, "2026-10-29");
+check(
+  "結束的策旅不在精選：10/29 精選只剩公東",
+  live.open.map((j) => j.id),
+  ["j-kungtung"],
+);
+check(
+  "結束的策旅進過往策旅：池上",
+  live.ended.map((x) => x.journey.id),
+  ["j-chishang"],
+);
+check(
+  "最後場次當天仍算進行中（台北 10/27 池上還在精選）",
+  splitJourneys(liveJourneys, liveEvents, 8, "2026-10-27").open.map((j) => j.id),
+  ["j-chishang", "j-kungtung"],
+);
+check(
+  "全部結束 → 精選零筆（首頁整區不畫）",
+  splitJourneys(liveJourneys, liveEvents, 8, "2026-12-01").open.length,
+  0,
+);
+check(
+  "卡片封面＝指著的那場活動的 image_key",
+  linkedEventFor("/events/kungtung", liveEvents)?.imageKey,
+  "storage:91c89fe9-1301-4d69-8708-7ff42ffbab94.webp",
+);
+check("指不到活動 → 沒有封面 key（用意象圖）", linkedEventFor("", liveEvents), null);
+
 // ── 靜態 ────────────────────────────────────────────────────────────────
 const eventsIndex = readFile("src/routes/events.index.tsx");
 const journeysRoute = readFile("src/routes/journeys.tsx");
@@ -163,6 +215,35 @@ check(
   true,
 );
 check("/journeys 用 PastShelf", journeysRoute.includes("<PastShelf"), true);
+const homeRoute = readFile("src/routes/index.tsx");
+check(
+  "首頁精選策旅用同一個 splitJourneys（不另寫判準）",
+  homeRoute.includes("splitJourneys(journeys, journeyEvents).open.slice(0, 3)"),
+  true,
+);
+check(
+  "首頁在同一個 Promise.all 查活動日期",
+  /Promise\.all\(\[[^\]]*fetchJourneyEventDates\(\)/.test(homeRoute),
+  true,
+);
+check("首頁精選零筆整區不畫", homeRoute.includes("{featuredJourneys.length > 0 && ("), true);
+check(
+  "首頁不在模組層算今天（每次 render 才算）",
+  /^const [^=]*=\s*splitJourneys/m.test(homeRoute),
+  false,
+);
+for (const [rel, src] of [
+  ["首頁", homeRoute],
+  ["/journeys", journeysRoute],
+]) {
+  check(
+    `${rel} 策旅卡封面走指著的活動 image_key`,
+    /imageFor\(\s*linkedEventFor\(j\.externalUrl, journeyEvents\)\?\.imageKey,\s*journeyImg,?\s*\)/.test(
+      src,
+    ),
+    true,
+  );
+}
 check(
   "/journeys 在同一個 Promise.all 查活動日期",
   /Promise\.all\(\[[^\]]*fetchJourneyEventDates\(\)/.test(journeysRoute),
