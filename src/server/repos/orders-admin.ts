@@ -54,6 +54,7 @@ import { supabaseAdmin } from "@/server/supabase-admin";
 import type { Localized } from "@/i18n/types";
 import { TO_SHIP_FILTER } from "@/lib/admin/order-fulfillment";
 import { canReissueInvoice } from "@/lib/invoice-alerts";
+import { canVoidInvoice } from "@/lib/invoice-void";
 import { INVOICE_MAX_RETRIES } from "@/server/repos/invoices";
 
 // ---------------------------------------------------------------------------
@@ -187,7 +188,7 @@ const DETAIL_SELECT =
   ", order_items(id, name, unit_price, quantity, subtotal, product_type, session_id, event_sessions(title, starts_at))" +
   ", order_addresses(type, recipient, phone, postal_code, city, district, street, cvs_store_id, cvs_store_name, cvs_address, cvs_sub_type)" +
   ", invoices(invoice_type, tax_id, company_title, carrier_type, carrier_number, love_code, " +
-  "status, invoice_number, retry_count, error_message, updated_at)";
+  "status, invoice_number, retry_count, error_message, updated_at, issued_at, voided_at, void_reason)";
 
 export type AdminOrderItemRow = {
   id: number;
@@ -236,6 +237,11 @@ export type AdminOrderInvoice = {
   /** 最後一次開立失敗的訊息（成功後清空）。 */
   error_message: string | null;
   updated_at: string | null;
+  /** 開立時間（Amego invoice_time）。作廢時換算成台北日期當 InvoiceDate。 */
+  issued_at: string | null;
+  /** 作廢時間、原因（0047）。 */
+  voided_at: string | null;
+  void_reason: string | null;
 };
 
 export type AdminOrderDetail = {
@@ -246,6 +252,11 @@ export type AdminOrderDetail = {
    * reissueInvoiceForOrder()。
    */
   invoice_can_reissue: boolean;
+  /**
+   * 「作廢發票」按鈕要不要出現：已開立且有發票號碼（canVoidInvoice，src/lib/invoice-void.ts）。
+   * 真正的邊界在 voidInvoiceAdmin（adminFnMiddleware）與 0047 claim_invoice_void。
+   */
+  invoice_can_void: boolean;
   /** = INVOICE_MAX_RETRIES，畫面顯示「已嘗試 n / 5 次」用。 */
   invoice_max_retries: number;
   id: string;
@@ -333,6 +344,9 @@ type InvoiceRawRow = {
   retry_count: number | null;
   error_message: string | null;
   updated_at: string | null;
+  issued_at: string | null;
+  voided_at: string | null;
+  void_reason: string | null;
 };
 
 type OrderDetailRawRow = {
@@ -432,6 +446,9 @@ export async function getAdminOrderDetail(orderId: string): Promise<AdminOrderDe
         retry_count: Number(inv.retry_count ?? 0),
         error_message: blankToNull(inv.error_message),
         updated_at: inv.updated_at ?? null,
+        issued_at: inv.issued_at ?? null,
+        voided_at: inv.voided_at ?? null,
+        void_reason: blankToNull(inv.void_reason),
       }
     : null;
 
@@ -444,6 +461,7 @@ export async function getAdminOrderDetail(orderId: string): Promise<AdminOrderDe
       new Date(),
       INVOICE_MAX_RETRIES,
     ),
+    invoice_can_void: canVoidInvoice(invoice),
     invoice_max_retries: INVOICE_MAX_RETRIES,
     archived_at: o.archived_at,
     id: o.id,

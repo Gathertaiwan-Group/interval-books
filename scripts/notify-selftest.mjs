@@ -374,7 +374,10 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 被單筆移除過時兩者相等）；expire 的 4c／4d 合成一句，認領條件（含 0034 匯款 3 天）、商品
   // 庫存、products.seats_taken、inv 保留、取消訂單、付款嘗試、回傳值逐字沿用 0036。另 revoke
   // registration_removal_log 的 sequence 權限。這支自檢的斷言重讀過，原樣成立。
-  reviewedThrough: "0045_plan_units_release_by_registrations.sql",
+  // 0047（後台作廢發票）：invoices 只加三個 nullable 欄位與 CHECK，新增 claim／finish／release_invoice_void
+  // 三支函式；public.orders 只被 claim 唯讀 select order_no／total。0007 的開立函式、invoice_backlog、
+  // orders／payments 的欄位、約束、grant 一個都沒動。這支自檢的斷言重讀過，原樣成立。
+  reviewedThrough: "0047_invoice_void.sql",
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

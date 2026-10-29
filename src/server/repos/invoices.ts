@@ -12,6 +12,7 @@
  */
 import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
+import { VOID_STALE_AFTER, type VoidClaim } from "@/lib/invoice-void";
 
 /** 與 0007 的 p_max_retries 預設值一致。改這裡要一起改 SQL 預設值。 */
 export const INVOICE_MAX_RETRIES = 5;
@@ -378,4 +379,97 @@ export async function resetInvoiceRetriesForReissue(orderId: string): Promise<bo
     return false;
   }
   return true;
+}
+
+// -----------------------------------------------------------------------------
+// 作廢（0047）—— 鎖在資料庫：claim_invoice_void／finish_invoice_void／release_invoice_void
+// -----------------------------------------------------------------------------
+
+const VOID_CLAIM_REASONS = new Set<string>([
+  "order_not_found",
+  "invoice_not_found",
+  "already_voided",
+  "not_issued",
+  "number_mismatch",
+  "locked",
+]);
+
+type VoidClaimRow = {
+  claimed: boolean;
+  reason: string;
+  invoice_id: string | null;
+  order_no: string | null;
+  invoice_number: string | null;
+  issued_at: string | null;
+  total: number | null;
+  status: string | null;
+  lock_token: string | null;
+};
+
+/**
+ * 取得「我可以去打 Amego 作廢」的許可。claimed=true 之後一定要走到
+ * finishInvoiceVoid 或 releaseInvoiceVoid（runInvoiceVoid 的 try/finally 保證）。
+ */
+export async function claimInvoiceVoid(orderId: string, invoiceNumber: string): Promise<VoidClaim> {
+  const { data, error } = await supabaseAdmin().rpc("claim_invoice_void", {
+    p_order_id: orderId,
+    p_invoice_number: invoiceNumber,
+    p_stale_after: VOID_STALE_AFTER,
+  });
+  if (error) {
+    console.error(`[invoices] claim_invoice_void 失敗：${error.code} ${error.message}`);
+    return { claimed: false, reason: "db_error", status: null };
+  }
+  const row = (Array.isArray(data) ? data[0] : data) as VoidClaimRow | undefined;
+  if (!row) {
+    console.error("[invoices] claim_invoice_void 沒有回傳任何列", orderId);
+    return { claimed: false, reason: "db_error", status: null };
+  }
+  if (row.claimed && row.invoice_id && row.order_no && row.invoice_number && row.lock_token) {
+    return {
+      claimed: true,
+      invoiceId: row.invoice_id,
+      orderNo: row.order_no,
+      invoiceNumber: row.invoice_number,
+      issuedAt: row.issued_at,
+      total: row.total === null ? null : Number(row.total),
+      lockToken: row.lock_token,
+    };
+  }
+  if (!VOID_CLAIM_REASONS.has(row.reason)) {
+    console.error("[invoices] claim_invoice_void 回了未知的 reason", row.reason);
+    return { claimed: false, reason: "db_error", status: row.status };
+  }
+  return {
+    claimed: false,
+    reason: row.reason as Extract<VoidClaim, { claimed: false }>["reason"],
+    status: row.status,
+  };
+}
+
+/** Amego 已確認作廢之後才呼叫。資料庫錯誤丟例外（runInvoiceVoid 會回 db_write_failed）。 */
+export async function finishInvoiceVoid(p: {
+  invoiceId: string;
+  invoiceNumber: string;
+  reason: string;
+  actorId: string;
+}): Promise<"voided" | "already_voided" | "not_issued"> {
+  const { data, error } = await supabaseAdmin().rpc("finish_invoice_void", {
+    p_invoice_id: p.invoiceId,
+    p_invoice_number: p.invoiceNumber,
+    p_reason: p.reason,
+    p_actor_id: p.actorId,
+  });
+  if (error) throw new Error(`finish_invoice_void ${error.code} ${error.message}`);
+  if (data === "voided" || data === "already_voided" || data === "not_issued") return data;
+  throw new Error(`finish_invoice_void 回了未知的結果 ${String(data)}`);
+}
+
+/** Amego 失敗或結果不確定時放掉作廢鎖，其餘欄位不動。 */
+export async function releaseInvoiceVoid(invoiceId: string, lockToken: string): Promise<void> {
+  const { error } = await supabaseAdmin().rpc("release_invoice_void", {
+    p_invoice_id: invoiceId,
+    p_lock_token: lockToken,
+  });
+  if (error) throw new Error(`release_invoice_void ${error.code} ${error.message}`);
 }

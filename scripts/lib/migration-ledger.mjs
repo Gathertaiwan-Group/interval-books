@@ -818,6 +818,15 @@ export const MIGRATION_LEDGER = Object.freeze([
     // 自己開的區域）。沒有 comment on；沒有碰任何既有表、函式或 sequence。
     touches: ["journey_wishes"],
   },
+  {
+    file: "0047_invoice_void.sql",
+    note: "後台「作廢發票」：invoices 加三個 nullable 欄位 voided_at／void_reason／voided_by 與 CHECK invoices_void_reason_len（btrim 後 1–20 字，Amego CancelReason 上限）。新函式 claim_invoice_void(order_id, invoice_number, stale_after)（for update 鎖發票列，確認 issued、號碼相符、locked_at 未在 stale_after 內，才設 locked_at=now()；回 claimed/reason/invoice_id/order_no/invoice_number/issued_at/total/status/lock_token，lock_token=設下的 locked_at）、finish_invoice_void(invoice_id, invoice_number, reason, actor_id)（條件式 update status='issued' 且號碼相符 → voided＋原因／時間／操作者、清 locked_at；回 voided/already_voided/not_issued）、release_invoice_void(invoice_id, lock_token)（只清 issued 列、且 locked_at 等於自己 lock_token 的那一把）。開頭先 drop function if exists 三支，可重跑。三支 security definer、search_path=''、只 grant service_role 照 0007。開立流程（0007 claim／reclaim／backlog）只在 status='issuing' 讀 locked_at，issued 列借來當作廢鎖不衝突",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：invoice（public.invoices 的
+    // alter table、select … for update、update）、orders_payments（識別字 orders —— claim 讀
+    // public.orders 的 order_no 與 total，唯讀）。沒有 comment on；沒有碰 order_post_payment_log、
+    // email_outbox 或 0007 的任何函式。
+    touches: ["invoice", "orders_payments"],
+  },
 ]);
 
 /** 磁碟上的 migration 檔名，排序過。空目錄 = 丟例外（那不是「沒有違規」）。 */

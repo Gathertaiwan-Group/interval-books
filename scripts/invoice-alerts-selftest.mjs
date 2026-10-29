@@ -521,14 +521,24 @@ checkTrue(
 );
 
 const fns = stripComments(read("src/lib/admin/fns/invoices.ts"));
+// 0047 起多了第三支 voidInvoiceAdmin（作廢發票，scripts/invoice-void-selftest.mjs 另有細驗）。
 check(
-  "fns/invoices.ts 兩支 server fn 都掛 adminFnMiddleware",
+  "fns/invoices.ts 三支 server fn 都掛 adminFnMiddleware",
   (fns.match(/\.middleware\(\[adminFnMiddleware\]\)/g) ?? []).length,
-  2,
+  3,
 );
-check("fns/invoices.ts 沒有 createServerFn 漏掛", (fns.match(/createServerFn\(/g) ?? []).length, 2);
+check("fns/invoices.ts 沒有 createServerFn 漏掛", (fns.match(/createServerFn\(/g) ?? []).length, 3);
 checkTrue("actorId 只認 context.admin.userId", fns.includes("context.admin.userId"));
-check("data 裡沒有 actorId", /actorId\s*:/.test(fns.slice(fns.indexOf("inputValidator"))), false);
+check(
+  "data 裡沒有 actorId（每一段 inputValidator(…) 到 .handler 之間都沒有）",
+  (fns.match(/\.inputValidator\([\s\S]*?\.handler\(/g) ?? []).some((seg) => /actorId/.test(seg)),
+  false,
+);
+check(
+  "handler 裡的 actorId 都來自 context.admin.userId",
+  (fns.match(/actorId\s*:[^,\n]*/g) ?? []).every((m) => /context\.admin\.userId/.test(m)),
+  true,
+);
 
 const issuer = stripComments(read("src/server/invoice-issuer.ts"));
 const reissue = issuer.slice(issuer.indexOf("export async function reissueInvoiceForOrder"));

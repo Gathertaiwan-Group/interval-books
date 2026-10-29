@@ -30,11 +30,20 @@
  */
 import { useState, type ReactNode } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { Archive, ArchiveRestore, Landmark, PackageCheck, RefreshCw, Trash2 } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  Ban,
+  Landmark,
+  PackageCheck,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AdminDetailNotFound, AdminDetailPage } from "@/components/admin/AdminDetailPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -79,6 +88,7 @@ import {
   type OrderListSearch,
 } from "@/lib/admin/order-labels";
 import { invoiceStatusLabel } from "@/lib/invoice-alerts";
+import { normalizeVoidReason, VOID_REASON_MAX } from "@/lib/invoice-void";
 // ⚠️ type-only：編譯後整行消失，不會把 server-only 的 repo 模組拉進瀏覽器 bundle。
 import type { AdminOrderDetail } from "@/server/repos/orders-admin";
 
@@ -143,6 +153,11 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
 
   const [reissueConfirmOpen, setReissueConfirmOpen] = useState(false);
   const [reissuing, setReissuing] = useState(false);
+
+  const [voidConfirmOpen, setVoidConfirmOpen] = useState(false);
+  const [voiding, setVoiding] = useState(false);
+  const [voidReason, setVoidReason] = useState("");
+  const voidReasonCheck = normalizeVoidReason(voidReason);
 
   /** 動作做完之後重跑 loader。失敗只代表畫面沒跟上，不是動作失敗。 */
   async function refresh() {
@@ -324,6 +339,36 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
     await refresh();
   }
 
+  /**
+   * 作廢發票（業主 2026-10-29）。伺服器那一側（voidInvoiceAdmin → runInvoiceVoid）會重新
+   * 讀 DB 確認仍是已開立、加鎖擋連按與兩個分頁同時按，Amego 成功（或回已作廢）才寫 DB。
+   * 每一種結果的說明文字由伺服器用 describeVoidOutcome() 產生，這裡只決定 toast 的樣式。
+   */
+  async function submitVoid() {
+    const invoiceNumber = detail.invoice?.invoice_number;
+    if (!invoiceNumber || !voidReasonCheck.ok) return;
+    setVoiding(true);
+    try {
+      const { voidInvoiceAdmin } = await import("@/lib/admin/fns/invoices");
+      const r = await voidInvoiceAdmin({
+        data: { orderId: detail.id, invoiceNumber, reason: voidReasonCheck.reason },
+      });
+      if (r.tone === "success") toast.success(r.message);
+      else if (r.tone === "info") toast.info(r.message);
+      else toast.error(r.message, { duration: 20_000 });
+      if (r.outcome.ok) {
+        setVoidConfirmOpen(false);
+        setVoidReason("");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "作廢失敗，請稍後再試");
+      return;
+    } finally {
+      setVoiding(false);
+    }
+    await refresh();
+  }
+
   /** 封存／取消封存一張已付款訂單（0035，admin_archive_order()）。 */
   async function submitArchive(archived: boolean) {
     setArchiving(true);
@@ -464,8 +509,9 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
       <Section title="發票">
         <InvoiceStatusBlock
           detail={detail}
-          busy={reissuing}
+          busy={reissuing || voiding}
           onReissue={() => setReissueConfirmOpen(true)}
+          onVoid={() => setVoidConfirmOpen(true)}
         />
         {detail.invoice ? (
           <dl className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-1 text-sm">
@@ -760,6 +806,51 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog
+        open={voidConfirmOpen}
+        onOpenChange={(open) => {
+          if (!voiding) setVoidConfirmOpen(open);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定要作廢這張發票？作廢後無法復原</AlertDialogTitle>
+            <AlertDialogDescription>
+              {`發票號碼 ${detail.invoice?.invoice_number ?? "—"}，金額 ${money(detail.total)}（訂單 ${detail.order_no}）。` +
+                "作廢會送到光貿並上傳財政部，送出後無法復原；要重新開立需另外處理。" +
+                "跨期（超過開立當期申報期限）的發票無法作廢，光貿會拒絕。"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="void-reason">作廢原因（必填，最多 {VOID_REASON_MAX} 字）</Label>
+            <Input
+              id="void-reason"
+              value={voidReason}
+              maxLength={VOID_REASON_MAX}
+              disabled={voiding}
+              placeholder="例如：測試訂單"
+              onChange={(e) => setVoidReason(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              {voidReason.trim().length} / {VOID_REASON_MAX} 字
+            </p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={voiding}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={voiding || !voidReasonCheck.ok}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                void submitVoid();
+              }}
+            >
+              {voiding ? "作廢中…" : "確定作廢"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -847,10 +938,12 @@ function InvoiceStatusBlock({
   detail,
   busy,
   onReissue,
+  onVoid,
 }: {
   detail: AdminOrderDetail;
   busy: boolean;
   onReissue: () => void;
+  onVoid: () => void;
 }) {
   if (detail.payment_status !== "paid") return null;
   if (!(detail.total > 0)) {
@@ -892,6 +985,18 @@ function InvoiceStatusBlock({
             </dd>
           </>
         ) : null}
+        {status === "voided" && inv?.void_reason ? (
+          <>
+            <dt className="text-muted-foreground">作廢原因</dt>
+            <dd>{inv.void_reason}</dd>
+          </>
+        ) : null}
+        {status === "voided" && inv?.voided_at ? (
+          <>
+            <dt className="text-muted-foreground">作廢時間</dt>
+            <dd>{formatTaipeiDateTime(inv.voided_at)}</dd>
+          </>
+        ) : null}
         {problem && inv?.error_message ? (
           <>
             <dt className="text-muted-foreground">最後錯誤</dt>
@@ -910,6 +1015,22 @@ function InvoiceStatusBlock({
             重新開立發票
           </Button>
         </>
+      ) : null}
+      {/* 伺服器算的 canVoidInvoice()：已開立且有號碼。只有 admin 拿得到這個 detail
+          （getAdminOrderDetail 掛 adminFnMiddleware），作廢本身也再擋一次。 */}
+      {detail.invoice_can_void ? (
+        <div className="pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-destructive"
+            disabled={busy}
+            onClick={onVoid}
+          >
+            <Ban className="h-4 w-4" aria-hidden="true" />
+            作廢發票
+          </Button>
+        </div>
       ) : null}
     </div>
   );
