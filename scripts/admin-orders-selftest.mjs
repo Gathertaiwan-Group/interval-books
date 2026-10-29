@@ -573,9 +573,11 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
     // 都是新表，不碰訂單、付款或報名。
     // 0044（移除報名補票種＋稽核）只改 admin_delete_registration() 的本體與新增稽核表，
     // 不碰訂單、付款或 admin_delete_order()／admin_archive_order()。
-    "supabase/migrations 剛好 44 個 .sql 檔（0001–0043 原封不動 + 0044 移除報名補票種與稽核）",
+    // 0045 只改 release_session_seat()／expire_unpaid_orders() 退票種的量（照實際刪掉的報名
+    // 列數），admin_delete_order() 本體與訂單／付款的處理一個字沒動。
+    "supabase/migrations 剛好 45 個 .sql 檔（0001–0044 原封不動 + 0045 票種依報名列數退）",
     migFiles.length,
-    44,
+    45,
   );
 }
 

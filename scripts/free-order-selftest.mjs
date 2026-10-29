@@ -255,7 +255,13 @@ assertMigrationDependencies(check, MIG_DIR, {
   // DELETE…RETURNING（沒刪到就不扣 seats_taken）、寫一列新表 registration_removal_log；
   // 另外校正一個票種的 units_taken。不改 order_items／event_registrations／event_sessions
   // 的欄位、約束、trigger 或其他函式，不碰訂單、付款、發票、交易信。這支自檢的斷言重讀過，原樣成立。
-  reviewedThrough: "0044_registration_removal_plan_units_audit.sql",
+  // 0045（票種改依實際刪掉的報名列數退）：create or replace 了 release_session_seat() 與
+  // expire_unpaid_orders()，簽章、回傳形狀、security definer、grant 都不變。唯一的行為差異是
+  // event_session_plans.units_taken 退 ceil(實際刪掉列數/spu) 而不是 order_items.quantity（沒人
+  // 被單筆移除過時兩者相等）；expire 的 4c／4d 合成一句，認領條件（含 0034 匯款 3 天）、商品
+  // 庫存、products.seats_taken、inv 保留、取消訂單、付款嘗試、回傳值逐字沿用 0036。另 revoke
+  // registration_removal_log 的 sequence 權限。這支自檢的斷言重讀過，原樣成立。
+  reviewedThrough: "0045_plan_units_release_by_registrations.sql",
 });
 
 // =============================================================================

@@ -39,6 +39,8 @@ const SELF = "scripts/registration-removal-selftest.mjs";
 const MIG_DIR = join(ROOT, "supabase/migrations");
 const MIG_0035 = join(MIG_DIR, "0035_admin_order_registration_cleanup.sql");
 const MIG_0044 = join(MIG_DIR, "0044_registration_removal_plan_units_audit.sql");
+const MIG_0036 = join(MIG_DIR, "0036_event_session_plans.sql");
+const MIG_0045 = join(MIG_DIR, "0045_plan_units_release_by_registrations.sql");
 const REG_ADMIN_REPO_PATH = join(ROOT, "src/server/repos/event-registrations-admin.ts");
 
 let pass = 0;
@@ -123,7 +125,13 @@ assertMigrationDependencies(check, MIG_DIR, {
     "session_plans",
     "order_expiry",
   ],
-  reviewedThrough: "0044_registration_removal_plan_units_audit.sql",
+  // 0045（票種改依實際刪掉的報名列數退）：create or replace 了 release_session_seat() 與
+  // expire_unpaid_orders()，簽章、回傳形狀、security definer、grant 都不變。唯一的行為差異是
+  // event_session_plans.units_taken 退 ceil(實際刪掉列數/spu) 而不是 order_items.quantity（沒人
+  // 被單筆移除過時兩者相等）；expire 的 4c／4d 合成一句，認領條件（含 0034 匯款 3 天）、商品
+  // 庫存、products.seats_taken、inv 保留、取消訂單、付款嘗試、回傳值逐字沿用 0036。另 revoke
+  // registration_removal_log 的 sequence 權限。這支自檢的斷言重讀過，原樣成立。
+  reviewedThrough: "0045_plan_units_release_by_registrations.sql",
 });
 checkTrue("0044 有 begin; / commit;", /^begin;$/m.test(sql0044) && /^commit;$/m.test(sql0044));
 
@@ -393,6 +401,186 @@ console.log("\n[7] 最新定義與呼叫端");
   checkTrue(
     "呼叫端解析的仍是 deleted／reason／freed",
     /deleted\?: boolean; reason\?: string; freed\?: number/.test(repo),
+  );
+}
+
+// =============================================================================
+// [8] 0045：事後回收的兩條路徑不再照 quantity 退票種（否則與 0044 的單筆移除重複退）
+// =============================================================================
+console.log("\n[8] 0045：release_session_seat／expire_unpaid_orders 依實際刪掉的列數退");
+{
+  const sql45 = stripSqlComments(readFile(MIG_0045));
+  const sql36 = stripSqlComments(readFile(MIG_0036));
+  const slice = (sql, name) => {
+    const a = sql.indexOf(`create or replace function public.${name}(`);
+    if (a === -1) return "";
+    const b = sql.indexOf("\n$$;", a);
+    return sql.slice(a, b === -1 ? sql.length : b);
+  };
+  const head = (body) => body.slice(0, body.indexOf("as $$"));
+  const rel45 = slice(sql45, "release_session_seat");
+  const exp45 = slice(sql45, "expire_unpaid_orders");
+  const rel36 = slice(sql36, "release_session_seat");
+  const exp36 = slice(sql36, "expire_unpaid_orders");
+  checkTrue("0045 有 begin; / commit;", /^begin;$/m.test(sql45) && /^commit;$/m.test(sql45));
+  checkTrue("兩支本體都切得到", rel45.length > 500 && exp45.length > 3000);
+  checkFalse("沒有 drop function（drop 會斷 pg_cron 與 grant）", /drop function/i.test(sql45));
+  check(
+    "release_session_seat 的宣告（簽章／回傳／definer／search_path）與 0036 逐字相同",
+    head(rel45),
+    head(rel36),
+  );
+  check(
+    "expire_unpaid_orders 的宣告（含 RETURNS TABLE 四欄）與 0036 逐字相同",
+    head(exp45),
+    head(exp36),
+  );
+
+  // release_session_seat
+  checkFalse("🔴 release_session_seat 不再用 quantity 退票種", /quantity/.test(rel45));
+  checkTrue(
+    "release_session_seat 退 ceil(v_freed / spu)",
+    /p\.units_taken - ceil\(v_freed::numeric \/ greatest\(coalesce\(v_spu, 1\), 1\)\)::integer/.test(
+      rel45,
+    ),
+  );
+  const rS = rel45.indexOf("from public.event_sessions s where s.id = v_session for no key update");
+  const rP = rel45.search(
+    /from public\.event_session_plans p\s+where p\.id = v_plan_id\s+for no key update/,
+  );
+  const rD = rel45.indexOf("delete from public.event_registrations");
+  checkTrue("release_session_seat 鎖序：場次 → 票種 → 才刪", rS > 0 && rP > rS && rD > rP);
+  checkTrue(
+    "release_session_seat 仍是 best effort（exception when others → 0）",
+    /exception\s+when others then\s+return 0;/.test(rel45),
+  );
+
+  // expire_unpaid_orders
+  const step4d = exp36.slice(exp36.indexOf("update public.event_session_plans p"));
+  checkTrue(
+    "（對照）0036 的 4d 是用 sum(oi.quantity) 退",
+    /sum\(oi\.quantity\)::integer as qty/.test(step4d.slice(0, 400)),
+  );
+  checkFalse(
+    "🔴 expire 不再用 sum(oi.quantity) 退票種",
+    /update public\.event_session_plans p\s+set units_taken = greatest\(0, p\.units_taken - agg\.qty\)/.test(
+      exp45,
+    ),
+  );
+  checkTrue(
+    "expire 依每個 order_item 實際刪掉的列數 ceil(n / spu) 加總",
+    /sum\(ceil\(item_agg\.n::numeric \/ greatest\(esp\.seats_per_unit, 1\)\)\)::integer as units/.test(
+      exp45,
+    ),
+  );
+  checkTrue(
+    "刪報名用 DELETE…RETURNING 帶出 order_item_id",
+    /returning r\.session_id, r\.order_item_id/.test(exp45),
+  );
+  const eS = exp45.search(/from public\.event_sessions s\s+where s\.id in \(/);
+  const eP = exp45.search(/from public\.event_session_plans p\s+where p\.id in \(/);
+  const eD = exp45.indexOf("delete from public.event_registrations");
+  checkTrue("expire 鎖序：場次 → 票種 → 才刪", eS > 0 && eP > eS && eD > eP);
+  // 其餘步驟逐字沿用 0036：認領、商品庫存、products.seats_taken、inv、取消、付款、回傳。
+  const cut = (body, from, to) => {
+    const a = body.indexOf(from);
+    const b = body.indexOf(to, a);
+    return a === -1 || b === -1 ? null : body.slice(a, b);
+  };
+  check(
+    "認領 → 商品 → products.seats_taken → inv 保留（4c 之前）與 0036 逐字相同",
+    cut(exp45, "declare", "perform 1\n    from public.event_sessions s"),
+    cut(exp36, "declare", "perform 1\n    from public.event_sessions s"),
+  );
+  check(
+    "取消訂單 → 付款嘗試 → 回傳（第 5 步之後）與 0036 逐字相同",
+    exp45.slice(exp45.indexOf("update public.orders o")),
+    exp36.slice(exp36.indexOf("update public.orders o")),
+  );
+  checkTrue(
+    "products.seats_taken 那一步原樣保留（CHECK 綁成 0，必然 no-op）",
+    /set seats_taken = greatest\(0, p\.seats_taken - agg\.qty\)/.test(exp45),
+  );
+
+  // grant 與 sequence
+  for (const sig of ["release_session_seat(bigint)", "expire_unpaid_orders(interval, integer)"]) {
+    checkTrue(
+      `${sig}：revoke public、anon/authenticated，grant service_role`,
+      sql45.includes(`revoke execute on function public.${sig} from public;`) &&
+        sql45.includes(`revoke execute on function public.${sig} from anon, authenticated;`) &&
+        sql45.includes(`grant  execute on function public.${sig} to service_role;`),
+    );
+  }
+  checkTrue(
+    "registration_removal_log 的 sequence 收回 anon／authenticated",
+    /revoke all on sequence public\.registration_removal_log_id_seq from anon, authenticated;/.test(
+      sql45,
+    ),
+  );
+  checkFalse("不改 default privileges（同庫還有別的站）", /alter default privileges/i.test(sql45));
+
+  // 最新定義
+  const files = readdirSync(MIG_DIR)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
+  const last = (name) =>
+    files
+      .filter((f) =>
+        stripSqlComments(readFile(join(MIG_DIR, f))).includes(
+          `create or replace function public.${name}(`,
+        ),
+      )
+      .at(-1);
+  check(
+    "release_session_seat 現在生效的定義來自 0045",
+    last("release_session_seat"),
+    "0045_plan_units_release_by_registrations.sql",
+  );
+  check(
+    "expire_unpaid_orders 現在生效的定義來自 0045",
+    last("expire_unpaid_orders"),
+    "0045_plan_units_release_by_registrations.sql",
+  );
+
+  // 純 JS 模型：先單筆移除 k 位（0044 每位退 unitsFreed），再整張回收（0045 退 ceil(剩下/spu)），
+  // 總退量必須恰好等於買的單位數 q——這就是「不重複退、也不漏退」。
+  const unitsFreed = (nAfter, spu) => Math.ceil((nAfter + 1) / spu) - Math.ceil(nAfter / spu);
+  let ok = true;
+  for (let spu = 1; spu <= 3; spu += 1)
+    for (let q = 1; q <= 4; q += 1)
+      for (let k = 0; k <= q * spu; k += 1) {
+        let n = q * spu;
+        let total = 0;
+        for (let i = 0; i < k; i += 1) {
+          n -= 1;
+          total += unitsFreed(n, spu);
+        }
+        total += Math.ceil(n / spu);
+        if (total !== q) ok = false;
+      }
+  checkTrue("spu 1–3 × 單位 1–4 × 先移除 0…全部：單筆移除＋整張回收的總退量恰好等於買的單位數", ok);
+  // 舊寫法（整張回收照 quantity）在先移除過人時多退——情境 A／B。
+  const removedFirst = (q, spu, k) => {
+    let n = q * spu;
+    let t = 0;
+    for (let i = 0; i < k; i += 1) {
+      n -= 1;
+      t += unitsFreed(n, spu);
+    }
+    return { n, t };
+  };
+  // 0036 的 expire 4d：不管還剩幾列，一律 sum(quantity)。
+  const oldExpire = (q, spu, k) => removedFirst(q, spu, k).t + q;
+  // 0036 的 release_session_seat：還有報名列才退，退 quantity。
+  const oldRelease = (q, spu, k) => {
+    const { n, t } = removedFirst(q, spu, k);
+    return n > 0 ? t + q : t;
+  };
+  check("（對照）舊寫法情境 A：q=1 spu=1 先移除 1 位再逾期，總退 2（多 1）", oldExpire(1, 1, 1), 2);
+  check(
+    "（對照）舊寫法情境 B：q=2 spu=1 先移除 1 位再刪單，總退 3（多 1）",
+    oldRelease(2, 1, 1),
+    3,
   );
 }
 

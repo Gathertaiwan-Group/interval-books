@@ -783,6 +783,26 @@ export const MIGRATION_LEDGER = Object.freeze([
       "session_seats",
     ],
   },
+  {
+    file: "0045_plan_units_release_by_registrations.sql",
+    note: "修 0044 之後的票種重複退：release_session_seat()（admin_delete_order() 逐 order_item 呼叫）與 expire_unpaid_orders() 第 4d 步不再照 order_items.quantity 退 units_taken，改成依實際刪掉的報名列數 ceil(n/spu)（沒人被單筆移除過時等於 quantity，行為不變）。expire 的 4c／4d 合成一句（鎖場次→鎖票種→DELETE…RETURNING 報名、扣場次、扣票種），其餘步驟逐字沿用 0036；products.seats_taken 被 CHECK 綁成 0，第 4 步照舊。兩支簽章與回傳形狀不變（create or replace，不斷 pg_cron），security definer／search_path=public、只 grant service_role 照 0036。另外 revoke registration_removal_log_id_seq 從 public default ACL 繼承來的 anon／authenticated 權限",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：session_seats（event_sessions、
+    // release_session_seat、seats_taken）、event_registrations、session_plans（event_session_plans、
+    // units_taken）、order_expiry（expire_unpaid_orders、order_items）、orders_payments（expire 本體的
+    // public.orders／public.payments，逐字沿用）、products_availability（public.products 的庫存與
+    // seats_taken 兩步）、inventory（inv.products 的鎖）。registration_removal 是多標的：sequence 名
+    // registration_removal_log_id_seq 底線相連，word boundary 對不到表名，但它確實是那張表的 sequence。
+    touches: [
+      "event_registrations",
+      "inventory",
+      "order_expiry",
+      "orders_payments",
+      "products_availability",
+      "registration_removal",
+      "session_plans",
+      "session_seats",
+    ],
+  },
 ]);
 
 /** 磁碟上的 migration 檔名，排序過。空目錄 = 丟例外（那不是「沒有違規」）。 */
