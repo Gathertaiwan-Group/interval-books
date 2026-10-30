@@ -61,7 +61,12 @@ import { INVOICE_MAX_RETRIES } from "@/server/repos/invoices";
 // 列表
 // ---------------------------------------------------------------------------
 
-export type AdminOrderListScope = "transfer_pending" | "to_ship" | "all" | "invoice_problem";
+export type AdminOrderListScope =
+  | "transfer_pending"
+  | "needs_contact"
+  | "to_ship"
+  | "all"
+  | "invoice_problem";
 
 export type AdminOrderListFilter = {
   scope: AdminOrderListScope;
@@ -80,7 +85,7 @@ export type AdminOrderListFilter = {
  * 都多帶一包資料回來。
  */
 const LIST_COLUMNS =
-  "id, order_no, created_at, total, payment_method, payment_status, status, shipping_method, remittance_last5, customer_name, archived_at";
+  "id, order_no, created_at, total, payment_method, payment_status, status, shipping_method, remittance_last5, customer_name, archived_at, needs_contact";
 
 export type AdminOrderListRow = {
   id: string;
@@ -96,6 +101,8 @@ export type AdminOrderListRow = {
   customer_name: string;
   /** 非 null＝已封存（0035）。列表預設濾掉，見 AdminOrderListFilter.includeArchived。 */
   archived_at: string | null;
+  /** 0048：客人選匯款時勾了「我需要專人聯繫協助付款」。 */
+  needs_contact: boolean;
 };
 
 /**
@@ -147,6 +154,13 @@ export async function listAdminOrders(filter: AdminOrderListFilter): Promise<Adm
 
   if (filter.scope === "transfer_pending") {
     query = query.eq("payment_method", "transfer").neq("payment_status", "paid");
+  } else if (filter.scope === "needs_contact") {
+    // 0048：還沒收到錢、也還沒被取消、而且客人要求專人聯繫的訂單——與列表／內頁
+    // 「需聯繫」標示亮起的條件相同（src/lib/admin/order-labels.ts showNeedsContact）。
+    query = query
+      .eq("needs_contact", true)
+      .neq("payment_status", "paid")
+      .neq("status", "cancelled");
   } else if (filter.scope === "to_ship") {
     // 待出貨：與 admin-todo.ts 的 toShip 計數、src/lib/admin/order-fulfillment.ts 的
     // canApply("ship") 同一組條件（TO_SHIP_FILTER）。
@@ -178,7 +192,7 @@ export async function listAdminOrders(filter: AdminOrderListFilter): Promise<Adm
 const ORDER_COLUMNS =
   "id, order_no, created_at, paid_at, shipped_at, completed_at, status, payment_status, payment_method, " +
   "subtotal, shipping_fee, discount, total, shipping_method, note, " +
-  "remittance_last5, remittance_reported_at, customer_name, customer_email, customer_phone, archived_at, " +
+  "remittance_last5, remittance_reported_at, customer_name, customer_email, customer_phone, archived_at, needs_contact, " +
   // 0040：推薦碼與當時的折扣%。
   "referral_code, referral_discount_percent";
 
@@ -277,6 +291,8 @@ export type AdminOrderDetail = {
   shipping_method: string;
   remittance_last5: string | null;
   remittance_reported_at: string | null;
+  /** 0048：客人選匯款時勾了「我需要專人聯繫協助付款」。 */
+  needs_contact: boolean;
   customer_name: string;
   customer_email: string | null;
   customer_phone: string | null;
@@ -367,6 +383,8 @@ type OrderDetailRawRow = {
   note: string | null;
   remittance_last5: string | null;
   remittance_reported_at: string | null;
+  /** 0048：客人選匯款時勾了「我需要專人聯繫協助付款」。 */
+  needs_contact: boolean;
   customer_name: string;
   customer_email: string | null;
   customer_phone: string | null;
@@ -480,6 +498,7 @@ export async function getAdminOrderDetail(orderId: string): Promise<AdminOrderDe
     shipping_method: o.shipping_method,
     remittance_last5: o.remittance_last5,
     remittance_reported_at: o.remittance_reported_at,
+    needs_contact: o.needs_contact === true,
     customer_name: o.customer_name,
     customer_email: blankToNull(o.customer_email),
     customer_phone: blankToNull(o.customer_phone),

@@ -417,7 +417,7 @@ function Booking({ product }: { product: ShopProduct }) {
       )}
       <p className="text-xs leading-relaxed text-muted-foreground">
         付款方式於下一步選擇：信用卡線上付款、銀行匯款（匯款帳戶於結帳完成後提供，請於下單後 3
-        天內完成，逾期名額將釋出），或由我們與你聯繫付款。
+        天內完成，逾期名額將釋出；如需專人協助付款，選匯款時可勾選「我需要專人聯繫協助付款」）。
       </p>
     </>
   );

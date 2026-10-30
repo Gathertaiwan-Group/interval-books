@@ -1418,7 +1418,10 @@ for (const [label, src] of [
     // 0047（後台作廢發票）：invoices 只加三個 nullable 欄位與 CHECK，新增 claim／finish／release_invoice_void
     // 三支函式；public.orders 只被 claim 唯讀 select order_no／total。0007 的開立函式、invoice_backlog、
     // orders／payments 的欄位、約束、grant 一個都沒動。這支自檢的斷言重讀過，原樣成立。
-    reviewedThrough: "0047_invoice_void.sql",
+    // ── 0048_order_needs_contact.sql 的重讀結論 ── 只對 public.orders 加 needs_contact boolean
+    // not null default false（＋comment on column）。沒有改任何函式、CHECK、trigger、排程或 grant，
+    // 既有欄位與 expire_unpaid_orders() 不變；這一支的斷言原樣成立。
+    reviewedThrough: "0048_order_needs_contact.sql",
   });
 }
 
@@ -1447,15 +1450,19 @@ for (const [label, src] of [
     false,
   );
   const checkoutSrc = readFile(join(ROOT, "src/routes/checkout.index.tsx"));
+  // 0048：選項清單從結帳頁搬到 src/lib/checkout.ts 的 checkoutMethodOptions()（純函式，
+  // needs-contact-selftest 直接呼叫它驗值）。這裡守的仍是同三件事，只是看那一份。
+  const checkoutLibSrc = readFile(join(ROOT, "src/lib/checkout.ts"));
   // 0034 把兩個選項變成三個，所以「刷卡選項出不出現」不再是一個 `{cardAvailable ?`
   // 三元式，而是 card 進不進得了 methodOptions 這份清單。守的事情沒變。
   checkTrue(
     "結帳頁的刷卡選項掛在 cardAvailable 上（false 就不進 methodOptions）",
-    /cardAvailable \? \(\["card"\] as const\) : \[\]/.test(checkoutSrc),
+    /if \(opts\.cardAvailable\) out\.push\("card"\);/.test(checkoutLibSrc) &&
+      /checkoutMethodOptions\(\{ cardAvailable, transferAvailable \}\)/.test(checkoutSrc),
   );
   checkTrue(
-    "offline 永遠在 methodOptions 裡（不需要任何設定的那條退路）",
-    /"offline" as const,/.test(checkoutSrc),
+    "offline 是 card 與 transfer 都沒設定時的退路（0048 起不再與匯款並列）",
+    /if \(out\.length === 0\) out\.push\("offline"\);/.test(checkoutLibSrc),
   );
   checkTrue(
     "cardAvailable 為 false 時預設付款方式退回清單的第一個（card 不在裡面）",
@@ -1467,7 +1474,9 @@ for (const [label, src] of [
   //    帳號），而畫面上沒有任何地方看得出來。
   checkTrue(
     "🔴 送出前的白名單是「這個方式有沒有提供」，不是「card 有沒有開」",
-    /paymentMethod: methodOptions\.includes\(payWith\) \? payWith : "offline"/.test(checkoutSrc),
+    /paymentMethod: methodOptions\.includes\(payWith\) \? payWith : methodOptions\[0\]/.test(
+      checkoutSrc,
+    ),
   );
   check(
     "🔴 舊的 cardAvailable 三元式 fallback 沒有殘留（它會吃掉匯款的選擇）",

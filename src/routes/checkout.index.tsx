@@ -46,6 +46,7 @@ import {
   amountToFreeShipping,
   checkoutErrorText,
   checkoutFormSchemaWithParticipants,
+  checkoutMethodOptions,
   computeShippingFee,
   SHIPPING_RULES,
   type CheckoutFormValues,
@@ -79,16 +80,16 @@ const PAGE = {
     ja: "ご購入手続き｜小時光書店 Interval Books",
   },
   metaDescription: {
-    zh: "填寫收件資料，完成小時光書店的訂單。付款方式將於下一階段開放。",
-    en: "Enter your delivery details to complete your Interval Books order. Payment opens in the next phase.",
-    ja: "お届け先をご入力いただき、小時光書店のご注文を確定します。お支払いは次の段階で開放されます。",
+    zh: "填寫收件資料並選擇付款方式，完成小時光書店的訂單。可用信用卡線上付款或銀行匯款。",
+    en: "Enter your delivery details and choose how to pay to complete your Interval Books order — by card online or by bank transfer.",
+    ja: "お届け先とお支払い方法をご入力いただき、小時光書店のご注文を確定します。クレジットカード決済または銀行振込をご利用いただけます。",
   },
   eyebrowSuffix: { zh: "結帳", en: "Checkout", ja: "ご購入手続き" },
   title: { zh: "留下收件資料", en: "Where should this go", ja: "お届け先のご入力" },
   intro: {
-    zh: "確認品項與金額後填寫收件資料。送出後訂單就會成立，我們會與你聯繫付款方式。",
-    en: "Check the items and the total, then tell us where to send them. Your order is created on submit and we will follow up about payment.",
-    ja: "商品と金額をご確認のうえ、お届け先をご入力ください。送信後にご注文が成立し、お支払い方法についてご連絡いたします。",
+    zh: "確認品項與金額後填寫收件資料，並選擇付款方式。送出後訂單就會成立。",
+    en: "Check the items and the total, tell us where to send them and choose how to pay. Your order is created on submit.",
+    ja: "商品と金額をご確認のうえ、お届け先とお支払い方法をご入力ください。送信後にご注文が成立します。",
   },
   empty: {
     zh: "購物車是空的，還沒有可以結帳的品項。",
@@ -183,10 +184,12 @@ const PAGE = {
     en: "The bank details appear once your order is placed, and we email you a copy. Please transfer within 3 days and come back to the order page to tell us the last five digits of your account — unpaid orders are cancelled automatically after that and the items and places are released.",
     ja: "ご注文確定後にお振込先を表示し、メールでもお送りします。3 日以内にお振込のうえ、ご注文ページで口座番号の下 5 桁をご入力ください。期限を過ぎたご注文は自動的にキャンセルとなり、商品・お席は解放されます。",
   },
+  // 0048：offline 只剩「金流與匯款帳戶都沒設定」的降級畫面會用到（那時不畫 radio，
+  // 這個標籤實際上不會出現）。保留它是因為 PAYMENT_LABELS 的鍵是 PaymentMethodChoice。
   payOffline: {
-    zh: "由我們與你聯繫付款",
-    en: "Arrange payment with us",
-    ja: "個別にお支払いをご案内",
+    zh: "由店家另行安排付款",
+    en: "Payment arranged by the shop",
+    ja: "店舗より個別にお支払いをご案内",
   },
   payOfflineNote: {
     zh: "訂單會先成立並保留品項，我們會以電子信箱與你聯繫付款方式。",
@@ -200,6 +203,17 @@ const PAGE = {
   },
   invoiceSection: { zh: "電子發票", en: "Invoice", ja: "電子インボイス" },
   submitTransfer: { zh: "送出訂單並取得匯款帳號", en: "Place order", ja: "注文して振込先を表示" },
+  // 0048（業主方案 A）：選銀行匯款時的勾選框。預設不勾。
+  needsContactLabel: {
+    zh: "我需要專人聯繫協助付款",
+    en: "I would like someone to contact me to help with payment",
+    ja: "お支払いについて担当者からの連絡を希望します",
+  },
+  needsContactNote: {
+    zh: "勾選後，訂單仍會顯示匯款帳號並保留 3 天，我們會盡快與你聯繫。",
+    en: "Your order still shows the bank details and is held for 3 days — we will contact you as soon as we can.",
+    ja: "チェックした場合も、お振込先を表示し 3 日間お取り置きします。担当者よりできるだけ早くご連絡いたします。",
+  },
   invoiceIntro: {
     zh: "付款完成後會自動開立電子發票，並以電子信箱通知。統編與載具送出後就不能改，請先確認。",
     en: "An e-invoice is issued automatically once payment clears, and emailed to you. A business number or carrier cannot be changed after submitting, so please check it now.",
@@ -456,16 +470,17 @@ function Checkout() {
   //    開」。清單只有這一份，畫面與送出用的是同一個。
   const cardAvailable = paymentOptions.cardAvailable;
   const transferAvailable = paymentOptions.transferAvailable;
+  // 0048（業主方案 A）：結帳頁只剩 card 與 transfer。「由我們與你聯繫付款」併進匯款，
+  // 改成匯款底下的「我需要專人聯繫協助付款」勾選框。offline 只在兩者都沒設定時出現
+  // （不畫 radio 的降級畫面）。規則只有一份：checkoutMethodOptions()。
   const methodOptions = useMemo<PaymentMethodChoice[]>(
-    () => [
-      ...(cardAvailable ? (["card"] as const) : []),
-      ...(transferAvailable ? (["transfer"] as const) : []),
-      // offline 永遠在清單裡：它不需要任何設定，是這家店在金流出現之前就有的路。
-      "offline" as const,
-    ],
+    () => checkoutMethodOptions({ cardAvailable, transferAvailable }),
     [cardAvailable, transferAvailable],
   );
   const [payWith, setPayWith] = useState<PaymentMethodChoice>(methodOptions[0]);
+  const hasPaymentChoice = methodOptions[0] !== "offline";
+  /** 0048：匯款時的「我需要專人聯繫協助付款」。預設 false；只有 payWith = transfer 時送 true。 */
+  const [needsContact, setNeedsContact] = useState(false);
   /**
    * Set once the PayUni form has been submitted; the page is navigating away.
    * Mirrored in a ref because the `finally` block runs in the same tick as the
@@ -759,7 +774,9 @@ function Checkout() {
           // 🔴 白名單是「這個方式現在有提供嗎」，不是「card 有沒有開」。見
           //    methodOptions 那一段的註解——舊的那一行會把一個選了匯款的客人
           //    靜靜改成 offline。
-          paymentMethod: methodOptions.includes(payWith) ? payWith : "offline",
+          paymentMethod: methodOptions.includes(payWith) ? payWith : methodOptions[0],
+          // 0048：勾選框只在匯款時出現；切到刷卡後殘留的 true 不送出去。
+          needsContact: payWith === "transfer" && needsContact,
           // 0040：只送碼，不送折扣。空字串＝不用推薦碼（伺服器不會再退回 cookie）。
           referralCode: typedReferral,
         },
@@ -1136,11 +1153,13 @@ function Checkout() {
               <fieldset className="space-y-4">
                 <legend className="eyebrow text-xl">{t(PAGE.paymentSection)}</legend>
                 {/*
-                  只剩一個選項（＝金流與匯款都沒設定，只有 offline）時不畫 radio ——
-                  一組只有一顆、而且不能不選的 radio 不是選擇，是雜訊。那個情況畫的
-                  是既有的 paymentUnavailable 說明，與 0034 之前的行為完全相同。
+                  只有 offline（＝金流與匯款都沒設定）時不畫 radio，畫既有的
+                  paymentUnavailable 說明，與 0034 之前的行為完全相同。
+                  0048：判準從「選項多於一個」改成「有沒有 card／transfer」——只設了
+                  匯款帳戶的部署現在只有 transfer 一個選項，它仍然要畫出來（附匯款說明
+                  與需聯繫勾選框），不能被當成「沒有付款方式」。
                 */}
-                {methodOptions.length > 1 ? (
+                {hasPaymentChoice ? (
                   <div className="grid gap-3 sm:grid-cols-2">
                     {methodOptions.map((p) => {
                       const selected = payWith === p;
@@ -1171,10 +1190,29 @@ function Checkout() {
                     {t(PAGE.paymentUnavailable)}
                   </p>
                 )}
-                {methodOptions.length > 1 && (
+                {hasPaymentChoice && (
                   <p className="text-xs leading-relaxed text-muted-foreground">
                     {t(PAYMENT_NOTES[payWith])}
                   </p>
+                )}
+                {payWith === "transfer" && methodOptions.includes("transfer") && (
+                  <div className="space-y-1">
+                    <label className="flex cursor-pointer items-baseline gap-3 text-sm">
+                      <input
+                        type="checkbox"
+                        name="needsContact"
+                        checked={needsContact}
+                        onChange={(e) => setNeedsContact(e.target.checked)}
+                        className="accent-current"
+                      />
+                      <span>{t(PAGE.needsContactLabel)}</span>
+                    </label>
+                    {needsContact && (
+                      <p className="pl-6 text-xs leading-relaxed text-muted-foreground">
+                        {t(PAGE.needsContactNote)}
+                      </p>
+                    )}
+                  </div>
                 )}
               </fieldset>
 

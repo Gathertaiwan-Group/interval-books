@@ -104,6 +104,18 @@ export type RemittanceEmailInput = {
   items: { name: Localized; quantity: number; subtotal: number }[];
   /** 這張訂單買到的場次（可能 0 個）。 */
   sessions: SessionBrief[];
+  /**
+   * 客人勾了「我需要專人聯繫協助付款」（0048 orders.needs_contact）。true 時在匯款
+   * 帳戶那一區加一句「我們會盡快與你聯繫」。不傳＝false，信與 0048 之前逐字相同。
+   */
+  needsContact?: boolean;
+};
+
+/** 匯款資訊信：客人勾了需專人聯繫時，印在匯款帳戶旁邊的那一句（0048）。 */
+export const REMITTANCE_NEEDS_CONTACT_NOTE: Localized = {
+  zh: "你勾選了需要專人協助付款，我們會盡快與你聯繫。",
+  en: "You asked for help with payment — we will contact you as soon as we can.",
+  ja: "お支払いのサポートをご希望いただきました。担当者よりできるだけ早くご連絡いたします。",
 };
 
 export type RegistrationEmailInput = {
@@ -194,6 +206,11 @@ export type AdminOrderNotificationInput = {
   paymentMethod: string | null;
   /** public.orders.shipping_method（0005:86）。 */
   shippingMethod: string;
+  /**
+   * 客人勾了「我需要專人聯繫協助付款」（0048 orders.needs_contact）。true 時主旨加
+   * 「需聯繫」、付款方式那一列與開頭說明都寫出來。不傳＝false。
+   */
+  needsContact?: boolean;
   items: { name: Localized; quantity: number; subtotal: number }[];
   /**
    * 這張訂單買到的場次，附這個場次總共幾位參加者，以及（讀得到時）逐位參加者。
@@ -344,6 +361,7 @@ const LABELS: Record<string, Localized> = {
   bankAccount: { zh: "帳號", en: "Account number", ja: "口座番号" },
   remittanceDue: { zh: "匯款期限", en: "Transfer by", ja: "お振込期限" },
   remittanceAccount: { zh: "匯款帳戶", en: "Bank account", ja: "お振込先" },
+  remittanceContact: { zh: "專人聯繫", en: "Payment help", ja: "担当者からのご連絡" },
   remittanceReportLink: {
     zh: "匯款後請回訂單頁填寫帳號末五碼",
     en: "After transferring, tell us your last five digits",
@@ -791,6 +809,13 @@ export function renderRemittanceEmail(
     accountRows.push({ label: pick(LABELS.bankCode, lang), value: input.bankCode });
   if (input.bankAccount)
     accountRows.push({ label: pick(LABELS.bankAccount, lang), value: input.bankAccount });
+  // 0048：需專人聯繫 → 匯款帳戶那一區最後加一句「我們會盡快與你聯繫」。
+  if (input.needsContact) {
+    accountRows.push({
+      label: pick(LABELS.remittanceContact, lang),
+      value: pick(REMITTANCE_NEEDS_CONTACT_NOTE, lang),
+    });
+  }
 
   const blocks = [
     ...(accountRows.length > 0
@@ -938,10 +963,12 @@ export function renderAdminOrderNotificationEmail(
       ? "有新的訂單／活動報名"
       : "有新的訂單";
   const buyerName = subjectSafe(contact?.customerName ?? "");
+  const needsContact = input.needsContact === true;
   const subject =
     (placed
       ? `【小時光書店】待收款訂單 ${input.orderNo}`
       : `【小時光書店】新訂單 ${input.orderNo}`) +
+    (needsContact ? "｜需聯繫" : "") +
     (buyerName ? `｜${buyerName}` : "") +
     `｜${formatMoney(input.total)}`;
 
@@ -963,6 +990,11 @@ export function renderAdminOrderNotificationEmail(
     { label: pick(LABELS.total, "zh"), value: formatMoney(input.total) },
     { label: pick(LABELS.paymentMethod, "zh"), value: paymentLabel },
   ];
+  // 0048：客人選匯款並勾了「我需要專人聯繫協助付款」。獨立一列、緊接付款方式，
+  // 讓店家一眼看到要主動打電話／寫信，不是等客人自己匯款。
+  if (needsContact) {
+    rows.push({ label: "需聯繫", value: ADMIN_NEEDS_CONTACT_NOTE });
+  }
   // 收件方式在訂購人區塊裡已經印了（跟地址放在一起才看得懂）；讀不到訂購人時才放這裡。
   if (!contact) {
     rows.push({
@@ -986,7 +1018,9 @@ export function renderAdminOrderNotificationEmail(
     // ⚠️ 純文字，不要用 **粗體** 這類 markdown —— layout() 會把它逐字跳脫之後印出來
     //    （信裡就會出現兩個星號），它沒有 markdown 轉換那一步。
     intro: placed
-      ? "後台收到一筆新訂單，款項尚未入帳。品項與座位已經先保留起來。"
+      ? needsContact
+        ? "後台收到一筆新訂單，款項尚未入帳，客人需要專人聯繫協助付款。品項與座位已經先保留起來。"
+        : "後台收到一筆新訂單，款項尚未入帳。品項與座位已經先保留起來。"
       : "後台收到一筆新訂單，摘要如下。",
     leadBlocks,
     rows,
@@ -1013,6 +1047,10 @@ export function renderAdminOrderNotificationEmail(
 
   return { subject, text, html };
 }
+
+/** 店家通知信：需專人聯繫的那一句（0048）。 */
+export const ADMIN_NEEDS_CONTACT_NOTE =
+  "需聯繫：客人勾選了「我需要專人聯繫協助付款」，請主動與客人聯繫。";
 
 /** 主旨用：換行／控制字元壓成空白、頭尾去空白、過長截斷。主旨是純文字，不做 HTML 跳脫。 */
 function subjectSafe(value: string): string {

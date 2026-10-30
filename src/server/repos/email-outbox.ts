@@ -479,6 +479,11 @@ export type NotifyOrder = {
    * expire_unpaid_orders() 算出來的是同一個時間點。
    */
   createdAt: string;
+  /**
+   * public.orders.needs_contact（0048）：客人選匯款時勾了「我需要專人聯繫協助付款」。
+   * 下單當下那兩封信（客人匯款資訊信、店家待收款通知信）要寫出來。
+   */
+  needsContact: boolean;
 };
 
 export type NotifyOrderItem = {
@@ -509,7 +514,7 @@ export async function getOrderForNotify(
     db
       .from("orders")
       .select(
-        "id, order_no, customer_name, total, locale, payment_method, shipping_method, created_at",
+        "id, order_no, customer_name, total, locale, payment_method, shipping_method, created_at, needs_contact",
       )
       .eq("id", orderId)
       .maybeSingle(),
@@ -548,6 +553,7 @@ export async function getOrderForNotify(
       paymentMethod: o.payment_method == null ? null : String(o.payment_method),
       shippingMethod: String(o.shipping_method ?? "none"),
       createdAt: String(o.created_at ?? ""),
+      needsContact: o.needs_contact === true,
     },
     items: ((itemsRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
       name: (r.name ?? {}) as Localized,

@@ -78,11 +78,13 @@ import {
   invoiceTypeLabel,
   isUuid,
   money,
+  NEEDS_CONTACT_LABEL,
   parseOrderListSearch,
   PAYMENT_STATUS_LABEL,
   paymentMethodLabel,
   paymentStatusBadgeVariant,
   shippingMethodLabel,
+  showNeedsContact,
   STATUS_LABEL,
   statusBadgeVariant,
   type OrderListSearch,
@@ -415,6 +417,10 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
           <Badge variant={paymentStatusBadgeVariant(detail.payment_status)}>
             {PAYMENT_STATUS_LABEL[detail.payment_status] ?? detail.payment_status}
           </Badge>
+          {/* 0048：客人勾了「我需要專人聯繫協助付款」，還沒付款也還沒取消。 */}
+          {showNeedsContact(detail) ? (
+            <Badge variant="destructive">{NEEDS_CONTACT_LABEL}</Badge>
+          ) : null}
           <span>
             下單於 {formatTaipeiDateTime(detail.created_at)}
             {detail.paid_at ? `・付款於 ${formatTaipeiDateTime(detail.paid_at)}` : ""}
@@ -613,6 +619,14 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
             <dt className="text-muted-foreground">付款方式</dt>
             <dd>{paymentMethodLabel(detail.payment_method)}</dd>
+            {showNeedsContact(detail) ? (
+              <>
+                <dt className="text-muted-foreground">{NEEDS_CONTACT_LABEL}</dt>
+                <dd className="font-medium text-destructive">
+                  客人勾選了「我需要專人聯繫協助付款」，請主動與客人聯繫
+                </dd>
+              </>
+            ) : null}
             {detail.payment_method === "transfer" ? (
               <>
                 <dt className="text-muted-foreground">回報末五碼</dt>

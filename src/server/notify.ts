@@ -341,8 +341,10 @@ async function queueWithClaim(orderId: string): Promise<NotifyOutcome> {
  *
  * 排幾封（都是「有才排」，沒有就安靜跳過）：
  *   · payment_method = 'transfer' → 客人 1 封匯款資訊信
- *   · payment_method = 'transfer' 或 NULL（＝「由我們與你聯繫付款」）
- *     → 店家 1 封「有一筆待收款的新訂單」
+ *   · payment_method = 'transfer' 或 NULL（＝舊的「由我們與你聯繫付款」，0048 起結帳頁
+ *     不再提供，只剩舊訂單）→ 店家 1 封「有一筆待收款的新訂單」
+ *   · 0048：orders.needs_contact = true（匯款＋勾了「我需要專人聯繫協助付款」）時，
+ *     客人那封在匯款資訊旁加「我們會盡快與你聯繫」，店家那封主旨與內文標「需聯繫」。
  *
  * 刷卡訂單不走這裡（它們有金流頁可以看，而店家的通知在付款成功之後由 0032 那條路
  * 寄）。免費訂單（total = 0）也不走這裡——它在 step 5b 就已經是 paid 了，該走的是
@@ -421,6 +423,7 @@ export async function queueOrderPlacedNotifications(orderId: string): Promise<No
               sessions: sessionIds
                 .map((id) => sessions.get(id))
                 .filter((s): s is SessionBrief => !!s),
+              needsContact: order.needsContact,
             },
             copy,
             order.locale,
@@ -447,7 +450,7 @@ export async function queueOrderPlacedNotifications(orderId: string): Promise<No
     }
 
     // ---- 2. 店家的「有一筆待收款的新訂單」------------------------------------
-    // 匯款與「由我們與你聯繫付款」兩條都寄。0032 那封只在**付款成功之後**寄，
+    // 匯款與舊的「由店家聯繫付款」（NULL）兩條都寄。0032 那封只在**付款成功之後**寄，
     // 而這兩條路的訂單可能永遠不會走到那一步——沒有這一封，一張 offline 訂單就是
     // 靜靜躺著等 expire，沒有任何人知道它存在過。
     try {
@@ -468,6 +471,7 @@ export async function queueOrderPlacedNotifications(orderId: string): Promise<No
         adminUrl: extras.adminUrl,
         paymentMethod: order.paymentMethod,
         shippingMethod: order.shippingMethod,
+        needsContact: order.needsContact,
         items: items.map((i) => ({ name: i.name, quantity: i.quantity, subtotal: i.subtotal })),
         sessions: sessionIds.flatMap((id) => {
           const session = sessions.get(id);

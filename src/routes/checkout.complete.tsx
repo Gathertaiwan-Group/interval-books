@@ -116,6 +116,12 @@ const PAGE = {
   bankAccount: { zh: "帳號", en: "Account number", ja: "口座番号" },
   transferAmount: { zh: "應匯金額", en: "Amount to transfer", ja: "お振込金額" },
   transferDue: { zh: "匯款期限", en: "Transfer by", ja: "お振込期限" },
+  // 0048：客人選匯款時勾了「我需要專人聯繫協助付款」。與匯款資訊信那一句同義。
+  transferNeedsContact: {
+    zh: "你勾選了需要專人協助付款，我們會盡快與你聯繫。",
+    en: "You asked for help with payment — we will contact you as soon as we can.",
+    ja: "お支払いのサポートをご希望いただきました。担当者よりできるだけ早くご連絡いたします。",
+  },
   transferDueNote: {
     zh: "逾期未匯款的訂單會自動取消，品項與名額會釋出。",
     en: "Orders that are not paid by then are cancelled automatically, and the items and places are released.",
@@ -491,6 +497,9 @@ function CheckoutComplete() {
             <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
               {t(PAGE.transferDueNote)}
             </p>
+            {transfer.needsContact ? (
+              <p className="mt-2 text-sm leading-relaxed">{t(PAGE.transferNeedsContact)}</p>
+            ) : null}
 
             <div className="rule my-6" />
 

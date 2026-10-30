@@ -19,7 +19,7 @@ export const listAdminOrders = createServerFn({ method: "GET" })
   .middleware([adminFnMiddleware])
   .inputValidator(
     z.object({
-      scope: z.enum(["transfer_pending", "to_ship", "all", "invoice_problem"]),
+      scope: z.enum(["transfer_pending", "needs_contact", "to_ship", "all", "invoice_problem"]),
       includeArchived: z.boolean().optional(),
     }),
   )

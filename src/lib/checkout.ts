@@ -60,6 +60,57 @@ export const PAYMENT_METHODS = ["card", "transfer", "offline"] as const;
 export type PaymentMethodChoice = (typeof PAYMENT_METHODS)[number];
 
 /**
+ * 結帳頁實際畫出來的付款選項（0048，業主方案 A）。
+ *
+ * 「銀行匯款」與「由我們與你聯繫付款」合併：結帳頁只剩 card 與 transfer，想要店家
+ * 主動聯繫的客人選 transfer 並勾「我需要專人聯繫協助付款」（needsContact）。
+ *
+ * offline 只在 card 與 transfer **都沒有設定**時出現（＝不畫 radio、只印說明的那個
+ * 降級畫面）——那是沒有金流、也沒有匯款帳戶的部署唯一能成立訂單的路，拿掉它等於
+ * 那種部署整個結帳壞掉。正式站設好了匯款帳戶，所以客人看不到它。
+ */
+export function checkoutMethodOptions(opts: {
+  cardAvailable: boolean;
+  transferAvailable: boolean;
+}): PaymentMethodChoice[] {
+  const out: PaymentMethodChoice[] = [];
+  if (opts.cardAvailable) out.push("card");
+  if (opts.transferAvailable) out.push("transfer");
+  if (out.length === 0) out.push("offline");
+  return out;
+}
+
+/**
+ * 伺服器端：結帳請求的付款選擇 → 要寫進 orders 的兩欄（0048）。
+ *
+ * 🔴 送來 offline（＝payment_method NULL）的新請求：**店家設好匯款帳戶時自動轉成
+ *    transfer + needs_contact = true**，不拒絕。理由：
+ *      · offline 的原意就是「請店家聯繫我付款」，transfer + 需聯繫 是它在新流程裡
+ *        一模一樣的意思，沒有資訊遺失；
+ *      · 會送 offline 的只有部署前就開著的舊分頁（舊版 JS 預設就是 offline，zod 的
+ *        default 也是），拒絕會讓這位客人在最後一步看到錯誤、購物車白填；
+ *      · 轉成 transfer 之後他會拿到匯款帳號與 3 天保留（舊 NULL 單只有 2 小時），
+ *        店家也會在通知信與後台看到「需聯繫」，對兩邊都比較好。
+ *    沒有匯款帳戶的部署照舊寫 NULL（那是它唯一的路，見 checkoutMethodOptions）。
+ *
+ * needsContact 只對 transfer 生效；card 一律 false（勾選框只在選匯款時出現，送來
+ * card + true 是竄改或殘留狀態，不該讓刷卡單在後台被標成需聯繫）。
+ */
+export function resolveOrderPaymentChoice(input: {
+  paymentMethod: PaymentMethodChoice;
+  needsContact: boolean;
+  transferAvailable: boolean;
+}): { paymentMethod: "card" | "transfer" | null; needsContact: boolean } {
+  if (input.paymentMethod === "card") return { paymentMethod: "card", needsContact: false };
+  if (input.paymentMethod === "transfer") {
+    return { paymentMethod: "transfer", needsContact: input.needsContact === true };
+  }
+  // offline
+  if (input.transferAvailable) return { paymentMethod: "transfer", needsContact: true };
+  return { paymentMethod: null, needsContact: false };
+}
+
+/**
  * 匯款期限：下單 + 3 天。
  *
  * 🔴 這個數字**必須**與 supabase/migrations/0034 的 expire_unpaid_orders() 裡的
@@ -785,6 +836,12 @@ export const checkoutPayloadSchema = checkoutFormSchema({
    */
   paymentMethod: z.enum(PAYMENT_METHODS).default("offline"),
   /**
+   * 0048：選銀行匯款時的「我需要專人聯繫協助付款」勾選框。預設 false（不勾）。
+   * 只在 paymentMethod = 'transfer' 時有意義；伺服器對其他付款方式一律寫 false
+   * （見 resolveOrderPaymentChoice()）。同樣**不影響金額**。
+   */
+  needsContact: z.boolean().default(false),
+  /**
    * 推薦碼（0040）。**只是一個碼，不是金額** —— 折扣%由伺服器用這個碼向
    * public.referrers 查出來、折扣金額由 computeReferralDiscount() 算，與上面每一個
    * 金額同一個立場。
@@ -834,6 +891,8 @@ export type OrderConfirmation = {
     /** 客人回報過的帳號末五碼。null ＝ 還沒回報。 */
     last5: string | null;
     reportedAt: string | null;
+    /** 0048：客人勾了「我需要專人聯繫協助付款」。完成頁在匯款資訊旁加一句「我們會盡快與你聯繫」。 */
+    needsContact: boolean;
   } | null;
   subtotal: number;
   shippingFee: number;

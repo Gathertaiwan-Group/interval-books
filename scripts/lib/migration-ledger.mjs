@@ -827,6 +827,13 @@ export const MIGRATION_LEDGER = Object.freeze([
     // email_outbox 或 0007 的任何函式。
     touches: ["invoice", "orders_payments"],
   },
+  {
+    file: "0048_order_needs_contact.sql",
+    note: "結帳頁「銀行匯款」與「由我們與你聯繫付款」合併（業主方案 A）：orders 加 needs_contact boolean not null default false（客人選匯款時勾了「我需要專人聯繫協助付款」），附 comment on column。default 讓部署前的舊程式 insert 不帶這欄也照常；PG11+ 常數 default 不重寫表。沒有 grant（orders 只給 service_role，沿用表層級權限）、沒有 index、沒有碰 expire_unpaid_orders 或任何函式",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：只有 orders_payments
+    // （public.orders 的 alter table 與 comment on column）。
+    touches: ["orders_payments"],
+  },
 ]);
 
 /** 磁碟上的 migration 檔名，排序過。空目錄 = 丟例外（那不是「沒有違規」）。 */

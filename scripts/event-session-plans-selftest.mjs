@@ -186,7 +186,10 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 0047（後台作廢發票）：invoices 只加三個 nullable 欄位與 CHECK，新增 claim／finish／release_invoice_void
   // 三支函式；public.orders 只被 claim 唯讀 select order_no／total。0007 的開立函式、invoice_backlog、
   // orders／payments 的欄位、約束、grant 一個都沒動。這支自檢的斷言重讀過，原樣成立。
-  reviewedThrough: "0047_invoice_void.sql",
+  // ── 0048_order_needs_contact.sql 的重讀結論 ── 只對 public.orders 加 needs_contact boolean
+  // not null default false（＋comment on column）。沒有改任何函式、CHECK、trigger、排程或 grant，
+  // 既有欄位與 expire_unpaid_orders() 不變；這一支的斷言原樣成立。
+  reviewedThrough: "0048_order_needs_contact.sql",
 });
 
 // =============================================================================

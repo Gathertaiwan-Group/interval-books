@@ -44,11 +44,13 @@ import { formatTaipeiDateTime } from "@/lib/taipei-time";
 import {
   isUuid,
   money,
+  NEEDS_CONTACT_LABEL,
   parseOrderListSearch,
   PAYMENT_STATUS_LABEL,
   paymentMethodLabel,
   paymentStatusBadgeVariant,
   scopeOf,
+  showNeedsContact,
   STATUS_LABEL,
   statusBadgeVariant,
   type OrderListScope,
@@ -157,6 +159,8 @@ function AdminOrdersPage() {
         >
           <TabsList>
             <TabsTrigger value="transfer_pending">待收款的匯款訂單</TabsTrigger>
+            {/* 0048：客人勾了「我需要專人聯繫協助付款」、還沒付款也還沒取消的訂單。 */}
+            <TabsTrigger value="needs_contact">{NEEDS_CONTACT_LABEL}</TabsTrigger>
             <TabsTrigger value="to_ship">待出貨</TabsTrigger>
             <TabsTrigger value="all">全部訂單</TabsTrigger>
             <TabsTrigger value="invoice_problem">
@@ -208,11 +212,13 @@ function AdminOrdersPage() {
                 <TableCell colSpan={8} className="h-32 text-center text-sm text-muted-foreground">
                   {scope === "transfer_pending"
                     ? "目前沒有待收款的匯款訂單"
-                    : scope === "to_ship"
-                      ? "目前沒有待出貨的訂單"
-                      : scope === "invoice_problem"
-                        ? "目前沒有發票尚未開立的已付款訂單"
-                        : "目前沒有訂單"}
+                    : scope === "needs_contact"
+                      ? "目前沒有需要專人聯繫的訂單"
+                      : scope === "to_ship"
+                        ? "目前沒有待出貨的訂單"
+                        : scope === "invoice_problem"
+                          ? "目前沒有發票尚未開立的已付款訂單"
+                          : "目前沒有訂單"}
                 </TableCell>
               </TableRow>
             ) : (
@@ -256,6 +262,11 @@ function AdminOrdersPage() {
                   <TableCell className="text-right tabular-nums">{money(o.total)}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     {paymentMethodLabel(o.payment_method)}
+                    {showNeedsContact(o) ? (
+                      <Badge variant="destructive" className="ml-2 font-normal">
+                        {NEEDS_CONTACT_LABEL}
+                      </Badge>
+                    ) : null}
                   </TableCell>
                   <TableCell>
                     <Badge

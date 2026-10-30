@@ -131,6 +131,7 @@ import {
   remittanceConfigured,
   remittanceDueAt,
   REMITTANCE_LAST5_RE,
+  resolveOrderPaymentChoice,
   type CheckoutPayload,
   type OrderConfirmation,
   type PaymentHandoff,
@@ -957,13 +958,35 @@ export async function createOrder(
   } = {},
 ): Promise<PlacedOrder> {
   const db = supabaseAdmin();
-  const wantsCard = payload.paymentMethod === "card";
+  /**
+   * 0048：付款選擇 → orders.payment_method 與 orders.needs_contact。規則只有一份，
+   * 在 resolveOrderPaymentChoice()（src/lib/checkout.ts），理由也寫在那裡：
+   * 新請求送來 offline（NULL）時，店家設好匯款帳戶就轉成 transfer + 需聯繫。
+   * 只有 offline 才需要知道匯款帳戶設了沒有，所以只在那時候讀 site_settings；
+   * 讀失敗就當作沒設定（照舊寫 NULL，訂單照樣成立）。
+   */
+  let transferAvailable = false;
+  if (payload.paymentMethod === "offline") {
+    try {
+      transferAvailable = remittanceConfigured(await getRemittanceAccount());
+    } catch (err) {
+      console.error(
+        `[repo/orders] 讀匯款帳戶失敗，offline 照舊寫 NULL：${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+  const choice = resolveOrderPaymentChoice({
+    paymentMethod: payload.paymentMethod,
+    needsContact: payload.needsContact,
+    transferAvailable,
+  });
+  const wantsCard = choice.paymentMethod === "card";
   /**
    * 匯款（0034）。⚠️ 它與 wantsCard 一樣**只決定去向，不決定金額** —— 下面每一個
    * 數字都還是從 public.products 重算的。它影響三件事：orders.payment_method 寫
    * 什麼、step 7 要不要去金流（不要）、step 7.5 要寄哪一封信。
    */
-  const wantsTransfer = payload.paymentMethod === "transfer";
+  const wantsTransfer = choice.paymentMethod === "transfer";
 
   // ---- step 0: has this exact attempt already succeeded? --------------------
   // This has to come before the availability pre-check, not after. A replay is
@@ -1046,6 +1069,9 @@ export async function createOrder(
       // NULL 的差別是「錢要怎麼進來這件事已經談定了」——所以完成頁印得出帳號、
       // 信寄得出去，而 expire_unpaid_orders() 也認得它要多留三天。
       payment_method: wantsCard ? "card" : wantsTransfer ? "transfer" : null,
+      // 0048：需專人聯繫。只有匯款訂單可能是 true（resolveOrderPaymentChoice）；
+      // 免費訂單（total = 0）在 step 5b 就結清了，沒有款項要聯繫，一律 false。
+      needs_contact: choice.needsContact && total > 0,
       idempotency_key: payload.idempotencyKey,
       locale: payload.locale,
       note: payload.note ?? null,
@@ -1428,7 +1454,7 @@ export async function createOrder(
   // 回 order_not_paid」（0022 §8）。這裡要寄的兩封信的前提正好相反：
   //
   //   · 匯款訂單 → 客人要收到帳號與期限，否則他不知道錢要匯去哪裡；
-  //   · 匯款／「由我們與你聯繫付款」→ 店家要知道有一張待收款的單。0032 那封是
+  //   · 匯款／舊的「由店家聯繫付款」（NULL）→ 店家要知道有一張待收款的單。0032 那封是
   //     付款成功之後才寄的，而這兩條路的訂單可能永遠走不到那一步 —— 沒有這一封，
   //     一張 offline 訂單就是靜靜躺著，兩小時後被 expire 掉，沒有任何人知道。
   //
@@ -1512,7 +1538,7 @@ export async function getOrderByToken(token: string): Promise<OrderSummary | nul
   const { data, error } = await db
     .from("orders")
     .select(
-      "id, order_no, status, payment_status, payment_method, subtotal, shipping_fee, discount, total, shipping_method, created_at, remittance_last5, remittance_reported_at, referral_code",
+      "id, order_no, status, payment_status, payment_method, subtotal, shipping_fee, discount, total, shipping_method, created_at, remittance_last5, remittance_reported_at, referral_code, needs_contact",
     )
     .eq("public_token", token)
     .maybeSingle();
@@ -1533,6 +1559,7 @@ export async function getOrderByToken(token: string): Promise<OrderSummary | nul
     remittance_last5: string | null;
     remittance_reported_at: string | null;
     referral_code: string | null;
+    needs_contact: boolean | null;
   };
 
   /**
@@ -1555,6 +1582,7 @@ export async function getOrderByToken(token: string): Promise<OrderSummary | nul
         dueAt: remittanceDueAt(o.created_at),
         last5: o.remittance_last5,
         reportedAt: o.remittance_reported_at,
+        needsContact: o.needs_contact === true,
       };
     }
   }

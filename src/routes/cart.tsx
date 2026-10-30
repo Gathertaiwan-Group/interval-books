@@ -44,9 +44,9 @@ const PAGE = {
     ja: "小計に送料は含まれません。",
   },
   checkoutNote: {
-    zh: "運費會在下一步依寄送方式計算。線上付款尚未開放，訂單成立後我們會與你聯繫付款方式。",
-    en: "Shipping is worked out at the next step, once you pick a delivery method. Online payment is not open yet — we will arrange it with you after the order is placed.",
-    ja: "送料は次のステップでお届け方法に応じて計算されます。オンライン決済は未開放のため、ご注文後に個別にご案内いたします。",
+    zh: "運費會在下一步依寄送方式計算。付款方式可選信用卡線上付款或銀行匯款。",
+    en: "Shipping is worked out at the next step, once you pick a delivery method. You can pay by card online or by bank transfer.",
+    ja: "送料は次のステップでお届け方法に応じて計算されます。お支払いはクレジットカード決済または銀行振込をご利用いただけます。",
   },
   checkout: { zh: "前往結帳", en: "Checkout", ja: "ご購入手続きへ" },
   checkoutBlocked: {

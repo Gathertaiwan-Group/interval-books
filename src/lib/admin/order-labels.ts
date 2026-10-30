@@ -10,17 +10,30 @@
  * 純函式、零 import：selftest 可以直接 import() 這個檔案本人。
  */
 
-export type OrderListScope = "transfer_pending" | "to_ship" | "all" | "invoice_problem";
+export type OrderListScope =
+  | "transfer_pending"
+  | "needs_contact"
+  | "to_ship"
+  | "all"
+  | "invoice_problem";
 
 /**
  * 列表頁的篩選條件，也是詳情頁「回訂單列表」要帶回去的網址參數。
  * transfer_pending 是預設分頁，網址上不寫；archived 只在打開時寫 `archived=1`。
  */
-export type OrderListSearch = { scope?: "to_ship" | "all" | "invoice_problem"; archived?: 1 };
+export type OrderListSearch = {
+  scope?: "needs_contact" | "to_ship" | "all" | "invoice_problem";
+  archived?: 1;
+};
 
 export function parseOrderListSearch(search: Record<string, unknown>): OrderListSearch {
   const out: OrderListSearch = {};
-  if (search.scope === "to_ship" || search.scope === "all" || search.scope === "invoice_problem") {
+  if (
+    search.scope === "needs_contact" ||
+    search.scope === "to_ship" ||
+    search.scope === "all" ||
+    search.scope === "invoice_problem"
+  ) {
     out.scope = search.scope;
   }
   const a = search.archived;
@@ -51,6 +64,19 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
 export function paymentMethodLabel(code: string | null): string {
   if (!code) return "由店家聯繫付款";
   return PAYMENT_METHOD_LABEL[code] ?? code;
+}
+
+/**
+ * 0048：客人選匯款時勾了「我需要專人聯繫協助付款」。列表與內頁的標示用同一個字。
+ * 已付款或已取消的訂單不再需要聯繫（錢收到了／單沒了），標示就不亮。
+ */
+export const NEEDS_CONTACT_LABEL = "需聯繫";
+export function showNeedsContact(o: {
+  needs_contact: boolean;
+  payment_status: string;
+  status: string;
+}): boolean {
+  return o.needs_contact === true && o.payment_status !== "paid" && o.status !== "cancelled";
 }
 
 const SHIPPING_METHOD_LABEL: Record<string, string> = {
