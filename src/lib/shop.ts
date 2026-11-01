@@ -44,6 +44,7 @@
  * instead of "no products".
  */
 import { supabase } from "@/lib/supabase";
+import { caseInsensitiveMatch, exactIlikePattern } from "@/lib/seo/core";
 import type { Localized } from "@/i18n/types";
 import {
   isMissingColumnError,
@@ -1045,6 +1046,31 @@ export async function fetchActiveProductForEventSlug(
 ): Promise<ShopProductResult> {
   if (!eventSlug) return { product: null, unavailable: false };
   return await fetchActiveProductBySlug(eventProductSlug(eventSlug));
+}
+
+/**
+ * /shop/$slug 查無此商品時：不分大小寫再找一次上架中的商品，找到剛好一筆、大小寫不同
+ * → 回正確的代稱讓路由 301（2026-11 SEO 驗收 #5，與活動同一套）。其餘 → null（404）。
+ */
+export async function findActiveProductSlugIgnoringCase(slug: string): Promise<string | null> {
+  const db = supabase;
+  const pattern = exactIlikePattern(slug);
+  if (!db || !pattern) return null;
+  try {
+    const { data, error } = await db
+      .from("products")
+      .select("slug")
+      .eq("status", "active")
+      .ilike("slug", pattern)
+      .limit(5);
+    if (error || !Array.isArray(data)) return null;
+    return caseInsensitiveMatch(
+      slug,
+      (data as unknown as Row[]).map((r) => String(r.slug ?? "")),
+    );
+  } catch {
+    return null;
+  }
 }
 
 /** NT$1,280 — the site shows whole dollars everywhere. */

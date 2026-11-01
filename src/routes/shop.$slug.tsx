@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
@@ -17,6 +17,7 @@ import { productSeo } from "@/lib/seo/pages";
 import { unavailableHeaders } from "@/lib/seo/status";
 import {
   fetchActiveProductBySlug,
+  findActiveProductSlugIgnoringCase,
   isSoldOut,
   remainingForSession,
   type ShopSession,
@@ -98,7 +99,15 @@ export const Route = createFileRoute("/shop/$slug")({
     const { product, unavailable } = await fetchActiveProductBySlug(params.slug);
     // A slug that resolves to nothing really is a 404. A failed read is not —
     // that would tell crawlers a live product is gone because Supabase blinked.
-    if (!product && !unavailable) throw notFound();
+    if (!product && !unavailable) {
+      // 2026-11 SEO 驗收 #5：/shop/PUB-TW-001 → 不分大小寫再找一次，找到就 301 到資料庫
+      // 裡的正確寫法（與 /events/$slug 同一套；不一律轉小寫，代稱的大小寫以資料庫為準）。
+      const canonical = await findActiveProductSlugIgnoringCase(params.slug);
+      if (canonical) {
+        throw redirect({ to: "/shop/$slug", params: { slug: canonical }, statusCode: 301 });
+      }
+      throw notFound();
+    }
     return { product, unavailable };
   },
   // SEO（2026-11 健檢）：title「{品名}｜{類別}｜小時光書店」、描述取摘要＋介紹文、

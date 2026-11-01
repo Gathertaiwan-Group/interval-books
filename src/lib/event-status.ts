@@ -84,3 +84,43 @@ export function isEventPast(
   const effective = last && last > event.isoDate ? last : event.isoDate;
   return isPastEvent(effective, today);
 }
+
+/**
+ * 單一活動頁（詳情頁、著陸頁、JSON-LD、sitemap）用的「已結束」：**跟列表同一條規則**，
+ * 只是場次直接從手上的售票商品算，不必再查一次。
+ *
+ *   · 有 iso_date → 完全等於 isEventPast({ isoDate, lastSessionDate })
+ *   · 沒有 iso_date（著陸頁的 loader 只拿售票商品、沒讀 events 列）→ 用最晚場次結束日
+ *     頂上 iso_date 的位置。沒有場次 → 仍然是 null → 不算結束（isPastEvent 的保守方向）。
+ *
+ * 2026-11 SEO 驗收：最後一個場次結束之後，頁面不再顯示「尚餘名額」、不能報名，
+ * JSON-LD 的 offers.availability 改 SoldOut，sitemap 的 lastmod 改用結束時間。
+ */
+export function isEventEnded(
+  isoDate: string | null | undefined,
+  sessions: ReadonlyArray<{ startsAt?: string | null; endsAt?: string | null }>,
+  today = todayInTaipei(),
+): boolean {
+  const lastSessionDate = latestSessionEndDate(sessions);
+  return isEventPast({ isoDate: isoDate || lastSessionDate, lastSessionDate }, today);
+}
+
+/**
+ * 最後一個場次的結束時間（ISO 字串原樣回傳；endsAt 沒填退回 startsAt）。沒有可讀的場次 → null。
+ * sitemap 對已結束活動的 lastmod 用這個。
+ */
+export function latestSessionEndIso(
+  sessions: ReadonlyArray<{ startsAt?: string | null; endsAt?: string | null }>,
+): string | null {
+  let best: string | null = null;
+  let bestT = -Infinity;
+  for (const s of sessions) {
+    const raw = s.endsAt || s.startsAt;
+    if (!raw) continue;
+    const t = Date.parse(raw);
+    if (Number.isNaN(t) || t <= bestT) continue;
+    best = raw;
+    bestT = t;
+  }
+  return best;
+}

@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { PlanPicker } from "@/components/shop/PlanPicker";
-import { SessionList, SessionPicker } from "@/components/shop/SessionPicker";
+import { EventEndedNotice, SessionList, SessionPicker } from "@/components/shop/SessionPicker";
 import { QuantityStepper } from "@/components/shop/ShopBits";
 import { useLang, useT } from "@/i18n/LanguageContext";
 import type { Localized } from "@/i18n/types";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
-import { fetchEventBySlug, fetchEventCategories } from "@/lib/cms";
+import { fetchEventBySlug, fetchEventCategories, findEventSlugIgnoringCase } from "@/lib/cms";
 import {
   directAnySeatsLeft,
   directCheckoutSearch,
@@ -19,7 +19,7 @@ import { EVENT_LIST_FIELDS } from "@/lib/event-blocks";
 import { imageFor } from "@/lib/images";
 import { fetchActiveProductForEventSlug, type ShopProduct } from "@/lib/shop";
 import { pageMeta } from "@/lib/seo/head";
-import { eventSeo } from "@/lib/seo/pages";
+import { eventEnded, eventSeo, storeAddressFromMatches, storeAddressOf } from "@/lib/seo/pages";
 import { unavailableHeaders } from "@/lib/seo/status";
 import { useSiteContent } from "@/lib/site-content";
 
@@ -167,7 +167,15 @@ export const Route = createFileRoute("/events/$slug")({
     // 這一行是這一頁最容易做錯的地方：只有「真的查不到」才 404。讀取失敗時
     // unavailable 為 true，於是這裡**不**丟 notFound()，改由元件渲染頁殼 ——
     // 不能因為資料庫眨一下眼，就告訴搜尋引擎這場活動不存在。
-    if (!event && !unavailable) throw notFound();
+    if (!event && !unavailable) {
+      // 2026-11 SEO 驗收 #5：代稱只差大小寫（/events/inntervalchishang.1023）→ 不分
+      // 大小寫再找一次，找到就 301 到資料庫裡的正確寫法；代稱本來就有大寫，不能一律轉小寫。
+      const canonical = await findEventSlugIgnoringCase(params.slug);
+      if (canonical) {
+        throw redirect({ to: "/events/$slug", params: { slug: canonical }, statusCode: 301 });
+      }
+      throw notFound();
+    }
 
     // 場次（0020 的 event_sessions）掛的是 products.id，不是 events.id，所以要先
     // 找到這場活動賣出去的那件商品。0026 之後這條反查走的是 products.slug
@@ -187,8 +195,13 @@ export const Route = createFileRoute("/events/$slug")({
   // SEO（2026-11 健檢）：title「{活動名}｜{日期}｜小時光書店」、描述取摘要＋內文、
   // 分享圖用活動封面、JSON-LD 輸出 Event（日期地點價格來自售票商品的場次）與麵包屑。
   // 組裝邏輯在 src/lib/seo/pages.ts#eventSeo，元件裡的 useDocumentMeta 用同一支。
-  head: ({ loaderData }) => {
-    const seo = eventSeo(loaderData?.event ?? null, loaderData?.booking.product ?? null, PAGE);
+  head: ({ loaderData, matches }) => {
+    const seo = eventSeo(
+      loaderData?.event ?? null,
+      loaderData?.booking.product ?? null,
+      PAGE,
+      storeAddressFromMatches(matches),
+    );
     return {
       meta: pageMeta({
         title: seo.title,
@@ -256,9 +269,10 @@ function EventDetail() {
   // 自己選語系（規則與 t() 一致：當前語系沒東西就退回 zh）。
   const { t, lang } = useLang();
   const { event, unavailable, categories, booking } = Route.useLoaderData();
-  const { ui } = useSiteContent();
+  const site = useSiteContent();
+  const { ui } = site;
 
-  const seo = eventSeo(event, booking.product, PAGE);
+  const seo = eventSeo(event, booking.product, PAGE, storeAddressOf(site));
   useDocumentMeta({
     title: metaOr(seo.title, PAGE.metaTitle),
     description: metaOr(seo.description, PAGE.metaDescription),
@@ -293,6 +307,9 @@ function EventDetail() {
   };
 
   const cta = registrationCta(event.registrationType, event.externalUrl, booking);
+  // 最後一個場次結束了（與 /events「已結束」分頁同一條規則）→ 報名區只列場次與票價、
+  // 不顯示「尚餘名額」、不能報名（2026-11 SEO 驗收 #2）。
+  const ended = eventEnded(event.isoDate, booking.product);
 
   return (
     <PageShell>
@@ -435,12 +452,19 @@ function EventDetail() {
 
       <section className="container-editorial pb-32">
         <div className="grid gap-12 border-t border-border pt-12 md:grid-cols-2 md:gap-16">
-          {cta.kind === "internal" ? (
+          {ended && booking.product ? (
+            <EventEndedNotice
+              product={booking.product}
+              heading={t(PAGE.registration)}
+              eyebrowClassName="eyebrow text-2xl"
+            />
+          ) : cta.kind === "internal" ? (
             <RegistrationPanel product={cta.product} />
           ) : (
             <>
               <SessionList
                 sessions={booking.product?.sessions ?? []}
+                basePrice={booking.product?.price ?? null}
                 // 商品還沒建立時沒有旗標可讀，退回「顯示」——那是 0029 的欄位預設，
                 // 也是這一支之前的行為。（這條分支的 sessions 本來就是空的。）
                 showSeatsRemaining={booking.product?.showSeatsRemaining ?? true}
@@ -521,6 +545,7 @@ function RegistrationPanel({ product }: { product: ShopProduct }) {
         <SessionPicker
           sessions={product.sessions}
           showSeatsRemaining={product.showSeatsRemaining}
+          basePrice={product.price}
           selectedId={sessionId}
           onSelect={(id) => {
             setSessionId(id);
@@ -532,7 +557,11 @@ function RegistrationPanel({ product }: { product: ShopProduct }) {
           }}
         />
       ) : (
-        <SessionList sessions={product.sessions} showSeatsRemaining={product.showSeatsRemaining} />
+        <SessionList
+          sessions={product.sessions}
+          showSeatsRemaining={product.showSeatsRemaining}
+          basePrice={product.price}
+        />
       )}
 
       {/* 0036：選了場次、而且那個場次有開方案，才畫方案選擇器——沒有方案的場次

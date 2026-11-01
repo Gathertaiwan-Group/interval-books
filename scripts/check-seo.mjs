@@ -94,6 +94,12 @@ function requiredFieldProblems(n) {
     need(/T\d{2}:\d{2}.*[+-]\d{2}:\d{2}$/.test(n.startDate ?? ""), "Event.startDate（含時區）");
     need(n.location?.name || n.location?.address, "Event.location");
     need(n.location?.address, "Event.location.address");
+    // 2026-11 驗收 #4：address 是 PostalAddress、至少有國別（不准只是一串字）
+    need(
+      n.location?.address?.["@type"] === "PostalAddress",
+      "Event.location.address 是 PostalAddress",
+    );
+    need(n.location?.address?.addressCountry === "TW", "PostalAddress.addressCountry");
     need(n.eventStatus, "Event.eventStatus");
     need(n.eventAttendanceMode, "Event.eventAttendanceMode");
     need(n.organizer?.name, "Event.organizer");
@@ -269,6 +275,52 @@ async function checkPage({ path, canonical, ld }) {
     ok(`${typesOf(n).join("+")} 必要欄位齊全`, problems.length === 0, problems.join("、"));
   }
   ok("剛好一個 h1", h.h1.length === 1, JSON.stringify(h.h1));
+
+  // ── 2026-11 SEO 驗收（只對有 Event 的頁）─────────────────────────────────
+  const events = nodes.filter((n) => typesOf(n).includes("Event"));
+  if (events.length) {
+    const pairs = events.map((e) => `${e.name}\u0000${e.url}`);
+    ok(
+      `#1 沒有同名同網址的 Event（${events.length} 個）`,
+      new Set(pairs).size === pairs.length,
+      events.map((e) => e.name).join(" / "),
+    );
+    ok(
+      "#1 每個 Event 的 @id 不同",
+      new Set(events.map((e) => e["@id"])).size === events.length,
+      events.map((e) => e["@id"]).join(" / "),
+    );
+    const body = html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ");
+    // #2：最後一個場次（endDate／startDate 的台北日期）早於今天 → 已結束
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
+    const lastDay = events
+      .map((e) => String(e.endDate || e.startDate || "").slice(0, 10))
+      .sort()
+      .at(-1);
+    const offers = events.flatMap((e) => [].concat(e.offers ?? []));
+    if (lastDay && lastDay < today) {
+      ok(
+        `#2 已結束（${lastDay}）→ 每個 Offer 都是 SoldOut`,
+        offers.every((o) => o.availability === "https://schema.org/SoldOut"),
+        offers.map((o) => o.availability).join(","),
+      );
+      ok(
+        "#2 已結束 → eventStatus 仍是 EventScheduled",
+        events.every((e) => e.eventStatus === "https://schema.org/EventScheduled"),
+      );
+      ok("#2 已結束 → 頁面沒有「尚餘名額」", !body.includes("尚餘名額"));
+      ok("#2 已結束 → 頁面沒有去結帳的連結", !/href="\/checkout/.test(html));
+      ok("#2 已結束 → 報名按鈕改成「活動已結束」", body.includes("活動已結束"));
+    }
+    // #3：JSON-LD 的每個價格在頁面上看得到
+    for (const price of new Set(offers.map((o) => o.price))) {
+      const shown =
+        price === 0
+          ? /免費|免費參加|不收費/.test(body)
+          : body.includes(`NT$${price.toLocaleString("en-US")}`);
+      ok(`#3 JSON-LD 價格 ${price} 在頁面上看得到`, shown);
+    }
+  }
 }
 
 async function checkRobotsAndSitemap() {
@@ -364,6 +416,16 @@ async function checkRedirectsAndNoindex() {
     `/Shop/pub-tw-001 → ${upper2.status}`,
     upper2.status === 301 && upper2.headers.get("location") === "/shop/pub-tw-001",
   );
+  // 2026-11 驗收 #5：代稱只差大小寫 → 不分大小寫查找後 301 到資料庫裡的正確寫法
+  for (const [from, to] of [
+    ["/shop/PUB-TW-001", "/shop/pub-tw-001"],
+    ["/events/inntervalchishang.1023", "/events/InntervalChishang.1023"],
+  ]) {
+    const r = await get(from);
+    const loc = (r.headers.get("location") ?? "").replace(/^https?:\/\/[^/]+/, "");
+    ok(`${from} → ${r.status} ${loc}`, r.status === 301 && loc === to);
+    await r.arrayBuffer();
+  }
   const slug = await get("/events/InntervalChishang.1023");
   ok("大小寫敏感的活動代稱不被轉址（200）", slug.status === 200);
   await slug.arrayBuffer();

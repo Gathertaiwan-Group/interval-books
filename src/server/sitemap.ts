@@ -11,6 +11,8 @@
  */
 import { supabase } from "@/lib/supabase";
 import { robotsTxt, sitemapXml, type SitemapEntry } from "@/lib/seo/core";
+import { buildSitemapEntries, latestOf } from "@/lib/seo/sitemap-entries";
+import { eventProductSlug } from "@/lib/shop";
 
 /** CDN 快取一小時、過期後一天內可先吐舊的（背景重新整理）。 */
 const SITEMAP_CACHE = "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400";
@@ -25,31 +27,10 @@ export function handleRobotsTxt(): Response {
   });
 }
 
-/**
- * 固定頁面 ↔ pages 表的 slug（lastmod 用 pages.updated_at）。
- * /shop 本身沒有 pages 列，lastmod 用商品的最新 updated_at。
- */
-const STATIC_PAGES: Array<{ path: string; pageSlugs: string[] }> = [
-  { path: "/", pageSlugs: ["index"] },
-  { path: "/events", pageSlugs: ["events"] },
-  { path: "/journeys", pageSlugs: ["journeys"] },
-  { path: "/about", pageSlugs: ["about", "visit"] },
-  { path: "/curation", pageSlugs: ["curation"] },
-  { path: "/partnership", pageSlugs: ["partnership"] },
-  { path: "/privacy", pageSlugs: ["privacy"] },
-  { path: "/shop?tab=curated", pageSlugs: ["curated"] },
-];
-
-/** 寫死在程式碼裡的著陸頁子頁（沒有自己的資料列）。 */
-const LANDING_SUBPAGES = ["/events/kungtung/hosts/alice", "/events/kungtung/hosts/fan-yishun"];
-
 type Row = Record<string, unknown>;
 
-function maxOf(values: Array<string | null | undefined>): string | null {
-  let best: string | null = null;
-  for (const v of values) if (v && (!best || Date.parse(v) > Date.parse(best))) best = v;
-  return best;
-}
+const ts = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
+const arr = (v: unknown): Row[] => (Array.isArray(v) ? (v as Row[]) : []);
 
 async function rows(
   table: string,
@@ -65,61 +46,81 @@ async function rows(
   return (data ?? []) as unknown as Row[];
 }
 
+/**
+ * 查資料庫 → 交給 buildSitemapEntries()（src/lib/seo/sitemap-entries.ts，lastmod 的規則
+ * 寫在那裡）。每一張表都有 updated_at 觸發器；這裡只讀 updated_at，不放任何「現在」。
+ */
 export async function collectSitemapEntries(): Promise<SitemapEntry[]> {
-  const [pages, events, products, journeys, publications] = await Promise.all([
+  const [
+    pages,
+    pageBlocks,
+    pageListItems,
+    events,
+    products,
+    journeys,
+    publications,
+    curatedItems,
+    curatedThemes,
+  ] = await Promise.all([
     rows("pages", "slug,updated_at"),
-    rows("events", "slug,updated_at", { eq: ["is_published", true] }),
-    rows("products", "slug,product_type,updated_at", { eq: ["status", "active"] }),
+    rows("page_blocks", "page_slug,updated_at"),
+    rows("page_list_items", "page_slug,updated_at"),
+    rows("events", "slug,iso_date,updated_at", { eq: ["is_published", true] }),
+    // 活動票券連同場次、票種一起 embed（event_sessions.product_id、
+    // event_session_plans.session_id 兩條外鍵），活動頁的 lastmod 要算進它們。
+    rows(
+      "products",
+      "slug,product_type,updated_at,event_sessions(starts_at,ends_at,updated_at,event_session_plans(updated_at))",
+      { eq: ["status", "active"] },
+    ),
     rows("journeys", "external_url,updated_at"),
     rows("publications", "updated_at", { latestOnly: true }),
+    rows("curated_items", "updated_at", { latestOnly: true }),
+    rows("curated_themes", "updated_at", { latestOnly: true }),
   ]);
 
-  const pageUpdated = new Map(pages.map((p) => [String(p.slug), p.updated_at as string | null]));
-  const entries: SitemapEntry[] = [];
-
-  for (const s of STATIC_PAGES) {
-    entries.push({
-      path: s.path,
-      lastmod: maxOf(s.pageSlugs.map((slug) => pageUpdated.get(slug))),
-    });
-  }
-
-  // 選物：/shop（商品分頁）與 /shop?tab=publications（地方刊物展）
-  entries.push({ path: "/shop", lastmod: maxOf(products.map((p) => p.updated_at as string)) });
-  entries.push({
-    path: "/shop?tab=publications",
-    lastmod: maxOf([
-      publications[0]?.updated_at as string | undefined,
-      ...products
-        .filter((p) => String(p.slug).startsWith("pub-"))
-        .map((p) => p.updated_at as string),
+  const bookingBySlug = new Map(
+    products.map((p) => [
+      String(p.slug ?? ""),
+      {
+        updatedAt: ts(p.updated_at),
+        sessions: arr(p.event_sessions).map((s) => ({
+          startsAt: ts(s.starts_at),
+          endsAt: ts(s.ends_at),
+          updatedAt: ts(s.updated_at),
+          planUpdatedAts: arr(s.event_session_plans).map((pl) => ts(pl.updated_at)),
+        })),
+      },
     ]),
+  );
+
+  return buildSitemapEntries({
+    pages: pages.map((p) => ({ slug: String(p.slug ?? ""), updatedAt: ts(p.updated_at) })),
+    pageParts: [...pageBlocks, ...pageListItems].map((p) => ({
+      pageSlug: String(p.page_slug ?? ""),
+      updatedAt: ts(p.updated_at),
+    })),
+    events: events.map((e) => {
+      const slug = String(e.slug ?? "");
+      return {
+        slug,
+        isoDate: ts(e.iso_date),
+        updatedAt: ts(e.updated_at),
+        booking: bookingBySlug.get(eventProductSlug(slug)) ?? null,
+      };
+    }),
+    products: products.map((p) => ({
+      slug: String(p.slug ?? ""),
+      productType: String(p.product_type ?? ""),
+      updatedAt: ts(p.updated_at),
+    })),
+    journeys: journeys.map((j) => ({
+      externalUrl: String(j.external_url ?? ""),
+      updatedAt: ts(j.updated_at),
+    })),
+    publicationsLatest: ts(publications[0]?.updated_at),
+    curatedLatest: latestOf([ts(curatedItems[0]?.updated_at), ts(curatedThemes[0]?.updated_at)]),
   });
-
-  // 活動（含著陸頁：/events/kungtung 等靜態路由的 slug 跟活動列相同，sitemapXml 會去重）
-  for (const e of events) {
-    const slug = String(e.slug ?? "").trim();
-    if (slug) entries.push({ path: `/events/${slug}`, lastmod: e.updated_at as string });
-  }
-  for (const path of LANDING_SUBPAGES) entries.push({ path });
-
-  // 策旅：卡片指著站內頁面的才列（外部網站不是我們的網址）
-  for (const j of journeys) {
-    const url = String(j.external_url ?? "").trim();
-    if (url.startsWith("/") && !url.startsWith("//")) {
-      entries.push({ path: url.split("#")[0], lastmod: j.updated_at as string });
-    }
-  }
-
-  // 商品：選物與刊物。活動票券（event-*／journey）不另列——它們的主頁是 /events/<slug>。
-  for (const p of products) {
-    const type = String(p.product_type);
-    const slug = String(p.slug ?? "").trim();
-    if (!slug || type === "event" || type === "journey") continue;
-    entries.push({ path: `/shop/${slug}`, lastmod: p.updated_at as string });
-  }
-
-  return entries;
 }
 
 export async function handleSitemapXml(): Promise<Response> {

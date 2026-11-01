@@ -20,6 +20,7 @@ import { excludeJourneyEvents } from "@/lib/journey-events";
 import { latestSessionEndDate } from "@/lib/event-status";
 import { taipeiToday } from "@/lib/taipei-time";
 import { eventProductSlug } from "@/lib/shop";
+import { caseInsensitiveMatch, exactIlikePattern } from "@/lib/seo/core";
 import {
   UI,
   SITE_INFO,
@@ -924,7 +925,7 @@ export async function fetchEventBySlug(slug: string): Promise<EventDetailResult>
         //    後七欄是 0027 的清單欄位，與 src/lib/event-blocks.ts 的
         //    EVENT_LIST_FIELDS 是同一份名單；同一支自檢有一條會逐欄比對兩邊，
         //    在那份名單加欄位卻忘了加到這裡，測試就會紅。
-        "id,slug,title,summary,description,display_date,category,external_url,registration_type,image_key,speaker_id,gallery_keys,highlights,suitable_for,not_suitable_for,takeaways,outline,includes,notes",
+        "id,slug,title,summary,description,display_date,iso_date,category,external_url,registration_type,image_key,speaker_id,gallery_keys,highlights,suitable_for,not_suitable_for,takeaways,outline,includes,notes",
       )
       .eq("slug", slug)
       .maybeSingle();
@@ -995,8 +996,9 @@ export async function fetchEventBySlug(slug: string): Promise<EventDetailResult>
         // ⚠️ 呼叫端必須先判斷非空再呼叫 imageFor()——見 EventEntry.imageKey 的
         //    型別註解與 events.$slug.tsx 的渲染。這裡不再刻意寫死 null。
         imageKey: nullableStr(r.image_key),
-        // 詳情頁不做「已結束」的判斷（直接連過來的人本來就該看得到內容）。
-        isoDate: null,
+        // 內容照樣全部顯示（直接連過來的人本來就該看得到）；iso_date 只拿來判斷
+        // 報名區要不要關、JSON-LD 的 availability（2026-11 SEO 驗收，見 isEventEnded）。
+        isoDate: nullableStr(r.iso_date),
         lastSessionDate: null,
         registrationType: r.registration_type === "internal" ? "internal" : "external",
         galleryKeys,
@@ -1106,4 +1108,25 @@ export async function fetchCollaborations(): Promise<CollaborationEntry[]> {
     mapped.push({ id: str(r.id), title, description });
   }
   return mapped.length ? mapped : FALLBACK_COLLABORATIONS;
+}
+
+/**
+ * /events/$slug 查無此代稱時：不分大小寫再找一次，找到剛好一筆、大小寫不同 → 回正確的
+ * 代稱讓路由 301（2026-11 SEO 驗收 #5）。代稱本來就可能有大寫，所以不能一律轉小寫。
+ * 讀取失敗、找不到、找到不只一筆 → null（路由照舊 404）。
+ */
+export async function findEventSlugIgnoringCase(slug: string): Promise<string | null> {
+  const db = supabase;
+  const pattern = exactIlikePattern(slug);
+  if (!db || !pattern) return null;
+  try {
+    const { data, error } = await db.from("events").select("slug").ilike("slug", pattern).limit(5);
+    if (error || !Array.isArray(data)) return null;
+    return caseInsensitiveMatch(
+      slug,
+      (data as unknown as Row[]).map((r) => str(r.slug)),
+    );
+  } catch {
+    return null;
+  }
 }

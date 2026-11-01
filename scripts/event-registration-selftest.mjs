@@ -1019,7 +1019,7 @@ checkTrue(
 // orders.ts 預檢的依據，第二份實作遲早會跟它們長歪。
 checkTrue(
   "SessionPicker 從 @/lib/shop import remainingForSession",
-  /import \{ remainingForSession, type ShopSession \} from "@\/lib\/shop";/.test(pickerCode),
+  /import \{[^}]*\bremainingForSession\b[^}]*\} from "@\/lib\/shop";/.test(pickerCode),
 );
 checkTrue(
   "SessionPicker 真的呼叫 remainingForSession",

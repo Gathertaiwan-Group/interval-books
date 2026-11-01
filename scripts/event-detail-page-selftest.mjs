@@ -165,9 +165,13 @@ const bySlugBody = stripTs(fnBody(readFile("src/lib/cms.ts"), "fetchEventBySlug"
 checkTrue("切得出 fetchEventBySlug 的本體", bySlugBody.length > 400);
 
 // (a) 查無此活動（或未發布）→ 真的 404。
+// 2026-11 SEO 驗收 #5：守衛裡多了一步「不分大小寫查找 → 301」，notFound() 仍然只在
+// 這個守衛裡面（找不到正確大小寫才 404）。
+const NOT_FOUND_GUARD =
+  /if \(!event && !unavailable\) \{\s*(?:\/\/[^\n]*\s*)*const canonical = await findEventSlugIgnoringCase\(params\.slug\);\s*if \(canonical\) \{[\s\S]*?statusCode: 301 \}\);\s*\}\s*throw notFound\(\);\s*\}/;
 checkTrue(
   "loader 只有在「查不到而且不是讀取失敗」時才 notFound()",
-  /if \(!event && !unavailable\) throw notFound\(\);/.test(detailCode),
+  NOT_FOUND_GUARD.test(detailCode),
 );
 // 🔴 讀取失敗絕對不能 404。下面兩條把「唯一一次 notFound()」釘死：整個檔案只有
 //    一處呼叫它，而且就是上面那一行帶著 !unavailable 的守衛。少了守衛，資料庫
@@ -175,9 +179,7 @@ checkTrue(
 check("整個路由只呼叫一次 notFound()", (detailCode.match(/notFound\(\)/g) ?? []).length, 1);
 checkFalse(
   "沒有任何一處無條件 notFound()",
-  /(^|[^!&\s])\s*throw notFound\(\);/m.test(
-    detailCode.replace("if (!event && !unavailable) throw notFound();", ""),
-  ),
+  /(^|[^!&\s])\s*throw notFound\(\);/m.test(detailCode.replace(NOT_FOUND_GUARD, "")),
 );
 // (b) 讀取失敗 → 頁殼 + 「暫時無法載入」，不是空白也不是 404。
 checkTrue("讀取失敗有自己的分支", /if \(!event\) \{/.test(detailCode));

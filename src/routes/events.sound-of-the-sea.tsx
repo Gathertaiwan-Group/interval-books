@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { SessionPicker, SessionList } from "@/components/shop/SessionPicker";
+import { EventEndedNotice, SessionPicker, SessionList } from "@/components/shop/SessionPicker";
 import { PlanPicker } from "@/components/shop/PlanPicker";
 import { QuantityStepper } from "@/components/shop/ShopBits";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fitDescription } from "@/lib/seo/core";
 import { pageMeta } from "@/lib/seo/head";
-import { landingEventLd } from "@/lib/seo/pages";
+import { eventEnded, landingEventLd, storeAddressFromMatches } from "@/lib/seo/pages";
 import {
   directAnySeatsLeft,
   directCheckoutSearch,
@@ -131,7 +131,7 @@ export const Route = createFileRoute("/events/sound-of-the-sea")({
   loader: async () => fetchActiveProductForEventSlug(EVENT_SLUG),
   // SEO（2026-11 健檢）：Event JSON-LD 的日期、地點、價格取自售票商品的場次與票種
   // （與報名區同一份資料），名稱與描述用這一頁的 PAGE 常數。
-  head: ({ loaderData }) => ({
+  head: ({ loaderData, matches }) => ({
     meta: pageMeta({
       title: PAGE.metaTitle,
       description: fitDescription(PAGE.metaDescription),
@@ -143,6 +143,7 @@ export const Route = createFileRoute("/events/sound-of-the-sea")({
         description: fitDescription(PAGE.metaDescription).zh,
         imageKey: POSTER_KEY,
         product: loaderData?.product ?? null,
+        store: storeAddressFromMatches(matches),
         performer: "胡海音",
       }),
     }),
@@ -658,10 +659,18 @@ function Booking({ product }: { product: ShopProduct }) {
   const unitPrice = selectedPlan ? selectedPlan.price : product.price;
   const lineLabel = selectedPlan ? selectedPlan.title.zh : "入場（含下午茶）";
 
+  // 最後一個場次結束了（與 /events「已結束」分頁同一條規則）→ 只列場次與票價、
+  // 不顯示「尚餘名額」、不能報名（2026-11 SEO 驗收 #2）。
+  if (eventEnded(null, product)) return <EventEndedNotice product={product} />;
+
   if (!directAnySeatsLeft(product)) {
     return (
       <>
-        <SessionList sessions={product.sessions} showSeatsRemaining={product.showSeatsRemaining} />
+        <SessionList
+          sessions={product.sessions}
+          showSeatsRemaining={product.showSeatsRemaining}
+          basePrice={product.price}
+        />
         <p className="mt-6 text-sm leading-relaxed text-muted-foreground">
           本場次名額已滿。若仍希望參加，歡迎來電 {PHONE} 由我們為您安排候補。
         </p>
@@ -674,6 +683,7 @@ function Booking({ product }: { product: ShopProduct }) {
       <SessionPicker
         sessions={product.sessions}
         showSeatsRemaining={product.showSeatsRemaining}
+        basePrice={product.price}
         selectedId={sessionId}
         onSelect={(id) => {
           setSessionId(id);

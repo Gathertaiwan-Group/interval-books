@@ -155,6 +155,29 @@ export function redirectFor(
   return { status, location: `${target}${search || ""}` };
 }
 
+/**
+ * 活動／商品代稱的「不分大小寫」查找（2026-11 SEO 驗收 #5）。
+ *
+ * 代稱本身就可能有大寫（InntervalChishang.1023），所以不能一律轉小寫——要先拿
+ * 網址上的代稱不分大小寫去資料庫找，找到**剛好一筆**、而且大小寫跟網址不同，
+ * 才 301 到資料庫裡的正確寫法。路由的 loader 在「查無此代稱」時才走這一步。
+ *
+ * PostgREST 的 ilike：`%` `_` 是 LIKE 萬用字元、`*` 也會被 PostgREST 換成 `%`。
+ * 前兩個用反斜線跳脫；含 `*` 的代稱直接不查（真的代稱不會有 `*`）。
+ */
+export function exactIlikePattern(slug: string): string | null {
+  if (!slug || slug.includes("*")) return null;
+  return slug.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+/** 候選代稱裡，跟網址只差大小寫的那一個（剛好一個才算）。完全相同或找不到 → null。 */
+export function caseInsensitiveMatch(requested: string, candidates: string[]): string | null {
+  const lower = requested.toLowerCase();
+  const hits = [...new Set(candidates)].filter((c) => c.toLowerCase() === lower);
+  if (hits.length !== 1 || hits[0] === requested) return null;
+  return hits[0];
+}
+
 // =============================================================================
 // 索引控制
 // =============================================================================
@@ -448,12 +471,7 @@ export function bookStoreLd(facts: StoreFacts, imageUrl: string, logoUrl: string
     logo: absoluteUrl(logoUrl),
     description: facts.site.shortDesc.zh,
     parentOrganization: { "@id": ORG_ID },
-    address: {
-      "@type": "PostalAddress",
-      streetAddress: facts.site.address.zh,
-      addressLocality: facts.site.city.zh,
-      addressCountry: "TW",
-    },
+    address: storePostalAddress({ address: facts.site.address.zh, city: facts.site.city.zh }),
     ...(geo ? { geo } : {}),
     ...(phone ? { telephone: phone } : {}),
     ...(facts.contactEmail ? { email: facts.contactEmail } : {}),
@@ -491,6 +509,8 @@ export function breadcrumbLd(crumbs: Crumb[]): JsonLd {
 
 /** 活動的一個場次（呼叫端從 ShopSession 轉過來；可不可買由呼叫端用 shop.ts 的規則算好）。 */
 export type LdSession = {
+  /** event_sessions.id —— 多場次時拿來組 `@id`（`<url>#session-<id>`）。 */
+  id: string;
   location: string;
   startsAt: string;
   endsAt: string | null;
@@ -499,6 +519,9 @@ export type LdSession = {
   /** 票種（0036）。空陣列 = 沒有票種，價格用 basePrice。 */
   plans: { name: string; price: number; available: boolean }[];
 };
+
+/** 書店自己的地址（site_settings.address／city 的中文，頁尾與 /about 印的那一份）。 */
+export type StoreAddress = { address: string; city: string };
 
 export type EventLdInput = {
   name: string;
@@ -510,6 +533,13 @@ export type EventLdInput = {
   /** 沒有票種時的單一價格（products.price）。 */
   basePrice: number | null;
   performer?: string | null;
+  /**
+   * 最後一個場次已經結束（呼叫端用 src/lib/event-status.ts 的 isEventEnded() 算，
+   * 與 /events「已結束」分頁同一條規則）。true → 每個 Offer 都標 SoldOut。
+   */
+  ended?: boolean;
+  /** 書店地址；場次在書店辦時拿來組 PostalAddress。null → 只輸出 addressCountry。 */
+  store?: StoreAddress | null;
 };
 
 /** ISO 時間 → 台北時間（+08:00）的 ISO 字串。不合法回 null。 */
@@ -523,22 +553,141 @@ export function toTaipeiIso(iso: string | null | undefined): string | null {
 }
 
 /**
+ * 場次的日期標籤（台北）：同一天「2026.09.05」、跨日「2026.10.23–10.25」、跨年寫全。
+ * 多場次活動拿來接在 Event.name 後面，讓每一場的名稱不一樣。
+ */
+export function sessionDateLabel(startsAt: string, endsAt: string | null): string | null {
+  const s = toTaipeiIso(startsAt);
+  if (!s) return null;
+  const e = toTaipeiIso(endsAt);
+  const [sy, sm, sd] = s.slice(0, 10).split("-");
+  const startLabel = `${sy}.${sm}.${sd}`;
+  if (!e || e.slice(0, 10) === s.slice(0, 10)) return startLabel;
+  const [ey, em, ed] = e.slice(0, 10).split("-");
+  return ey === sy ? `${startLabel}–${em}.${ed}` : `${startLabel}–${ey}.${em}.${ed}`;
+}
+
+// ── 地址 ─────────────────────────────────────────────────────────────────────
+/**
+ * 台灣 22 個縣市，以及在場次地點文字裡認得出它的寫法。「新竹」「嘉義」市縣同名，
+ * 只認寫全的（新竹市／新竹縣）——光寫「新竹」判不出是哪一個，就不輸出。
+ * 輸出用站上慣用的「台」字（頁尾印的是「台北市中正區」）。
+ */
+const TW_REGIONS: Array<[string, string[]]> = [
+  ["台北市", ["台北", "臺北"]],
+  ["新北市", ["新北"]],
+  ["桃園市", ["桃園"]],
+  ["台中市", ["台中", "臺中"]],
+  ["台南市", ["台南", "臺南"]],
+  ["高雄市", ["高雄"]],
+  ["基隆市", ["基隆"]],
+  ["新竹市", ["新竹市"]],
+  ["新竹縣", ["新竹縣"]],
+  ["嘉義市", ["嘉義市"]],
+  ["嘉義縣", ["嘉義縣"]],
+  ["苗栗縣", ["苗栗"]],
+  ["彰化縣", ["彰化"]],
+  ["南投縣", ["南投"]],
+  ["雲林縣", ["雲林"]],
+  ["屏東縣", ["屏東"]],
+  ["宜蘭縣", ["宜蘭"]],
+  ["花蓮縣", ["花蓮"]],
+  ["台東縣", ["台東", "臺東"]],
+  ["澎湖縣", ["澎湖"]],
+  ["金門縣", ["金門"]],
+  ["連江縣", ["連江"]],
+];
+
+/** 地點文字裡提到的縣市。沒提到或提到兩個以上（判不出是哪裡）→ null。 */
+export function regionOf(text: string): string | null {
+  const hits = TW_REGIONS.filter(([, aliases]) => aliases.some((a) => text.includes(a))).map(
+    ([name]) => name,
+  );
+  return hits.length === 1 ? hits[0] : null;
+}
+
+/** 「台北市中正區」→ { region: "台北市", locality: "中正區" }。拆不開就整串當 locality。 */
+function splitCity(city: string): { region: string | null; locality: string | null } {
+  const c = city.trim();
+  if (!c) return { region: null, locality: null };
+  const m = /^(.{2}[市縣])(.{1,4}[區鄉鎮市])$/.exec(c);
+  if (m) return { region: m[1].replace(/^臺/, "台"), locality: m[2] };
+  return { region: regionOf(c), locality: c };
+}
+
+/** 書店的 PostalAddress：全部欄位都來自 site_settings，沒有的欄位（郵遞區號）不輸出。 */
+export function storePostalAddress(store: StoreAddress): JsonLd {
+  const { region, locality } = splitCity(store.city);
+  const street = store.address.trim();
+  return {
+    "@type": "PostalAddress",
+    ...(street ? { streetAddress: street } : {}),
+    ...(locality ? { addressLocality: locality } : {}),
+    ...(region ? { addressRegion: region } : {}),
+    addressCountry: "TW",
+  };
+}
+
+/** 場次地點是不是書店本身（後台填的是「華山小時光風土誌書店…」「小時光書店（華山…）」）。 */
+export function isStoreLocation(location: string): boolean {
+  return /小時光|Interval Books/i.test(location);
+}
+
+/**
+ * 場次地點 → PostalAddress。
+ *
+ *   · 在書店辦：用 site_settings 的地址（streetAddress／addressLocality／addressRegion）。
+ *   · 店外（例：台東池上）：只輸出文字裡**明寫**的縣市（addressRegion）＋ addressCountry。
+ *     鄉鎮只有在「<縣市><鄉鎮區>」寫全的時候才輸出。
+ *
+ * 🔴 不編造郵遞區號、門牌、路名：資料庫沒有拆好的欄位就不輸出。
+ */
+export function postalAddressFor(location: string, store: StoreAddress | null): JsonLd {
+  if (store && isStoreLocation(location)) return storePostalAddress(store);
+  const region = regionOf(location);
+  let locality: string | null = null;
+  const aliases = TW_REGIONS.find(([name]) => name === region)?.[1] ?? [];
+  for (const alias of aliases) {
+    const base = alias.replace(/[市縣]$/, "");
+    const m = new RegExp(`${base}[市縣]([\\u4e00-\\u9fff]{1,3}?[區鄉鎮市])`).exec(location);
+    if (m) {
+      locality = m[1];
+      break;
+    }
+  }
+  return {
+    "@type": "PostalAddress",
+    ...(locality ? { addressLocality: locality } : {}),
+    ...(region ? { addressRegion: region } : {}),
+    addressCountry: "TW",
+  };
+}
+
+/**
  * 一個場次一個 Event。資料全部來自售票商品（products → event_sessions →
  * event_session_plans）：日期、地點、價格、名額。
  *
- *   - eventStatus：站上沒有「取消／延期」的狀態欄位，賣得到的場次就是 EventScheduled。
+ *   - 多場次（2026-11 驗收 #1）：Google 的活動複合式搜尋結果**不讀 subEvent**，它的
+ *     規範是「每一場各標一個 Event」。所以維持一場一個 Event，但 name 接上場次日期、
+ *     `@id` 用 `<url>#session-<場次 id>` 區分，不再出現兩個同名同網址的 Event。
+ *     單一場次的活動 name 不加日期（沒有要區分的對象），`@id` 一樣帶場次 id。
+ *   - eventStatus：站上沒有「取消／延期」的狀態欄位，一律 EventScheduled——**活動結束
+ *     之後也不改**（Google 規範：已結束的活動不更動 eventStatus）。
+ *   - 已結束（input.ended）：每個 Offer 標 SoldOut。不用 Discontinued：Google 活動
+ *     結構化資料的 offers.availability 只認 InStock／SoldOut／PreOrder，Discontinued
+ *     不在清單裡，可能被當成無效值；SoldOut 的意思「這裡已經買不到」也正是現況。
  *   - eventAttendanceMode：站上沒有線上場次的欄位，所有活動都是實體（Offline）。
- *   - 地點：場次的 location 文字（後台填的「華山小時光風土誌書店（台北市中正區…）」），
- *     同時當 Place 的 name 與 address——沒有拆好的郵遞地址就不假裝有。
+ *   - 地點：Place.name 是場次的 location 文字，address 是 PostalAddress（postalAddressFor）。
  */
 export function eventLd(input: EventLdInput): JsonLd[] {
   const out: JsonLd[] = [];
   const availability = (ok: boolean) =>
-    ok ? "https://schema.org/InStock" : "https://schema.org/SoldOut";
-  for (const s of input.sessions) {
-    const start = toTaipeiIso(s.startsAt);
-    const where = (s.location || "").trim();
-    if (!start || !where) continue;
+    ok && !input.ended ? "https://schema.org/InStock" : "https://schema.org/SoldOut";
+  const usable = input.sessions.filter((s) => toTaipeiIso(s.startsAt) && (s.location || "").trim());
+  const many = usable.length > 1;
+  for (const s of usable) {
+    const start = toTaipeiIso(s.startsAt) as string;
+    const where = s.location.trim();
     const end = toTaipeiIso(s.endsAt);
     const offers: JsonLd[] = s.plans.length
       ? s.plans.map((p) => ({
@@ -560,10 +709,12 @@ export function eventLd(input: EventLdInput): JsonLd[] {
             },
           ]
         : [];
+    const dateLabel = many ? sessionDateLabel(s.startsAt, s.endsAt) : null;
     out.push({
       "@context": "https://schema.org",
       "@type": "Event",
-      name: input.name,
+      ...(s.id ? { "@id": `${input.url}#session-${s.id}` } : {}),
+      name: dateLabel ? `${input.name}｜${dateLabel}` : input.name,
       description: input.description,
       url: input.url,
       ...(input.image ? { image: [absoluteUrl(input.image)] } : {}),
@@ -571,7 +722,11 @@ export function eventLd(input: EventLdInput): JsonLd[] {
       ...(end ? { endDate: end } : {}),
       eventStatus: "https://schema.org/EventScheduled",
       eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
-      location: { "@type": "Place", name: where, address: where },
+      location: {
+        "@type": "Place",
+        name: where,
+        address: postalAddressFor(where, input.store ?? null),
+      },
       organizer: {
         "@type": "Organization",
         "@id": ORG_ID,

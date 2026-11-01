@@ -31,13 +31,31 @@
  */
 import { useT } from "@/i18n/LanguageContext";
 import type { Localized } from "@/i18n/types";
-import { remainingForSession, type ShopSession } from "@/lib/shop";
+import { formatPrice, remainingForSession, type ShopProduct, type ShopSession } from "@/lib/shop";
 import { SEATS_LEFT_LABEL } from "@/components/shop/labels";
 
 const COPY: Record<
-  "chooseSession" | "sessionFull" | "noSessions" | "sessionsHeading" | "noPublicSessions",
+  | "chooseSession"
+  | "sessionFull"
+  | "noSessions"
+  | "sessionsHeading"
+  | "noPublicSessions"
+  | "sessionEnded"
+  | "eventEnded"
+  | "eventEndedNote"
+  | "free"
+  | "fee",
   Localized
 > = {
+  sessionEnded: { zh: "已結束", en: "Ended", ja: "終了" },
+  eventEnded: { zh: "活動已結束", en: "This event has ended", ja: "終了しました" },
+  eventEndedNote: {
+    zh: "這場活動已經結束，報名已關閉。謝謝每一位參與的朋友，下一場活動請見活動列表。",
+    en: "This event has ended and registration is closed. Thank you to everyone who joined — see the events page for what's next.",
+    ja: "この催しは終了し、お申し込みは締め切りました。ご参加いただいた皆さま、ありがとうございました。次回はイベント一覧をご覧ください。",
+  },
+  free: { zh: "免費", en: "Free", ja: "無料" },
+  fee: { zh: "費用", en: "Fee", ja: "料金" },
   chooseSession: { zh: "選擇場次", en: "Choose a sitting", ja: "回を選ぶ" },
   sessionFull: { zh: "已額滿", en: "Full", ja: "満席" },
   noSessions: {
@@ -58,6 +76,7 @@ export function SessionPicker({
   selectedId,
   onSelect,
   showSeatsRemaining,
+  basePrice = null,
 }: {
   sessions: ShopSession[];
   /** 目前選中的場次 id，還沒選就是 null。 */
@@ -68,6 +87,12 @@ export function SessionPicker({
    * **必填、沒有預設值** —— 理由見檔頭。額滿不受它影響。
    */
   showSeatsRemaining: boolean;
+  /**
+   * 售票商品的 products.price。沒有票種的場次（0036 之前的單一價格）就印這個價格——
+   * 結帳收的就是它，JSON-LD 的 Offer 也是它（2026-11 SEO 驗收 #3：頁面上要看得到）。
+   * 有票種的場次不印（選了場次之後 PlanPicker 會列每個票種的價格）。
+   */
+  basePrice?: number | null;
 }) {
   const t = useT();
 
@@ -108,6 +133,11 @@ export function SessionPicker({
               {" ・ "}
               {t(session.location)}
             </span>
+            {(session.plans ?? []).length === 0 && basePrice !== null ? (
+              <span className="mt-2 block text-sm">
+                {t(COPY.fee)} {basePrice > 0 ? formatPrice(basePrice) : t(COPY.free)}
+              </span>
+            ) : null}
             {note === null ? null : (
               <span className="mt-2 block text-xs text-muted-foreground">{note}</span>
             )}
@@ -139,6 +169,8 @@ export function SessionPicker({
 export function SessionList({
   sessions,
   showSeatsRemaining,
+  basePrice = null,
+  ended = false,
 }: {
   sessions: ShopSession[];
   /**
@@ -146,6 +178,10 @@ export function SessionList({
    * **必填、沒有預設值** —— 理由見檔頭。額滿不受它影響。
    */
   showSeatsRemaining: boolean;
+  /** 見 SessionPicker 的 basePrice。這裡沒有 PlanPicker，所以有票種的場次也逐一列出票價。 */
+  basePrice?: number | null;
+  /** 活動已結束：每一場標「已結束」，不印「尚餘名額」／「已額滿」。 */
+  ended?: boolean;
 }) {
   const t = useT();
 
@@ -161,12 +197,20 @@ export function SessionList({
           {sessions.map((session) => {
             const left = remainingForSession(session);
             // 與 SessionPicker 同一條規則、同一個順序：額滿優先，旗標只管剩餘。
-            const note =
-              left <= 0
+            // 已結束最優先（2026-11 SEO 驗收 #2：結束的活動不再印「尚餘名額」）。
+            const note = ended
+              ? t(COPY.sessionEnded)
+              : left <= 0
                 ? t(COPY.sessionFull)
                 : showSeatsRemaining
                   ? `${t(SEATS_LEFT_LABEL)} ${left}`
                   : null;
+            const prices: Array<{ key: string; label: string | null; price: number }> =
+              (session.plans ?? []).length > 0
+                ? session.plans.map((p) => ({ key: p.id, label: t(p.title), price: p.price }))
+                : basePrice !== null
+                  ? [{ key: "base", label: null, price: basePrice }]
+                  : [];
             return (
               <li key={session.id} className="border border-border p-4">
                 <span className="block text-sm">{t(session.title)}</span>
@@ -175,6 +219,11 @@ export function SessionList({
                   {" ・ "}
                   {t(session.location)}
                 </span>
+                {prices.map((p) => (
+                  <span key={p.key} className="mt-2 block text-sm">
+                    {p.label ?? t(COPY.fee)} {p.price > 0 ? formatPrice(p.price) : t(COPY.free)}
+                  </span>
+                ))}
                 {note === null ? null : (
                   <span className="mt-2 block text-xs text-muted-foreground">{note}</span>
                 )}
@@ -184,6 +233,49 @@ export function SessionList({
         </ul>
       )}
     </div>
+  );
+}
+
+/**
+ * 活動已結束時報名區的樣子（2026-11 SEO 驗收 #2）：場次與票價照列（JSON-LD 的價格要
+ * 在頁面上看得到）、每一場標「已結束」、不印「尚餘名額」；報名按鈕停用並改文案，
+ * DOM 裡沒有任何通往 /checkout 的連結。
+ *
+ * 「已結束」由呼叫端判斷（src/lib/seo/pages.ts 的 eventEnded() → event-status.ts 的
+ * isEventEnded()），與 /events「已結束」分頁同一條規則。詳情頁與三個著陸頁都用這一個。
+ */
+export function EventEndedNotice({
+  product,
+  heading,
+  eyebrowClassName = "eyebrow text-2xl",
+}: {
+  product: ShopProduct;
+  heading?: string;
+  eyebrowClassName?: string;
+}) {
+  const t = useT();
+  return (
+    <>
+      <SessionList
+        sessions={product.sessions}
+        showSeatsRemaining={false}
+        basePrice={product.price}
+        ended
+      />
+      <div data-event-ended="true">
+        {heading ? <p className={eyebrowClassName}>{heading}</p> : null}
+        <div className={heading ? "mt-6 space-y-5" : "mt-8 space-y-5"}>
+          <button
+            type="button"
+            disabled
+            className="inline-block cursor-not-allowed border border-border px-6 py-3 text-xs tracking-widest text-muted-foreground"
+          >
+            {t(COPY.eventEnded)}
+          </button>
+          <p className="text-sm leading-relaxed text-muted-foreground">{t(COPY.eventEndedNote)}</p>
+        </div>
+      </div>
+    </>
   );
 }
 

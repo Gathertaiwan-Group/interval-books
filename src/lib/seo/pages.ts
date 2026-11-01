@@ -8,6 +8,7 @@
 import { PRODUCT_TYPE_LABELS } from "@/components/shop/labels";
 import type { Localized } from "@/i18n/types";
 import type { EventDetailEntry } from "@/lib/cms";
+import { isEventEnded } from "@/lib/event-status";
 import { imageFor } from "@/lib/images";
 import {
   isPlanAvailable,
@@ -27,6 +28,7 @@ import {
   type Crumb,
   type JsonLd,
   type LdSession,
+  type StoreAddress,
 } from "./core";
 
 export type SeoBundle = {
@@ -71,6 +73,7 @@ function joinLocalized(...parts: Array<Localized | null | undefined>): Localized
 /** ShopSession → JSON-LD 用的場次（可不可買沿用 shop.ts 的規則：名額＋販售期間）。 */
 function ldSessions(sessions: ShopSession[]): LdSession[] {
   return sessions.map((s) => ({
+    id: s.id,
     location: s.location.zh,
     startsAt: s.startsAt,
     endsAt: s.endsAt,
@@ -83,11 +86,44 @@ function ldSessions(sessions: ShopSession[]): LdSession[] {
   }));
 }
 
+/**
+ * 這場活動結束了沒（頁面報名區、JSON-LD 共用同一個答案）。規則是 event-status.ts 的
+ * isEventEnded()——與 /events「已結束」分頁同一條。isoDate 只有詳情頁拿得到；著陸頁傳
+ * null，改用售票商品的最晚場次。
+ */
+export function eventEnded(isoDate: string | null, product: ShopProduct | null): boolean {
+  return isEventEnded(isoDate, product?.sessions ?? []);
+}
+
+/** root loader 的 site（SiteContent）→ JSON-LD 要的書店地址。沒有（讀取失敗）→ null。 */
+export function storeAddressOf(
+  site: { site?: { address?: Localized; city?: Localized } } | null | undefined,
+): StoreAddress | null {
+  const address = site?.site?.address?.zh?.trim() ?? "";
+  const city = site?.site?.city?.zh?.trim() ?? "";
+  return address || city ? { address, city } : null;
+}
+
+/**
+ * 子路由的 head() 拿書店地址：root loader 讀的 site_settings 在 matches 的第一個 match 上
+ * （root 的 head 用的是同一份）。找不到 → null（JSON-LD 只輸出 addressCountry，不猜）。
+ */
+export function storeAddressFromMatches(
+  matches: ReadonlyArray<{ loaderData?: unknown }> | undefined,
+): StoreAddress | null {
+  for (const m of matches ?? []) {
+    const data = m?.loaderData as { site?: Parameters<typeof storeAddressOf>[0] } | undefined;
+    if (data?.site) return storeAddressOf(data.site);
+  }
+  return null;
+}
+
 /** /events/$slug。event 為 null（讀取失敗）時回頁面層的預設值，沒有 JSON-LD。 */
 export function eventSeo(
   event: EventDetailEntry | null,
   product: ShopProduct | null,
   fallback: { metaTitle: Localized; metaDescription: Localized },
+  store: StoreAddress | null = null,
 ): SeoBundle {
   if (!event) {
     return {
@@ -115,6 +151,8 @@ export function eventSeo(
         sessions: product ? ldSessions(product.sessions) : [],
         basePrice: product ? product.price : null,
         performer: event.speaker?.name || null,
+        ended: eventEnded(event.isoDate, product),
+        store,
       }),
       breadcrumbLd([HOME, EVENTS, { name, path }]),
     ],
@@ -133,6 +171,7 @@ export function landingEventLd(opts: {
   imageKey: string | null;
   product: ShopProduct | null;
   performer?: string | null;
+  store?: StoreAddress | null;
 }): JsonLd[] {
   const image = opts.imageKey ? imageFor(opts.imageKey, "") : null;
   return [
@@ -144,6 +183,8 @@ export function landingEventLd(opts: {
       sessions: opts.product ? ldSessions(opts.product.sessions) : [],
       basePrice: opts.product ? opts.product.price : null,
       performer: opts.performer ?? null,
+      ended: eventEnded(null, opts.product),
+      store: opts.store ?? null,
     }),
     breadcrumbLd([HOME, EVENTS, { name: opts.name, path: opts.path }]),
   ];

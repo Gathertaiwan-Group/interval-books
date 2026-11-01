@@ -24,17 +24,23 @@ import {
   bookStoreLd,
   breadcrumbLd,
   canonicalUrl,
+  caseInsensitiveMatch,
   charLength,
   eventLd,
+  exactIlikePattern,
   fitDescription,
   hasPlaceholder,
   isNoindexPath,
+  isStoreLocation,
   parseOpeningHours,
+  postalAddressFor,
   productLd,
   redirectFor,
+  regionOf,
   robotsTagFor,
   robotsTxt,
   seoTitle,
+  sessionDateLabel,
   sitemapXml,
   STATIC_PUBLIC_PATHS,
   stripForeignBrandSuffix,
@@ -230,6 +236,7 @@ const events = eventLd({
   image: "/media/site-images/x.webp",
   sessions: [
     {
+      id: "s1",
       location: "台東",
       startsAt: "2026-12-04T03:10:00+00:00",
       endsAt: "2026-12-06T08:13:00+00:00",
@@ -240,6 +247,7 @@ const events = eventLd({
       ],
     },
     {
+      id: "s2",
       location: "",
       startsAt: "2026-12-04T03:10:00+00:00",
       endsAt: null,
@@ -265,7 +273,13 @@ for (const key of [
 ]) {
   checkTrue(`Event.${key}`, ev[key] !== undefined);
 }
-check("Event.location.address", ev.location.address, "台東");
+check("Event.location.address 是 PostalAddress（店外只有縣市＋國別）", ev.location.address, {
+  "@type": "PostalAddress",
+  addressRegion: "台東縣",
+  addressCountry: "TW",
+});
+check("單一場次 name 不加日期", ev.name, "范毅舜公東教堂文化之旅");
+check("@id 帶場次 id", ev["@id"], `${O}/events/kungtung#session-s1`);
 check("Event.offers 每個票種一個", ev.offers.length, 2);
 check("Offer 幣別", ev.offers[0].priceCurrency, "TWD");
 check("售完的票種標 SoldOut", ev.offers[1].availability, "https://schema.org/SoldOut");
@@ -330,6 +344,11 @@ check(
 check("BookStore 電話", store.telephone, "+886223416800");
 check("BookStore geo 來自 Apple Maps ll", store.geo.latitude, 25.044);
 check("BookStore 沒有郵遞區號（不編造）", store.address.postalCode, undefined);
+check(
+  "BookStore addressRegion／Locality 拆自 site_settings.city",
+  [store.address.addressRegion, store.address.addressLocality],
+  ["台北市", "中正區"],
+);
 check("空的 social 不進 sameAs", store.sameAs, ["https://www.instagram.com/intervalbookstw/"]);
 
 console.log("\n[6] sitemap.xml");
@@ -355,6 +374,170 @@ checkTrue("重複時取最新 lastmod", xml.includes("<lastmod>2026-11-01T04:23:
 checkTrue("& 有跳脫", xml.includes("/events/a&amp;b"));
 checkTrue("query 網址保留", xml.includes(`<loc>${O}/shop?tab=publications</loc>`));
 check("<url> 成對", (xml.match(/<url>/g) ?? []).length, (xml.match(/<\/url>/g) ?? []).length);
+
+console.log("\n[8] 2026-11 SEO 驗收：多場次、已結束、PostalAddress、大小寫");
+{
+  // 驗收 #1：池上兩個梯次 → 兩個 Event，name 與 @id 都不同、url 相同（同一頁）
+  const url = `${O}/events/InntervalChishang.1023`;
+  const sess = (id, start, end, price) => ({
+    id,
+    location: "台東池上・INNTERVAL 馥自然人文空間",
+    startsAt: start,
+    endsAt: end,
+    available: true,
+    plans: [{ name: "每人（兩人一房）", price, available: true }],
+  });
+  const two = eventLd({
+    name: "2026 台東池上秋收山海旅行",
+    description: "d",
+    url,
+    image: null,
+    sessions: [
+      sess("d9a3", "2026-10-23T06:00:00+00:00", "2026-10-25T04:00:00+00:00", 21800),
+      sess("2284", "2026-10-25T06:00:00+00:00", "2026-10-27T04:00:00+00:00", 24200),
+    ],
+    basePrice: 21800,
+  });
+  check("兩個場次兩個 Event", two.length, 2);
+  check(
+    "多場次 name 接場次日期",
+    two.map((e) => e.name),
+    ["2026 台東池上秋收山海旅行｜2026.10.23–10.25", "2026 台東池上秋收山海旅行｜2026.10.25–10.27"],
+  );
+  check("name 互不相同", new Set(two.map((e) => e.name)).size, 2);
+  check("@id 互不相同", new Set(two.map((e) => e["@id"])).size, 2);
+  check("@id 用 #session-<id>", two[0]["@id"], `${url}#session-d9a3`);
+  check(
+    "url 仍是同一頁",
+    two.map((e) => e.url),
+    [url, url],
+  );
+  check("未結束 → InStock", two[0].offers.availability, "https://schema.org/InStock");
+
+  // 驗收 #2：已結束 → 每個 Offer SoldOut、eventStatus 不變
+  const ended = eventLd({
+    name: "x",
+    description: "d",
+    url,
+    image: null,
+    sessions: [sess("a", "2026-10-23T06:00:00+00:00", null, 21800)],
+    basePrice: 21800,
+    ended: true,
+  });
+  check("已結束 → SoldOut", ended[0].offers.availability, "https://schema.org/SoldOut");
+  check(
+    "已結束 eventStatus 仍是 EventScheduled",
+    ended[0].eventStatus,
+    "https://schema.org/EventScheduled",
+  );
+  const endedBase = eventLd({
+    name: "x",
+    description: "d",
+    url,
+    image: null,
+    sessions: [{ ...sess("b", "2026-09-05T02:00:00+00:00", null, 0), plans: [] }],
+    basePrice: 1800,
+    ended: true,
+  });
+  check(
+    "已結束（單一價格）→ SoldOut",
+    endedBase[0].offers.availability,
+    "https://schema.org/SoldOut",
+  );
+  check("單一價格 = products.price", endedBase[0].offers.price, 1800);
+
+  check(
+    "場次日期：同一天",
+    sessionDateLabel("2026-09-05T02:00:00+00:00", "2026-09-05T04:00:00+00:00"),
+    "2026.09.05",
+  );
+  check(
+    "場次日期：跨年",
+    sessionDateLabel("2026-12-31T02:00:00+00:00", "2027-01-02T04:00:00+00:00"),
+    "2026.12.31–2027.01.02",
+  );
+  check(
+    "場次日期：沒有結束時間",
+    sessionDateLabel("2026-09-05T02:00:00+00:00", null),
+    "2026.09.05",
+  );
+
+  // 驗收 #4：PostalAddress
+  const storeAddr = { address: "華山文創園區．紅磚六合院 西7-3館", city: "台北市中正區" };
+  check(
+    "書店場次 → site_settings 的地址",
+    postalAddressFor("華山小時光風土誌書店（台北市中正區八德路一段 1 號）", storeAddr),
+    {
+      "@type": "PostalAddress",
+      streetAddress: "華山文創園區．紅磚六合院 西7-3館",
+      addressLocality: "中正區",
+      addressRegion: "台北市",
+      addressCountry: "TW",
+    },
+  );
+  check(
+    "店外：只有縣市＋國別（不編造鄉鎮、門牌、郵遞區號）",
+    postalAddressFor("台東池上・INNTERVAL 馥自然人文空間", storeAddr),
+    { "@type": "PostalAddress", addressRegion: "台東縣", addressCountry: "TW" },
+  );
+  check(
+    "店外：寫全「縣＋鄉」才輸出 addressLocality",
+    postalAddressFor("臺東縣池上鄉 某空間", storeAddr),
+    {
+      "@type": "PostalAddress",
+      addressLocality: "池上鄉",
+      addressRegion: "台東縣",
+      addressCountry: "TW",
+    },
+  );
+  check("判不出縣市 → 只有國別", postalAddressFor("某個沒寫地點的空間", null), {
+    "@type": "PostalAddress",
+    addressCountry: "TW",
+  });
+  check("只寫「新竹」判不出市或縣 → 不猜", regionOf("新竹某處"), null);
+  check("兩個縣市都提到 → 不猜", regionOf("台北出發、台東集合"), null);
+  checkTrue("書店地點判斷", isStoreLocation("小時光書店（華山文創園區 紅磚六合院 西 7-3 館）"));
+  check("沒有書店資料時，書店場次也不編造", postalAddressFor("小時光書店（華山）", null), {
+    "@type": "PostalAddress",
+    addressCountry: "TW",
+  });
+  for (const e of two) {
+    check(
+      `Event location.address 型別（${e["@id"]}）`,
+      e.location.address["@type"],
+      "PostalAddress",
+    );
+    check("Event 沒有 postalCode", e.location.address.postalCode, undefined);
+  }
+
+  // 驗收 #5：大小寫
+  check("ilike 跳脫 _ %", exactIlikePattern("a_b%c"), "a\\_b\\%c");
+  check("含 * 不查", exactIlikePattern("a*"), null);
+  check(
+    "代稱有大寫：保留大寫",
+    exactIlikePattern("InntervalChishang.1023"),
+    "InntervalChishang.1023",
+  );
+  check(
+    "inntervalchishang.1023 → InntervalChishang.1023",
+    caseInsensitiveMatch("inntervalchishang.1023", ["InntervalChishang.1023"]),
+    "InntervalChishang.1023",
+  );
+  // 少一個 n 的 intervalchishang 不是大小寫問題，是另一個字——不分大小寫的查找不該猜它。
+  check(
+    "intervalchishang（少一個 n）不是大小寫差異 → 不轉",
+    caseInsensitiveMatch("intervalchishang.1023", ["InntervalChishang.1023"]),
+    null,
+  );
+  check(
+    "PUB-TW-001 → pub-tw-001",
+    caseInsensitiveMatch("PUB-TW-001", ["pub-tw-001"]),
+    "pub-tw-001",
+  );
+  check("完全相同不轉", caseInsensitiveMatch("pub-tw-001", ["pub-tw-001"]), null);
+  check("只差大小寫的有兩筆 → 不猜", caseInsensitiveMatch("ab", ["Ab", "aB"]), null);
+  check("ilike 撈到不同字的不算", caseInsensitiveMatch("ab", ["abc"]), null);
+}
 
 console.log("\n[7] STATIC_PUBLIC_PATHS 與路由表對帳");
 const tree = readFile(join(ROOT, "src/routeTree.gen.ts"));
