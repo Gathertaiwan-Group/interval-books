@@ -539,7 +539,7 @@ export function Moments() {
               alt="公東教堂彩色玻璃與木製長椅，導覽場域實景"
               loading="lazy"
             />
-            <p>12.05 / 14:30</p>
+            <p>12.05 / 10:30</p>
             <h3>范毅舜｜親自導覽</h3>
             <span>在現場，讀懂建築與生命的對話。</span>
           </article>
@@ -588,29 +588,17 @@ export function Itinerary() {
               <p className="kt-eyebrow">DAY 01 / 12.04（五）</p>
               <h3>從山海入席，從故事相遇。</h3>
               <p className="kt-body-copy">
-                抵達台東，讓藝術與餐桌開啟旅程。夜幕降下，聽范毅舜說起《公東的教堂》。
+                抵達台東，讓山海與餐桌開啟旅程。夜幕降下，聽范毅舜說起《公東的教堂》。
               </p>
             </div>
             <ol>
               <li>
-                <time>11:10</time>
-                <span>台東火車站接駁（建議台鐵408：台北07:20 → 台東11:10）</span>
-              </li>
-              <li>
-                <time>11:30</time>
-                <span>花里岸餐廳午餐｜費用自理</span>
-              </li>
-              <li>
-                <time>14:00</time>
-                <span>江賢二藝術園區</span>
-              </li>
-              <li>
-                <time>16:00</time>
-                <span>入住 INNTERVAL 馥自然人文空間</span>
-              </li>
-              <li>
                 <time>16:30</time>
-                <span>迎賓下午茶</span>
+                <span>台東火車站接駁（建議台鐵420普悠瑪：台北11:35 → 台東15:56）</span>
+              </li>
+              <li>
+                <time>17:30</time>
+                <span>入住 INNTERVAL 馥自然人文空間</span>
               </li>
               <li>
                 <time>18:00</time>
@@ -627,7 +615,7 @@ export function Itinerary() {
               <p className="kt-eyebrow">DAY 02 / 12.05（六）</p>
               <h3>走進教堂，也走近生命。</h3>
               <p className="kt-body-copy">
-                清晨與自然相處，午後跟著范毅舜讀懂建築中的人文故事。夜晚，把對話留給音樂與彼此。
+                清晨與自然相處，上午跟著范毅舜讀懂建築中的人文故事，午後走進江賢二藝術園區。夜晚，把對話留給音樂與彼此。
               </p>
             </div>
             <ol>
@@ -640,24 +628,20 @@ export function Itinerary() {
                 <span>馥自然早餐</span>
               </li>
               <li>
-                <time>10:00</time>
-                <span>馥自然園區生態探索（自由參加）</span>
-              </li>
-              <li>
-                <time>11:30</time>
-                <span>野菜蔬食午餐</span>
-              </li>
-              <li>
-                <time>12:30</time>
+                <time>09:30</time>
                 <span>出發前往公東教堂</span>
               </li>
               <li>
-                <time>13:30</time>
-                <span>抵達公東教堂</span>
+                <time>10:30</time>
+                <span>抵達公東教堂｜范毅舜親自導覽公東教堂</span>
               </li>
               <li>
-                <time>14:30</time>
-                <span>范毅舜親自導覽公東教堂｜結束時間待確認</span>
+                <time>12:00</time>
+                <span>午餐</span>
+              </li>
+              <li>
+                <time>15:00</time>
+                <span>抵達江賢二藝術園區</span>
               </li>
               <li>
                 <time>18:00</time>
@@ -708,10 +692,10 @@ export function Itinerary() {
         <div className="kt-transport-note">
           <p className="kt-transport-title">台北-台東出發的朋友：</p>
           <p className="kt-body-copy">
-            去程建議台鐵408、回程建議台鐵431，列車時刻僅供參考，請自行核對最新時刻與訂票。
+            去程建議台鐵420、回程建議台鐵431，列車時刻僅供參考，請自行核對最新時刻與訂票。
           </p>
         </div>
-        <p className="kt-itinerary-note">導覽結束時間待確認；講座主講與行程內容以實際確認為準。</p>
+        <p className="kt-itinerary-note">講座主講與行程內容以實際確認為準。</p>
         <div className="mt-8">
           <a
             href="#register"
@@ -997,10 +981,6 @@ export function Price() {
                 </span>
               </li>
               <li>
-                <strong>第一天午餐</strong>
-                <span>我們安排在花里岸餐廳，您可以依照喜好自由點餐，餐費由旅人自行結帳。</span>
-              </li>
-              <li>
                 <strong>單人入住差額</strong>
                 <span>如希望一人獨享房間，兩晚需另加 NT$10,000。</span>
               </li>
@@ -1088,7 +1068,7 @@ export function Faq() {
               <span aria-hidden="true">＋</span>
             </summary>
             <p>
-              包含台東火車站往返及行程安排的接駁服務。往返台東的火車、飛機或自行開車費用敬請自理；去程建議台鐵408、回程建議台鐵431，列車時刻僅供參考，請自行核對最新時刻與訂票。
+              包含台東火車站往返及行程安排的接駁服務。往返台東的火車、飛機或自行開車費用敬請自理；去程建議台鐵420、回程建議台鐵431，列車時刻僅供參考，請自行核對最新時刻與訂票。
             </p>
           </details>
           <details>
@@ -1097,7 +1077,7 @@ export function Faq() {
               <span aria-hidden="true">＋</span>
             </summary>
             <p>
-              已包含兩天早餐、第二天與第三天午餐，以及兩晚晚餐，共六餐，另有無酒精飲料吧。首日午餐安排在花里岸餐廳，餐費自行結帳。素食或過敏需求請填在表單，由主辦確認安排。
+              已包含兩天早餐、第二天與第三天午餐，以及兩晚晚餐，共六餐，另有無酒精飲料吧。素食或過敏需求請填在表單，由主辦確認安排。
             </p>
           </details>
           <details>
