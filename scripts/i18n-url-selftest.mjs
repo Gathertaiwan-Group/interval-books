@@ -10,6 +10,8 @@
  *   [2] localizeHref／switchLangHref：私密頁不加前綴、不加第二層、保留 query／hash
  *   [3] canonical、轉址、noindex：/EN/Events 301、/en/ 308、/en/admin noindex
  *   [4] 🔴 noindex 規則（isLangIndexable）：標題沒翻譯、本文全部沒翻譯、中文限定頁 → 不可收錄
+ *   [5] sitemap：每個語言一筆 <url>＋xhtml:link 互相對應、不可收錄的語言不出現
+ *   [6] buildSitemapEntries：活動／商品依翻譯判斷、策旅卡片沿用活動頁的語言
  *   [7] router rewrite：輸入輸出可逆（SSR 不會多一次轉址）、站內連結帶前綴、私密頁不帶
  *   [8] 靜態守門：公開頁都用 pageHead()、root 不再輸出 canonical、LanguageProvider 不讀 navigator
  *
@@ -61,6 +63,9 @@ const readFile = (rel) => {
 
 const i18n = await import(pathToFileURL(join(ROOT, "src/lib/seo/i18n.ts")).href);
 const core = await import(pathToFileURL(join(ROOT, "src/lib/seo/core.ts")).href);
+const { buildSitemapEntries } = await import(
+  pathToFileURL(join(ROOT, "src/lib/seo/sitemap-entries.ts")).href
+);
 const { createLangRewrite } = await import(
   pathToFileURL(join(ROOT, "src/lib/i18n-rewrite.ts")).href
 );
@@ -307,6 +312,123 @@ check(
 check("一般活動不是中文限定", i18n.isZhOnlyPath("/events/InntervalChishang.1023"), false);
 
 // ─────────────────────────────────────────────────────────────────────────────
+console.log("\n[5] sitemap：每語一筆＋xhtml:link");
+const xml = core.sitemapXml([
+  { path: "/", lastmod: "2026-11-01T00:00:00Z", langs: ["zh", "en", "ja"] },
+  { path: "/events/kungtung", langs: ["zh"] },
+  { path: "/events/kungtung", langs: ["zh", "en", "ja"] },
+  { path: "/shop?tab=publications", langs: ["zh", "en", "ja"] },
+  { path: "/shop/x", langs: ["zh", "en"] },
+  { path: "/legacy" },
+]);
+const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+checkTrue("有 xhtml 命名空間", xml.includes('xmlns:xhtml="http://www.w3.org/1999/xhtml"'));
+check("網址清單", locs, [
+  "https://www.intervalbooks.tw/",
+  "https://www.intervalbooks.tw/en",
+  "https://www.intervalbooks.tw/ja",
+  "https://www.intervalbooks.tw/events/kungtung",
+  "https://www.intervalbooks.tw/shop?tab=publications",
+  "https://www.intervalbooks.tw/en/shop?tab=publications",
+  "https://www.intervalbooks.tw/ja/shop?tab=publications",
+  "https://www.intervalbooks.tw/shop/x",
+  "https://www.intervalbooks.tw/en/shop/x",
+  "https://www.intervalbooks.tw/legacy",
+]);
+const blocks = [...xml.matchAll(/<url>([\s\S]*?)<\/url>/g)].map((m) => m[1]);
+const altsOf = (b) =>
+  [...b.matchAll(/hreflang="([^"]+)" href="([^"]+)"/g)].map((m) => `${m[1]} ${m[2]}`);
+check("/en 那筆列出三語＋x-default", altsOf(blocks[1]), [
+  "zh-Hant https://www.intervalbooks.tw/",
+  "en https://www.intervalbooks.tw/en",
+  "ja https://www.intervalbooks.tw/ja",
+  "x-default https://www.intervalbooks.tw/",
+]);
+check(
+  "三語各筆的 alternate 一模一樣（互相對應）",
+  altsOf(blocks[0]).join("|") === altsOf(blocks[2]).join("|"),
+  true,
+);
+check("lastmod 三語都帶", (xml.match(/<lastmod>2026-11-01T00:00:00Z<\/lastmod>/g) ?? []).length, 3);
+check("重複的網址取語言交集（kungtung 只剩中文、沒有 alternate）", altsOf(blocks[3]), []);
+check(
+  "缺日文的商品：沒有 ja、alternate 不列 ja",
+  altsOf(blocks[8]).some((a) => a.startsWith("ja ")),
+  false,
+);
+check("query 的 & 有跳脫", xml.includes("/shop?tab=publications</loc>"), true);
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log("\n[6] buildSitemapEntries 依翻譯判斷");
+const entries = buildSitemapEntries(
+  {
+    pages: [
+      {
+        slug: "index",
+        updatedAt: null,
+        content: { title: L("首頁", "Home", "ホーム"), body: [L("介紹", "Intro", "紹介")] },
+      },
+      {
+        slug: "about",
+        updatedAt: null,
+        content: { title: L("關於", "", ""), body: [L("介紹", "", "")] },
+      },
+    ],
+    pageParts: [{ pageSlug: "about", updatedAt: null, value: L("區塊", "Block", "") }],
+    events: [
+      {
+        slug: "ok",
+        isoDate: null,
+        updatedAt: null,
+        booking: null,
+        content: { title: L("活動", "Event", "イベント"), body: [L("摘要", "Sum", "要約")] },
+      },
+      {
+        slug: "zh",
+        isoDate: null,
+        updatedAt: null,
+        booking: null,
+        content: { title: L("活動", "", ""), body: [L("摘要", "", "")] },
+      },
+      {
+        slug: "kungtung",
+        isoDate: null,
+        updatedAt: null,
+        booking: null,
+        content: { title: L("公東", "Kung Tung", "公東"), body: [L("摘要", "Sum", "要約")] },
+      },
+    ],
+    products: [
+      {
+        slug: "p1",
+        productType: "book",
+        updatedAt: null,
+        content: { title: L("書", "Book", "本"), body: [L("介紹", "Intro", "")] },
+      },
+    ],
+    journeys: [
+      { externalUrl: "/events/ok", updatedAt: null },
+      { externalUrl: "/events/kungtung#x", updatedAt: null },
+    ],
+    publicationsLatest: null,
+    curatedLatest: null,
+  },
+  "2026-11-01",
+);
+const langsAt = (path) => entries.filter((e) => e.path === path).map((e) => e.langs);
+check("首頁三語", langsAt("/")[0], ["zh", "en", "ja"]);
+check("/about：英文靠區塊有翻 → en 可、ja 不可… 但標題沒翻 → 只剩中文", langsAt("/about")[0], [
+  "zh",
+]);
+check("活動有翻譯 → 三語", langsAt("/events/ok")[0], ["zh", "en", "ja"]);
+check("活動沒翻譯 → 只有中文", langsAt("/events/zh")[0], ["zh"]);
+check("kungtung（中文限定）→ 只有中文", langsAt("/events/kungtung")[0], ["zh"]);
+check("策旅卡片沿用活動頁的語言", langsAt("/events/ok")[1], ["zh", "en", "ja"]);
+check("主理人子頁只有中文", langsAt("/events/kungtung/hosts/alice")[0], ["zh"]);
+check("商品：日文本文空、標題有翻 → 不可（本文全缺）", langsAt("/shop/p1")[0], ["zh", "en"]);
+check("沒給翻譯資料的頁（/journeys）→ 三語", langsAt("/journeys")[0], ["zh", "en", "ja"]);
+
+// ─────────────────────────────────────────────────────────────────────────────
 console.log("\n[7] router rewrite（真的 @tanstack/react-router）");
 const { createRouter, createRootRoute, createRoute } = await import("@tanstack/react-router");
 const { createMemoryHistory } = await import("@tanstack/history");
@@ -482,6 +604,13 @@ const rootSrc2 = strip(readFile("src/routes/__root.tsx"));
 checkTrue(
   "root loader 的語言過期（私密頁換語言後進公開頁）會重跑",
   /rootLangIsStale\(location\.publicHref\)/.test(rootSrc2),
+);
+const sitemapSrc = strip(readFile("src/server/sitemap.ts"));
+checkTrue(
+  "sitemap 的 loc() 與 cms.ts 同樣要求三個鍵都是字串",
+  /typeof o\.zh !== "string" \|\| typeof o\.en !== "string" \|\| typeof o\.ja !== "string"/.test(
+    sitemapSrc,
+  ),
 );
 const routerSrc = strip(readFile("src/router.tsx"));
 checkTrue(

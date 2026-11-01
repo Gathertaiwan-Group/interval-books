@@ -16,7 +16,7 @@
  *     breadcrumbLd()——**只吃呼叫端給的資料**，沒有的欄位就不輸出，不在這裡編任何值。
  */
 import type { Lang, Localized } from "../../i18n/types";
-import { isLocalizablePath, localizeHref, SITE_LANGS } from "./i18n.ts";
+import { HREFLANG as HREFLANG_CODES, isLocalizablePath, localizeHref, SITE_LANGS } from "./i18n.ts";
 
 // =============================================================================
 // 網址
@@ -813,7 +813,11 @@ export function productLd(input: ProductLdInput): JsonLd {
 // sitemap.xml
 // =============================================================================
 
-export type SitemapEntry = { path: string; lastmod?: string | null };
+/**
+ * sitemap 的一筆。path 是**不含語言前綴**的路徑；langs 是這一頁可以被收錄的語言
+ * （i18n.ts 的 indexableLangs()），沒給 = 只有中文。
+ */
+export type SitemapEntry = { path: string; lastmod?: string | null; langs?: readonly Lang[] };
 
 function xmlEscape(s: string): string {
   return s
@@ -834,22 +838,52 @@ export function toLastmod(value: string | null | undefined): string | null {
 
 /**
  * 組 sitemap.xml。同一個網址出現多次時只留一筆、lastmod 取最新的那一個
- * （例：/events/kungtung 同時是活動列與策旅卡片指著的頁面）。
+ * （例：/events/kungtung 同時是活動列與策旅卡片指著的頁面），可收錄的語言取交集。
+ *
+ * 多語（2026-11 /en /ja）：照 Google「在 sitemap 標示替代語言版本」的做法——**每一個語言版本
+ * 各列一筆 <url>**，而且每一筆都用 `xhtml:link rel="alternate"` 列出全部語言版本（含自己）
+ * 與 x-default。兩件事要一起做才算完整（Google 要求每個版本的 <url> 都列出全部替代版本），
+ * 也讓 Search Console 的涵蓋範圍報表能逐一看到英日文網址。noindex 的語言版本不在 langs 裡，
+ * 所以既不會有自己的 <url>，也不會出現在別人的 xhtml:link。
  */
 export function sitemapXml(entries: SitemapEntry[]): string {
-  const byLoc = new Map<string, string | null>();
+  const byPath = new Map<
+    string,
+    { path: string; query: string | undefined; lastmod: string | null; langs: Lang[] }
+  >();
   for (const e of entries) {
     const [pathOnly, query] = e.path.split("?");
-    const loc = query
-      ? `${SITE_ORIGIN}${canonicalPathname(pathOnly)}?${query}`
-      : canonicalUrl(pathOnly);
+    const path = canonicalPathname(pathOnly);
+    const key = query ? `${path}?${query}` : path;
     const lastmod = toLastmod(e.lastmod);
-    const prev = byLoc.get(loc);
-    if (prev === undefined || (lastmod && (!prev || lastmod > prev))) byLoc.set(loc, lastmod);
+    const langs: Lang[] = SITE_LANGS.filter((l) => l === "zh" || (e.langs ?? []).includes(l));
+    const prev = byPath.get(key);
+    if (!prev) {
+      byPath.set(key, { path, query, lastmod, langs });
+      continue;
+    }
+    if (lastmod && (!prev.lastmod || lastmod > prev.lastmod)) prev.lastmod = lastmod;
+    prev.langs = prev.langs.filter((l) => langs.includes(l));
   }
-  const urls = [...byLoc.entries()].map(
-    ([loc, lastmod]) =>
-      `  <url>\n    <loc>${xmlEscape(loc)}</loc>${lastmod ? `\n    <lastmod>${lastmod}</lastmod>` : ""}\n  </url>`,
-  );
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join("\n")}\n</urlset>\n`;
+  const locOf = (path: string, query: string | undefined, lang: Lang) =>
+    `${SITE_ORIGIN}${localizeHref(query ? `${path}?${query}` : path, lang)}`;
+  const urls: string[] = [];
+  for (const { path, query, lastmod, langs } of byPath.values()) {
+    const alternates =
+      langs.length > 1
+        ? [
+            ...langs.map(
+              (l) =>
+                `\n    <xhtml:link rel="alternate" hreflang="${HREFLANG_CODES[l]}" href="${xmlEscape(locOf(path, query, l))}"/>`,
+            ),
+            `\n    <xhtml:link rel="alternate" hreflang="x-default" href="${xmlEscape(locOf(path, query, "zh"))}"/>`,
+          ].join("")
+        : "";
+    for (const lang of langs) {
+      urls.push(
+        `  <url>\n    <loc>${xmlEscape(locOf(path, query, lang))}</loc>${lastmod ? `\n    <lastmod>${lastmod}</lastmod>` : ""}${alternates}\n  </url>`,
+      );
+    }
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${urls.join("\n")}\n</urlset>\n`;
 }

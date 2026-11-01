@@ -362,7 +362,7 @@ const xml = sitemapXml([
 checkTrue(
   "XML 宣告與命名空間",
   xml.startsWith(
-    '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
   ),
 );
 check(

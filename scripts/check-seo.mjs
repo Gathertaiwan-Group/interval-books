@@ -11,7 +11,7 @@
  *   - noindex：/admin/login 有 robots noindex 與 X-Robots-Tag；404 頁回 404 且 noindex
  *   - 英日文網址（2026-11 /en /ja）：<html lang>、canonical 指自己、hreflang 三語＋x-default 且
  *     互相對應、站內連結帶前綴、中文限定著陸頁的英日版 noindex、私密頁 404、轉址、Vary、
- *     （見 checkLanguageVersions()）
+ *     sitemap 的 xhtml:link（見 checkLanguageVersions()）
  *
  * 用法：
  *   node scripts/check-seo.mjs                          # 預設打 https://www.intervalbooks.tw
@@ -359,7 +359,7 @@ async function checkRobotsAndSitemap() {
   );
   ok(
     "XML 開頭與 urlset 命名空間",
-    /^<\?xml[^>]*\?>\s*<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/.test(
+    /^<\?xml[^>]*\?>\s*<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9"( xmlns:xhtml="http:\/\/www\.w3\.org\/1999\/xhtml")?>/.test(
       xml,
     ),
   );
@@ -375,6 +375,48 @@ async function checkRobotsAndSitemap() {
     "沒有後台／結帳網址",
     !locs.some((l) => /\/(admin|vendor|checkout|cart|account)(\/|$)/.test(l)),
   );
+  // ── 多語（2026-11 /en /ja）────────────────────────────────────────────────
+  const urlBlocks = [...xml.matchAll(/<url>([\s\S]*?)<\/url>/g)].map((m) => m[1]);
+  const groups = urlBlocks.map((b) => ({
+    loc: decode((/<loc>([^<]+)<\/loc>/.exec(b) ?? [])[1] ?? ""),
+    alts: [...b.matchAll(/<xhtml:link rel="alternate" hreflang="([^"]+)" href="([^"]+)"\/>/g)].map(
+      (m) => [m[1], decode(m[2])],
+    ),
+  }));
+  const locSet = new Set(locs);
+  ok(
+    `有英文網址（${locs.filter((l) => l.startsWith(`${ORIGIN}/en`)).length}）`,
+    locs.some((l) => l.startsWith(`${ORIGIN}/en`)),
+  );
+  ok(
+    `有日文網址（${locs.filter((l) => l.startsWith(`${ORIGIN}/ja`)).length}）`,
+    locs.some((l) => l.startsWith(`${ORIGIN}/ja`)),
+  );
+  ok(
+    "中文限定的著陸頁沒有英日文網址",
+    !locs.some((l) =>
+      /^https:\/\/www\.intervalbooks\.tw\/(en|ja)\/events\/(kungtung|sound-of-the-sea|city-salon-0922)(\/|$)/.test(
+        l,
+      ),
+    ),
+  );
+  const multi = groups.filter((g) => g.alts.length > 0);
+  ok(
+    "有 xhtml:link 的每一筆都把自己列為 alternate",
+    multi.every((g) => g.alts.some(([, href]) => href === g.loc)),
+  );
+  ok(
+    "xhtml:link 的每個 alternate 都有自己的 <url>（互相對應）",
+    multi.every((g) => g.alts.every(([, href]) => locSet.has(href))),
+  );
+  ok(
+    "x-default 指向中文版",
+    multi.every((g) =>
+      g.alts.some(
+        ([lang, href]) => lang === "x-default" && !/intervalbooks\.tw\/(en|ja)(\/|$|\?)/.test(href),
+      ),
+    ),
+  );
   const lastmods = [...xml.matchAll(/<lastmod>([^<]+)<\/lastmod>/g)].map((m) => m[1]);
   ok(
     "lastmod 是 W3C 時間",
@@ -387,6 +429,8 @@ async function checkRobotsAndSitemap() {
       locs[1],
       ...locs.filter((l) => /\/events\//.test(l)).slice(0, 2),
       ...locs.filter((l) => /\/shop\//.test(l)).slice(0, 1),
+      ...locs.filter((l) => /\.tw\/en(\/|$|\?)/.test(l)).slice(0, 2),
+      ...locs.filter((l) => /\.tw\/ja(\/|$|\?)/.test(l)).slice(0, 2),
       ...locs.sort(() => Math.random() - 0.5).slice(0, 5),
     ]),
   ];

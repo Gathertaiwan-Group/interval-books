@@ -16,8 +16,18 @@
  *   · 沒有資料列的頁（寫死在程式碼裡的著陸頁子頁）：不輸出 lastmod。
  *
  * 🔴 **絕不放部署時間或「現在」**：沒有 updated_at 可用就不輸出 lastmod。
+ *
+ * ── 語言（2026-11 /en /ja）─────────────────────────────────────────────────────
+ * 每一筆帶 langs（可收錄的語言），規則與頁面 head() 同一支：i18n.ts 的 isLangIndexable()。
+ *   · 活動、商品：標題＋摘要＋內文（與 pages.ts 的 contentTranslation 相同）。
+ *   · 固定頁：pages 列的頁首標題（沒有就 meta_title）＋頁首介紹＋描述＋頁面區塊
+ *     （與 pages.ts 的 pageRowTranslation 相同）；查不到那一列 → 三語（畫面用程式內建文案）。
+ *   · 中文限定的著陸頁（ZH_ONLY_PATHS）→ 只有中文。
+ * 沒給翻譯資料（舊的呼叫端／測試）→ 視同三語齊全。
  */
 import { isEventEnded, latestSessionEndIso, todayInTaipei } from "@/lib/event-status";
+import type { Lang, Localized } from "@/i18n/types";
+import { indexableLangs, isZhOnlyPath, SITE_LANGS, type PageTranslation } from "@/lib/seo/i18n";
 import type { SitemapEntry } from "./core";
 
 type Ts = string | null | undefined;
@@ -29,8 +39,12 @@ export type SitemapSessionRow = {
   planUpdatedAts: Ts[];
 };
 
+/** 標題＋本文欄位（noindex 規則的輸入）。沒有 → 視同三語齊全。 */
+export type SitemapContent = { title: Localized | null; body: Array<Localized | null> };
+
 export type SitemapEventRow = {
   slug: string;
+  content?: SitemapContent;
   isoDate: string | null;
   updatedAt: Ts;
   /** 售票商品（event-<slug>）。沒有（外部報名）→ null。 */
@@ -39,12 +53,17 @@ export type SitemapEventRow = {
 
 export type SitemapSource = {
   /** pages 表：slug → updated_at。 */
-  pages: Array<{ slug: string; updatedAt: Ts }>;
+  pages: Array<{ slug: string; updatedAt: Ts; content?: SitemapContent }>;
   /** page_blocks ＋ page_list_items：page_slug → updated_at。 */
-  pageParts: Array<{ pageSlug: string; updatedAt: Ts }>;
+  pageParts: Array<{ pageSlug: string; updatedAt: Ts; value?: Localized | null }>;
   events: SitemapEventRow[];
   /** 上架中的商品（含活動票券）。 */
-  products: Array<{ slug: string; productType: string; updatedAt: Ts }>;
+  products: Array<{
+    slug: string;
+    productType: string;
+    updatedAt: Ts;
+    content?: SitemapContent;
+  }>;
   journeys: Array<{ externalUrl: string; updatedAt: Ts }>;
   publicationsLatest: Ts;
   curatedLatest: Ts;
@@ -53,6 +72,7 @@ export type SitemapSource = {
 /** 固定頁面 ↔ pages 表的 slug，以及另外算進 lastmod 的內容來源。 */
 const STATIC_PAGES: Array<{
   path: string;
+  /** 第一個是這一頁自己的 pages 列（翻譯判斷看它）；其餘只算 lastmod。 */
   pageSlugs: string[];
   extra?: "events" | "journeys" | "curated";
 }> = [
@@ -96,6 +116,17 @@ export function eventLastmod(e: SitemapEventRow, today = todayInTaipei()): strin
   ]);
 }
 
+function langsOf(content: SitemapContent | undefined): Lang[] {
+  if (!content) return [...SITE_LANGS];
+  const translation: PageTranslation = { title: content.title, body: content.body };
+  return indexableLangs(translation);
+}
+
+/** 不含前綴的路徑 → 可收錄的語言（中文限定的著陸頁只有中文）。 */
+function langsFor(path: string, content: SitemapContent | undefined): Lang[] {
+  return isZhOnlyPath(path.split("?")[0]) ? ["zh"] : langsOf(content);
+}
+
 export function buildSitemapEntries(src: SitemapSource, today = todayInTaipei()): SitemapEntry[] {
   const pageUpdated = new Map<string, Ts[]>();
   const add = (slug: string, v: Ts) => {
@@ -112,6 +143,17 @@ export function buildSitemapEntries(src: SitemapSource, today = todayInTaipei())
     curated: [src.curatedLatest],
   };
 
+  // 固定頁的翻譯判斷：pages 列（頁首標題、介紹、描述）＋該頁所有區塊。
+  const pageContent = new Map<string, SitemapContent>();
+  for (const p of src.pages) {
+    if (p.content) pageContent.set(p.slug, { title: p.content.title, body: [...p.content.body] });
+  }
+  for (const part of src.pageParts) {
+    const c = pageContent.get(part.pageSlug);
+    if (c && part.value) c.body.push(part.value);
+  }
+  const staticLangs = (slug: string) => langsOf(pageContent.get(slug));
+
   const entries: SitemapEntry[] = [];
   for (const s of STATIC_PAGES) {
     entries.push({
@@ -120,37 +162,52 @@ export function buildSitemapEntries(src: SitemapSource, today = todayInTaipei())
         ...s.pageSlugs.flatMap((slug) => pageUpdated.get(slug) ?? []),
         ...(s.extra ? extras[s.extra] : []),
       ]),
+      langs: staticLangs(s.pageSlugs[0]),
     });
   }
 
   // 選物：/shop（商品分頁）與 /shop?tab=publications（地方刊物展）
-  entries.push({ path: "/shop", lastmod: latestOf(src.products.map((p) => p.updatedAt)) });
+  entries.push({
+    path: "/shop",
+    lastmod: latestOf(src.products.map((p) => p.updatedAt)),
+    langs: staticLangs("shop"),
+  });
   entries.push({
     path: "/shop?tab=publications",
     lastmod: latestOf([
       src.publicationsLatest,
       ...src.products.filter((p) => p.slug.startsWith("pub-")).map((p) => p.updatedAt),
     ]),
+    langs: staticLangs("publications"),
   });
 
   // 活動（含著陸頁：/events/kungtung 等靜態路由的 slug 跟活動列相同，sitemapXml 會去重）
+  const eventLangs = new Map<string, Lang[]>();
   for (const e of src.events) {
     const slug = e.slug.trim();
-    if (slug) entries.push({ path: `/events/${slug}`, lastmod: eventLastmod(e, today) });
+    if (!slug) continue;
+    const path = `/events/${slug}`;
+    const langs = langsFor(path, e.content);
+    eventLangs.set(path, langs);
+    entries.push({ path, lastmod: eventLastmod(e, today), langs });
   }
-  for (const path of LANDING_SUBPAGES) entries.push({ path });
+  for (const path of LANDING_SUBPAGES) entries.push({ path, langs: langsFor(path, undefined) });
 
   // 策旅：卡片指著站內頁面的才列（外部網站不是我們的網址）。不帶 lastmod（見檔頭）。
+  // 語言跟著那一頁自己的那一筆（活動頁）；不是活動頁 → 依路徑判斷。
   for (const j of src.journeys) {
     const url = j.externalUrl.trim();
-    if (url.startsWith("/") && !url.startsWith("//")) entries.push({ path: url.split("#")[0] });
+    if (!url.startsWith("/") || url.startsWith("//")) continue;
+    const path = url.split("#")[0];
+    entries.push({ path, langs: eventLangs.get(path) ?? langsFor(path, undefined) });
   }
 
   // 商品：選物與刊物。活動票券（event-*／journey）不另列——它們的主頁是 /events/<slug>。
   for (const p of src.products) {
     const slug = p.slug.trim();
     if (!slug || p.productType === "event" || p.productType === "journey") continue;
-    entries.push({ path: `/shop/${slug}`, lastmod: p.updatedAt ?? null });
+    const path = `/shop/${slug}`;
+    entries.push({ path, lastmod: p.updatedAt ?? null, langs: langsFor(path, p.content) });
   }
 
   return entries;
