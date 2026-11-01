@@ -658,7 +658,7 @@ export function Itinerary() {
               <p className="kt-eyebrow">DAY 03 / 12.06（日）</p>
               <h3>帶著海岸的光，回到日常。</h3>
               <p className="kt-body-copy">
-                沿海岸北行，在牧場與海景餐桌之間停留，讓三天的相遇慢慢沉澱。
+                在牧場與海景餐桌之間停留，再走進馬蘭教堂，讓三天的相遇慢慢沉澱。
               </p>
             </div>
             <ol>
@@ -679,12 +679,12 @@ export function Itinerary() {
                 <span>里漾餐廳 Lyang・海景秘境小餐館午餐</span>
               </li>
               <li>
-                <time>14:40</time>
-                <span>專車前往玉里火車站</span>
+                <time>14:00</time>
+                <span>馬蘭教堂</span>
               </li>
               <li>
-                <time>16:13</time>
-                <span>建議台鐵431自強號：玉里16:13 → 台北19:49</span>
+                <time>15:30</time>
+                <span>專車前往台東火車站（建議台鐵439自強號：台東16:55 → 台北21:34）</span>
               </li>
             </ol>
           </article>
@@ -692,7 +692,7 @@ export function Itinerary() {
         <div className="kt-transport-note">
           <p className="kt-transport-title">台北-台東出發的朋友：</p>
           <p className="kt-body-copy">
-            去程建議台鐵420、回程建議台鐵431，列車時刻僅供參考，請自行核對最新時刻與訂票。
+            去程建議台鐵420、回程建議台鐵439，列車時刻僅供參考，請自行核對最新時刻與訂票。
           </p>
         </div>
         <p className="kt-itinerary-note">講座主講與行程內容以實際確認為準。</p>
@@ -1068,7 +1068,7 @@ export function Faq() {
               <span aria-hidden="true">＋</span>
             </summary>
             <p>
-              包含台東火車站往返及行程安排的接駁服務。往返台東的火車、飛機或自行開車費用敬請自理；去程建議台鐵420、回程建議台鐵431，列車時刻僅供參考，請自行核對最新時刻與訂票。
+              包含台東火車站往返及行程安排的接駁服務。往返台東的火車、飛機或自行開車費用敬請自理；去程建議台鐵420、回程建議台鐵439，列車時刻僅供參考，請自行核對最新時刻與訂票。
             </p>
           </details>
           <details>
