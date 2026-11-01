@@ -56,6 +56,12 @@ export function SiteHeader({ bookingClosed }: { bookingClosed: boolean }) {
           三日旅程
         </a>
         <a
+          href="#stay"
+          className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary underline-offset-4 hover:underline h-9 px-4 py-2"
+        >
+          旅宿
+        </a>
+        <a
           href="#price"
           className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-primary underline-offset-4 hover:underline h-9 px-4 py-2"
         >
@@ -737,133 +743,249 @@ export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
   );
 }
 
+/**
+ * 「空間與餐桌」（參考站原有的敘事段）＋緊接在後的「旅宿資訊」（Stay）。
+ * Stay 由這裡一起輸出，路由檔不必多掛一個元件。
+ */
 export function Space() {
   return (
-    <section id="space" className="kt-section-band kt-space-band">
-      <div className="kt-editorial-container">
-        <p className="kt-eyebrow">STAY & TASTE / 空間與餐桌</p>
-        <h2 className="kt-section-title mb-12">
-          在馥自然，
-          <br />
-          感受生活的款待。
-        </h2>
-        <div className="kt-space-content">
-          {"          "}
-          <div className="grid items-center gap-10 md:grid-cols-2 md:gap-16">
-            <div className="space-y-6">
-              <img
-                src={IMG["funature-exterior"]}
-                alt="馥自然人文空間的清水模建築外觀"
-                loading="lazy"
-                className="w-full object-cover"
-              />
-              <div className="grid grid-cols-2 gap-4">
+    <>
+      <section id="space" className="kt-section-band kt-space-band">
+        <div className="kt-editorial-container">
+          <p className="kt-eyebrow">STAY & TASTE / 空間與餐桌</p>
+          <h2 className="kt-section-title mb-12">
+            在馥自然，
+            <br />
+            感受生活的款待。
+          </h2>
+          <div className="kt-space-content">
+            {"          "}
+            <div className="grid items-center gap-10 md:grid-cols-2 md:gap-16">
+              <div className="space-y-6">
                 <img
-                  src={IMG["funature-room"]}
-                  alt="馥自然人文空間臨海客房"
+                  src={IMG["funature-exterior"]}
+                  alt="馥自然人文空間的清水模建築外觀"
                   loading="lazy"
-                  className="aspect-[4/3] w-full object-cover"
+                  className="w-full object-cover"
                 />
+                <div className="grid grid-cols-2 gap-4">
+                  <img
+                    src={IMG["funature-room"]}
+                    alt="馥自然人文空間臨海客房"
+                    loading="lazy"
+                    className="aspect-[4/3] w-full object-cover"
+                  />
+                  <img
+                    src={IMG["funature-books"]}
+                    alt="馥自然館內的書牆與選品"
+                    loading="lazy"
+                    className="aspect-[4/3] w-full object-cover"
+                  />
+                </div>
+              </div>
+              <div>
+                <p className="text-sm text-primary">旅程的家</p>
+                <h2 className="mt-4 text-3xl">INNTERVAL 馥自然人文空間</h2>
+                <p className="mt-6 leading-loose text-muted-foreground">
+                  山海間的靜謐之所。隱於台東東河鄉的山海之間，鄰近江賢二藝術園區，
+                  以當地的自然與文化為靈感，把藝術、設計與生活緊緊織在一起。
+                  清水模與木質交織的空間，名字取自樂譜裡的「休止符」——
+                  在這裡走動、停頓、望海、閱讀，讓時間慢下來，與大地一起呼吸。
+                </p>
+                <p className="mt-4 leading-loose text-muted-foreground">
+                  客房以原民聖歌命名：塔米利是誕生與祝福，阿努安意為「一起唱歌」，
+                  亞維尤是「日出之地」的祝福歌——每個名字，都是一段迎向晨光的歌。
+                </p>
+                <p className="mt-4 leading-loose text-muted-foreground">
+                  館內的「馥選生活」，是一座藏在旅宿裡的選品店；清晨則有以當地時令食材
+                  入饌的款待，手工烘焙的麵包與慢火熬煮的湯品，用土地的溫度喚醒一天。
+                </p>
+              </div>
+            </div>
+            <div className="grid items-center gap-10 md:grid-cols-[minmax(0,260px)_1fr] md:gap-16">
+              <img
+                src={IMG["funature-chef"]}
+                alt="山海料理人莫子"
+                loading="lazy"
+                className="mx-auto w-full max-w-[260px] object-cover"
+              />
+              <div>
+                <p className="text-sm text-primary">主廚介紹 Chef</p>
+                <h2 className="mt-4 text-3xl">山海料理人｜莫子</h2>
+                <p className="mt-6 leading-loose text-muted-foreground">
+                  莫子是來自台東達谷梵部落的阿美族料理人。2016 至 2020
+                  年，莫子在法國安古蘭（Angoulême） 跟隨法國主廚 Reine Soumagnac 工作擔任二廚；2018
+                  年創立「莫子醬物所」， 以在地食材結合法式手法，說出不一樣的土地故事。
+                </p>
+                <ul className="mt-8 space-y-4 border-l border-primary/30 pl-5">
+                  <li>
+                    <span className="text-xs text-primary">2018</span>
+                    <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
+                      創立「莫子醬物所」餐廳外燴團隊，擔任負責人與主廚；同年餐廳獲法國在台協會認證，為全台
+                      17 家之一。
+                    </p>
+                  </li>
+                  <li>
+                    <span className="text-xs text-primary">2019</span>
+                    <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
+                      獲選法國「味覺法國」活動餐廳。
+                    </p>
+                  </li>
+                  <li>
+                    <span className="text-xs text-primary">2023</span>
+                    <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
+                      獲選江振誠「500 盤」餐廳，擔任主廚。
+                    </p>
+                  </li>
+                  <li>
+                    <span className="text-xs text-primary">2024</span>
+                    <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
+                      擔任文化部港口部落「海社會」計畫主廚，並獲台灣生態飲食設計中心邀請，
+                      成為「彰化西海岸永續」生態廚師；同年為全聯系列廣告擔任食物設計。
+                    </p>
+                  </li>
+                  <li>
+                    <span className="text-xs text-primary">2025</span>
+                    <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
+                      以遊艇外燴與私廚為主要業務，持續探索山海之間的風味。
+                    </p>
+                  </li>
+                </ul>
+                <p className="mt-6 leading-loose text-muted-foreground">
+                  擅長風味的堆疊、盤飾變化與人文訴說，一點一滴注入每一道料理。
+                  第一晚的馥自然山海套餐，便出自莫子之手。
+                </p>
                 <img
-                  src={IMG["funature-books"]}
-                  alt="馥自然館內的書牆與選品"
+                  src={IMG["funature-dish"]}
+                  alt="莫子主廚的山海料理"
                   loading="lazy"
-                  className="aspect-[4/3] w-full object-cover"
+                  className="mt-8 w-full object-cover"
                 />
               </div>
             </div>
-            <div>
-              <p className="text-sm text-primary">旅程的家</p>
-              <h2 className="mt-4 text-3xl">INNTERVAL 馥自然人文空間</h2>
-              <p className="mt-6 leading-loose text-muted-foreground">
-                山海間的靜謐之所。隱於台東東河鄉的山海之間，鄰近江賢二藝術園區，
-                以當地的自然與文化為靈感，把藝術、設計與生活緊緊織在一起。
-                清水模與木質交織的空間，名字取自樂譜裡的「休止符」——
-                在這裡走動、停頓、望海、閱讀，讓時間慢下來，與大地一起呼吸。
-              </p>
-              <p className="mt-4 leading-loose text-muted-foreground">
-                客房以阿美族聖歌命名：塔米利是誕生與祝福，阿努安意為「一起唱歌」，
-                亞維尤是「日出之地」的祝福歌——每個名字，都是一段迎向晨光的歌。
-              </p>
-              <p className="mt-4 leading-loose text-muted-foreground">
-                館內的「馥選生活」，是一座藏在旅宿裡的選品店；清晨則有以當地時令食材
-                入饌的款待，手工烘焙的麵包與慢火熬煮的湯品，用土地的溫度喚醒一天。
-              </p>
-            </div>
           </div>
-          <div className="grid items-center gap-10 md:grid-cols-[minmax(0,260px)_1fr] md:gap-16">
-            <img
-              src={IMG["funature-chef"]}
-              alt="山海料理人莫子"
-              loading="lazy"
-              className="mx-auto w-full max-w-[260px] object-cover"
-            />
-            <div>
-              <p className="text-sm text-primary">主廚介紹 Chef</p>
-              <h2 className="mt-4 text-3xl">山海料理人｜莫子</h2>
-              <p className="mt-6 leading-loose text-muted-foreground">
-                莫子是來自台東達谷梵部落的阿美族料理人。2016 至 2020
-                年，莫子在法國安古蘭（Angoulême） 跟隨法國主廚 Reine Soumagnac 工作擔任二廚；2018
-                年創立「莫子醬物所」， 以在地食材結合法式手法，說出不一樣的土地故事。
+          <figure className="kt-gift-layout">
+            <img src={IMG["funature-slippers"]} alt="INDOSOLE 環保拖鞋贈禮實拍" loading="lazy" />
+            <figcaption>
+              <p className="kt-eyebrow">A GIFT FOR EVERYDAY / 帶回日常的贈禮</p>
+              <h3 className="text-2xl mt-4">INDOSOLE｜環保拖鞋</h3>
+              <p className="kt-body-copy">
+                以回收廢棄輪胎製作鞋底的品牌。響應環保，為旅客準備品牌拖鞋（價值
+                NT$1,680），陪你走過旅程，也回到日常。
               </p>
-              <ul className="mt-8 space-y-4 border-l border-primary/30 pl-5">
-                <li>
-                  <span className="text-xs text-primary">2018</span>
-                  <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-                    創立「莫子醬物所」餐廳外燴團隊，擔任負責人與主廚；同年餐廳獲法國在台協會認證，為全台
-                    17 家之一。
-                  </p>
-                </li>
-                <li>
-                  <span className="text-xs text-primary">2019</span>
-                  <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-                    獲選法國「味覺法國」活動餐廳。
-                  </p>
-                </li>
-                <li>
-                  <span className="text-xs text-primary">2023</span>
-                  <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-                    獲選江振誠「500 盤」餐廳，擔任主廚。
-                  </p>
-                </li>
-                <li>
-                  <span className="text-xs text-primary">2024</span>
-                  <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-                    擔任文化部港口部落「海社會」計畫主廚，並獲台灣生態飲食設計中心邀請，
-                    成為「彰化西海岸永續」生態廚師；同年為全聯系列廣告擔任食物設計。
-                  </p>
-                </li>
-                <li>
-                  <span className="text-xs text-primary">2025</span>
-                  <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-                    以遊艇外燴與私廚為主要業務，持續探索山海之間的風味。
-                  </p>
-                </li>
-              </ul>
-              <p className="mt-6 leading-loose text-muted-foreground">
-                擅長風味的堆疊、盤飾變化與人文訴說，一點一滴注入每一道料理。
-                第一晚的馥自然山海套餐，便出自莫子之手。
-              </p>
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+      <Stay />
+    </>
+  );
+}
+
+/**
+ * 旅宿資訊（2026-11-01 業主要求「把旅宿的資訊加上去」）。
+ *
+ * 每一句都要能在出處找到，官網沒寫的（標準入退房時間、離火車站距離、禁菸、寵物、停車、
+ * 房內設備）一律不寫，等業主補：
+ * - 地址、五間房型與名稱、「需自行攜帶一次性備品」、早餐（房客免費、當地時令食材、
+ *   手工烘焙麵包、慢火熬煮的湯品、主廚依時節調整菜單）、「馥選生活」選品：
+ *   https://www.funature.com.tw/（單頁官網，2026-11-01 查證）
+ * - 入住 12/04 17:30、退房 12/06 09:30、兩天早餐、火車站接駁、兩人一房：本頁行程表與費用說明。
+ * 圖片：funature-lounge-sea ＝官網首頁輪播 ab74d9_a7b0ad00…；funature-breakfast ＝官網
+ * 「晨曦中的款待」ab74d9_692f51e8…。
+ */
+export function Stay() {
+  return (
+    <section id="stay" className="kt-section-band kt-stay-band" aria-labelledby="stay-title">
+      <div className="kt-editorial-container">
+        <p className="kt-eyebrow">WHERE YOU STAY / 旅宿資訊</p>
+        <h2 id="stay-title" className="kt-section-title">
+          兩晚的落腳處，
+          <br />
+          就在東河的山海之間。
+        </h2>
+        <p className="kt-body-copy kt-stay-lead">
+          這趟旅程的兩晚，都住在 INNTERVAL
+          馥自然人文空間——隱於台東東河鄉山海之間，以當地自然與文化為靈感，把藝術、設計與生活放進同一個空間。
+        </p>
+        <div className="kt-stay-layout">
+          <div className="kt-stay-photos">
+            <figure>
               <img
-                src={IMG["funature-dish"]}
-                alt="莫子主廚的山海料理"
+                src={IMG.funature_lounge_sea}
+                alt="馥自然館內面海的長窗與書架，旅人坐在窗前看海"
+                width="1600"
+                height="1066"
                 loading="lazy"
-                className="mt-8 w-full object-cover"
               />
-            </div>
+            </figure>
+            <figure>
+              <img
+                src={IMG.funature_breakfast}
+                alt="馥自然的早餐：手工麵包、沙拉、優格與時令配菜"
+                width="1600"
+                height="1066"
+                loading="lazy"
+              />
+            </figure>
+          </div>
+          <div>
+            <dl className="kt-stay-facts">
+              <div>
+                <dt>地址與交通</dt>
+                <dd>
+                  台東縣東河鄉隆昌村七里橋一之8號。旅程含台東火車站往返與行程接駁：12/04（五）16:30
+                  於台東火車站接駁，一同前往馥自然。
+                </dd>
+              </div>
+              <div>
+                <dt>房型與設施</dt>
+                <dd>
+                  館內五間客房皆以原民聖歌命名：四間景觀雙人房（其中塔米利附陽台）與一間景觀四人房；館內另有「馥選生活」選品空間。本次旅程以兩人一房為安排基準。
+                </dd>
+              </div>
+              <div>
+                <dt>入住與退房</dt>
+                <dd>12/04（五）17:30 入住；12/06（日）09:30 退房，隨後專車出發。</dd>
+              </div>
+              <div>
+                <dt>早餐</dt>
+                <dd>
+                  12/05、12/06
+                  兩天早餐在館內享用：以當地時令食材入饌，從手工烘焙的麵包到慢火熬煮的湯品，主廚會依時節特產與當日鮮貨調整菜單。
+                </dd>
+              </div>
+            </dl>
+            <p className="kt-stay-note">
+              <strong>行前提醒</strong>
+              館方提醒：本館需自行攜帶一次性備品，請先備妥個人盥洗用品。
+            </p>
+            <a
+              href="https://www.funature.com.tw/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="kt-stay-link"
+            >
+              前往馥自然官網
+              <span className="sr-only">（另開新分頁）</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M7 7h10v10" />
+                <path d="M7 17 17 7" />
+              </svg>
+            </a>
           </div>
         </div>
-        <figure className="kt-gift-layout">
-          <img src={IMG["funature-slippers"]} alt="INDOSOLE 環保拖鞋贈禮實拍" loading="lazy" />
-          <figcaption>
-            <p className="kt-eyebrow">A GIFT FOR EVERYDAY / 帶回日常的贈禮</p>
-            <h3 className="text-2xl mt-4">INDOSOLE｜環保拖鞋</h3>
-            <p className="kt-body-copy">
-              以回收廢棄輪胎製作鞋底的品牌。響應環保，為旅客準備品牌拖鞋（價值
-              NT$1,680），陪你走過旅程，也回到日常。
-            </p>
-          </figcaption>
-        </figure>
       </div>
     </section>
   );

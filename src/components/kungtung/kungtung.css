@@ -1877,3 +1877,140 @@
     opacity: 0;
   }
 }
+
+/* ── 旅宿資訊（#stay，2026-11-01 新增）：接在「空間與餐桌」之後、費用之前。
+ * 沿用本頁的色票與分隔線語彙（accent 細線、secondary 底的提醒框、serif 小標）。 */
+.kt-root .kt-stay-band {
+  border-bottom: 1px solid var(--border);
+}
+.kt-root .kt-stay-lead {
+  max-width: 44rem;
+  font-size: 15px;
+}
+.kt-root .kt-stay-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  align-items: start;
+  gap: 64px;
+  margin-top: 48px;
+  display: grid;
+}
+.kt-root .kt-stay-photos {
+  gap: 16px;
+  display: grid;
+}
+.kt-root .kt-stay-photos figure {
+  margin: 0;
+}
+.kt-root .kt-stay-photos img {
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.kt-root .kt-stay-photos figure + figure {
+  width: 72%;
+  margin-left: auto;
+}
+.kt-root .kt-stay-facts {
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+}
+.kt-root .kt-stay-facts > div {
+  border-top: 1px solid var(--accent);
+  grid-template-columns: 7.5em minmax(0, 1fr);
+  gap: 20px;
+  padding: 18px 0;
+  display: grid;
+}
+.kt-root .kt-stay-facts > div + div {
+  border-top-color: var(--border);
+}
+.kt-root .kt-stay-facts dt {
+  font-family: var(--font-serif);
+  color: var(--primary);
+  font-size: 16px;
+  line-height: 1.8;
+}
+.kt-root .kt-stay-facts dd {
+  color: var(--muted-foreground);
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.9;
+}
+.kt-root .kt-stay-note {
+  border-left: 3px solid var(--accent);
+  background: var(--secondary);
+  color: var(--foreground);
+  margin-top: 24px;
+  padding: 14px 18px;
+  font-size: 14px;
+  line-height: 1.9;
+}
+.kt-root .kt-stay-note strong {
+  font-family: var(--font-serif);
+  margin-right: 10px;
+  font-weight: 400;
+}
+.kt-root .kt-stay-link {
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  margin-top: 28px;
+  padding-inline: 18px;
+  font-size: 14px;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+  display: inline-flex;
+}
+.kt-root .kt-stay-link svg {
+  width: 16px;
+  height: 16px;
+}
+.kt-root .kt-stay-link:hover {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.kt-root .kt-stay-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+@media (width<=900px) {
+  .kt-root .kt-stay-layout {
+    grid-template-columns: 1fr;
+    gap: 36px;
+    margin-top: 36px;
+  }
+  .kt-root .kt-stay-photos {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .kt-root .kt-stay-photos figure + figure {
+    width: auto;
+  }
+  .kt-root .kt-stay-photos img {
+    aspect-ratio: 4 / 3;
+  }
+}
+@media (width<=767px) {
+  .kt-root .kt-stay-lead {
+    font-size: 14px;
+  }
+  .kt-root .kt-stay-facts > div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 16px 0;
+  }
+  .kt-root .kt-stay-facts dt {
+    font-size: 15px;
+  }
+  .kt-root .kt-stay-note {
+    padding: 12px 14px;
+  }
+  .kt-root .kt-stay-note strong {
+    display: block;
+  }
+}

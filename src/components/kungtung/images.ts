@@ -1,5 +1,5 @@
 /**
- * 《范毅舜公東教堂文化之旅》著陸頁用到的圖（Storage 15 張＋public/kungtung 3 張）。
+ * 《范毅舜公東教堂文化之旅》著陸頁用到的圖（Storage 15 張＋public/kungtung 5 張）。
  *
  * Storage 的是業主 Lovable 參考站（www.kungtung.intervalbooks.tw）上的原圖，2026-10-29 下載、
  * 轉成 WebP（長邊 ≤1600px）後經站上 MCP 的 upload_image_from_url 存進 site-images bucket，
@@ -36,6 +36,10 @@ const LOCAL = {
   walk_into_cathedral_cover: "/kungtung/walk-into-cathedral-cover.webp",
   coastal_range_swiss_spread: "/kungtung/coastal-range-swiss-cover.webp",
   yetaixi_cover: "/kungtung/yetaixi-cover.webp",
+  // 2026-11-01「旅宿資訊」區塊用：取自馥自然官網 www.funature.com.tw（業主合作空間）的原圖，
+  // 轉 WebP（長邊 1600px、≤300KB），不熱連 wixstatic。來源見 MainSections.tsx 的 Stay()。
+  funature_lounge_sea: "/kungtung/funature-lounge-sea.webp",
+  funature_breakfast: "/kungtung/funature-breakfast.webp",
 } as const;
 
 export type KungtungImage = keyof typeof KEYS | keyof typeof LOCAL;
