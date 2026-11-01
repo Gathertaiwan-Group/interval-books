@@ -5,6 +5,8 @@ import { PastShelf } from "@/components/PastShelf";
 import { linkedEventFor, splitJourneys } from "@/lib/past-shelf";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
+import { fitDescription } from "@/lib/seo/core";
+import { pageMeta } from "@/lib/seo/head";
 import { fetchJourneyEventDates, fetchJourneys, fetchPage, pageText, eyebrowOf } from "@/lib/cms";
 import { CARD, CARD_HOVER, featureLayout } from "@/lib/feature-layout";
 import { useSiteContent } from "@/lib/site-content";
@@ -66,13 +68,13 @@ export const Route = createFileRoute("/journeys")({
   head: ({ loaderData }) => {
     const p = pageText(loaderData?.page ?? null);
     return {
-      meta: [
-        { title: p.metaTitle(PAGE.metaTitle).zh },
-        { name: "description", content: p.metaDescription(PAGE.metaDescription).zh },
-        { property: "og:title", content: p.ogTitle(PAGE.title).zh },
-        { property: "og:description", content: p.metaDescription(PAGE.metaDescription).zh },
-        { property: "og:image", content: imageFor(loaderData?.page?.ogImageKey, journeyImg) },
-      ],
+      meta: pageMeta({
+        title: p.metaTitle(PAGE.metaTitle),
+        description: fitDescription(p.metaDescription(PAGE.metaDescription)),
+        ogTitle: p.ogTitle(PAGE.title),
+        image: imageFor(loaderData?.page?.ogImageKey, journeyImg),
+        type: "website",
+      }),
     };
   },
   component: Journeys,
@@ -90,7 +92,7 @@ function Journeys() {
 
   useDocumentMeta({
     title: p.metaTitle(PAGE.metaTitle),
-    description: p.metaDescription(PAGE.metaDescription),
+    description: fitDescription(p.metaDescription(PAGE.metaDescription)),
     ogTitle: p.ogTitle(PAGE.title),
     ogImage: imageFor(page?.ogImageKey, journeyImg),
   });
@@ -120,10 +122,10 @@ function Journeys() {
               <>
                 {/* journeys 表沒有 image_key；封面用卡片指著的那場活動的 events.image_key
                   （與首頁精選、下方過往策旅同一個來源），指不到或沒設圖才用固定意象圖。
-                  標題就在卡片上，所以圖當裝飾（alt=""）。 */}
+                  alt 用策旅名稱（2026-11 SEO 健檢 M6：圖片搜尋與無障礙都需要語意）。 */}
                 <CoverImage
                   src={imageFor(linkedEventFor(j.externalUrl, journeyEvents)?.imageKey, journeyImg)}
-                  alt=""
+                  alt={t(j.title)}
                   loading="lazy"
                   className={`aspect-[4/3] ${layout.image}`}
                   imgClassName="transition-transform duration-500 group-hover:scale-[1.03]"
@@ -132,11 +134,11 @@ function Journeys() {
                   <p className="eyebrow text-sm tracking-widest">
                     {t(j.days)} ／ {t(j.theme)}
                   </p>
-                  <h3
+                  <h2
                     className={`display mt-3 text-2xl leading-snug whitespace-pre-line ${layout.title}`}
                   >
                     {t(j.title)}
-                  </h3>
+                  </h2>
                   <p
                     className={`mt-4 text-sm leading-relaxed text-foreground/75 flex-1 ${layout.summary}`}
                   >

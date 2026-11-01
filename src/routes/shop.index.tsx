@@ -24,6 +24,8 @@ import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { eyebrowOf, fetchCuratedThemes, fetchPages, pageText } from "@/lib/cms";
 import { imageFor } from "@/lib/images";
+import { fitDescription, shopTabOf, type ShopIndexableTab } from "@/lib/seo/core";
+import { pageMeta } from "@/lib/seo/head";
 import { fetchPublicationsForList } from "@/lib/publications";
 import { fetchActiveProductsForList } from "@/lib/shop";
 import curatedImg from "@/assets/curated-objects.jpg";
@@ -55,7 +57,38 @@ const PAGE = {
   tabPublications: { zh: "地方刊物", en: "Local Publications", ja: "地域の刊行物" },
   tabCurated: { zh: "主理人的選品", en: "Curated", ja: "店主の選品" },
   tabsLabel: { zh: "選物分頁", en: "Selection sections", ja: "セレクトの分類" },
+  /**
+   * `?tab=publications`／`?tab=curated` 的 title 與描述（2026-11 SEO 健檢 H3）。
+   * 兩個分頁是不同的內容（126 本地方刊物、主理人的主題櫥窗），所以各自是一個可收錄的頁面，
+   * canonical 指向自己（見 src/lib/seo/core.ts 的 canonicalUrl()）。pages 表有對應的列時
+   * （'publications'／'curated'）以後台的為準，這裡是退路。
+   */
+  publicationsMetaTitle: {
+    zh: "地方刊物 Local Publications｜小時光書店 Interval Books",
+    en: "Local Publications｜Interval Books",
+    ja: "地域の刊行物｜小時光書店 Interval Books",
+  },
+  publicationsMetaDescription: {
+    zh: "小時光書店的地方刊物展：從基隆的漁村到日本的山間小鎮，一個地方怎麼被自己的人寫下來。台灣與日本的地方刊物依地區整理，部分可線上選購，其餘在店內展閱。",
+    en: "The local-publications show at Interval Books: from a fishing village in Keelung to small mountain towns in Japan — how a place gets written down by its own people. Some titles can be ordered online; the rest are on display in the store.",
+    ja: "小時光書店の地域の刊行物展。基隆の漁村から日本の山あいの町まで、土地がその土地の人によって書き残される姿を集めました。一部はオンラインで購入でき、その他は店頭でご覧いただけます。",
+  },
+  curatedMetaTitle: {
+    zh: "主理人的選品 Curated｜小時光書店 Interval Books",
+    en: "The Owner's Curated Window｜Interval Books",
+    ja: "店主の選品｜小時光書店 Interval Books",
+  },
+  curatedMetaDescription: {
+    zh: "三個主題櫥窗：地方風土、器物與陶、茶與日常。展示型呈現，請至店或來信詢問。",
+    en: "Three themed windows — local terroir, vessels and clay, tea and the everyday. Displayed rather than listed; visit the store or write to us to ask.",
+    ja: "三つのテーマのウィンドウ——土地の風土、器と陶、茶と日常。展示形式のため、店頭またはメールでお問い合わせください。",
+  },
 };
+
+/** 依目前分頁挑一個值（商品分頁＝/shop 本身）。 */
+function byTab<T>(tab: ShopIndexableTab | null, products: T, publications: T, curated: T): T {
+  return tab === "publications" ? publications : tab === "curated" ? curated : products;
+}
 
 export const SHOP_TABS = ["products", "publications", "curated"] as const;
 export type ShopTab = (typeof SHOP_TABS)[number];
@@ -116,18 +149,31 @@ export const Route = createFileRoute("/shop/")({
       curatedThemes,
     };
   },
-  head: ({ loaderData }) => {
+  head: ({ loaderData, match }) => {
+    const tab = shopTabOf(match.search);
     const p = pageText(loaderData?.page ?? null);
+    const pub = pageText(loaderData?.publicationsPage ?? null);
+    const cur = pageText(loaderData?.curatedPage ?? null);
     const ogImg = imageFor(loaderData?.page?.ogImageKey, curatedImg);
     return {
-      meta: [
-        { title: p.metaTitle(PAGE.metaTitle).zh },
-        { name: "description", content: p.metaDescription(PAGE.metaDescription).zh },
-        { property: "og:title", content: p.ogTitle(PAGE.title).zh },
-        { property: "og:description", content: p.metaDescription(PAGE.metaDescription).zh },
-        { property: "og:image", content: ogImg },
-        { name: "twitter:image", content: ogImg },
-      ],
+      meta: pageMeta({
+        title: byTab(
+          tab,
+          p.metaTitle(PAGE.metaTitle),
+          pub.metaTitle(PAGE.publicationsMetaTitle),
+          cur.metaTitle(PAGE.curatedMetaTitle),
+        ),
+        description: fitDescription(
+          byTab(
+            tab,
+            p.metaDescription(PAGE.metaDescription),
+            pub.metaDescription(PAGE.publicationsMetaDescription),
+            cur.metaDescription(PAGE.curatedMetaDescription),
+          ),
+        ),
+        image: ogImg,
+        type: "website",
+      }),
     };
   },
   component: Shop,
@@ -142,10 +188,24 @@ function Shop() {
   const p = pageText(page);
   const heroSrc = imageFor(page?.ogImageKey, curatedImg);
 
+  const seoTab = shopTabOf({ tab });
+  const pubText = pageText(publicationsPage);
+  const curText = pageText(curatedPage);
   useDocumentMeta({
-    title: p.metaTitle(PAGE.metaTitle),
-    description: p.metaDescription(PAGE.metaDescription),
-    ogTitle: p.ogTitle(PAGE.title),
+    title: byTab(
+      seoTab,
+      p.metaTitle(PAGE.metaTitle),
+      pubText.metaTitle(PAGE.publicationsMetaTitle),
+      curText.metaTitle(PAGE.curatedMetaTitle),
+    ),
+    description: fitDescription(
+      byTab(
+        seoTab,
+        p.metaDescription(PAGE.metaDescription),
+        pubText.metaDescription(PAGE.publicationsMetaDescription),
+        curText.metaDescription(PAGE.curatedMetaDescription),
+      ),
+    ),
     ogImage: heroSrc,
   });
 

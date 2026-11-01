@@ -18,6 +18,9 @@ import {
 import { EVENT_LIST_FIELDS } from "@/lib/event-blocks";
 import { imageFor } from "@/lib/images";
 import { fetchActiveProductForEventSlug, type ShopProduct } from "@/lib/shop";
+import { pageMeta } from "@/lib/seo/head";
+import { eventSeo } from "@/lib/seo/pages";
+import { unavailableHeaders } from "@/lib/seo/status";
 import { useSiteContent } from "@/lib/site-content";
 
 /**
@@ -181,19 +184,24 @@ export const Route = createFileRoute("/events/$slug")({
 
     return { event, unavailable, categories, booking };
   },
+  // SEO（2026-11 健檢）：title「{活動名}｜{日期}｜小時光書店」、描述取摘要＋內文、
+  // 分享圖用活動封面、JSON-LD 輸出 Event（日期地點價格來自售票商品的場次）與麵包屑。
+  // 組裝邏輯在 src/lib/seo/pages.ts#eventSeo，元件裡的 useDocumentMeta 用同一支。
   head: ({ loaderData }) => {
-    const event = loaderData?.event ?? null;
-    const title = metaOr(event?.title, PAGE.metaTitle);
-    const description = metaOr(event?.summary, PAGE.metaDescription);
+    const seo = eventSeo(loaderData?.event ?? null, loaderData?.booking.product ?? null, PAGE);
     return {
-      meta: [
-        { title: title.zh },
-        { name: "description", content: description.zh },
-        { property: "og:title", content: title.zh },
-        { property: "og:description", content: description.zh },
-      ],
+      meta: pageMeta({
+        title: seo.title,
+        description: seo.description,
+        image: seo.image,
+        type: "article",
+        jsonLd: seo.jsonLd,
+      }),
     };
   },
+  // 讀不到活動（不是查無此活動）→ 503 + Retry-After，不讓搜尋引擎把空殼當成正式內容。
+  headers: ({ loaderData }) =>
+    unavailableHeaders(Boolean(loaderData?.unavailable && !loaderData?.event)),
   component: EventDetail,
 });
 
@@ -250,11 +258,13 @@ function EventDetail() {
   const { event, unavailable, categories, booking } = Route.useLoaderData();
   const { ui } = useSiteContent();
 
+  const seo = eventSeo(event, booking.product, PAGE);
   useDocumentMeta({
-    title: metaOr(event?.title, PAGE.metaTitle),
-    description: metaOr(event?.summary, PAGE.metaDescription),
-    ogTitle: metaOr(event?.title, PAGE.metaTitle),
-    ogDescription: metaOr(event?.summary, PAGE.metaDescription),
+    title: metaOr(seo.title, PAGE.metaTitle),
+    description: metaOr(seo.description, PAGE.metaDescription),
+    ogTitle: metaOr(seo.title, PAGE.metaTitle),
+    ogDescription: metaOr(seo.description, PAGE.metaDescription),
+    ogImage: seo.image ?? undefined,
   });
 
   if (!event) {
@@ -410,7 +420,7 @@ function EventDetail() {
                 <div key={`${key}-${i}`} className="aspect-square overflow-hidden bg-muted">
                   <img
                     src={imageFor(key, "")}
-                    alt=""
+                    alt={`${t(event.title)}（${i + 1}）`}
                     loading="lazy"
                     width={600}
                     height={600}

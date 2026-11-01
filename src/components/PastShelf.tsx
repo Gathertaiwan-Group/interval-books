@@ -70,7 +70,7 @@ function PastCard({ item, badge }: { item: PastShelfItem; badge: string }) {
       {item.image ? (
         <CoverImage
           src={item.image}
-          alt=""
+          alt={item.title}
           loading="lazy"
           className="aspect-[4/3]"
           imgClassName="transition-transform duration-500 group-hover:scale-[1.03]"

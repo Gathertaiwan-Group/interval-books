@@ -6,6 +6,9 @@ import { SessionPicker, SessionList } from "@/components/shop/SessionPicker";
 import { PlanPicker } from "@/components/shop/PlanPicker";
 import { QuantityStepper } from "@/components/shop/ShopBits";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
+import { fitDescription } from "@/lib/seo/core";
+import { pageMeta } from "@/lib/seo/head";
+import { landingEventLd } from "@/lib/seo/pages";
 import { CARD } from "@/lib/feature-layout";
 import {
   directAnySeatsLeft,
@@ -45,9 +48,9 @@ import { fetchActiveProductForEventSlug, type ShopProduct } from "@/lib/shop";
 /** 三語 meta。⚠️ 必須是頂層靜態常數、每一句都是字面值——check-meta.mjs 靜態解析這個物件。 */
 const PAGE = {
   metaTitle: {
-    zh: "城市思享沙龍 #01｜台東，不只是遠方",
-    en: "City Think Salon #01｜Taitung Is Not Just a Distant Place",
-    ja: "都市サロン #01｜台東は、遠い場所であるだけではない",
+    zh: "城市思享沙龍 #01｜台東，不只是遠方｜小時光書店",
+    en: "City Think Salon #01｜Taitung Is Not Just a Distant Place｜Interval Books",
+    ja: "都市サロン #01｜台東は、遠い場所であるだけではない｜小時光書店",
   },
   metaDescription: {
     zh: "2026.9.22 於小時光風土誌書店。藝術、地方創生與一種新的商業生活方式——15 席限定的定向邀請沙龍。",
@@ -182,15 +185,23 @@ export const Route = createFileRoute("/events/city-salon-0922")({
   // reserve_session_seat() → event_registrations。名單因此直接出現在
   // /admin/registrations，不需要為這一場另外做一個後台。
   loader: async () => fetchActiveProductForEventSlug(EVENT_SLUG),
-  head: () => ({
-    meta: [
-      { title: PAGE.metaTitle.zh },
-      { name: "description", content: PAGE.metaDescription.zh },
-      { property: "og:title", content: PAGE.metaTitle.zh },
-      { property: "og:description", content: PAGE.metaDescription.zh },
-      { property: "og:image", content: imageFor(OG_IMAGE_KEY, "") },
-      { name: "twitter:image", content: imageFor(OG_IMAGE_KEY, "") },
-    ],
+  // SEO（2026-11 健檢）：Event JSON-LD 的日期、地點、價格取自售票商品的場次與票種
+  // （與報名區同一份資料），名稱與描述用這一頁的 PAGE 常數。
+  head: ({ loaderData }) => ({
+    meta: pageMeta({
+      title: PAGE.metaTitle,
+      description: fitDescription(PAGE.metaDescription),
+      image: imageFor(OG_IMAGE_KEY, ""),
+      type: "article",
+      jsonLd: landingEventLd({
+        path: "/events/" + EVENT_SLUG,
+        name: "城市思享沙龍 #01｜台東，不只是遠方",
+        description: fitDescription(PAGE.metaDescription).zh,
+        imageKey: OG_IMAGE_KEY,
+        product: loaderData?.product ?? null,
+        performer: null,
+      }),
+    }),
   }),
   component: CitySalon,
 });
@@ -208,9 +219,9 @@ function SectionHead({ eyebrow, title }: { eyebrow: string; title: string }) {
 function CitySalon() {
   useDocumentMeta({
     title: PAGE.metaTitle,
-    description: PAGE.metaDescription,
+    description: fitDescription(PAGE.metaDescription),
     ogTitle: PAGE.metaTitle,
-    ogDescription: PAGE.metaDescription,
+    ogDescription: fitDescription(PAGE.metaDescription),
     // ⚠️ 這裡一定要帶：useDocumentMeta 在沒收到 ogImage 時會**移除**既有的
     //    og:image／twitter:image（見那支 hook 的檔頭）。head() 放好的標籤會在
     //    hydrate 之後被清掉，分享預覽就沒圖了。

@@ -25,6 +25,8 @@ import { PageShell, PageHeader } from "@/components/PageShell";
 import { useLang } from "@/i18n/LanguageContext";
 import type { Lang, Localized } from "@/i18n/types";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
+import { fitDescription } from "@/lib/seo/core";
+import { pageMeta } from "@/lib/seo/head";
 import { fetchCollaborations, fetchPage, pageText, eyebrowOf } from "@/lib/cms";
 import type { PageListEntry } from "@/lib/cms";
 import { CARD } from "@/lib/feature-layout";
@@ -303,13 +305,13 @@ export const Route = createFileRoute("/partnership")({
     const page = loaderData?.page ?? null;
     const p = pageText(page);
     return {
-      meta: [
-        { title: p.metaTitle(PAGE.metaTitle).zh },
-        { name: "description", content: p.metaDescription(PAGE.metaDescription).zh },
-        { property: "og:title", content: p.ogTitle(PAGE.title).zh },
-        { property: "og:description", content: p.metaDescription(PAGE.metaDescription).zh },
-        { property: "og:image", content: imageFor(page?.ogImageKey, exhibitionImg) },
-      ],
+      meta: pageMeta({
+        title: p.metaTitle(PAGE.metaTitle),
+        description: fitDescription(p.metaDescription(PAGE.metaDescription)),
+        ogTitle: p.ogTitle(PAGE.title),
+        image: imageFor(page?.ogImageKey, exhibitionImg),
+        type: "website",
+      }),
     };
   },
   component: Partnership,
@@ -322,7 +324,7 @@ function Partnership() {
 
   useDocumentMeta({
     title: p.metaTitle(PAGE.metaTitle),
-    description: p.metaDescription(PAGE.metaDescription),
+    description: fitDescription(p.metaDescription(PAGE.metaDescription)),
     ogTitle: p.ogTitle(PAGE.title),
     ogImage: imageFor(page?.ogImageKey, exhibitionImg),
   });

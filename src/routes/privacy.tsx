@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageShell, PageHeader } from "@/components/PageShell";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
+import { fitDescription } from "@/lib/seo/core";
+import { pageMeta } from "@/lib/seo/head";
 import { fetchPage, pageText } from "@/lib/cms";
 
 /** Fallback copy — used only when the Supabase read fails. */
@@ -29,10 +31,12 @@ export const Route = createFileRoute("/privacy")({
   head: ({ loaderData }) => {
     const p = pageText(loaderData?.page ?? null);
     return {
-      meta: [
-        { title: p.metaTitle(PAGE.metaTitle).zh },
-        { name: "description", content: p.metaDescription(PAGE.metaDescription).zh },
-      ],
+      meta: pageMeta({
+        title: p.metaTitle(PAGE.metaTitle),
+        description: fitDescription(p.metaDescription(PAGE.metaDescription)),
+        ogTitle: p.ogTitle(PAGE.title),
+        type: "website",
+      }),
     };
   },
   component: Privacy,
@@ -45,7 +49,7 @@ function Privacy() {
 
   useDocumentMeta({
     title: p.metaTitle(PAGE.metaTitle),
-    description: p.metaDescription(PAGE.metaDescription),
+    description: fitDescription(p.metaDescription(PAGE.metaDescription)),
     ogTitle: p.ogTitle(PAGE.title),
   });
 

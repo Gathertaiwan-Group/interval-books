@@ -5,6 +5,9 @@ import { PlanPicker } from "@/components/shop/PlanPicker";
 import { QuantityStepper } from "@/components/shop/ShopBits";
 import { FixedLanguage } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
+import { fitDescription } from "@/lib/seo/core";
+import { pageMeta } from "@/lib/seo/head";
+import { landingEventLd } from "@/lib/seo/pages";
 import {
   directAnySeatsLeft,
   directCheckoutSearch,
@@ -102,15 +105,23 @@ const BUTTON =
 
 export const Route = createFileRoute("/events/kungtung")({
   loader: async () => fetchActiveProductForEventSlug(EVENT_SLUG),
-  head: () => ({
-    meta: [
-      { title: PAGE.metaTitle.zh },
-      { name: "description", content: PAGE.metaDescription.zh },
-      { property: "og:title", content: PAGE.metaTitle.zh },
-      { property: "og:description", content: PAGE.metaDescription.zh },
-      { property: "og:image", content: imageFor(HERO_KEY, "") },
-      { name: "twitter:image", content: imageFor(HERO_KEY, "") },
-    ],
+  // SEO（2026-11 健檢）：Event JSON-LD 的日期、地點、價格取自售票商品的場次與票種
+  // （與報名區同一份資料），名稱與描述用這一頁的 PAGE 常數。
+  head: ({ loaderData }) => ({
+    meta: pageMeta({
+      title: PAGE.metaTitle,
+      description: fitDescription(PAGE.metaDescription),
+      image: imageFor(HERO_KEY, ""),
+      type: "article",
+      jsonLd: landingEventLd({
+        path: "/events/" + EVENT_SLUG,
+        name: "范毅舜公東教堂文化之旅｜台東三天兩夜",
+        description: fitDescription(PAGE.metaDescription).zh,
+        imageKey: HERO_KEY,
+        product: loaderData?.product ?? null,
+        performer: "范毅舜",
+      }),
+    }),
     links: [
       { rel: "stylesheet", href: FONTS_HREF },
       { rel: "stylesheet", href: kungtungCss },
@@ -122,9 +133,9 @@ export const Route = createFileRoute("/events/kungtung")({
 function KungtungJourney() {
   useDocumentMeta({
     title: PAGE.metaTitle,
-    description: PAGE.metaDescription,
+    description: fitDescription(PAGE.metaDescription),
     ogTitle: PAGE.metaTitle,
-    ogDescription: PAGE.metaDescription,
+    ogDescription: fitDescription(PAGE.metaDescription),
     // ⚠️ 一定要帶：沒給 ogImage 時 useDocumentMeta 會移除 head() 放好的 og:image。
     ogImage: imageFor(HERO_KEY, ""),
   });

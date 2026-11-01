@@ -4,6 +4,9 @@ import { SessionPicker, SessionList } from "@/components/shop/SessionPicker";
 import { PlanPicker } from "@/components/shop/PlanPicker";
 import { QuantityStepper } from "@/components/shop/ShopBits";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
+import { fitDescription } from "@/lib/seo/core";
+import { pageMeta } from "@/lib/seo/head";
+import { landingEventLd } from "@/lib/seo/pages";
 import {
   directAnySeatsLeft,
   directCheckoutSearch,
@@ -126,15 +129,23 @@ const WAVE_DIVIDER: React.CSSProperties = {
 
 export const Route = createFileRoute("/events/sound-of-the-sea")({
   loader: async () => fetchActiveProductForEventSlug(EVENT_SLUG),
-  head: () => ({
-    meta: [
-      { title: PAGE.metaTitle.zh },
-      { name: "description", content: PAGE.metaDescription.zh },
-      { property: "og:title", content: PAGE.metaTitle.zh },
-      { property: "og:description", content: PAGE.metaDescription.zh },
-      { property: "og:image", content: imageFor(POSTER_KEY, "") },
-      { name: "twitter:image", content: imageFor(POSTER_KEY, "") },
-    ],
+  // SEO（2026-11 健檢）：Event JSON-LD 的日期、地點、價格取自售票商品的場次與票種
+  // （與報名區同一份資料），名稱與描述用這一頁的 PAGE 常數。
+  head: ({ loaderData }) => ({
+    meta: pageMeta({
+      title: PAGE.metaTitle,
+      description: fitDescription(PAGE.metaDescription),
+      image: imageFor(POSTER_KEY, ""),
+      type: "article",
+      jsonLd: landingEventLd({
+        path: "/events/" + EVENT_SLUG,
+        name: "胡海音《海的聲音》手作繪本分享會",
+        description: fitDescription(PAGE.metaDescription).zh,
+        imageKey: POSTER_KEY,
+        product: loaderData?.product ?? null,
+        performer: "胡海音",
+      }),
+    }),
     links: [
       // 稿用的是 Noto Serif TC 400/600 與 Noto Sans TC 400/500；全站只載了
       // Serif 300–500，「應付總額」那個 600 要這一頁自己補。
@@ -150,9 +161,9 @@ export const Route = createFileRoute("/events/sound-of-the-sea")({
 function SoundOfTheSea() {
   useDocumentMeta({
     title: PAGE.metaTitle,
-    description: PAGE.metaDescription,
+    description: fitDescription(PAGE.metaDescription),
     ogTitle: PAGE.metaTitle,
-    ogDescription: PAGE.metaDescription,
+    ogDescription: fitDescription(PAGE.metaDescription),
     // ⚠️ 一定要帶：沒給 ogImage 時 useDocumentMeta 會移除 head() 放好的 og:image。
     ogImage: imageFor(POSTER_KEY, ""),
   });

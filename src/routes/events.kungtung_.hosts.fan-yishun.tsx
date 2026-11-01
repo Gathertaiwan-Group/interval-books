@@ -1,5 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
+import { fitDescription } from "@/lib/seo/core";
+import { pageMeta } from "@/lib/seo/head";
+import { landingSubpageLd } from "@/lib/seo/pages";
 import { imageFor } from "@/lib/images";
 import {
   FanHeader,
@@ -35,13 +38,16 @@ const OG_IMAGE_KEY = "storage:dc86a283-0c38-409d-acda-4545085bf86e.webp";
 
 export const Route = createFileRoute("/events/kungtung_/hosts/fan-yishun")({
   head: () => ({
-    meta: [
-      { title: PAGE.metaTitle.zh },
-      { name: "description", content: PAGE.metaDescription.zh },
-      { property: "og:title", content: PAGE.metaTitle.zh },
-      { property: "og:description", content: PAGE.metaDescription.zh },
-      { property: "og:image", content: imageFor(OG_IMAGE_KEY, "") },
-    ],
+    meta: pageMeta({
+      title: PAGE.metaTitle,
+      description: fitDescription(PAGE.metaDescription),
+      image: imageFor(OG_IMAGE_KEY, ""),
+      type: "profile",
+      jsonLd: landingSubpageLd(
+        { name: "范毅舜公東教堂文化之旅｜台東三天兩夜", path: "/events/kungtung" },
+        { name: "范毅舜", path: "/events/kungtung/hosts/fan-yishun" },
+      ),
+    }),
     links: [
       {
         rel: "stylesheet",
@@ -56,9 +62,9 @@ export const Route = createFileRoute("/events/kungtung_/hosts/fan-yishun")({
 function FanYishunHost() {
   useDocumentMeta({
     title: PAGE.metaTitle,
-    description: PAGE.metaDescription,
+    description: fitDescription(PAGE.metaDescription),
     ogTitle: PAGE.metaTitle,
-    ogDescription: PAGE.metaDescription,
+    ogDescription: fitDescription(PAGE.metaDescription),
     ogImage: imageFor(OG_IMAGE_KEY, ""),
   });
   return (

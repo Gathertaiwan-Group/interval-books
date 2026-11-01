@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageShell, PageHeader } from "@/components/PageShell";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
+import { fitDescription } from "@/lib/seo/core";
+import { pageMeta } from "@/lib/seo/head";
 import { fetchCollaborations, fetchPage, pageText, eyebrowOf } from "@/lib/cms";
 import { CARD, featureLayout } from "@/lib/feature-layout";
 import { useSiteContent } from "@/lib/site-content";
@@ -66,12 +68,12 @@ export const Route = createFileRoute("/curation")({
   head: ({ loaderData }) => {
     const p = pageText(loaderData?.page ?? null);
     return {
-      meta: [
-        { title: p.metaTitle(PAGE.metaTitle).zh },
-        { name: "description", content: p.metaDescription(PAGE.metaDescription).zh },
-        { property: "og:title", content: p.ogTitle(PAGE.title).zh },
-        { property: "og:description", content: p.metaDescription(PAGE.metaDescription).zh },
-      ],
+      meta: pageMeta({
+        title: p.metaTitle(PAGE.metaTitle),
+        description: fitDescription(p.metaDescription(PAGE.metaDescription)),
+        ogTitle: p.ogTitle(PAGE.title),
+        type: "website",
+      }),
     };
   },
   component: Curation,
@@ -86,7 +88,7 @@ function Curation() {
 
   useDocumentMeta({
     title: p.metaTitle(PAGE.metaTitle),
-    description: p.metaDescription(PAGE.metaDescription),
+    description: fitDescription(p.metaDescription(PAGE.metaDescription)),
     ogTitle: p.ogTitle(PAGE.title),
   });
 
@@ -112,9 +114,9 @@ function Curation() {
                 <p className="text-[0.65rem] tracking-widest text-muted-foreground">
                   {String(i + 1).padStart(2, "0")}
                 </p>
-                <h3 className={`display mt-3 text-2xl leading-snug ${layout.title}`}>
+                <h2 className={`display mt-3 text-2xl leading-snug ${layout.title}`}>
                   {t(c.title)}
-                </h3>
+                </h2>
                 <p className="mt-4 text-sm leading-relaxed text-foreground/75">
                   {t(c.description)}
                 </p>

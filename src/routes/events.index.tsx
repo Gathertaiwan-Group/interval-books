@@ -7,6 +7,8 @@ import { PastShelf } from "@/components/PastShelf";
 import { newestEndedFirst } from "@/lib/past-shelf";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
+import { fitDescription } from "@/lib/seo/core";
+import { pageMeta } from "@/lib/seo/head";
 import { eyebrowOf, fetchEventCategories, fetchEvents, fetchPage, pageText } from "@/lib/cms";
 import { CARD, featureLayout } from "@/lib/feature-layout";
 import { useSiteContent } from "@/lib/site-content";
@@ -120,14 +122,13 @@ export const Route = createFileRoute("/events/")({
     const p = pageText(loaderData?.page ?? null);
     const ogImg = imageFor(loaderData?.page?.ogImageKey, eventImg);
     return {
-      meta: [
-        { title: p.metaTitle(PAGE.metaTitle).zh },
-        { name: "description", content: p.metaDescription(PAGE.metaDescription).zh },
-        { property: "og:title", content: p.ogTitle(PAGE.title).zh },
-        { property: "og:description", content: p.metaDescription(PAGE.metaDescription).zh },
-        { property: "og:image", content: ogImg },
-        { name: "twitter:image", content: ogImg },
-      ],
+      meta: pageMeta({
+        title: p.metaTitle(PAGE.metaTitle),
+        description: fitDescription(p.metaDescription(PAGE.metaDescription)),
+        ogTitle: p.ogTitle(PAGE.title),
+        image: ogImg,
+        type: "website",
+      }),
     };
   },
   component: Events,
@@ -142,7 +143,7 @@ function Events() {
 
   useDocumentMeta({
     title: p.metaTitle(PAGE.metaTitle),
-    description: p.metaDescription(PAGE.metaDescription),
+    description: fitDescription(p.metaDescription(PAGE.metaDescription)),
     ogTitle: p.ogTitle(PAGE.title),
     ogImage: heroSrc,
   });
@@ -258,7 +259,7 @@ function Events() {
               {e.imageKey ? (
                 <CoverImage
                   src={imageFor(e.imageKey, eventImg)}
-                  alt=""
+                  alt={t(e.title)}
                   loading="lazy"
                   className={`aspect-[4/3] ${layout.image}`}
                 />
@@ -286,9 +287,10 @@ function Events() {
                     </span>
                   ) : null}
                 </div>
-                <h3 className={`display mt-4 text-2xl leading-snug ${layout.title}`}>
+                {/* h2（2026-11 SEO 健檢 L4：原本 h1 直接跳 h3）；h1–h5 樣式相同，畫面不變。 */}
+                <h2 className={`display mt-4 text-2xl leading-snug ${layout.title}`}>
                   {t(e.title)}
-                </h3>
+                </h2>
                 <p className="mt-4 text-sm text-muted-foreground">{e.date}</p>
                 <p
                   className={`mt-4 text-sm leading-relaxed text-foreground/75 flex-1 ${layout.summary}`}

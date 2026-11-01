@@ -31,10 +31,12 @@ import { PageShell, PageHeader } from "@/components/PageShell";
 import { useT } from "@/i18n/LanguageContext";
 import type { Localized } from "@/i18n/types";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
+import { fitDescription } from "@/lib/seo/core";
+import { pageMeta } from "@/lib/seo/head";
 import { fetchPage, pageText, eyebrowOf } from "@/lib/cms";
 import type { PageListEntry } from "@/lib/cms";
 import { CARD, featureLayout } from "@/lib/feature-layout";
-import { imageFor } from "@/lib/images";
+import { imageFor, srcSetFor } from "@/lib/images";
 import { useSiteContent } from "@/lib/site-content";
 import interiorImg from "@/assets/bookstore-interior.jpg";
 import curatedImg from "@/assets/curated-objects.jpg";
@@ -49,13 +51,13 @@ export const Route = createFileRoute("/about")({
     const page = loaderData?.page ?? null;
     const p = pageText(page);
     return {
-      meta: [
-        { title: p.metaTitle(PAGE.metaTitle).zh },
-        { name: "description", content: p.metaDescription(PAGE.metaDescription).zh },
-        { property: "og:title", content: p.ogTitle(PAGE.title).zh },
-        { property: "og:description", content: p.metaDescription(PAGE.metaDescription).zh },
-        { property: "og:image", content: imageFor(page?.ogImageKey, interiorImg) },
-      ],
+      meta: pageMeta({
+        title: p.metaTitle(PAGE.metaTitle),
+        description: fitDescription(p.metaDescription(PAGE.metaDescription)),
+        ogTitle: p.ogTitle(PAGE.title),
+        image: imageFor(page?.ogImageKey, interiorImg),
+        type: "website",
+      }),
     };
   },
   component: About,
@@ -294,7 +296,7 @@ function About() {
 
   useDocumentMeta({
     title: p.metaTitle(PAGE.metaTitle),
-    description: p.metaDescription(PAGE.metaDescription),
+    description: fitDescription(p.metaDescription(PAGE.metaDescription)),
     ogTitle: p.ogTitle(PAGE.title),
     ogImage: imageFor(page?.ogImageKey, interiorImg),
   });
@@ -313,11 +315,16 @@ function About() {
         data-testid="about-story"
       >
         <div className="aspect-[4/5] overflow-hidden bg-muted">
+          {/* 首屏圖：不 lazy（lazy 會拖慢 LCP）、WebP srcset（2026-11 SEO 健檢 M5）。 */}
           <img
             src={interiorImg}
+            srcSet={srcSetFor(interiorImg)}
+            sizes="(min-width: 768px) 50vw, 100vw"
             alt={t(p.title(PAGE.title))}
             className="h-full w-full object-cover"
-            loading="lazy"
+            width={1080}
+            height={1920}
+            fetchPriority="high"
           />
         </div>
         <div>

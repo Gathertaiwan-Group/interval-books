@@ -8,13 +8,15 @@ import { fetchEvents, fetchJourneyEventDates, fetchJourneys, fetchPage, pageText
 import { useSiteContent } from "@/lib/site-content";
 import { isEventPast } from "@/lib/event-status";
 import { featureLayout } from "@/lib/feature-layout";
-import { imageFor } from "@/lib/images";
+import { imageFor, srcSetFor } from "@/lib/images";
 import { fetchHomeShelfProducts } from "@/lib/shop";
 import heroImg from "@/assets/hero-mountain.jpg";
 import storefrontImg from "@/assets/storefront.jpg";
 import curatedImg from "@/assets/curated-objects.jpg";
 import journeyImg from "@/assets/journey-mist.jpg";
 import { journeyLinkProps } from "@/lib/journey-link";
+import { fitDescription } from "@/lib/seo/core";
+import { pageMeta } from "@/lib/seo/head";
 import { linkedEventFor, splitJourneys } from "@/lib/past-shelf";
 
 /** Fallback copy — used only when the Supabase read fails. */
@@ -23,6 +25,19 @@ const PAGE_META = {
     zh: "小時光書店 Interval Books｜風土誌策展的閱讀與生活場域",
     en: "Interval Books｜A curated home for reading, terroir, and quiet life",
     ja: "小時光書店 Interval Books｜風土誌をキュレーションする読書と暮らしの場",
+  },
+  /**
+   * 首頁的搜尋結果描述（2026-11 SEO 健檢 M2）。
+   *
+   * pages/'index' 的 meta_description 目前是「留一段屬於自己的＿＿＿小時光。」——那是英雄區
+   * 刻意留白的文案，拿來當描述只有 15 字還帶著佔位底線。fitDescription() 看到佔位符就改用
+   * 這一段。內容全部是站上已經寫著的事實（地址、風土誌、地方刊物、活動、策旅）。後台把
+   * meta_description 改成一段正常的文字之後，那一段就會優先。
+   */
+  description: {
+    zh: "小時光書店 Interval Books 位於台北華山文創園區紅磚六合院西7-3館，是一間以風土誌為主題的書店：選書、地方刊物與選物，也舉辦讀書會、講座、工作坊與台東策旅。留一段屬於自己的小時光。",
+    en: "Interval Books is a terroir-minded bookstore in the Red Brick Courtyard (West 7-3) of Huashan 1914 Creative Park, Taipei: books, local publications and curated objects, plus reading circles, talks, workshops and journeys to Taitung.",
+    ja: "小時光書店は台北・華山1914文化創意産業園区 紅煉瓦六合院 西7-3館にある、風土誌をテーマにした書店。選書、地域の刊行物、セレクト品のほか、読書会・トーク・ワークショップ・台東への旅も企画しています。",
   },
 };
 
@@ -111,14 +126,13 @@ export const Route = createFileRoute("/")({
     const p = pageText(loaderData?.page ?? null);
     const ogImg = imageFor(loaderData?.page?.ogImageKey, heroImg);
     return {
-      meta: [
-        { title: p.metaTitle(PAGE_META.title).zh },
-        { name: "description", content: p.metaDescription(HERO.intro).zh },
-        { property: "og:title", content: p.ogTitle(HERO.titleSub).zh },
-        { property: "og:description", content: p.metaDescription(HERO.intro).zh },
-        { property: "og:image", content: ogImg },
-        { name: "twitter:image", content: ogImg },
-      ],
+      meta: pageMeta({
+        title: p.metaTitle(PAGE_META.title),
+        description: fitDescription(p.metaDescription(HERO.intro), PAGE_META.description),
+        ogTitle: p.ogTitle(HERO.titleSub),
+        image: ogImg,
+        type: "website",
+      }),
     };
   },
   component: Index,
@@ -151,7 +165,7 @@ function Index() {
 
   useDocumentMeta({
     title: p.metaTitle(PAGE_META.title),
-    description: p.metaDescription(HERO.intro),
+    description: fitDescription(p.metaDescription(HERO.intro), PAGE_META.description),
     ogTitle: p.ogTitle(HERO.titleSub),
     ogImage: heroSrc,
   });
@@ -179,12 +193,17 @@ function Index() {
           </div>
           <div className="lg:col-span-6">
             <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+              {/* 首屏大圖（LCP）：WebP 多尺寸 srcset，JPG 留作 src 退路（2026-11 SEO 健檢 M5）。
+                  width/height 是原圖真實尺寸 1536×864；外框由 aspect-[4/3] 決定，不影響版面。 */}
               <img
                 src={heroSrc}
+                srcSet={srcSetFor(heroSrc)}
+                sizes="(min-width: 1024px) 50vw, 100vw"
                 alt={t(p.block("hero.titleMain", HERO.titleMain))}
                 className="absolute inset-0 h-full w-full object-cover"
                 width={1536}
-                height={1920}
+                height={864}
+                fetchPriority="high"
               />
             </div>
           </div>
@@ -217,7 +236,7 @@ function Index() {
                 {e.imageKey ? (
                   <CoverImage
                     src={imageFor(e.imageKey, storefrontImg)}
-                    alt=""
+                    alt={t(e.title)}
                     loading="lazy"
                     className={`aspect-[4/3] ${eventsLayout.image}`}
                     imgClassName="transition-transform duration-500 group-hover:scale-[1.03]"
@@ -266,7 +285,7 @@ function Index() {
                       linkedEventFor(j.externalUrl, journeyEvents)?.imageKey,
                       journeyImg,
                     )}
-                    alt=""
+                    alt={t(j.title)}
                     loading="lazy"
                     className={`aspect-[4/3] ${journeysLayout.image}`}
                     imgClassName="transition-transform duration-500 group-hover:scale-[1.03]"

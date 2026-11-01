@@ -12,6 +12,9 @@ import type { Localized } from "@/i18n/types";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { cartInputFor, useCart } from "@/lib/cart";
 import { imageFor } from "@/lib/images";
+import { pageMeta } from "@/lib/seo/head";
+import { productSeo } from "@/lib/seo/pages";
+import { unavailableHeaders } from "@/lib/seo/status";
 import {
   fetchActiveProductBySlug,
   isSoldOut,
@@ -98,22 +101,23 @@ export const Route = createFileRoute("/shop/$slug")({
     if (!product && !unavailable) throw notFound();
     return { product, unavailable };
   },
+  // SEO（2026-11 健檢）：title「{品名}｜{類別}｜小時光書店」、描述取摘要＋介紹文、
+  // JSON-LD 輸出 Product（刊物另標 Book）與麵包屑。組裝在 src/lib/seo/pages.ts#productSeo。
   head: ({ loaderData }) => {
-    const product = loaderData?.product ?? null;
-    const ogImg = imageFor(product?.imageKey, curatedImg);
-    const title = metaOr(product?.title, PAGE.metaTitle);
-    const description = metaOr(product?.summary, PAGE.metaDescription);
+    const seo = productSeo(loaderData?.product ?? null, PAGE, curatedImg);
     return {
-      meta: [
-        { title: title.zh },
-        { name: "description", content: description.zh },
-        { property: "og:title", content: title.zh },
-        { property: "og:description", content: description.zh },
-        { property: "og:image", content: ogImg },
-        { name: "twitter:image", content: ogImg },
-      ],
+      meta: pageMeta({
+        title: seo.title,
+        description: seo.description,
+        image: seo.image,
+        type: "product",
+        jsonLd: seo.jsonLd,
+      }),
     };
   },
+  // 讀不到商品（不是查無此商品）→ 503 + Retry-After。
+  headers: ({ loaderData }) =>
+    unavailableHeaders(Boolean(loaderData?.unavailable && !loaderData?.product)),
   component: ProductDetail,
 });
 
@@ -134,11 +138,12 @@ function ProductDetail() {
   // 0036：這個場次選了哪個方案。跟 sessionId 一樣只活在這個元件裡。
   const [planId, setPlanId] = useState<string | null>(null);
 
+  const seo = productSeo(product, PAGE, curatedImg);
   useDocumentMeta({
-    title: metaOr(product?.title, PAGE.metaTitle),
-    description: metaOr(product?.summary, PAGE.metaDescription),
-    ogTitle: metaOr(product?.title, PAGE.metaTitle),
-    ogImage: imageFor(product?.imageKey, curatedImg),
+    title: metaOr(seo.title, PAGE.metaTitle),
+    description: metaOr(seo.description, PAGE.metaDescription),
+    ogTitle: metaOr(seo.title, PAGE.metaTitle),
+    ogImage: seo.image ?? undefined,
   });
 
   if (!product) {
