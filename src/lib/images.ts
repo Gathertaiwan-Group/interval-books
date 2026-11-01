@@ -5,6 +5,11 @@ import exhibitionCorner from "@/assets/exhibition-corner.jpg";
 import heroMountain from "@/assets/hero-mountain.jpg";
 import journeyMist from "@/assets/journey-mist.jpg";
 import storefront from "@/assets/storefront.jpg";
+import heroMountain640 from "@/assets/responsive/hero-mountain-640.webp";
+import heroMountain1080 from "@/assets/responsive/hero-mountain-1080.webp";
+import heroMountain1536 from "@/assets/responsive/hero-mountain-1536.webp";
+import bookstoreInterior540 from "@/assets/responsive/bookstore-interior-540.webp";
+import bookstoreInterior1080 from "@/assets/responsive/bookstore-interior-1080.webp";
 
 /**
  * image_key -> bundled asset URL.
@@ -52,9 +57,43 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 /** Must match the bucket name the images were uploaded into (src/server/storage.ts#SITE_IMAGES_BUCKET). */
 const STORAGE_BUCKET = "site-images";
 
+/**
+ * 自家網域的圖片代理路徑（2026-11 SEO 健檢 M5）。src/server.ts 攔下 /media/site-images/<name>，
+ * 向 Supabase Storage 取圖後加上一年 immutable 快取再回傳（src/server/media-proxy.ts）。
+ *
+ * 為什麼不直接用 Supabase 的公開網址：搬庫之後 bucket 裡的物件回的是
+ * `cache-control: private, no-cache`，每次瀏覽都要重新驗證、CDN 也不存。物件名稱是上傳時
+ * 產生的 uuid（uploadSiteImage()），同一個名字永遠是同一張圖，所以可以放心長效快取。
+ */
+export const MEDIA_PROXY_PREFIX = "/media/site-images/";
+
+/** 代理只接受 uploadSiteImage() 會產生的檔名：uuid + 圖片副檔名。 */
+export const MEDIA_OBJECT_NAME_RE = /^[0-9a-f-]{36}\.(webp|jpg|jpeg|png|gif|avif)$/i;
+
 function storagePublicUrl(objectName: string): string | null {
   if (!SUPABASE_URL || !objectName) return null;
+  if (MEDIA_OBJECT_NAME_RE.test(objectName)) return `${MEDIA_PROXY_PREFIX}${objectName}`;
   return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${objectName}`;
+}
+
+/** 代理要轉去的上游網址（server 端用）。 */
+export function storageUpstreamUrl(objectName: string): string | null {
+  if (!SUPABASE_URL || !MEDIA_OBJECT_NAME_RE.test(objectName)) return null;
+  return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${objectName}`;
+}
+
+/**
+ * 首屏大圖的 WebP 多尺寸版本（2026-11 SEO 健檢 M5）。key 是 imageFor() 回傳的網址，
+ * 所以後台把首頁／關於頁的圖設成這兩張內建圖時自動套用；換成上傳的圖就沒有 srcset，
+ * 照原樣顯示。
+ */
+const SRCSET_BY_SRC: Record<string, string> = {
+  [heroMountain]: `${heroMountain640} 640w, ${heroMountain1080} 1080w, ${heroMountain1536} 1536w`,
+  [bookstoreInterior]: `${bookstoreInterior540} 540w, ${bookstoreInterior1080} 1080w`,
+};
+
+export function srcSetFor(src: string): string | undefined {
+  return SRCSET_BY_SRC[src];
 }
 
 /**

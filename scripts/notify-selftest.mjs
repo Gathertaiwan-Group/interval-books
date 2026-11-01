@@ -984,7 +984,9 @@ checkTrue(
 );
 checkTrue(
   "每條路徑都用 dynamic import（service_role 不在模組載入時被拉進來）",
-  (serverCode.match(/await import\("@\/server\//g) ?? []).length === paths.length + 2,
+  // +2：OAuth discovery／端點；+3（2026-11 SEO 健檢）：/robots.txt、/sitemap.xml（同一個
+  // src/server/sitemap 模組）與 /media/site-images/（src/server/media-proxy）。
+  (serverCode.match(/await import\("@\/server\//g) ?? []).length === paths.length + 2 + 3,
 );
 // 檔頭那張表要說明為什麼它不能用 createServerFn 表達（src/server.ts L21-24 的規矩）。
 checkTrue(

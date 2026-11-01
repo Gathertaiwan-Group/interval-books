@@ -507,8 +507,9 @@ function isPrivateV6(b: number[]): boolean {
 export const SITE_IMAGES_BUCKET_NAME = "site-images";
 
 const STORAGE_KEY_RE = /^storage:[0-9a-f-]{36}\.(webp|jpg|png)$/;
+// 也認前台現在顯示的自家網域代理網址 /media/site-images/<name>（2026-11，見 src/server/media-proxy.ts）。
 const PUBLIC_URL_RE = new RegExp(
-  `/storage/v1/object/public/${SITE_IMAGES_BUCKET_NAME}/([0-9a-f-]{36}\\.(?:webp|jpg|png))$`,
+  `(?:/storage/v1/object/public|/media)/${SITE_IMAGES_BUCKET_NAME}/([0-9a-f-]{36}\\.(?:webp|jpg|png))$`,
 );
 
 /**

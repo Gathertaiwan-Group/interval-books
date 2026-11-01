@@ -56,10 +56,20 @@
  *                          ⚠️ /oauth/authorize **不在這裡**：那是老闆的瀏覽器、要讀後台 cookie、
  *                          要畫同意頁 —— 它是一般的 TanStack 頁面（src/routes/oauth/authorize.tsx），
  *                          只在下面補上防 iframe 的標頭。
+ *   /robots.txt、/sitemap.xml  搜尋引擎要的兩個檔（2026-11 SEO 健檢 H1）。呼叫者是爬蟲，
+ *                          要的是純文字／XML 而不是 HTML 頁面；sitemap 要即時從資料庫列出
+ *                          所有公開網址（src/server/sitemap.ts）。
+ *
+ * 另外兩件不是「攔截路徑」、而是對所有頁面請求都做的事（同樣是 2026-11 SEO 健檢）：
+ *   * 交給 startFetch **之前**：尾斜線 308、固定路徑大小寫不對 301（redirectFor()）。
+ *   * startFetch **之後**：不該被收錄的路徑補 X-Robots-Tag（robotsTagFor()），以及頁面
+ *     讀不到資料時把 200 頁殼改成 503 + Retry-After（INTERNAL_STATUS_HEADER，見下）。
  */
 import { createStartHandler, defaultStreamHandler } from "@tanstack/react-start/server";
 import { BLACKCAT_APN_PATH, BLACKCAT_RETURN_PATH } from "@/server/blackcat";
 import { cacheControlFor } from "@/server/cache-policy";
+import { redirectFor, robotsTagFor } from "@/lib/seo/core";
+import { INTERNAL_STATUS_HEADER } from "@/lib/seo/status";
 import { isOAuthDiscoveryPath, MCP_PATH } from "@/server/mcp/core";
 import { OAUTH_ENDPOINT_PATHS } from "@/server/mcp/oauth-paths";
 import { PAYUNI_WEBHOOK_PATH } from "@/server/payuni";
@@ -74,10 +84,29 @@ const startFetch = createStartHandler(defaultStreamHandler);
 export default {
   async fetch(request: Request, ...rest: unknown[]): Promise<Response> {
     let pathname: string;
+    let search = "";
     try {
-      pathname = new URL(request.url).pathname;
+      const url = new URL(request.url);
+      pathname = url.pathname;
+      search = url.search;
     } catch {
       pathname = "";
+    }
+
+    if (pathname === "/robots.txt") {
+      const { handleRobotsTxt } = await import("@/server/sitemap");
+      return handleRobotsTxt();
+    }
+
+    // Supabase Storage 圖片的自家網域代理，加長效快取（src/server/media-proxy.ts）。
+    if (pathname.startsWith("/media/site-images/")) {
+      const { handleMediaProxy } = await import("@/server/media-proxy");
+      return handleMediaProxy(request, pathname);
+    }
+
+    if (pathname === "/sitemap.xml") {
+      const { handleSitemapXml } = await import("@/server/sitemap");
+      return handleSitemapXml();
     }
 
     if (pathname === BLACKCAT_APN_PATH) {
@@ -125,6 +154,15 @@ export default {
       return handleNotifyTask(request);
     }
 
+    // 尾斜線 → 308、/EVENTS 這類大小寫 → 301（只對頁面的 GET/HEAD；見 redirectFor()）。
+    const redirect = redirectFor(pathname, search, request.method);
+    if (redirect) {
+      return new Response(null, {
+        status: redirect.status,
+        headers: { location: redirect.location, "cache-control": "public, max-age=3600" },
+      });
+    }
+
     const response = await (startFetch as (req: Request, ...a: unknown[]) => Promise<Response>)(
       request,
       ...rest,
@@ -134,21 +172,39 @@ export default {
     // src/server/cache-policy.ts 檔頭——這裡不是新加一條攔截路徑（上面那六條的
     // 規矩不適用），是在 startFetch 已經算出真正的回應之後，只換掉 Cache-Control
     // 這一個標頭。body 直接原封傳遞（不 buffer、不解析），SSR streaming 不受影響。
-    const cacheControl = cacheControlFor(pathname, request.method, response.status);
+    //
+    // 頁面讀不到資料（Supabase 眨眼）時，路由用 headers() 送出內部標頭要求 503——
+    // 框架自己只會給 200／404／500，見 src/lib/seo/status.ts。這裡把它換成真正的
+    // 503 + Retry-After，讓搜尋引擎稍後重試，而不是把空殼收錄成正式內容。
+    const wants503 = response.headers.get(INTERNAL_STATUS_HEADER) === "503";
+    const status = wants503 && response.status === 200 ? 503 : response.status;
+    const cacheControl = cacheControlFor(pathname, request.method, status);
+    const robotsTag = robotsTagFor(pathname);
     // /oauth/authorize（同意頁）：不准被別人的網頁用 iframe 框起來騙點「允許」（clickjacking），
     // 也不把網址（含 state）經 Referer 帶給別的網站。
     const isOAuthPage = pathname === "/oauth" || pathname.startsWith("/oauth/");
-    if (cacheControl === null && !isOAuthPage) return response;
+    if (
+      cacheControl === null &&
+      !isOAuthPage &&
+      robotsTag === null &&
+      !response.headers.has(INTERNAL_STATUS_HEADER)
+    )
+      return response;
     const headers = new Headers(response.headers);
-    if (cacheControl !== null) headers.set("cache-control", cacheControl);
+    headers.delete(INTERNAL_STATUS_HEADER);
+    if (status === 503) {
+      headers.set("retry-after", "120");
+      headers.set("cache-control", "no-store");
+    } else if (cacheControl !== null) headers.set("cache-control", cacheControl);
+    if (robotsTag !== null) headers.set("x-robots-tag", robotsTag);
     if (isOAuthPage) {
       headers.set("content-security-policy", "frame-ancestors 'none'");
       headers.set("x-frame-options", "DENY");
       headers.set("referrer-policy", "no-referrer");
     }
     return new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
+      status,
+      statusText: status === response.status ? response.statusText : "Service Unavailable",
       headers,
     });
   },
