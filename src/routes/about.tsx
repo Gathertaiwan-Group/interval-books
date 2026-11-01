@@ -32,7 +32,8 @@ import { useT } from "@/i18n/LanguageContext";
 import type { Localized } from "@/i18n/types";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fitDescription } from "@/lib/seo/core";
-import { pageMeta } from "@/lib/seo/head";
+import { pageHead } from "@/lib/seo/head";
+import { pageRowTranslation } from "@/lib/seo/pages";
 import { fetchPage, pageText, eyebrowOf } from "@/lib/cms";
 import type { PageListEntry } from "@/lib/cms";
 import { CARD, featureLayout } from "@/lib/feature-layout";
@@ -47,17 +48,21 @@ export const Route = createFileRoute("/about")({
     const [page, visitPage] = await Promise.all([fetchPage("about"), fetchPage("visit")]);
     return { page, visitPage };
   },
-  head: ({ loaderData }) => {
+  head: ({ loaderData, matches, match }) => {
     const page = loaderData?.page ?? null;
     const p = pageText(page);
     return {
-      meta: pageMeta({
-        title: p.metaTitle(PAGE.metaTitle),
-        description: fitDescription(p.metaDescription(PAGE.metaDescription)),
-        ogTitle: p.ogTitle(PAGE.title),
-        image: imageFor(page?.ogImageKey, interiorImg),
-        type: "website",
-      }),
+      ...pageHead(
+        { matches, match },
+        {
+          translation: pageRowTranslation(loaderData?.page ?? null),
+          title: p.metaTitle(PAGE.metaTitle),
+          description: fitDescription(p.metaDescription(PAGE.metaDescription)),
+          ogTitle: p.ogTitle(PAGE.title),
+          image: imageFor(page?.ogImageKey, interiorImg),
+          type: "website",
+        },
+      ),
     };
   },
   component: About,

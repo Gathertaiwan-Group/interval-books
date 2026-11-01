@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fitDescription } from "@/lib/seo/core";
-import { pageMeta } from "@/lib/seo/head";
+import { langFromMatches, pageHead, withLinks } from "@/lib/seo/head";
 import { landingSubpageLd } from "@/lib/seo/pages";
 import { imageFor } from "@/lib/images";
 import {
@@ -37,25 +37,31 @@ const PAGE = {
 const OG_IMAGE_KEY = "storage:3eec0ea5-091b-44f2-8d3a-7b9e65225725.webp";
 
 export const Route = createFileRoute("/events/kungtung_/hosts/alice")({
-  head: () => ({
-    meta: pageMeta({
-      title: PAGE.metaTitle,
-      description: fitDescription(PAGE.metaDescription),
-      image: imageFor(OG_IMAGE_KEY, ""),
-      type: "profile",
-      jsonLd: landingSubpageLd(
-        { name: "范毅舜公東教堂文化之旅｜台東三天兩夜", path: "/events/kungtung" },
-        { name: "Alice 劉柳樺", path: "/events/kungtung/hosts/alice" },
+  head: ({ matches, match }) =>
+    withLinks(
+      pageHead(
+        { matches, match },
+        {
+          translation: "zh-only",
+          title: PAGE.metaTitle,
+          description: fitDescription(PAGE.metaDescription),
+          image: imageFor(OG_IMAGE_KEY, ""),
+          type: "profile",
+          jsonLd: landingSubpageLd(
+            { name: "范毅舜公東教堂文化之旅｜台東三天兩夜", path: "/events/kungtung" },
+            { name: "Alice 劉柳樺", path: "/events/kungtung/hosts/alice" },
+            langFromMatches(matches),
+          ),
+        },
       ),
-    }),
-    links: [
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500&family=Noto+Serif+TC:wght@400;600&display=swap",
-      },
-      { rel: "stylesheet", href: kungtungCss },
-    ],
-  }),
+      [
+        {
+          rel: "stylesheet",
+          href: "https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500&family=Noto+Serif+TC:wght@400;600&display=swap",
+        },
+        { rel: "stylesheet", href: kungtungCss },
+      ],
+    ),
   component: AliceHost,
 });
 

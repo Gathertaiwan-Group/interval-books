@@ -1,15 +1,16 @@
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { Link, useRouterState } from "@tanstack/react-router";
+import { useState, type ReactNode } from "react";
 import { ShoppingBag, UserRound } from "lucide-react";
-import { useLang, useT } from "@/i18n/LanguageContext";
-import { LANGS } from "@/i18n/types";
+import { useLang, useT, writeStoredLang } from "@/i18n/LanguageContext";
+import { HTML_LANG, LANGS, type Lang } from "@/i18n/types";
+import { switchLangHref } from "@/lib/seo/i18n";
 import { useCartCount, useCartHydrated } from "@/lib/cart";
 import { useSiteContent } from "@/lib/site-content";
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const t = useT();
-  const { lang, setLang } = useLang();
+  const { lang } = useLang();
   const { ui } = useSiteContent();
 
   /**
@@ -56,17 +57,16 @@ export function SiteHeader() {
             {LANGS.map((l, i) => (
               <span key={l.code} className="flex items-center gap-2">
                 {i > 0 && <span className="text-border">·</span>}
-                <button
-                  onClick={() => setLang(l.code)}
+                <LangSwitch
+                  code={l.code}
                   className={
                     lang === l.code
                       ? "text-foreground border-b border-foreground pb-0.5"
                       : "text-muted-foreground hover:text-foreground transition-colors"
                   }
-                  aria-current={lang === l.code ? "true" : undefined}
                 >
                   {l.label}
-                </button>
+                </LangSwitch>
               </span>
             ))}
           </span>
@@ -98,8 +98,8 @@ export function SiteHeader() {
             {LANGS.map((l, i) => (
               <span key={l.code} className="flex items-center gap-3">
                 {i > 0 && <span className="text-border">·</span>}
-                <button
-                  onClick={() => setLang(l.code)}
+                <LangSwitch
+                  code={l.code}
                   className={
                     lang === l.code
                       ? "text-foreground border-b border-foreground pb-0.5"
@@ -107,7 +107,7 @@ export function SiteHeader() {
                   }
                 >
                   {l.label}
-                </button>
+                </LangSwitch>
               </span>
             ))}
           </div>
@@ -197,5 +197,50 @@ function AccountLink({ label, onNavigate }: { label: string; onNavigate?: () => 
     >
       <UserRound className="h-5 w-5" aria-hidden="true" />
     </Link>
+  );
+}
+
+/**
+ * 語言切換（2026-11 /en /ja）。
+ *
+ *   · 公開頁：連到**同一頁的另一個語言網址**的 <a href>（整頁載入；搜尋引擎也看得到這三個
+ *     連結），按下時順便記住選擇（localStorage），之後的購物車、結帳介面跟著換。
+ *   · 私密頁（購物車、結帳、會員…；沒有 /en 網址）：維持原本的按鈕，只換介面語言。
+ */
+function LangSwitch({
+  code,
+  className,
+  children,
+}: {
+  code: Lang;
+  className: string;
+  children: ReactNode;
+}) {
+  const { lang, urlLang, setLang } = useLang();
+  const publicHref = useRouterState({ select: (s) => s.location.publicHref });
+  const current = lang === code;
+  if (urlLang !== null) {
+    return (
+      <a
+        // hash 不帶：SSR 拿不到 hash，帶了會讓 SSR 與瀏覽器的 href 不一致。
+        href={switchLangHref((publicHref ?? "/").split("#")[0], code)}
+        hrefLang={HTML_LANG[code]}
+        lang={HTML_LANG[code]}
+        onClick={() => writeStoredLang(code)}
+        className={className}
+        aria-current={current ? "true" : undefined}
+      >
+        {children}
+      </a>
+    );
+  }
+  return (
+    <button
+      onClick={() => setLang(code)}
+      className={className}
+      aria-current={current ? "true" : undefined}
+    >
+      {children}
+    </button>
   );
 }

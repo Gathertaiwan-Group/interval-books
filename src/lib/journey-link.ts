@@ -9,9 +9,11 @@
  */
 export function journeyLinkProps(
   url: string | null | undefined,
+  /** 站內路徑加上目前網址的語言前綴（/en、/ja）；元件裡傳 useLocalizeHref() 的結果。 */
+  localize: (href: string) => string = (href) => href,
 ): { href: string; target?: "_blank"; rel?: "noreferrer" } | null {
   const trimmed = url?.trim();
   if (!trimmed) return null;
-  if (trimmed.startsWith("/")) return { href: trimmed };
+  if (trimmed.startsWith("/")) return { href: localize(trimmed) };
   return { href: trimmed, target: "_blank", rel: "noreferrer" };
 }

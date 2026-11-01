@@ -61,7 +61,8 @@
  *                          所有公開網址（src/server/sitemap.ts）。
  *
  * 另外兩件不是「攔截路徑」、而是對所有頁面請求都做的事（同樣是 2026-11 SEO 健檢）：
- *   * 交給 startFetch **之前**：尾斜線 308、固定路徑大小寫不對 301（redirectFor()）。
+ *   * 交給 startFetch **之前**：尾斜線 308、固定路徑大小寫不對 301（redirectFor()；/en、/ja
+ *     前綴一樣適用，見 src/lib/seo/i18n.ts）。
  *   * startFetch **之後**：不該被收錄的路徑補 X-Robots-Tag（robotsTagFor()），以及頁面
  *     讀不到資料時把 200 頁殼改成 503 + Retry-After（INTERNAL_STATUS_HEADER，見下）。
  */
@@ -69,6 +70,7 @@ import { createStartHandler, defaultStreamHandler } from "@tanstack/react-start/
 import { BLACKCAT_APN_PATH, BLACKCAT_RETURN_PATH } from "@/server/blackcat";
 import { cacheControlFor } from "@/server/cache-policy";
 import { redirectFor, robotsTagFor } from "@/lib/seo/core";
+import { splitLangPrefix } from "@/lib/seo/i18n";
 import { INTERNAL_STATUS_HEADER } from "@/lib/seo/status";
 import { isOAuthDiscoveryPath, MCP_PATH } from "@/server/mcp/core";
 import { OAUTH_ENDPOINT_PATHS } from "@/server/mcp/oauth-paths";
@@ -178,7 +180,9 @@ export default {
     // 503 + Retry-After，讓搜尋引擎稍後重試，而不是把空殼收錄成正式內容。
     const wants503 = response.headers.get(INTERNAL_STATUS_HEADER) === "503";
     const status = wants503 && response.status === 200 ? 503 : response.status;
-    const cacheControl = cacheControlFor(pathname, request.method, status);
+    // /en/events、/ja/shop/xxx 跟中文頁同一套快取規則（語言在網址裡，CDN 的 cache key 本來就
+    // 各自分開；SSR 輸出只看網址，不看 cookie、Accept-Language，所以沒有 Vary 要加）。
+    const cacheControl = cacheControlFor(splitLangPrefix(pathname).rest, request.method, status);
     const robotsTag = robotsTagFor(pathname);
     // /oauth/authorize（同意頁）：不准被別人的網頁用 iframe 框起來騙點「允許」（clickjacking），
     // 也不把網址（含 state）經 Referer 帶給別的網站。

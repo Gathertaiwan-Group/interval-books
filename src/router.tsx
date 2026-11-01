@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { createRouter, useRouter, type ErrorComponentProps } from "@tanstack/react-router";
+import {
+  createRouter,
+  useRouter,
+  useRouterState,
+  type ErrorComponentProps,
+} from "@tanstack/react-router";
 import { toast } from "sonner";
 import { routeTree } from "./routeTree.gen";
 import {
@@ -11,6 +16,8 @@ import {
 } from "@/lib/stale-deploy";
 import { applyAdminRouteCacheDefaults, registerAdminCacheRouter } from "@/lib/admin/route-cache";
 import { registerAdminDetailNav } from "@/lib/admin/detail-nav";
+import { createLangRewrite, registerClientLangRewrite } from "@/lib/i18n-rewrite";
+import { localizeHref, publicLangOf } from "@/lib/seo/i18n";
 
 /**
  * 部署之後還開著的分頁會壞：頁面記得的是上一版的程式檔名，而 Vercel 每次部署都是一整組新的
@@ -77,6 +84,9 @@ if (typeof window !== "undefined") {
 
 function DefaultErrorComponent({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
+  // 「Go home」回到目前語言的首頁（/en 底下出錯 → /en）。
+  const publicHref = useRouterState({ select: (s) => s.location.publicHref });
+  const homeHref = localizeHref("/", publicLangOf((publicHref ?? "/").split(/[?#]/)[0]) ?? "zh");
   // @tanstack/react-router 1.170 起 error 的型別是 unknown（被 throw 的不一定是 Error 物件）
   const message = errorMessage(error);
   const staleDeploy = isStaleDeployError(error);
@@ -150,7 +160,7 @@ function DefaultErrorComponent({ error, reset }: ErrorComponentProps) {
             Try again
           </button>
           <a
-            href="/"
+            href={homeHref}
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
             Go home
@@ -162,18 +172,25 @@ function DefaultErrorComponent({ error, reset }: ErrorComponentProps) {
 }
 
 export const getRouter = () => {
+  // /en、/ja 網址前綴（2026-11）：路由表不變，靠 location rewrite 把 /en/events 對到 /events，
+  // 站內 <Link> 產生的網址自動帶回目前語言。每個 router 一份狀態（server 每個請求都新建
+  // 一個 router，不會互相污染）。規則與坑見 src/lib/i18n-rewrite.ts。
+  const langRewrite = createLangRewrite();
   const router = createRouter({
     routeTree,
     context: {},
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
     defaultErrorComponent: DefaultErrorComponent,
+    rewrite: langRewrite.rewrite,
   });
+  langRewrite.normalizePublicHref(router);
   // 後台（/admin/_shell 底下）的 route 一律 30 秒內沿用 loader 資料；前台不動。
   // 寫入之後怎麼清、換人登入怎麼清，見 src/lib/admin/route-cache.ts。
   applyAdminRouteCacheDefaults(router.routesById);
   if (typeof window !== "undefined") {
     currentRouter = router;
+    registerClientLangRewrite(router, langRewrite);
     registerAdminCacheRouter(router);
     // 後台內頁「← 回到列表」判斷能不能直接按上一頁（見 src/lib/admin/detail-nav.ts）。
     registerAdminDetailNav(router);

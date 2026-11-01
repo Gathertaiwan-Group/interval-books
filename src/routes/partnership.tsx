@@ -26,7 +26,8 @@ import { useLang } from "@/i18n/LanguageContext";
 import type { Lang, Localized } from "@/i18n/types";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fitDescription } from "@/lib/seo/core";
-import { pageMeta } from "@/lib/seo/head";
+import { pageHead } from "@/lib/seo/head";
+import { pageRowTranslation } from "@/lib/seo/pages";
 import { fetchCollaborations, fetchPage, pageText, eyebrowOf } from "@/lib/cms";
 import type { PageListEntry } from "@/lib/cms";
 import { CARD } from "@/lib/feature-layout";
@@ -301,17 +302,21 @@ export const Route = createFileRoute("/partnership")({
     ]);
     return { page, collaborations };
   },
-  head: ({ loaderData }) => {
+  head: ({ loaderData, matches, match }) => {
     const page = loaderData?.page ?? null;
     const p = pageText(page);
     return {
-      meta: pageMeta({
-        title: p.metaTitle(PAGE.metaTitle),
-        description: fitDescription(p.metaDescription(PAGE.metaDescription)),
-        ogTitle: p.ogTitle(PAGE.title),
-        image: imageFor(page?.ogImageKey, exhibitionImg),
-        type: "website",
-      }),
+      ...pageHead(
+        { matches, match },
+        {
+          translation: pageRowTranslation(loaderData?.page ?? null),
+          title: p.metaTitle(PAGE.metaTitle),
+          description: fitDescription(p.metaDescription(PAGE.metaDescription)),
+          ogTitle: p.ogTitle(PAGE.title),
+          image: imageFor(page?.ogImageKey, exhibitionImg),
+          type: "website",
+        },
+      ),
     };
   },
   component: Partnership,

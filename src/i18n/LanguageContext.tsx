@@ -1,62 +1,110 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Lang, Localized } from "./types";
+import { localizeHref } from "@/lib/seo/i18n";
+import { syncRouterLang } from "@/lib/i18n-rewrite";
 
 type Ctx = {
   lang: Lang;
   setLang: (l: Lang) => void;
   t: (l: Localized) => string;
+  /** 公開頁的網址語言；私密頁（或沒有 router）→ null。 */
+  urlLang: Lang | null;
+  /** 訪客記住的語言（掛載後才有）。 */
+  stored: Lang | null;
 };
 
 const LanguageContext = createContext<Ctx | null>(null);
-const STORAGE_KEY = "interval-books-lang";
 
 /**
- * 初次造訪一律中文；只有訪客**自己按過**語言切換（存進 localStorage）才換。
+ * 語言從哪裡來（2026-11 /en /ja 網址前綴之後）：
  *
- * 🔴 不要再依 navigator.language 自動換語言（2026-11 SEO 健檢 H2）。原本 en-US 的瀏覽器
- *    一載入就把整頁（<html lang>、title、h1、description）換成英文——而 Googlebot 的
- *    渲染器就是 en-US 的 Chromium，結果中文頁被當成英文頁收錄。SSR 輸出的永遠是中文，
- *    初次渲染必須跟它一致。英日文要被收錄，正解是 /en、/ja 網址前綴（需要業主決定），
- *    不是在同一個網址上偷換內容。
+ *   · **公開頁**（首頁、活動、選物、關於…）：一律看**網址**。/events 是中文、/en/events 是英文。
+ *     SSR 依網址輸出、瀏覽器第一次 render 也依網址，兩邊一定一致（不會 #418）。
+ *     localStorage 記住的語言**不會**讓中文頁自動換成英文（Googlebot 是 en-US 的 Chromium、
+ *     分享出去的中文連結也不該被轉走）；只會在中文頁顯示一個不擋畫面的「View in English?」提示
+ *     （LanguageHint）。
+ *   · **私密頁**（購物車、結帳、會員、後台…；沒有 /en 網址）：沿用訪客記住的語言
+ *     （localStorage），掛載之後才讀——SSR 與第一次 render 都是中文，同原本的做法。
+ *
+ * 記住的語言什麼時候寫入：按語言切換鈕、或打開 /en、/ja 的頁面（之後的購物車、結帳介面
+ * 延續同一個語言）。打開中文頁**不**寫入（中文是預設值，不代表訪客選了中文）。
+ *
+ * 🔴 不要再依 navigator.language 自動換語言（2026-11 SEO 健檢 H2）。
+ *
+ * urlLang：由 __root.tsx 依目前網址算好傳進來（src/lib/seo/i18n.ts 的 publicLangOf）。
+ *   Lang = 公開頁的語言；null = 私密頁；undefined = 沒有 router 的地方（selftest 的
+ *   renderToStaticMarkup）——當作私密頁處理。
  */
-function detectInitial(): Lang {
-  if (typeof window === "undefined") return "zh";
+export const LANG_STORAGE_KEY = "interval-books-lang";
+
+export function readStoredLang(): Lang | null {
+  if (typeof window === "undefined") return null;
   try {
-    const saved = window.localStorage.getItem(STORAGE_KEY) as Lang | null;
+    const saved = window.localStorage.getItem(LANG_STORAGE_KEY) as Lang | null;
     if (saved === "zh" || saved === "en" || saved === "ja") return saved;
   } catch {
     /* ignore */
   }
-  return "zh";
+  return null;
 }
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("zh");
+export function writeStoredLang(l: Lang) {
+  try {
+    window.localStorage.setItem(LANG_STORAGE_KEY, l);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function LanguageProvider({
+  children,
+  urlLang,
+}: {
+  children: ReactNode;
+  urlLang?: Lang | null;
+}) {
+  // 記住的語言：只在掛載後讀（SSR 讀不到 localStorage）。
+  const [stored, setStored] = useState<Lang | null>(null);
 
   useEffect(() => {
-    const initial = detectInitial();
-    setLangState(initial);
+    setStored(readStoredLang());
   }, []);
 
+  // 打開 /en、/ja 的頁面 = 選了那個語言（購物車、結帳沿用）。
+  useEffect(() => {
+    if (urlLang === "en" || urlLang === "ja") {
+      writeStoredLang(urlLang);
+      setStored(urlLang);
+    }
+  }, [urlLang]);
+
+  const lang: Lang = urlLang ?? stored ?? "zh";
+
+  // 私密頁：頁首、頁尾的站內連結跟著介面語言（直接載入 /cart 時 router 還以為是中文）。
+  // 只在掛載後（stored 有值）才做，SSR 與 hydration 的 href 維持一致。
+  useEffect(() => {
+    if (urlLang == null && stored) syncRouterLang(stored);
+  }, [urlLang, stored]);
+
+  // <html lang>：公開頁由 __root.tsx 的 RootShell 依網址輸出（SSR 就對）；私密頁跟著記住的語言。
+  // urlLang 也列進依賴：從 /en/shop 換頁到 /cart 時 RootShell 會把 lang 寫回預設值，這裡要再蓋一次。
   useEffect(() => {
     if (typeof document !== "undefined") {
       document.documentElement.lang = lang === "zh" ? "zh-Hant" : lang === "ja" ? "ja" : "en";
     }
-  }, [lang]);
+  }, [lang, urlLang]);
 
   const setLang = (l: Lang) => {
-    setLangState(l);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, l);
-    } catch {
-      /* ignore */
-    }
+    setStored(l);
+    writeStoredLang(l);
   };
 
   const t = (entry: Localized) => entry[lang] || entry.zh;
 
   return (
-    <LanguageContext.Provider value={{ lang, setLang, t }}>{children}</LanguageContext.Provider>
+    <LanguageContext.Provider value={{ lang, setLang, t, urlLang: urlLang ?? null, stored }}>
+      {children}
+    </LanguageContext.Provider>
   );
 }
 
@@ -79,8 +127,15 @@ export function FixedLanguage({ lang, children }: { lang: Lang; children: ReactN
   const parent = useLang();
   const t = (entry: Localized) => entry[lang] || entry.zh;
   return (
-    <LanguageContext.Provider value={{ lang, setLang: parent.setLang, t }}>
-      {children}
-    </LanguageContext.Provider>
+    <LanguageContext.Provider value={{ ...parent, lang, t }}>{children}</LanguageContext.Provider>
   );
+}
+
+/**
+ * 手寫的站內 `<a href>`（不是 <Link>）要帶上目前網址的語言前綴（/en、/ja）。
+ * <Link> 不需要：router 的 output rewrite 會自動加（src/lib/i18n-rewrite.ts）。
+ */
+export function useLocalizeHref(): (href: string) => string {
+  const { urlLang } = useLang();
+  return (href: string) => localizeHref(href, urlLang ?? "zh");
 }

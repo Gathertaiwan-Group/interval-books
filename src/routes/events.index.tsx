@@ -8,7 +8,8 @@ import { newestEndedFirst } from "@/lib/past-shelf";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fitDescription } from "@/lib/seo/core";
-import { pageMeta } from "@/lib/seo/head";
+import { pageHead } from "@/lib/seo/head";
+import { pageRowTranslation } from "@/lib/seo/pages";
 import { eyebrowOf, fetchEventCategories, fetchEvents, fetchPage, pageText } from "@/lib/cms";
 import { CARD, featureLayout } from "@/lib/feature-layout";
 import { useSiteContent } from "@/lib/site-content";
@@ -118,17 +119,21 @@ export const Route = createFileRoute("/events/")({
     ]);
     return { page, events, categories };
   },
-  head: ({ loaderData }) => {
+  head: ({ loaderData, matches, match }) => {
     const p = pageText(loaderData?.page ?? null);
     const ogImg = imageFor(loaderData?.page?.ogImageKey, eventImg);
     return {
-      meta: pageMeta({
-        title: p.metaTitle(PAGE.metaTitle),
-        description: fitDescription(p.metaDescription(PAGE.metaDescription)),
-        ogTitle: p.ogTitle(PAGE.title),
-        image: ogImg,
-        type: "website",
-      }),
+      ...pageHead(
+        { matches, match },
+        {
+          translation: pageRowTranslation(loaderData?.page ?? null),
+          title: p.metaTitle(PAGE.metaTitle),
+          description: fitDescription(p.metaDescription(PAGE.metaDescription)),
+          ogTitle: p.ogTitle(PAGE.title),
+          image: ogImg,
+          type: "website",
+        },
+      ),
     };
   },
   component: Events,

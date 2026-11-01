@@ -1,12 +1,15 @@
 /**
  * 原站的兩個主理人內頁（/hosts/fan-yishun、/hosts/alice）的章節，轉換方式同 MainSections.tsx。
  */
+import { useLocalizeHref } from "@/i18n/LanguageContext";
 import { IMG } from "./images";
 
 export function FanNav() {
+  // 站內連結帶上目前網址的語言前綴（/en、/ja 版本點了不會跳回中文）。
+  const lh = useLocalizeHref();
   return (
     <nav className="kt-editorial-container kt-host-page-nav" aria-label="人物專頁導覽">
-      <a className="kt-host-back" href="/events/kungtung#hosts">
+      <a className="kt-host-back" href={lh("/events/kungtung#hosts")}>
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="16"
@@ -25,7 +28,7 @@ export function FanNav() {
         </svg>
         回到旅程首頁
       </a>
-      <a className="kt-host-back" href="/events/kungtung#register">
+      <a className="kt-host-back" href={lh("/events/kungtung#register")}>
         預約這趟文化旅程
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -422,11 +425,13 @@ export function FanSection3() {
 }
 
 export function FanSection4() {
+  // 站內連結帶上目前網址的語言前綴（/en、/ja 版本點了不會跳回中文）。
+  const lh = useLocalizeHref();
   return (
     <section className="kt-editorial-container kt-host-page-cta">
       <p className="kt-eyebrow">2026.12.04–12.06｜台東・三天兩夜</p>
       <h2 className="kt-section-title">有些故事，值得親自走進去。</h2>
-      <a className="kt-journey-button kt-host-cta-link" href="/events/kungtung#register">
+      <a className="kt-journey-button kt-host-cta-link" href={lh("/events/kungtung#register")}>
         預約這趟文化旅程
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -449,9 +454,11 @@ export function FanSection4() {
   );
 }
 export function AliceNav() {
+  // 站內連結帶上目前網址的語言前綴（/en、/ja 版本點了不會跳回中文）。
+  const lh = useLocalizeHref();
   return (
     <nav className="kt-editorial-container kt-host-page-nav" aria-label="人物專頁導覽">
-      <a className="kt-host-back" href="/events/kungtung#hosts">
+      <a className="kt-host-back" href={lh("/events/kungtung#hosts")}>
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="16"
@@ -470,7 +477,7 @@ export function AliceNav() {
         </svg>
         回到旅程首頁
       </a>
-      <a className="kt-host-back" href="/events/kungtung#register">
+      <a className="kt-host-back" href={lh("/events/kungtung#register")}>
         預約這趟文化旅程
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -627,11 +634,13 @@ export function AliceSection3() {
 }
 
 export function AliceSection4() {
+  // 站內連結帶上目前網址的語言前綴（/en、/ja 版本點了不會跳回中文）。
+  const lh = useLocalizeHref();
   return (
     <section className="kt-editorial-container kt-host-page-cta">
       <p className="kt-eyebrow">2026.12.04–12.06｜台東・三天兩夜</p>
       <h2 className="kt-section-title">有些故事，值得親自走進去。</h2>
-      <a className="kt-journey-button kt-host-cta-link" href="/events/kungtung#register">
+      <a className="kt-journey-button kt-host-cta-link" href={lh("/events/kungtung#register")}>
         預約這趟文化旅程
         <svg
           xmlns="http://www.w3.org/2000/svg"

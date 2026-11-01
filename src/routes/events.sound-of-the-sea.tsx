@@ -5,7 +5,7 @@ import { PlanPicker } from "@/components/shop/PlanPicker";
 import { QuantityStepper } from "@/components/shop/ShopBits";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fitDescription } from "@/lib/seo/core";
-import { pageMeta } from "@/lib/seo/head";
+import { langFromMatches, pageHead, withLinks } from "@/lib/seo/head";
 import { eventEnded, landingEventLd, storeAddressFromMatches } from "@/lib/seo/pages";
 import {
   directAnySeatsLeft,
@@ -135,31 +135,37 @@ export const Route = createFileRoute("/events/sound-of-the-sea")({
   loader: async () => ({ ...(await fetchActiveProductForEventSlug(EVENT_SLUG)), now: Date.now() }),
   // SEO（2026-11 健檢）：Event JSON-LD 的日期、地點、價格取自售票商品的場次與票種
   // （與報名區同一份資料），名稱與描述用這一頁的 PAGE 常數。
-  head: ({ loaderData, matches }) => ({
-    meta: pageMeta({
-      title: PAGE.metaTitle,
-      description: fitDescription(PAGE.metaDescription),
-      image: imageFor(POSTER_KEY, ""),
-      type: "article",
-      jsonLd: landingEventLd({
-        path: "/events/" + EVENT_SLUG,
-        name: "胡海音《海的聲音》手作繪本分享會",
-        description: fitDescription(PAGE.metaDescription).zh,
-        imageKey: POSTER_KEY,
-        product: loaderData?.product ?? null,
-        store: storeAddressFromMatches(matches),
-        performer: "胡海音",
-      }),
-    }),
-    links: [
-      // 稿用的是 Noto Serif TC 400/600 與 Noto Sans TC 400/500；全站只載了
-      // Serif 300–500，「應付總額」那個 600 要這一頁自己補。
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500&family=Noto+Serif+TC:wght@400;600&display=swap",
-      },
-    ],
-  }),
+  head: ({ matches, match, loaderData }) =>
+    withLinks(
+      pageHead(
+        { matches, match },
+        {
+          translation: "zh-only",
+          title: PAGE.metaTitle,
+          description: fitDescription(PAGE.metaDescription),
+          image: imageFor(POSTER_KEY, ""),
+          type: "article",
+          jsonLd: landingEventLd({
+            path: "/events/" + EVENT_SLUG,
+            name: "胡海音《海的聲音》手作繪本分享會",
+            description: fitDescription(PAGE.metaDescription).zh,
+            imageKey: POSTER_KEY,
+            product: loaderData?.product ?? null,
+            store: storeAddressFromMatches(matches),
+            lang: langFromMatches(matches),
+            performer: "胡海音",
+          }),
+        },
+      ),
+      [
+        // 稿用的是 Noto Serif TC 400/600 與 Noto Sans TC 400/500；全站只載了
+        // Serif 300–500，「應付總額」那個 600 要這一頁自己補。
+        {
+          rel: "stylesheet",
+          href: "https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500&family=Noto+Serif+TC:wght@400;600&display=swap",
+        },
+      ],
+    ),
   component: SoundOfTheSea,
 });
 

@@ -3,10 +3,11 @@ import { PageShell, PageHeader } from "@/components/PageShell";
 import { CoverImage } from "@/components/CoverImage";
 import { PastShelf } from "@/components/PastShelf";
 import { linkedEventFor, splitJourneys } from "@/lib/past-shelf";
-import { useT } from "@/i18n/LanguageContext";
+import { useLocalizeHref, useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fitDescription } from "@/lib/seo/core";
-import { pageMeta } from "@/lib/seo/head";
+import { pageHead } from "@/lib/seo/head";
+import { pageRowTranslation } from "@/lib/seo/pages";
 import { fetchJourneyEventDates, fetchJourneys, fetchPage, pageText, eyebrowOf } from "@/lib/cms";
 import { CARD, CARD_HOVER, featureLayout } from "@/lib/feature-layout";
 import { useSiteContent } from "@/lib/site-content";
@@ -65,16 +66,20 @@ export const Route = createFileRoute("/journeys")({
     ]);
     return { page, journeys, journeyEvents };
   },
-  head: ({ loaderData }) => {
+  head: ({ loaderData, matches, match }) => {
     const p = pageText(loaderData?.page ?? null);
     return {
-      meta: pageMeta({
-        title: p.metaTitle(PAGE.metaTitle),
-        description: fitDescription(p.metaDescription(PAGE.metaDescription)),
-        ogTitle: p.ogTitle(PAGE.title),
-        image: imageFor(loaderData?.page?.ogImageKey, journeyImg),
-        type: "website",
-      }),
+      ...pageHead(
+        { matches, match },
+        {
+          translation: pageRowTranslation(loaderData?.page ?? null),
+          title: p.metaTitle(PAGE.metaTitle),
+          description: fitDescription(p.metaDescription(PAGE.metaDescription)),
+          ogTitle: p.ogTitle(PAGE.title),
+          image: imageFor(loaderData?.page?.ogImageKey, journeyImg),
+          type: "website",
+        },
+      ),
     };
   },
   component: Journeys,
@@ -82,6 +87,7 @@ export const Route = createFileRoute("/journeys")({
 
 function Journeys() {
   const t = useT();
+  const localizeHref = useLocalizeHref();
   const { page, journeys: allJourneys, journeyEvents } = Route.useLoaderData();
   const p = pageText(page);
   const { ui, contactEmail } = useSiteContent();
@@ -117,7 +123,7 @@ function Journeys() {
           {journeys.map((j) => {
             // 與首頁「精選策旅」同一種卡片：有連結就整張卡可點，還沒設連結的策旅
             // 仍然看得到卡片，只是不可點（不要讓它消失）。
-            const link = journeyLinkProps(j.externalUrl);
+            const link = journeyLinkProps(j.externalUrl, localizeHref);
             const body = (
               <>
                 {/* journeys 表沒有 image_key；封面用卡片指著的那場活動的 events.image_key
@@ -171,7 +177,7 @@ function Journeys() {
         title={t(p.block("pastTitle", PAGE.pastTitle))}
         badge={t(p.block("pastBadge", PAGE.pastBadge))}
         items={ended.map(({ journey: j, event: e }) => {
-          const link = journeyLinkProps(j.externalUrl);
+          const link = journeyLinkProps(j.externalUrl, localizeHref);
           return {
             key: j.id,
             title: t(j.title),

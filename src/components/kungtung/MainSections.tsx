@@ -8,6 +8,7 @@
  *
  * ⚠️ 內容寫死在這裡，後台改不到；/admin 改這一場只影響列表卡片與結帳品項名稱。
  */
+import { useLocalizeHref } from "@/i18n/LanguageContext";
 import { IMG } from "./images";
 
 /**
@@ -391,6 +392,8 @@ export function Values() {
 }
 
 export function Hosts() {
+  // 站內連結帶上目前網址的語言前綴（/en、/ja 版本點了不會跳回中文）。
+  const lh = useLocalizeHref();
   return (
     <section id="hosts" className="kt-section-band">
       <div className="kt-editorial-container">
@@ -447,7 +450,7 @@ export function Hosts() {
                   大愛電視《愛悅讀》，一路走讀公東的教堂
                 </a>
               </div>
-              <a className="kt-host-more-link" href="/events/kungtung/hosts/fan-yishun">
+              <a className="kt-host-more-link" href={lh("/events/kungtung/hosts/fan-yishun")}>
                 閱讀范毅舜的完整經歷、著作與報導
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -502,7 +505,7 @@ export function Hosts() {
               <p className="kt-alice-text">
                 不只是帶大家去看一座教堂，更希望每位旅人，都能帶著新的感動回到生活。
               </p>
-              <a className="kt-host-more-link" href="/events/kungtung/hosts/alice">
+              <a className="kt-host-more-link" href={lh("/events/kungtung/hosts/alice")}>
                 閱讀 Alice 的完整經歷
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

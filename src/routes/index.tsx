@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { CoverImage } from "@/components/CoverImage";
 import { HomeProductShelf } from "@/components/shop/HomeProductShelf";
-import { useT } from "@/i18n/LanguageContext";
+import { useLocalizeHref, useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fetchEvents, fetchJourneyEventDates, fetchJourneys, fetchPage, pageText } from "@/lib/cms";
 import { useSiteContent } from "@/lib/site-content";
@@ -16,7 +16,8 @@ import curatedImg from "@/assets/curated-objects.jpg";
 import journeyImg from "@/assets/journey-mist.jpg";
 import { journeyLinkProps } from "@/lib/journey-link";
 import { fitDescription } from "@/lib/seo/core";
-import { pageMeta } from "@/lib/seo/head";
+import { pageHead } from "@/lib/seo/head";
+import { pageRowTranslation } from "@/lib/seo/pages";
 import { linkedEventFor, splitJourneys } from "@/lib/past-shelf";
 
 /** Fallback copy — used only when the Supabase read fails. */
@@ -122,17 +123,21 @@ export const Route = createFileRoute("/")({
     ]);
     return { page, events, journeys, journeyEvents, shelf };
   },
-  head: ({ loaderData }) => {
+  head: ({ loaderData, matches, match }) => {
     const p = pageText(loaderData?.page ?? null);
     const ogImg = imageFor(loaderData?.page?.ogImageKey, heroImg);
     return {
-      meta: pageMeta({
-        title: p.metaTitle(PAGE_META.title),
-        description: fitDescription(p.metaDescription(HERO.intro), PAGE_META.description),
-        ogTitle: p.ogTitle(HERO.titleSub),
-        image: ogImg,
-        type: "website",
-      }),
+      ...pageHead(
+        { matches, match },
+        {
+          translation: pageRowTranslation(loaderData?.page ?? null),
+          title: p.metaTitle(PAGE_META.title),
+          description: fitDescription(p.metaDescription(HERO.intro), PAGE_META.description),
+          ogTitle: p.ogTitle(HERO.titleSub),
+          image: ogImg,
+          type: "website",
+        },
+      ),
     };
   },
   component: Index,
@@ -140,6 +145,7 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const t = useT();
+  const localizeHref = useLocalizeHref();
   const { page, events, journeys, journeyEvents, shelf } = Route.useLoaderData();
   const shelfProducts = shelf.products;
 
@@ -275,7 +281,7 @@ function Index() {
             {featuredJourneys.map((j) => {
               // 策旅的連結可能是站內路徑、也可能是外部網站（見 journeyLinkProps）。
               // 還沒設連結的策旅仍然要看得到卡片，只是整張卡不可點——不要讓它消失。
-              const link = journeyLinkProps(j.externalUrl);
+              const link = journeyLinkProps(j.externalUrl, localizeHref);
               const body = (
                 <>
                   {/* journeys 表沒有 image_key；封面用卡片指著的那場活動的 events.image_key

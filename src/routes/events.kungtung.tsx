@@ -6,7 +6,7 @@ import { QuantityStepper } from "@/components/shop/ShopBits";
 import { FixedLanguage } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fitDescription } from "@/lib/seo/core";
-import { pageMeta } from "@/lib/seo/head";
+import { langFromMatches, pageHead, withLinks } from "@/lib/seo/head";
 import { eventEnded, landingEventLd, storeAddressFromMatches } from "@/lib/seo/pages";
 import {
   directAnySeatsLeft,
@@ -112,27 +112,33 @@ export const Route = createFileRoute("/events/kungtung")({
   loader: async () => ({ ...(await fetchActiveProductForEventSlug(EVENT_SLUG)), now: Date.now() }),
   // SEO（2026-11 健檢）：Event JSON-LD 的日期、地點、價格取自售票商品的場次與票種
   // （與報名區同一份資料），名稱與描述用這一頁的 PAGE 常數。
-  head: ({ loaderData, matches }) => ({
-    meta: pageMeta({
-      title: PAGE.metaTitle,
-      description: fitDescription(PAGE.metaDescription),
-      image: imageFor(HERO_KEY, ""),
-      type: "article",
-      jsonLd: landingEventLd({
-        path: "/events/" + EVENT_SLUG,
-        name: "范毅舜公東教堂文化之旅｜台東三天兩夜",
-        description: fitDescription(PAGE.metaDescription).zh,
-        imageKey: HERO_KEY,
-        product: loaderData?.product ?? null,
-        store: storeAddressFromMatches(matches),
-        performer: "范毅舜",
-      }),
-    }),
-    links: [
-      { rel: "stylesheet", href: FONTS_HREF },
-      { rel: "stylesheet", href: kungtungCss },
-    ],
-  }),
+  head: ({ matches, match, loaderData }) =>
+    withLinks(
+      pageHead(
+        { matches, match },
+        {
+          translation: "zh-only",
+          title: PAGE.metaTitle,
+          description: fitDescription(PAGE.metaDescription),
+          image: imageFor(HERO_KEY, ""),
+          type: "article",
+          jsonLd: landingEventLd({
+            path: "/events/" + EVENT_SLUG,
+            name: "范毅舜公東教堂文化之旅｜台東三天兩夜",
+            description: fitDescription(PAGE.metaDescription).zh,
+            imageKey: HERO_KEY,
+            product: loaderData?.product ?? null,
+            store: storeAddressFromMatches(matches),
+            lang: langFromMatches(matches),
+            performer: "范毅舜",
+          }),
+        },
+      ),
+      [
+        { rel: "stylesheet", href: FONTS_HREF },
+        { rel: "stylesheet", href: kungtungCss },
+      ],
+    ),
   component: KungtungJourney,
 });
 

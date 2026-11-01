@@ -19,8 +19,8 @@ import {
 import { isSessionClosedForBooking } from "@/lib/event-status";
 import { useBookingNow } from "@/hooks/use-booking-now";
 import { imageFor } from "@/lib/images";
-import { pageMeta } from "@/lib/seo/head";
-import { productSeo } from "@/lib/seo/pages";
+import { langFromMatches, pageHead } from "@/lib/seo/head";
+import { contentTranslation, productSeo } from "@/lib/seo/pages";
 import { unavailableHeaders } from "@/lib/seo/status";
 import {
   fetchActiveProductBySlug,
@@ -120,16 +120,21 @@ export const Route = createFileRoute("/shop/$slug")({
   },
   // SEO（2026-11 健檢）：title「{品名}｜{類別}｜小時光書店」、描述取摘要＋介紹文、
   // JSON-LD 輸出 Product（刊物另標 Book）與麵包屑。組裝在 src/lib/seo/pages.ts#productSeo。
-  head: ({ loaderData }) => {
-    const seo = productSeo(loaderData?.product ?? null, PAGE, curatedImg);
+  head: ({ loaderData, matches, match }) => {
+    const product = loaderData?.product ?? null;
+    const seo = productSeo(product, PAGE, curatedImg, langFromMatches(matches));
     return {
-      meta: pageMeta({
-        title: seo.title,
-        description: seo.description,
-        image: seo.image,
-        type: "product",
-        jsonLd: seo.jsonLd,
-      }),
+      ...pageHead(
+        { matches, match },
+        {
+          translation: contentTranslation(product),
+          title: seo.title,
+          description: seo.description,
+          image: seo.image,
+          type: "product",
+          jsonLd: seo.jsonLd,
+        },
+      ),
     };
   },
   // 讀不到商品（不是查無此商品）→ 503 + Retry-After。

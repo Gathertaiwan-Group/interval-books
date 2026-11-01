@@ -9,6 +9,9 @@
  *   - robots.txt 有 Sitemap 一行、擋後台；sitemap.xml 是合法 XML，抽查網址都回 200
  *   - 轉址：尾斜線 308／301、/EVENTS 301 到 /events；?utm_source 的 canonical 是乾淨網址
  *   - noindex：/admin/login 有 robots noindex 與 X-Robots-Tag；404 頁回 404 且 noindex
+ *   - 英日文網址（2026-11 /en /ja）：<html lang>、canonical 指自己、hreflang 三語＋x-default 且
+ *     互相對應、站內連結帶前綴、中文限定著陸頁的英日版 noindex、私密頁 404、轉址、Vary、
+ *     （見 checkLanguageVersions()）
  *
  * 用法：
  *   node scripts/check-seo.mjs                          # 預設打 https://www.intervalbooks.tw
@@ -496,10 +499,205 @@ async function checkRedirectsAndNoindex() {
   ok("gtag config 關掉自動 page_view", /send_page_view:false/.test(home));
 }
 
+// =============================================================================
+// 英日文網址（2026-11 /en /ja，src/lib/seo/i18n.ts）
+// =============================================================================
+
+const LANG_INFO = {
+  en: { html: "en", og: "en_US", ld: "en" },
+  ja: { html: "ja", og: "ja_JP", ld: "ja" },
+};
+const PRIVATE_RE = /^\/(admin|vendor|checkout|cart|account|auth|oauth|api)(\/|$|\?)/;
+
+function localized(path, lang) {
+  if (lang === "zh") return path;
+  const [p, q] = path.split("?");
+  return `/${lang}${p === "/" ? "" : p}${q ? `?${q}` : ""}`;
+}
+
+function alternatesOf(html) {
+  return [...html.matchAll(/<link\b[^>]*>/g)]
+    .map((m) => attrsOf(m[0]))
+    .filter((l) => l.rel === "alternate" && l.hreflang)
+    .map((l) => [l.hreflang, l.href]);
+}
+
+/** 有翻譯的頁：三語都可收錄。 */
+const LANG_PAGES = [
+  "/",
+  "/events",
+  "/events/InntervalChishang.1023",
+  "/journeys",
+  "/shop",
+  "/shop?tab=publications",
+  "/shop/pub-tw-001",
+  "/about",
+  "/curation",
+  "/privacy",
+];
+
+async function checkLanguageVersions() {
+  console.log("\n[英日文網址]");
+  const zhHtml = new Map();
+  for (const path of LANG_PAGES) {
+    const zh = await get(path);
+    zhHtml.set(path, await zh.text());
+  }
+  for (const path of LANG_PAGES) {
+    const zhAlts = alternatesOf(zhHtml.get(path));
+    const zhHead = parseHead(zhHtml.get(path));
+    const zhH1 = zhHead.h1[0] ?? "";
+    const zhTitle = zhHead.title;
+    for (const lang of ["en", "ja"]) {
+      const lp = localized(path, lang);
+      const info = LANG_INFO[lang];
+      const res = await get(lp);
+      const html = await res.text();
+      const h = parseHead(html);
+      const self = `${ORIGIN}${lp}`;
+      console.log(`  ${lp}`);
+      ok(`${lp} 200`, res.status === 200, `實得 ${res.status}`);
+      ok(`${lp} <html lang="${info.html}">`, h.lang === info.html, h.lang);
+      ok(
+        `${lp} canonical 指向自己`,
+        h.canonicals.length === 1 && h.canonicals[0] === self,
+        h.canonicals.join(","),
+      );
+      ok(`${lp} og:url = canonical`, h.meta("og:url")[0] === self);
+      ok(`${lp} og:locale = ${info.og}`, h.meta("og:locale")[0] === info.og);
+      ok(`${lp} 沒有 noindex`, !h.meta("robots").some((v) => /noindex/.test(v)));
+      // 書名、刊物名在日文常常就是同一組漢字（東北風），那種頁看 title（類別名稱會換成日文）。
+      ok(
+        `${lp} h1／title 是譯文（≠ 中文版）`,
+        h.h1.length === 1 && (h.h1[0] !== zhH1 || h.title !== zhTitle),
+        `${h.h1.join(" / ")}｜${h.title}`,
+      );
+      const alts = alternatesOf(html);
+      const want = [
+        ["zh-Hant", `${ORIGIN}${path === "/" ? "/" : path}`],
+        ["en", `${ORIGIN}${localized(path, "en")}`],
+        ["ja", `${ORIGIN}${localized(path, "ja")}`],
+        ["x-default", `${ORIGIN}${path === "/" ? "/" : path}`],
+      ];
+      ok(
+        `${lp} hreflang 三語＋x-default`,
+        JSON.stringify([...alts].sort()) === JSON.stringify([...want].sort()),
+        JSON.stringify(alts),
+      );
+      ok(
+        `${lp} hreflang 與中文版互相對應`,
+        JSON.stringify([...alts].sort()) === JSON.stringify([...zhAlts].sort()),
+        JSON.stringify(zhAlts),
+      );
+      const nodes = [];
+      for (const raw of h.ldRaw) {
+        try {
+          flattenLd(JSON.parse(raw), nodes);
+        } catch {
+          /* checkPage 已檢查 */
+        }
+      }
+      const page = nodes.find((n) => typesOf(n).includes("WebPage"));
+      ok(
+        `${lp} JSON-LD WebPage inLanguage=${info.ld}`,
+        page?.inLanguage === info.ld && page?.url === self,
+      );
+      // 站內連結：語言切換鈕（有 hreflang 屬性）以外，一律帶前綴或是私密頁
+      const anchors = [...html.matchAll(/<a\b[^>]*>/g)].map((m) => attrsOf(m[0]));
+      const bad = anchors
+        .filter((a) => a.href && a.href.startsWith("/") && !a.href.startsWith("//") && !a.hreflang)
+        .map((a) => a.href)
+        .filter((href) => !href.startsWith(`/${lang}`) && !PRIVATE_RE.test(href));
+      ok(`${lp} 站內連結都帶 /${lang}`, bad.length === 0, bad.slice(0, 5).join(" "));
+      const switches = anchors.filter((a) => a.hreflang).map((a) => [a.hreflang, a.href]);
+      ok(
+        `${lp} 語言切換鈕連到對應網址`,
+        switches.some(([l, href]) => l === "zh-Hant" && href === path) &&
+          switches.some(([l, href]) => l === "en" && href === localized(path, "en")) &&
+          switches.some(([l, href]) => l === "ja" && href === localized(path, "ja")),
+        JSON.stringify(switches.slice(0, 3)),
+      );
+      const vary = (res.headers.get("vary") ?? "").toLowerCase();
+      ok(
+        `${lp} 沒有依 cookie／Accept-Language 的 Vary`,
+        !/cookie|accept-language/.test(vary),
+        vary,
+      );
+    }
+  }
+
+  console.log("\n[中文頁不跟著瀏覽器語言變]");
+  for (const al of ["en-US,en;q=0.9", "ja-JP,ja;q=0.9"]) {
+    const r = await fetch(`${BASE}/events`, { headers: { "accept-language": al } });
+    const h = parseHead(await r.text());
+    ok(`Accept-Language: ${al} 開 /events 仍是 zh-Hant`, h.lang === "zh-Hant", h.lang);
+  }
+
+  console.log("\n[中文限定著陸頁的英日版]");
+  for (const lp of [
+    "/en/events/kungtung",
+    "/ja/events/kungtung",
+    "/en/events/sound-of-the-sea",
+    "/ja/events/city-salon-0922",
+    "/en/events/kungtung/hosts/alice",
+  ]) {
+    const r = await get(lp);
+    const html = await r.text();
+    const h = parseHead(html);
+    ok(`${lp} 200`, r.status === 200, `實得 ${r.status}`);
+    ok(
+      `${lp} noindex`,
+      h.meta("robots").some((v) => /noindex/.test(v)),
+    );
+    ok(
+      `${lp} 沒有 canonical／hreflang`,
+      h.canonicals.length === 0 && alternatesOf(html).length === 0,
+    );
+  }
+  const zhOnly = parseHead(await (await get("/events/kungtung")).text());
+  ok("/events/kungtung（中文）仍可收錄", !zhOnly.meta("robots").some((v) => /noindex/.test(v)));
+  const zhOnlyAlts = alternatesOf(await (await get("/events/kungtung")).text());
+  ok(
+    "/events/kungtung 的 hreflang 不含英日文",
+    !zhOnlyAlts.some(([l]) => l === "en" || l === "ja"),
+    JSON.stringify(zhOnlyAlts),
+  );
+
+  console.log("\n[私密頁沒有語言前綴]");
+  for (const p of ["/en/admin", "/en/admin/login", "/ja/cart", "/en/checkout", "/ja/account"]) {
+    const r = await get(p);
+    const h = parseHead(await r.text());
+    ok(`${p} 404（${r.status}）`, r.status === 404);
+    ok(
+      `${p} noindex`,
+      h.meta("robots").some((v) => /noindex/.test(v)),
+    );
+  }
+
+  console.log("\n[英日文的轉址]");
+  for (const [from, status, to] of [
+    ["/en/", [308], "/en"],
+    ["/en/events/", [308], "/en/events"],
+    ["/EN/Events", [301], "/en/events"],
+    ["/Ja/Shop/pub-tw-001", [301], "/ja/shop/pub-tw-001"],
+    ["/en/news", [301], "/en"],
+    ["/ja/news/whatever", [301], "/ja"],
+    ["/en/visit", [301], "/en/about"],
+    ["/en/events/inntervalchishang.1023", [301], "/en/events/InntervalChishang.1023"],
+    ["/ja/shop/PUB-TW-001", [301], "/ja/shop/pub-tw-001"],
+  ]) {
+    const r = await get(from);
+    const loc = (r.headers.get("location") ?? "").replace(/^https?:\/\/[^/]+/, "");
+    ok(`${from} → ${r.status} ${loc}`, status.includes(r.status) && loc === to);
+    await r.arrayBuffer();
+  }
+}
+
 console.log(`→ SEO_BASE = ${BASE}`);
 await checkRobotsAndSitemap();
 for (const page of PAGES) await checkPage(page);
 await checkRedirectsAndNoindex();
+await checkLanguageVersions();
 
 console.log(`\n${"─".repeat(52)}`);
 console.log(`check-seo: pass=${pass} fail=${fail}`);

@@ -15,7 +15,8 @@
  *   - JSON-LD：organizationLd()、websiteLd()、bookStoreLd()、eventLd()、productLd()、
  *     breadcrumbLd()——**只吃呼叫端給的資料**，沒有的欄位就不輸出，不在這裡編任何值。
  */
-import type { Localized } from "../../i18n/types";
+import type { Lang, Localized } from "../../i18n/types";
+import { isLocalizablePath, localizeHref, SITE_LANGS } from "./i18n.ts";
 
 // =============================================================================
 // 網址
@@ -96,6 +97,18 @@ export function canonicalPathname(pathname: string): string {
   p = p.replace(/\/{2,}/g, "/");
   if (p.length > 1 && p.endsWith("/")) p = p.replace(/\/+$/, "") || "/";
 
+  // 語言前綴（/en、/ja；大小寫不分）：前綴轉小寫、後面照中文的規則正規化。
+  // 剝掉前綴之後是私密路徑（/en/admin）→ 那不是一條有頁面的網址，只做上面兩件事。
+  const prefix = /^\/(en|ja)(?=\/|$)/i.exec(p);
+  if (prefix) {
+    const rest = canonicalPathname(p.slice(prefix[0].length) || "/");
+    if (isLocalizablePath(rest)) {
+      const lang = prefix[1].toLowerCase();
+      return rest === "/" ? `/${lang}` : `/${lang}${rest}`;
+    }
+    return p;
+  }
+
   const lower = p.toLowerCase();
   if (STATIC_SET.has(lower)) return lower;
 
@@ -121,13 +134,30 @@ export function shopTabOf(search: unknown): ShopIndexableTab | null {
  * `?tab=publications`／`?tab=curated`（兩個獨立內容的分頁，見 shop.index.tsx）。
  * `?tab=products` 就是 /shop 本身，所以不保留。
  */
-export function canonicalUrl(pathname: string, search?: unknown): string {
+export function canonicalUrl(pathname: string, search?: unknown, lang: Lang = "zh"): string {
   const path = canonicalPathname(pathname);
   if (path === "/shop") {
     const tab = shopTabOf(search);
-    if (tab) return `${SITE_ORIGIN}/shop?tab=${tab}`;
+    if (tab) return `${SITE_ORIGIN}${localizeHref(`/shop?tab=${tab}`, lang)}`;
   }
-  return path === "/" ? `${SITE_ORIGIN}/` : `${SITE_ORIGIN}${path}`;
+  const localized = localizeHref(path, lang);
+  return localized === "/" ? `${SITE_ORIGIN}/` : `${SITE_ORIGIN}${localized}`;
+}
+
+/**
+ * hreflang 用的一組網址（2026-11 /en /ja）：每個可收錄的語言一筆，外加 x-default 指向中文。
+ * pathname 是**不含前綴**的路徑；langs 只放可收錄的語言（見 i18n.ts 的 isLangIndexable）。
+ */
+export function alternateUrls(
+  pathname: string,
+  search: unknown,
+  langs: readonly Lang[],
+): Array<{ lang: Lang | "x-default"; href: string }> {
+  const out: Array<{ lang: Lang | "x-default"; href: string }> = SITE_LANGS.filter((l) =>
+    langs.includes(l),
+  ).map((l) => ({ lang: l, href: canonicalUrl(pathname, search, l) }));
+  if (langs.includes("zh")) out.push({ lang: "x-default", href: canonicalUrl(pathname, search) });
+  return out;
 }
 
 /**
@@ -204,7 +234,11 @@ function matchesPrefix(path: string, prefix: string): boolean {
 
 /** 這條路徑的頁面要不要 noindex（robots meta 與 X-Robots-Tag 共用同一份判斷）。 */
 export function isNoindexPath(pathname: string): boolean {
-  const p = canonicalPathname(pathname).toLowerCase();
+  // /en/checkout 這種（私密頁不加前綴）本來就是 404；仍照前綴後面那段判斷，回應一律帶 noindex。
+  const p =
+    canonicalPathname(pathname)
+      .toLowerCase()
+      .replace(/^\/(en|ja)(?=\/|$)/, "") || "/";
   return NOINDEX_PREFIXES.some((prefix) => matchesPrefix(p, prefix));
 }
 
@@ -391,7 +425,8 @@ export function websiteLd(facts: StoreFacts): JsonLd {
     "@id": WEBSITE_ID,
     name: facts.meta.siteName,
     url: `${SITE_ORIGIN}/`,
-    inLanguage: "zh-Hant-TW",
+    // 2026-11 起有 /en、/ja 版本（src/lib/seo/i18n.ts）。
+    inLanguage: ["zh-Hant-TW", "en", "ja"],
     publisher: { "@id": ORG_ID },
   };
 }

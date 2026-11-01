@@ -25,7 +25,8 @@ import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { eyebrowOf, fetchCuratedThemes, fetchPages, pageText } from "@/lib/cms";
 import { imageFor } from "@/lib/images";
 import { fitDescription, shopTabOf, type ShopIndexableTab } from "@/lib/seo/core";
-import { pageMeta } from "@/lib/seo/head";
+import { pageHead } from "@/lib/seo/head";
+import { pageRowTranslation } from "@/lib/seo/pages";
 import { fetchPublicationsForList } from "@/lib/publications";
 import { fetchActiveProductsForList } from "@/lib/shop";
 import curatedImg from "@/assets/curated-objects.jpg";
@@ -149,31 +150,41 @@ export const Route = createFileRoute("/shop/")({
       curatedThemes,
     };
   },
-  head: ({ loaderData, match }) => {
+  head: ({ loaderData, matches, match }) => {
     const tab = shopTabOf(match.search);
     const p = pageText(loaderData?.page ?? null);
     const pub = pageText(loaderData?.publicationsPage ?? null);
     const cur = pageText(loaderData?.curatedPage ?? null);
     const ogImg = imageFor(loaderData?.page?.ogImageKey, curatedImg);
     return {
-      meta: pageMeta({
-        title: byTab(
-          tab,
-          p.metaTitle(PAGE.metaTitle),
-          pub.metaTitle(PAGE.publicationsMetaTitle),
-          cur.metaTitle(PAGE.curatedMetaTitle),
-        ),
-        description: fitDescription(
-          byTab(
-            tab,
-            p.metaDescription(PAGE.metaDescription),
-            pub.metaDescription(PAGE.publicationsMetaDescription),
-            cur.metaDescription(PAGE.curatedMetaDescription),
+      ...pageHead(
+        { matches, match },
+        {
+          translation: pageRowTranslation(
+            tab === "publications"
+              ? (loaderData?.publicationsPage ?? null)
+              : tab === "curated"
+                ? (loaderData?.curatedPage ?? null)
+                : (loaderData?.page ?? null),
           ),
-        ),
-        image: ogImg,
-        type: "website",
-      }),
+          title: byTab(
+            tab,
+            p.metaTitle(PAGE.metaTitle),
+            pub.metaTitle(PAGE.publicationsMetaTitle),
+            cur.metaTitle(PAGE.curatedMetaTitle),
+          ),
+          description: fitDescription(
+            byTab(
+              tab,
+              p.metaDescription(PAGE.metaDescription),
+              pub.metaDescription(PAGE.publicationsMetaDescription),
+              cur.metaDescription(PAGE.curatedMetaDescription),
+            ),
+          ),
+          image: ogImg,
+          type: "website",
+        },
+      ),
     };
   },
   component: Shop,

@@ -6,8 +6,9 @@
  * SSR 與瀏覽器渲染後的 title 才會一致。
  */
 import { PRODUCT_TYPE_LABELS } from "@/components/shop/labels";
-import type { Localized } from "@/i18n/types";
-import type { EventDetailEntry } from "@/lib/cms";
+import type { Lang, Localized } from "@/i18n/types";
+import { localizeHref, type PageTranslation } from "./i18n";
+import type { EventDetailEntry, PageContent } from "@/lib/cms";
 import { isEventEnded } from "@/lib/event-status";
 import { imageFor } from "@/lib/images";
 import {
@@ -38,10 +39,42 @@ export type SeoBundle = {
   jsonLd: JsonLd[];
 };
 
-const HOME: Crumb = { name: "首頁", path: "/" };
-const EVENTS: Crumb = { name: "活動", path: "/events" };
-const SHOP: Crumb = { name: "選物", path: "/shop" };
-const PUBLICATIONS: Crumb = { name: "地方刊物", path: "/shop?tab=publications" };
+/** 麵包屑的一段：三語名稱＋不含語言前綴的路徑（crumb() 依語言組出來）。 */
+type LocalCrumb = { name: Localized; path: string };
+
+const HOME: LocalCrumb = { name: { zh: "首頁", en: "Home", ja: "ホーム" }, path: "/" };
+const EVENTS: LocalCrumb = {
+  name: { zh: "活動", en: "Events", ja: "イベント" },
+  path: "/events",
+};
+const SHOP: LocalCrumb = { name: { zh: "選物", en: "Shop", ja: "ショップ" }, path: "/shop" };
+const PUBLICATIONS: LocalCrumb = {
+  name: { zh: "地方刊物", en: "Local Publications", ja: "地域の刊行物" },
+  path: "/shop?tab=publications",
+};
+
+/** 麵包屑一段 → 該語言（名稱缺就用中文；路徑加上 /en、/ja 前綴）。 */
+function crumb(c: LocalCrumb, lang: Lang): Crumb {
+  return { name: c.name[lang] || c.name.zh, path: localizeHref(c.path, lang) };
+}
+
+function crumbsFor(lang: Lang, trail: LocalCrumb[], self: { name: string; path: string }): Crumb[] {
+  return [
+    ...trail.map((c) => crumb(c, lang)),
+    { name: self.name, path: localizeHref(self.path, lang) },
+  ];
+}
+
+/**
+ * 資料庫內容頁的「主要內容」（noindex 規則的輸入，見 i18n.ts 的 isLangIndexable）：
+ * 標題＋摘要＋內文。讀取失敗（null）→ "full"（那一頁會是 503，不需要另外 noindex）。
+ */
+export function contentTranslation(
+  row: { title: Localized; summary?: Localized | null; description?: Localized | null } | null,
+): PageTranslation {
+  if (!row) return "full";
+  return { title: row.title, body: [row.summary, row.description] };
+}
 
 /**
  * 「摘要。內文」串成一段描述的素材（各語言分開），交給 fitDescription() 截到合理長度。
@@ -70,8 +103,20 @@ function joinLocalized(...parts: Array<Localized | null | undefined>): Localized
   return { zh: join("zh"), en: join("en"), ja: join("ja") };
 }
 
+/**
+ * 由 pages 表驅動的固定頁（首頁、/events、/about…）：主要內容＝頁首標題＋頁首介紹＋
+ * 描述＋各個頁面區塊。讀取失敗（null，畫面用程式內建的三語預設文案）→ "full"。
+ */
+export function pageRowTranslation(page: PageContent | null): PageTranslation {
+  if (!page) return "full";
+  return {
+    title: page.headerTitle ?? page.metaTitle,
+    body: [page.headerIntro, page.metaDescription, ...Object.values(page.blocks)],
+  };
+}
+
 /** ShopSession → JSON-LD 用的場次（可不可買沿用 shop.ts 的規則：名額＋販售期間）。 */
-function ldSessions(sessions: ShopSession[]): LdSession[] {
+function ldSessions(sessions: ShopSession[], lang: Lang = "zh"): LdSession[] {
   return sessions.map((s) => ({
     id: s.id,
     location: s.location.zh,
@@ -79,7 +124,7 @@ function ldSessions(sessions: ShopSession[]): LdSession[] {
     endsAt: s.endsAt,
     available: remainingForSession(s) > 0,
     plans: s.plans.map((p) => ({
-      name: p.title.zh,
+      name: p.title[lang] || p.title.zh,
       price: p.price,
       available: isPlanAvailable(p) && remainingForSession(s) >= Math.max(1, p.seatsPerUnit),
     })),
@@ -124,6 +169,7 @@ export function eventSeo(
   product: ShopProduct | null,
   fallback: { metaTitle: Localized; metaDescription: Localized },
   store: StoreAddress | null = null,
+  lang: Lang = "zh",
 ): SeoBundle {
   if (!event) {
     return {
@@ -134,10 +180,10 @@ export function eventSeo(
     };
   }
   const path = `/events/${event.slug}`;
-  const url = canonicalUrl(path);
+  const url = canonicalUrl(path, undefined, lang);
   const description = fitDescription(joinLocalized(event.summary, event.description));
   const image = event.imageKey ? imageFor(event.imageKey, "") : null;
-  const name = stripForeignBrandSuffix(event.title.zh);
+  const name = stripForeignBrandSuffix(event.title[lang] || event.title.zh);
   return {
     title: seoTitle(event.title, event.date || null),
     description,
@@ -145,16 +191,16 @@ export function eventSeo(
     jsonLd: [
       ...eventLd({
         name,
-        description: description.zh,
+        description: description[lang] || description.zh,
         url,
         image,
-        sessions: product ? ldSessions(product.sessions) : [],
+        sessions: product ? ldSessions(product.sessions, lang) : [],
         basePrice: product ? product.price : null,
         performer: event.speaker?.name || null,
         ended: eventEnded(event.isoDate, product),
         store,
       }),
-      breadcrumbLd([HOME, EVENTS, { name, path }]),
+      breadcrumbLd(crumbsFor(lang, [HOME, EVENTS], { name, path })),
     ],
   };
 }
@@ -172,13 +218,16 @@ export function landingEventLd(opts: {
   product: ShopProduct | null;
   performer?: string | null;
   store?: StoreAddress | null;
+  /** 著陸頁內容只有中文；/en、/ja 版本 noindex，網址仍指向該語言版本自己。 */
+  lang?: Lang;
 }): JsonLd[] {
   const image = opts.imageKey ? imageFor(opts.imageKey, "") : null;
+  const lang = opts.lang ?? "zh";
   return [
     ...eventLd({
       name: opts.name,
       description: opts.description,
-      url: canonicalUrl(opts.path),
+      url: canonicalUrl(opts.path, undefined, lang),
       image,
       sessions: opts.product ? ldSessions(opts.product.sessions) : [],
       basePrice: opts.product ? opts.product.price : null,
@@ -186,13 +235,25 @@ export function landingEventLd(opts: {
       ended: eventEnded(null, opts.product),
       store: opts.store ?? null,
     }),
-    breadcrumbLd([HOME, EVENTS, { name: opts.name, path: opts.path }]),
+    breadcrumbLd(crumbsFor(lang, [HOME, EVENTS], { name: opts.name, path: opts.path })),
   ];
 }
 
 /** 著陸頁子頁（主理人介紹）的麵包屑：首頁 › 活動 › 著陸頁 › 這一頁。 */
-export function landingSubpageLd(parent: Crumb, self: Crumb): JsonLd[] {
-  return [breadcrumbLd([HOME, EVENTS, parent, self])];
+export function landingSubpageLd(parent: Crumb, self: Crumb, lang: Lang = "zh"): JsonLd[] {
+  return [
+    breadcrumbLd(
+      crumbsFor(
+        lang,
+        [
+          HOME,
+          EVENTS,
+          { name: { zh: parent.name, en: parent.name, ja: parent.name }, path: parent.path },
+        ],
+        self,
+      ),
+    ),
+  ];
 }
 
 /** 地方刊物（pub-*）在 /shop 的分頁裡，類別名稱跟著分頁叫「地方刊物」。 */
@@ -211,6 +272,7 @@ export function productSeo(
   product: ShopProduct | null,
   fallback: { metaTitle: Localized; metaDescription: Localized },
   fallbackImage: string,
+  lang: Lang = "zh",
 ): SeoBundle {
   if (!product) {
     return {
@@ -225,7 +287,7 @@ export function productSeo(
   const category = pub ? PUBLICATION_LABEL : PRODUCT_TYPE_LABELS[product.productType];
   const description = fitDescription(joinLocalized(product.summary, product.description));
   const image = imageFor(product.imageKey, fallbackImage);
-  const name = product.title.zh;
+  const name = product.title[lang] || product.title.zh;
   return {
     title: seoTitle(product.title, category),
     description,
@@ -233,16 +295,18 @@ export function productSeo(
     jsonLd: [
       productLd({
         name,
-        description: description.zh,
-        url: canonicalUrl(path),
+        description: description[lang] || description.zh,
+        url: canonicalUrl(path, undefined, lang),
         image: product.imageKey ? image : null,
         sku: product.slug,
         price: product.price,
         inStock: !isSoldOut(product),
         isBook: product.productType === "book",
-        category: category.zh,
+        category: category[lang] || category.zh,
       }),
-      breadcrumbLd(pub ? [HOME, SHOP, PUBLICATIONS, { name, path }] : [HOME, SHOP, { name, path }]),
+      breadcrumbLd(
+        crumbsFor(lang, pub ? [HOME, SHOP, PUBLICATIONS] : [HOME, SHOP], { name, path }),
+      ),
     ],
   };
 }

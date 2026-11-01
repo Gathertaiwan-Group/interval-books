@@ -7,7 +7,7 @@ import { PlanPicker } from "@/components/shop/PlanPicker";
 import { QuantityStepper } from "@/components/shop/ShopBits";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fitDescription } from "@/lib/seo/core";
-import { pageMeta } from "@/lib/seo/head";
+import { langFromMatches, pageHead, withLinks } from "@/lib/seo/head";
 import { eventEnded, landingEventLd, storeAddressFromMatches } from "@/lib/seo/pages";
 import { CARD } from "@/lib/feature-layout";
 import {
@@ -191,23 +191,30 @@ export const Route = createFileRoute("/events/city-salon-0922")({
   loader: async () => ({ ...(await fetchActiveProductForEventSlug(EVENT_SLUG)), now: Date.now() }),
   // SEO（2026-11 健檢）：Event JSON-LD 的日期、地點、價格取自售票商品的場次與票種
   // （與報名區同一份資料），名稱與描述用這一頁的 PAGE 常數。
-  head: ({ loaderData, matches }) => ({
-    meta: pageMeta({
-      title: PAGE.metaTitle,
-      description: fitDescription(PAGE.metaDescription),
-      image: imageFor(OG_IMAGE_KEY, ""),
-      type: "article",
-      jsonLd: landingEventLd({
-        path: "/events/" + EVENT_SLUG,
-        name: "城市思享沙龍 #01｜台東，不只是遠方",
-        description: fitDescription(PAGE.metaDescription).zh,
-        imageKey: OG_IMAGE_KEY,
-        product: loaderData?.product ?? null,
-        store: storeAddressFromMatches(matches),
-        performer: null,
-      }),
-    }),
-  }),
+  head: ({ matches, match, loaderData }) =>
+    withLinks(
+      pageHead(
+        { matches, match },
+        {
+          translation: "zh-only",
+          title: PAGE.metaTitle,
+          description: fitDescription(PAGE.metaDescription),
+          image: imageFor(OG_IMAGE_KEY, ""),
+          type: "article",
+          jsonLd: landingEventLd({
+            path: "/events/" + EVENT_SLUG,
+            name: "城市思享沙龍 #01｜台東，不只是遠方",
+            description: fitDescription(PAGE.metaDescription).zh,
+            imageKey: OG_IMAGE_KEY,
+            product: loaderData?.product ?? null,
+            store: storeAddressFromMatches(matches),
+            lang: langFromMatches(matches),
+            performer: null,
+          }),
+        },
+      ),
+      [],
+    ),
   component: CitySalon,
 });
 

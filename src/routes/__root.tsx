@@ -9,11 +9,14 @@ import {
 } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { LanguageProvider, useT } from "@/i18n/LanguageContext";
+import { HTML_LANG } from "@/i18n/types";
+import { LanguageHint } from "@/components/LanguageHint";
+import { OG_LOCALE, publicLangOf } from "@/lib/seo/i18n";
 import { fetchSiteContent, FALLBACK_SITE_CONTENT } from "@/lib/cms";
 import { isBackOfficePath } from "@/lib/admin/back-office-path";
 import { SiteContentProvider, useSiteContent } from "@/lib/site-content";
 import { ReferralCapture } from "@/components/ReferralCapture";
-import { absoluteUrl, canonicalUrl, isNoindexPath, siteGraphLd } from "@/lib/seo/core";
+import { absoluteUrl, isNoindexPath, siteGraphLd } from "@/lib/seo/core";
 import { ld } from "@/lib/seo/head";
 import {
   analyticsEnabledFor,
@@ -26,9 +29,19 @@ import storefrontImg from "@/assets/storefront.jpg";
 
 import appCss from "../styles.css?url";
 
+/**
+ * 目前網址的語言（公開頁）／null（私密頁）。看的是**給人看的網址**（publicHref，含 /en、/ja
+ * 前綴），不是路由表的網址（/en/events 在路由表裡是 /events，見 src/lib/i18n-rewrite.ts）。
+ */
+function useUrlLang() {
+  const publicHref = useRouterState({ select: (s) => s.location.publicHref });
+  return publicLangOf((publicHref ?? "/").split(/[?#]/)[0]);
+}
+
 function NotFoundComponent() {
+  const urlLang = useUrlLang();
   return (
-    <LanguageProvider>
+    <LanguageProvider urlLang={urlLang}>
       <NotFoundInner />
     </LanguageProvider>
   );
@@ -63,6 +76,21 @@ function NotFoundInner() {
 let rootDataIsBackOfficeFallback =
   typeof window !== "undefined" && isBackOfficePath(window.location.pathname);
 
+/** 瀏覽器端：root loader 手上的 lang（第一次是 SSR 依載入網址算的，公式同 loader）。 */
+let rootDataLang =
+  typeof window !== "undefined" ? (publicLangOf(window.location.pathname) ?? "zh") : null;
+
+/**
+ * 換到一個語言跟 root loader 手上不同的公開頁 → root 要重跑，各頁 head() 才拿得到對的語言。
+ * 平常不會發生（同一個 document 裡語言不變）；只有「直接載入私密頁（/cart）→ 介面跟著記住的
+ * 英文 → 點頁首連到 /en/events」這條路會走到。
+ */
+function rootLangIsStale(publicHref: string | undefined): boolean {
+  if (typeof window === "undefined" || !publicHref) return false;
+  const lang = publicLangOf(publicHref.split(/[?#]/)[0]);
+  return lang !== null && lang !== rootDataLang;
+}
+
 export const Route = createRootRoute({
   // Runs on the server for the initial request (and on the client for
   // subsequent navigations), so the shell copy is present in the SSR HTML.
@@ -74,28 +102,38 @@ export const Route = createRootRoute({
   // root 的 match 在整個 SPA 期間不會自己重跑（換頁都是 cause "stay"）。所以從後台用 client 端
   // 換頁到前台（404 頁的「回首頁」、上一頁／下一頁）時要強制重跑一次，前台才不會一直掛著預設文案。
   loader: async ({ location }) => {
+    // lang：這一頁（document）的語言，給各頁 head() 用（src/lib/seo/head.ts 的 langFromMatches）。
+    // 同一個 document 裡語言不會變（語言切換是整頁載入），所以 root loader 不需要每次換頁重跑。
+    // 私密頁 → 中文（它們 noindex，head 用哪一種語言不影響收錄）。
+    const lang = publicLangOf((location.publicHref ?? location.pathname).split(/[?#]/)[0]) ?? "zh";
     const backOffice = isBackOfficePath(location.pathname);
     if (typeof window !== "undefined") rootDataIsBackOfficeFallback = backOffice;
-    return { site: backOffice ? FALLBACK_SITE_CONTENT : await fetchSiteContent() };
+    if (typeof window !== "undefined") rootDataLang = lang;
+    return { site: backOffice ? FALLBACK_SITE_CONTENT : await fetchSiteContent(), lang };
   },
   shouldReload: ({ location }) =>
     typeof window !== "undefined" &&
     rootDataIsBackOfficeFallback &&
     !isBackOfficePath(location.pathname)
       ? true
-      : undefined,
+      : rootLangIsStale(location.publicHref)
+        ? true
+        : undefined,
   head: ({ loaderData, matches }) => {
     const site = loaderData?.site ?? FALLBACK_SITE_CONTENT;
     // ── 全站 SEO（2026-11 SEO 健檢 H3／H4／L3／L5／M3）──────────────────────────
     // root 的 head() 每次換頁都會跟著重跑（router-core 的 projectLane 對整條 match 鏈
     // 逐一呼叫 head），所以這裡從「最深的那一個 match」拿得到目前頁面的路徑與 search。
     // 子路由的 meta 同名時子路由贏（HeadContent 由深到淺去重），所以這裡放的是預設值。
+    //
+    // canonical／og:url／hreflang／og:locale 由各頁的 pageMeta()／pageLinks() 輸出（2026-11
+    // /en /ja：要知道這一頁各語言有沒有翻譯，只有那一頁自己知道，見 src/lib/seo/head.ts）。
     const leaf = matches[matches.length - 1];
     const pathname = leaf?.pathname ?? "/";
+    const lang = loaderData?.lang ?? "zh";
     const isNotFound = matches.some((m) => m.status === "notFound" || m._notFound);
     const noindex = isNotFound || isNoindexPath(pathname);
     const backOffice = isBackOfficePath(pathname) || pathname.startsWith("/vendor");
-    const canonical = noindex ? null : canonicalUrl(pathname, leaf?.search);
     return {
       meta: [
         { charSet: "utf-8" },
@@ -107,11 +145,10 @@ export const Route = createRootRoute({
         { name: "author", content: site.meta.author },
         { property: "og:type", content: site.meta.ogType },
         { property: "og:site_name", content: site.meta.siteName },
-        { property: "og:locale", content: "zh_TW" },
+        { property: "og:locale", content: OG_LOCALE[lang] },
         { name: "twitter:card", content: site.meta.twitterCard },
         // Search Console 的 HTML 標記驗證：全站 SSR 輸出（首頁一定要有）。
         { name: "google-site-verification", content: GOOGLE_SITE_VERIFICATION },
-        ...(canonical ? [{ property: "og:url", content: canonical }] : []),
         // 預設分享圖：子路由沒給自己的 og:image 時用這張（絕對網址）。
         ...(backOffice
           ? []
@@ -125,7 +162,6 @@ export const Route = createRootRoute({
         ...(backOffice || isNotFound ? [] : [ld(siteGraphLd(site, storefrontImg, "/logo.png"))]),
       ],
       links: [
-        ...(canonical ? [{ rel: "canonical", href: canonical }] : []),
         { rel: "stylesheet", href: appCss },
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
@@ -146,8 +182,10 @@ export const Route = createRootRoute({
 });
 
 function RootShell({ children }: { children: React.ReactNode }) {
+  // 公開頁依網址（/en → en、/ja → ja）；私密頁先輸出中文，掛載後由 LanguageProvider 換成記住的語言。
+  const urlLang = useUrlLang();
   return (
-    <html lang="zh-Hant">
+    <html lang={HTML_LANG[urlLang ?? "zh"]}>
       <head>
         <HeadContent />
       </head>
@@ -164,11 +202,13 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { site } = Route.useLoaderData();
+  const urlLang = useUrlLang();
   return (
     <SiteContentProvider value={site}>
-      <LanguageProvider>
+      <LanguageProvider urlLang={urlLang}>
         <ReferralCapture />
         <GaPageViews />
+        <LanguageHint />
         <Outlet />
       </LanguageProvider>
     </SiteContentProvider>

@@ -3,7 +3,8 @@ import { PageShell, PageHeader } from "@/components/PageShell";
 import { useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fitDescription } from "@/lib/seo/core";
-import { pageMeta } from "@/lib/seo/head";
+import { pageHead } from "@/lib/seo/head";
+import { pageRowTranslation } from "@/lib/seo/pages";
 import { fetchCollaborations, fetchPage, pageText, eyebrowOf } from "@/lib/cms";
 import { CARD, featureLayout } from "@/lib/feature-layout";
 import { useSiteContent } from "@/lib/site-content";
@@ -65,15 +66,19 @@ export const Route = createFileRoute("/curation")({
     ]);
     return { page, collaborations };
   },
-  head: ({ loaderData }) => {
+  head: ({ loaderData, matches, match }) => {
     const p = pageText(loaderData?.page ?? null);
     return {
-      meta: pageMeta({
-        title: p.metaTitle(PAGE.metaTitle),
-        description: fitDescription(p.metaDescription(PAGE.metaDescription)),
-        ogTitle: p.ogTitle(PAGE.title),
-        type: "website",
-      }),
+      ...pageHead(
+        { matches, match },
+        {
+          translation: pageRowTranslation(loaderData?.page ?? null),
+          title: p.metaTitle(PAGE.metaTitle),
+          description: fitDescription(p.metaDescription(PAGE.metaDescription)),
+          ogTitle: p.ogTitle(PAGE.title),
+          type: "website",
+        },
+      ),
     };
   },
   component: Curation,

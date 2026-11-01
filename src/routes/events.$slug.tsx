@@ -21,8 +21,14 @@ import { useBookingNow } from "@/hooks/use-booking-now";
 import { EVENT_LIST_FIELDS } from "@/lib/event-blocks";
 import { imageFor } from "@/lib/images";
 import { fetchActiveProductForEventSlug, type ShopProduct } from "@/lib/shop";
-import { pageMeta } from "@/lib/seo/head";
-import { eventEnded, eventSeo, storeAddressFromMatches, storeAddressOf } from "@/lib/seo/pages";
+import { langFromMatches, pageHead } from "@/lib/seo/head";
+import {
+  contentTranslation,
+  eventEnded,
+  eventSeo,
+  storeAddressFromMatches,
+  storeAddressOf,
+} from "@/lib/seo/pages";
 import { unavailableHeaders } from "@/lib/seo/status";
 import { useSiteContent } from "@/lib/site-content";
 
@@ -201,21 +207,27 @@ export const Route = createFileRoute("/events/$slug")({
   // SEO（2026-11 健檢）：title「{活動名}｜{日期}｜小時光書店」、描述取摘要＋內文、
   // 分享圖用活動封面、JSON-LD 輸出 Event（日期地點價格來自售票商品的場次）與麵包屑。
   // 組裝邏輯在 src/lib/seo/pages.ts#eventSeo，元件裡的 useDocumentMeta 用同一支。
-  head: ({ loaderData, matches }) => {
+  head: ({ loaderData, matches, match }) => {
+    const event = loaderData?.event ?? null;
     const seo = eventSeo(
-      loaderData?.event ?? null,
+      event,
       loaderData?.booking.product ?? null,
       PAGE,
       storeAddressFromMatches(matches),
+      langFromMatches(matches),
     );
     return {
-      meta: pageMeta({
-        title: seo.title,
-        description: seo.description,
-        image: seo.image,
-        type: "article",
-        jsonLd: seo.jsonLd,
-      }),
+      ...pageHead(
+        { matches, match },
+        {
+          translation: contentTranslation(event),
+          title: seo.title,
+          description: seo.description,
+          image: seo.image,
+          type: "article",
+          jsonLd: seo.jsonLd,
+        },
+      ),
     };
   },
   // 讀不到活動（不是查無此活動）→ 503 + Retry-After，不讓搜尋引擎把空殼當成正式內容。
