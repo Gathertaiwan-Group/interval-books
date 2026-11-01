@@ -140,7 +140,7 @@ check(
 check("讀不到活動（空陣列）→ 全部留在進行中", splitJourneys(journeys, [], 8, TODAY).open.length, 4);
 
 // ── 首頁精選策旅（2026-10-29 業主：池上那趟 10 月辦完了還掛在首頁精選）──────
-// 正式庫 2026-10-29 的兩趟：池上最後場次 10/27 結束、公東 11/16 結束。
+// 正式庫 2026-10-29 的兩趟：池上最後場次 10/27 結束、公東 12/6 結束（2026-11-01 業主改期，原 11/14–11/16）。
 const liveEvents = [
   {
     slug: "InntervalChishang.1023",
@@ -153,9 +153,9 @@ const liveEvents = [
   {
     slug: "kungtung",
     externalUrl: "",
-    date: "2026.11.14 (六)~11.16 (一)",
-    isoDate: "2026-11-16",
-    lastSessionDate: "2026-11-16",
+    date: "2026.12.04 (五)~12.06 (日)",
+    isoDate: "2026-12-06",
+    lastSessionDate: "2026-12-06",
     imageKey: "storage:91c89fe9-1301-4d69-8708-7ff42ffbab94.webp",
   },
 ];
@@ -181,7 +181,7 @@ check(
 );
 check(
   "全部結束 → 精選零筆（首頁整區不畫）",
-  splitJourneys(liveJourneys, liveEvents, 8, "2026-12-01").open.length,
+  splitJourneys(liveJourneys, liveEvents, 8, "2026-12-07").open.length,
   0,
 );
 check(

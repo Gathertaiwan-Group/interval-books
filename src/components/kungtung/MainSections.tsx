@@ -93,7 +93,7 @@ export function Hero() {
       />
       <div className="kt-bg-hero-overlay absolute inset-0"></div>
       <div className="kt-editorial-container kt-hero-content">
-        <p className="kt-hero-date">2026.11.14–11.16｜台東・三天兩夜</p>
+        <p className="kt-hero-date">2026.12.04–12.06｜台東・三天兩夜</p>
         <p className="kt-hero-name">范毅舜公東教堂文化之旅</p>
         <h1>
           有些故事，
@@ -529,7 +529,7 @@ export function Moments() {
               loading="lazy"
               className="kt-moment-book"
             />
-            <p>11.14 / 20:00</p>
+            <p>12.04 / 20:00</p>
             <h3>公東的教堂｜夜間沙龍</h3>
             <span>從一本書，走近一座教堂的故事。</span>
           </article>
@@ -539,7 +539,7 @@ export function Moments() {
               alt="公東教堂彩色玻璃與木製長椅，導覽場域實景"
               loading="lazy"
             />
-            <p>11.15 / 14:30</p>
+            <p>12.05 / 14:30</p>
             <h3>范毅舜｜親自導覽</h3>
             <span>在現場，讀懂建築與生命的對話。</span>
           </article>
@@ -549,7 +549,7 @@ export function Moments() {
               alt="莫子主廚料理實拍，非本次活動固定菜單"
               loading="lazy"
             />
-            <p>11.14 / 18:00</p>
+            <p>12.04 / 18:00</p>
             <h3>莫子｜山海套餐</h3>
             <span>以在地風味與法式手法，讓餐桌說故事。</span>
           </article>
@@ -559,7 +559,7 @@ export function Moments() {
               alt="馥自然書牆與選品空間實景，非沙龍活動紀錄"
               loading="lazy"
             />
-            <p>11.15 / 20:00</p>
+            <p>12.05 / 20:00</p>
             <h3>黑膠音樂｜調飲沙龍</h3>
             <span>音樂、調飲與自由交流，慢慢延續夜晚。</span>
           </article>
@@ -585,7 +585,7 @@ export function Itinerary() {
         <div className="kt-itinerary-list">
           <article className="kt-itinerary-day">
             <div>
-              <p className="kt-eyebrow">DAY 01 / 11.14（六）</p>
+              <p className="kt-eyebrow">DAY 01 / 12.04（五）</p>
               <h3>從山海入席，從故事相遇。</h3>
               <p className="kt-body-copy">
                 抵達台東，讓藝術與餐桌開啟旅程。夜幕降下，聽范毅舜說起《公東的教堂》。
@@ -624,7 +624,7 @@ export function Itinerary() {
           </article>
           <article className="kt-itinerary-day">
             <div>
-              <p className="kt-eyebrow">DAY 02 / 11.15（日）</p>
+              <p className="kt-eyebrow">DAY 02 / 12.05（六）</p>
               <h3>走進教堂，也走近生命。</h3>
               <p className="kt-body-copy">
                 清晨與自然相處，午後跟著范毅舜讀懂建築中的人文故事。夜晚，把對話留給音樂與彼此。
@@ -671,7 +671,7 @@ export function Itinerary() {
           </article>
           <article className="kt-itinerary-day">
             <div>
-              <p className="kt-eyebrow">DAY 03 / 11.16（一）</p>
+              <p className="kt-eyebrow">DAY 03 / 12.06（日）</p>
               <h3>帶著海岸的光，回到日常。</h3>
               <p className="kt-body-copy">
                 沿海岸北行，在牧場與海景餐桌之間停留，讓三天的相遇慢慢沉澱。
@@ -1142,7 +1142,7 @@ export function SiteFooter() {
     <footer className="kt-site-footer kt-editorial-container">
       <div>
         <p className="font-serif text-lg">范毅舜公東教堂文化之旅</p>
-        <p className="mt-2 text-xs">INNTERVAL 馥自然人文空間・2026.11.14–11.16</p>
+        <p className="mt-2 text-xs">INNTERVAL 馥自然人文空間・2026.12.04–12.06</p>
       </div>
       <div className="kt-site-footer-contact">
         <a href="tel:0223416800">02-2341-6800</a>

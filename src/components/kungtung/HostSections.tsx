@@ -424,7 +424,7 @@ export function FanSection3() {
 export function FanSection4() {
   return (
     <section className="kt-editorial-container kt-host-page-cta">
-      <p className="kt-eyebrow">2026.11.14–11.16｜台東・三天兩夜</p>
+      <p className="kt-eyebrow">2026.12.04–12.06｜台東・三天兩夜</p>
       <h2 className="kt-section-title">有些故事，值得親自走進去。</h2>
       <a className="kt-journey-button kt-host-cta-link" href="/events/kungtung#register">
         預約這趟文化旅程
@@ -629,7 +629,7 @@ export function AliceSection3() {
 export function AliceSection4() {
   return (
     <section className="kt-editorial-container kt-host-page-cta">
-      <p className="kt-eyebrow">2026.11.14–11.16｜台東・三天兩夜</p>
+      <p className="kt-eyebrow">2026.12.04–12.06｜台東・三天兩夜</p>
       <h2 className="kt-section-title">有些故事，值得親自走進去。</h2>
       <a className="kt-journey-button kt-host-cta-link" href="/events/kungtung#register">
         預約這趟文化旅程

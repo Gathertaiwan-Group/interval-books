@@ -46,7 +46,7 @@ import {
 import kungtungCss from "@/components/kungtung/kungtung.css?url";
 
 /**
- * 《范毅舜公東教堂文化之旅｜台東三天兩夜》（2026.11.14–11.16）的策旅著陸頁。
+ * 《范毅舜公東教堂文化之旅｜台東三天兩夜》（2026.12.04–12.06）的策旅著陸頁。
  *
  * ═══ 為什麼有自己的路由 ═══════════════════════════════════════════════════════
  * 業主在 Lovable 做好一份參考站（www.kungtung.intervalbooks.tw），要「一模一樣」。
@@ -82,9 +82,9 @@ const PAGE = {
     ja: "范毅舜と巡る公東教会文化の旅｜台東2泊3日｜小時光書店",
   },
   metaDescription: {
-    zh: "2026.11.14–11.16｜台東・三天兩夜。跟著范毅舜讀懂一座教堂，跟著 Alice 感受一種生活。范毅舜親自導覽公東教堂、入住 INNTERVAL 馥自然人文空間。旅程費用 NT$19,800／人起。",
-    en: "14–16 Nov 2026, Taitung, 3 days 2 nights. Read the Kung Tung Chapel with photographer Nicholas Fan and stay at INNTERVAL Fu Nature & Humanities Space. From NT$19,800 per person.",
-    ja: "2026年11月14日〜16日、台東2泊3日。写真家・范毅舜の案内で公東教会を巡り、INNTERVAL 馥自然人文空間に滞在する旅。お一人様 NT$19,800 から。",
+    zh: "2026.12.04–12.06｜台東・三天兩夜。跟著范毅舜讀懂一座教堂，跟著 Alice 感受一種生活。范毅舜親自導覽公東教堂、入住 INNTERVAL 馥自然人文空間。旅程費用 NT$19,800／人起。",
+    en: "4–6 Dec 2026, Taitung, 3 days 2 nights. Read the Kung Tung Chapel with photographer Nicholas Fan and stay at INNTERVAL Fu Nature & Humanities Space. From NT$19,800 per person.",
+    ja: "2026年12月4日〜6日、台東2泊3日。写真家・范毅舜の案内で公東教会を巡り、INNTERVAL 馥自然人文空間に滞在する旅。お一人様 NT$19,800 から。",
   },
 };
 
@@ -256,7 +256,7 @@ function Registration() {
             給值得走進的故事。
           </h2>
           <p className="mt-6 leading-loose">
-            2026.11.14–11.16｜台東・三天兩夜
+            2026.12.04–12.06｜台東・三天兩夜
             <br />
             旅程費用 NT$19,800／人・小時光知友 NT$16,800
             <br />
@@ -517,7 +517,7 @@ function NextJourney() {
           每個人心裡，都藏著一趟嚮往的旅行。也許是跟著攝影家尋找光影、走進有故事的建築，或只是找個地方，陪自己慢慢生活。告訴我們，你心中最想要的旅行模樣。你的想法，可能成為小時光下一趟文化策旅的靈感。
         </p>
         <p className="kt-wish-disclaimer" role="note">
-          這是未來旅程的靈感募集，不影響本次 11/14–11/16 已公布的行程，也不代表主辦方已承諾安排。
+          這是未來旅程的靈感募集，不影響本次 12/4–12/6 已公布的行程，也不代表主辦方已承諾安排。
         </p>
         {sent ? (
           <div className="mt-8 max-w-2xl space-y-4" role="status" aria-live="polite">
