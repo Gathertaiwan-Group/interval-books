@@ -679,8 +679,12 @@ export function Itinerary() {
                 <span>里漾餐廳 Lyang・海景秘境小餐館午餐</span>
               </li>
               <li>
-                <time>14:00</time>
-                <span>馬蘭教堂</span>
+                <time>13:30</time>
+                <span>前往馬蘭教堂</span>
+              </li>
+              <li>
+                <time>14:30</time>
+                <span>馬蘭教堂導覽</span>
               </li>
               <li>
                 <time>15:30</time>
