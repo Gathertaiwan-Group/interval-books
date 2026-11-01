@@ -629,7 +629,7 @@ export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
               <p className="kt-eyebrow">DAY 02 / 12.05（六）</p>
               <h3>走進教堂，也走近生命。</h3>
               <p className="kt-body-copy">
-                清晨與自然相處，上午跟著范毅舜讀懂建築中的人文故事，午後走進江賢二藝術園區。夜晚，把對話留給音樂與彼此。
+                清晨與自然相處，上午跟著范毅舜讀懂建築中的人文故事。夜晚，把對話留給音樂與彼此。
               </p>
             </div>
             <ol>
@@ -654,10 +654,6 @@ export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
                 <span>午餐</span>
               </li>
               <li>
-                <time>15:00</time>
-                <span>抵達江賢二藝術園區</span>
-              </li>
-              <li>
                 <time>18:00</time>
                 <span>莫子主廚創意料理</span>
               </li>
@@ -672,7 +668,7 @@ export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
               <p className="kt-eyebrow">DAY 03 / 12.06（日）</p>
               <h3>帶著海岸的光，回到日常。</h3>
               <p className="kt-body-copy">
-                在牧場與海景餐桌之間停留，再走進馬蘭教堂，讓三天的相遇慢慢沉澱。
+                上午走進江賢二藝術園區，午後再訪馬蘭教堂，讓三天的相遇慢慢沉澱。
               </p>
             </div>
             <ol>
@@ -686,11 +682,11 @@ export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
               </li>
               <li>
                 <time>10:00</time>
-                <span>笑笑羊牧場</span>
+                <span>江賢二藝術園區</span>
               </li>
               <li>
                 <time>12:00</time>
-                <span>里漾餐廳 Lyang・海景秘境小餐館午餐</span>
+                <span>午餐</span>
               </li>
               <li>
                 <time>13:30</time>
@@ -889,11 +885,34 @@ export function Space() {
  * 房內設備）一律不寫，等業主補：
  * - 地址、五間房型與名稱、「需自行攜帶一次性備品」、早餐（房客免費、當地時令食材、
  *   手工烘焙麵包、慢火熬煮的湯品、主廚依時節調整菜單）、「馥選生活」選品：
- *   https://www.funature.com.tw/（單頁官網，2026-11-01 查證）
+ *   馥自然官網（單頁，2026-11-01 查證）。
  * - 入住 12/04 17:30、退房 12/06 09:30、兩天早餐、火車站接駁、兩人一房：本頁行程表與費用說明。
- * 圖片：funature-lounge-sea ＝官網首頁輪播 ab74d9_a7b0ad00…；funature-breakfast ＝官網
- * 「晨曦中的款待」ab74d9_692f51e8…。
+ * 業主要客人留在本站：不放馥自然官網的外部連結。
+ * 照片（STAY_PHOTOS）取自馥自然官網、業主同意使用，來源 id 寫在各張旁邊；
+ * 已在「空間與餐桌」出現的外觀、書牆不重複放。
  */
+const STAY_PHOTOS = [
+  // ab74d9_a7b0ad00…（官網首頁輪播）
+  { src: IMG.funature_lounge_sea, alt: "館內面海的長窗與書架，旅人坐在窗前看海", w: 1600, h: 1066 },
+  // ab74d9_a18f6492…
+  { src: IMG.funature_garden_exterior, alt: "從園區草木間望向清水模建築外觀", w: 1054, h: 1600 },
+  // ab74d9_77bb24c5…（官網「房型總覽」，原圖僅 462px 寬）
+  { src: IMG.funature_room, alt: "景觀雙人房：兩張單人床與大片落地窗", w: 462, h: 345 },
+  // ab74d9_1a5db66d…（官網首頁輪播）
+  { src: IMG.funature_lounge, alt: "挑高的公共起居空間，沙發與吊燈", w: 1600, h: 1061 },
+  // ab74d9_692f51e8…（官網「晨曦中的款待」）
+  {
+    src: IMG.funature_breakfast,
+    alt: "館內早餐：手工麵包、沙拉、優格與時令配菜",
+    w: 1600,
+    h: 1066,
+  },
+  // ab74d9_72d7c82c…
+  { src: IMG.funature_window_table, alt: "窗邊長桌與乾燥花植栽，窗外是山景", w: 1600, h: 1034 },
+  // ab74d9_4fc30149…（官網「馥選生活」）
+  { src: IMG.funature_select, alt: "「馥選生活」選品：綠色磁磚前的瓶裝選物", w: 1067, h: 1600 },
+] as const;
+
 export function Stay() {
   return (
     <section id="stay" className="kt-section-band kt-stay-band" aria-labelledby="stay-title">
@@ -908,84 +927,50 @@ export function Stay() {
           這趟旅程的兩晚，都住在 INNTERVAL
           馥自然人文空間——隱於台東東河鄉山海之間，以當地自然與文化為靈感，把藝術、設計與生活放進同一個空間。
         </p>
-        <div className="kt-stay-layout">
-          <div className="kt-stay-photos">
-            <figure>
+        <ul className="kt-stay-gallery" aria-label="馥自然人文空間照片" tabIndex={0}>
+          {STAY_PHOTOS.map((photo) => (
+            <li key={photo.src}>
               <img
-                src={IMG.funature_lounge_sea}
-                alt="馥自然館內面海的長窗與書架，旅人坐在窗前看海"
-                width="1600"
-                height="1066"
+                src={photo.src}
+                alt={photo.alt}
+                width={photo.w}
+                height={photo.h}
                 loading="lazy"
+                decoding="async"
               />
-            </figure>
-            <figure>
-              <img
-                src={IMG.funature_breakfast}
-                alt="馥自然的早餐：手工麵包、沙拉、優格與時令配菜"
-                width="1600"
-                height="1066"
-                loading="lazy"
-              />
-            </figure>
+            </li>
+          ))}
+        </ul>
+        <dl className="kt-stay-facts">
+          <div>
+            <dt>地址與交通</dt>
+            <dd>
+              台東縣東河鄉隆昌村七里橋一之8號。旅程含台東火車站往返與行程接駁：12/04（五）16:30
+              於台東火車站接駁，一同前往馥自然。
+            </dd>
           </div>
           <div>
-            <dl className="kt-stay-facts">
-              <div>
-                <dt>地址與交通</dt>
-                <dd>
-                  台東縣東河鄉隆昌村七里橋一之8號。旅程含台東火車站往返與行程接駁：12/04（五）16:30
-                  於台東火車站接駁，一同前往馥自然。
-                </dd>
-              </div>
-              <div>
-                <dt>房型與設施</dt>
-                <dd>
-                  館內五間客房皆以原民聖歌命名：四間景觀雙人房（其中塔米利附陽台）與一間景觀四人房；館內另有「馥選生活」選品空間。本次旅程以兩人一房為安排基準。
-                </dd>
-              </div>
-              <div>
-                <dt>入住與退房</dt>
-                <dd>12/04（五）17:30 入住；12/06（日）09:30 退房，隨後專車出發。</dd>
-              </div>
-              <div>
-                <dt>早餐</dt>
-                <dd>
-                  12/05、12/06
-                  兩天早餐在館內享用：以當地時令食材入饌，從手工烘焙的麵包到慢火熬煮的湯品，主廚會依時節特產與當日鮮貨調整菜單。
-                </dd>
-              </div>
-            </dl>
-            <p className="kt-stay-note">
-              <strong>行前提醒</strong>
-              館方提醒：本館需自行攜帶一次性備品，請先備妥個人盥洗用品。
-            </p>
-            <a
-              href="https://www.funature.com.tw/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="kt-stay-link"
-            >
-              前往馥自然官網
-              <span className="sr-only">（另開新分頁）</span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M7 7h10v10" />
-                <path d="M7 17 17 7" />
-              </svg>
-            </a>
+            <dt>房型與設施</dt>
+            <dd>
+              館內五間客房皆以原民聖歌命名：四間景觀雙人房（其中塔米利附陽台）與一間景觀四人房；館內另有「馥選生活」選品空間。本次旅程以兩人一房為安排基準。
+            </dd>
           </div>
-        </div>
+          <div>
+            <dt>入住與退房</dt>
+            <dd>12/04（五）17:30 入住；12/06（日）09:30 退房，隨後專車出發。</dd>
+          </div>
+          <div>
+            <dt>早餐</dt>
+            <dd>
+              12/05、12/06
+              兩天早餐在館內享用：以當地時令食材入饌，從手工烘焙的麵包到慢火熬煮的湯品，主廚會依時節特產與當日鮮貨調整菜單。
+            </dd>
+          </div>
+        </dl>
+        <p className="kt-stay-note">
+          <strong>行前提醒</strong>
+          館方提醒：本館需自行攜帶一次性備品，請先備妥個人盥洗用品。
+        </p>
       </div>
     </section>
   );
