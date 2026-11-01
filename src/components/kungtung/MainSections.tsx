@@ -629,7 +629,7 @@ export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
               <p className="kt-eyebrow">DAY 02 / 12.05（六）</p>
               <h3>走進教堂，也走近生命。</h3>
               <p className="kt-body-copy">
-                清晨與自然相處，上午跟著范毅舜讀懂建築中的人文故事。夜晚，把對話留給音樂與彼此。
+                清晨與自然相處，上午跟著范毅舜讀懂公東教堂，再走訪馬蘭天主教堂，認識天主教在台東的文化足跡。夜晚，把對話留給音樂與彼此。
               </p>
             </div>
             <ol>
@@ -651,7 +651,15 @@ export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
               </li>
               <li>
                 <time>12:00</time>
-                <span>午餐</span>
+                <span>前往馬蘭天主教堂</span>
+              </li>
+              <li>
+                <time>13:00</time>
+                <span>花里岸 WARiYAN 南島風味午餐</span>
+              </li>
+              <li>
+                <time>14:30</time>
+                <span>返回馥自然・自由時光</span>
               </li>
               <li>
                 <time>18:00</time>
@@ -668,7 +676,7 @@ export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
               <p className="kt-eyebrow">DAY 03 / 12.06（日）</p>
               <h3>帶著海岸的光，回到日常。</h3>
               <p className="kt-body-copy">
-                上午走進江賢二藝術園區，午後再訪馬蘭教堂，讓三天的相遇慢慢沉澱。
+                上午走進江賢二藝術園區，在山海之間，讓三天的相遇慢慢沉澱。
               </p>
             </div>
             <ol>
@@ -687,14 +695,6 @@ export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
               <li>
                 <time>12:00</time>
                 <span>午餐</span>
-              </li>
-              <li>
-                <time>13:30</time>
-                <span>前往馬蘭教堂</span>
-              </li>
-              <li>
-                <time>14:30</time>
-                <span>馬蘭教堂導覽</span>
               </li>
               <li>
                 <time>16:00</time>
