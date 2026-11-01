@@ -294,7 +294,14 @@ async function checkRobotsAndSitemap() {
   const s = await get("/sitemap.xml");
   const xml = await s.text();
   ok("200 application/xml", s.status === 200 && /xml/.test(s.headers.get("content-type") ?? ""));
-  ok("有 s-maxage 快取", /s-maxage=\d+/.test(s.headers.get("cache-control") ?? ""));
+  // Vercel 會吃掉 s-maxage（不轉給瀏覽器），正式站改看第二次請求是不是 CDN HIT。
+  const again = await get("/sitemap.xml");
+  await again.arrayBuffer();
+  ok(
+    "有 CDN 快取（s-maxage 或 x-vercel-cache: HIT）",
+    /s-maxage=\d+/.test(s.headers.get("cache-control") ?? "") ||
+      /HIT|STALE/.test(again.headers.get("x-vercel-cache") ?? ""),
+  );
   ok(
     "XML 開頭與 urlset 命名空間",
     /^<\?xml[^>]*\?>\s*<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/.test(
