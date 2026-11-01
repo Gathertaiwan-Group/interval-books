@@ -687,7 +687,7 @@ export function Itinerary() {
                 <span>馬蘭教堂導覽</span>
               </li>
               <li>
-                <time>15:30</time>
+                <time>16:00</time>
                 <span>專車前往台東火車站（建議台鐵439自強號：台東16:55 → 台北21:34）</span>
               </li>
             </ol>
