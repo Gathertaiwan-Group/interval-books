@@ -1,10 +1,28 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { useEffect } from "react";
+import {
+  Outlet,
+  Link,
+  createRootRoute,
+  HeadContent,
+  Scripts,
+  useRouterState,
+} from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { LanguageProvider, useT } from "@/i18n/LanguageContext";
 import { fetchSiteContent, FALLBACK_SITE_CONTENT } from "@/lib/cms";
 import { isBackOfficePath } from "@/lib/admin/back-office-path";
 import { SiteContentProvider, useSiteContent } from "@/lib/site-content";
 import { ReferralCapture } from "@/components/ReferralCapture";
+import { absoluteUrl, canonicalUrl, isNoindexPath, siteGraphLd } from "@/lib/seo/core";
+import { ld } from "@/lib/seo/head";
+import {
+  analyticsEnabledFor,
+  ga4HeadScripts,
+  GOOGLE_SITE_VERIFICATION,
+  sendPageView,
+} from "@/lib/analytics";
+import heroImg from "@/assets/hero-mountain.jpg";
+import storefrontImg from "@/assets/storefront.jpg";
 
 import appCss from "../styles.css?url";
 
@@ -23,7 +41,8 @@ function NotFoundInner() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <p className="eyebrow text-2xl">404</p>
-        <h2 className="display mt-4 text-4xl">{t(ui.notFound.title)}</h2>
+        {/* h1（2026-11 SEO 健檢 L3）：class 不變，樣子與原本的 h2 一樣（h1–h5 共用同一組 base 樣式）。 */}
+        <h1 className="display mt-4 text-4xl">{t(ui.notFound.title)}</h1>
         <div className="mt-8">
           <Link
             to="/"
@@ -65,20 +84,48 @@ export const Route = createRootRoute({
     !isBackOfficePath(location.pathname)
       ? true
       : undefined,
-  head: ({ loaderData }) => {
+  head: ({ loaderData, matches }) => {
     const site = loaderData?.site ?? FALLBACK_SITE_CONTENT;
+    // ── 全站 SEO（2026-11 SEO 健檢 H3／H4／L3／L5／M3）──────────────────────────
+    // root 的 head() 每次換頁都會跟著重跑（router-core 的 projectLane 對整條 match 鏈
+    // 逐一呼叫 head），所以這裡從「最深的那一個 match」拿得到目前頁面的路徑與 search。
+    // 子路由的 meta 同名時子路由贏（HeadContent 由深到淺去重），所以這裡放的是預設值。
+    const leaf = matches[matches.length - 1];
+    const pathname = leaf?.pathname ?? "/";
+    const isNotFound = matches.some((m) => m.status === "notFound" || m._notFound);
+    const noindex = isNotFound || isNoindexPath(pathname);
+    const backOffice = isBackOfficePath(pathname) || pathname.startsWith("/vendor");
+    const canonical = noindex ? null : canonicalUrl(pathname, leaf?.search);
     return {
       meta: [
         { charSet: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
-        { title: site.meta.defaultTitle },
+        {
+          title: isNotFound ? `找不到頁面｜${site.meta.siteName}` : site.meta.defaultTitle,
+        },
         { name: "description", content: site.meta.defaultDescription },
         { name: "author", content: site.meta.author },
         { property: "og:type", content: site.meta.ogType },
         { property: "og:site_name", content: site.meta.siteName },
+        { property: "og:locale", content: "zh_TW" },
         { name: "twitter:card", content: site.meta.twitterCard },
+        // Search Console 的 HTML 標記驗證：全站 SSR 輸出（首頁一定要有）。
+        { name: "google-site-verification", content: GOOGLE_SITE_VERIFICATION },
+        ...(canonical ? [{ property: "og:url", content: canonical }] : []),
+        // 預設分享圖：子路由沒給自己的 og:image 時用這張（絕對網址）。
+        ...(backOffice
+          ? []
+          : [
+              { property: "og:image", content: absoluteUrl(heroImg) },
+              { name: "twitter:image", content: absoluteUrl(heroImg) },
+            ]),
+        ...(noindex ? [{ name: "robots", content: "noindex, nofollow" }] : []),
+        // Organization／WebSite／BookStore：資料全部來自後台的 site_settings（頁尾與 /about
+        // 印的同一份），後台頁面與 404 不輸出。
+        ...(backOffice || isNotFound ? [] : [ld(siteGraphLd(site, storefrontImg, "/logo.png"))]),
       ],
       links: [
+        ...(canonical ? [{ rel: "canonical", href: canonical }] : []),
         { rel: "stylesheet", href: appCss },
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
@@ -89,6 +136,8 @@ export const Route = createRootRoute({
         { rel: "icon", type: "image/png", href: "/logo.png" },
         { rel: "apple-touch-icon", href: "/logo.png" },
       ],
+      // GA4：前台才載（後台、廠商入口不載），見 src/lib/analytics.ts。
+      scripts: analyticsEnabledFor(pathname) ? ga4HeadScripts() : [],
     };
   },
   shellComponent: RootShell,
@@ -119,8 +168,24 @@ function RootComponent() {
     <SiteContentProvider value={site}>
       <LanguageProvider>
         <ReferralCapture />
+        <GaPageViews />
         <Outlet />
       </LanguageProvider>
     </SiteContentProvider>
   );
+}
+
+/**
+ * GA4 的 page_view：每次路由**完成**（resolvedLocation 換了，含第一頁 hydrate）送一次。
+ * gtag 的 config 關掉了自動 send_page_view（見 src/lib/analytics.ts），所以第一頁不會重複。
+ * 延到下一個 tick 送，讓各頁 useDocumentMeta 的 effect 先把 document.title 換好。
+ */
+function GaPageViews() {
+  const href = useRouterState({ select: (s) => s.resolvedLocation?.href });
+  useEffect(() => {
+    if (!href) return;
+    const timer = window.setTimeout(sendPageView, 0);
+    return () => window.clearTimeout(timer);
+  }, [href]);
+  return null;
 }

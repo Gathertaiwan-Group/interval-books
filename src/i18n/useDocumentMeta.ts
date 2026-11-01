@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { absoluteUrl } from "@/lib/seo/core";
 import { useLang } from "./LanguageContext";
 import type { Localized } from "./types";
 
@@ -41,13 +42,15 @@ export function useDocumentMeta(meta: MetaInput) {
     setMeta('meta[name="twitter:title"]', "name", "twitter:title", ogTitle);
     setMeta('meta[name="twitter:description"]', "name", "twitter:description", ogDescription);
     if (meta.ogImage) {
-      setMeta('meta[property="og:image"]', "property", "og:image", meta.ogImage);
-      setMeta('meta[name="twitter:image"]', "name", "twitter:image", meta.ogImage);
-    } else {
-      // Remove stale image tags from a previous route so each page only carries its own.
-      document.head.querySelector('meta[property="og:image"]')?.remove();
-      document.head.querySelector('meta[name="twitter:image"]')?.remove();
+      // 絕對網址：與 head() 的 SSR 輸出一致（見 src/lib/seo/head.ts），FB／LINE 只吃絕對網址。
+      const ogImage = absoluteUrl(meta.ogImage);
+      setMeta('meta[property="og:image"]', "property", "og:image", ogImage);
+      setMeta('meta[name="twitter:image"]', "name", "twitter:image", ogImage);
     }
+    // 沒給 ogImage 時**不再移除** og:image（2026-11）：__root.tsx 的 head() 現在一定會放
+    // 一張全站預設分享圖，那是 React（HeadContent）管的節點，從 DOM 拔掉它下一次換頁
+    // React 會對著一個不存在的節點 reconcile。換頁時 HeadContent 本來就會換成新頁面的值，
+    // 不會留下前一頁的圖。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     lang,

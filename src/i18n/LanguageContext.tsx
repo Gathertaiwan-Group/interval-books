@@ -10,6 +10,15 @@ type Ctx = {
 const LanguageContext = createContext<Ctx | null>(null);
 const STORAGE_KEY = "interval-books-lang";
 
+/**
+ * 初次造訪一律中文；只有訪客**自己按過**語言切換（存進 localStorage）才換。
+ *
+ * 🔴 不要再依 navigator.language 自動換語言（2026-11 SEO 健檢 H2）。原本 en-US 的瀏覽器
+ *    一載入就把整頁（<html lang>、title、h1、description）換成英文——而 Googlebot 的
+ *    渲染器就是 en-US 的 Chromium，結果中文頁被當成英文頁收錄。SSR 輸出的永遠是中文，
+ *    初次渲染必須跟它一致。英日文要被收錄，正解是 /en、/ja 網址前綴（需要業主決定），
+ *    不是在同一個網址上偷換內容。
+ */
 function detectInitial(): Lang {
   if (typeof window === "undefined") return "zh";
   try {
@@ -18,10 +27,6 @@ function detectInitial(): Lang {
   } catch {
     /* ignore */
   }
-  const nav = (navigator.language || "").toLowerCase();
-  if (nav.startsWith("ja")) return "ja";
-  if (nav.startsWith("zh")) return "zh";
-  if (nav.startsWith("en")) return "en";
   return "zh";
 }
 
