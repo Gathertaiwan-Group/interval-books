@@ -265,6 +265,8 @@ const L = (s) => ({ zh: s, en: s, ja: s });
 // ⚠️ startsAt 預設在很遠的未來：場次開始後不收新訂單（isSessionClosedForBooking），
 //    寫死一個會過去的日期，這一支會在那一天自己轉紅。測「已開始」的地方另外傳。
 const FUTURE_START = "2099-09-05T02:00:00.000Z";
+// 活動頁那幾支 helper（directAnySeatsLeft / directSoleSession）的 now 是必填參數。
+const CHECK_NOW = Date.now();
 function session(id, capacity, seatsTaken, sortOrder = 0, plans = [], startsAt = FUTURE_START) {
   return {
     id,
@@ -636,9 +638,9 @@ check(
 check("不帶 unavailable 旗標（那是購物車 sync 出來的東西）", "unavailable" in line, false);
 
 // 整體還有沒有位子（拿來決定要不要畫報名區，不是數量上限）。
-check("兩場中還有一場有位子 → true", directAnySeatsLeft(EVENT), true);
-check("每一場都滿了 → false", directAnySeatsLeft(product({ sessions: [FULL] })), false);
-check("一場都沒有 → false", directAnySeatsLeft(product({ sessions: [] })), false);
+check("兩場中還有一場有位子 → true", directAnySeatsLeft(EVENT, CHECK_NOW), true);
+check("每一場都滿了 → false", directAnySeatsLeft(product({ sessions: [FULL] }), CHECK_NOW), false);
+check("一場都沒有 → false", directAnySeatsLeft(product({ sessions: [] }), CHECK_NOW), false);
 
 // =============================================================================
 // [8] 🔴 執行：直接結帳的訂單不可以清購物車
@@ -1043,37 +1045,42 @@ const SOLO_FULL = session("s-full", 5, 5, 0);
 
 check(
   "剛好一場又有位子 → 回那一場",
-  directSoleSession(product({ sessions: [SOLO_OPEN] }))?.id,
+  directSoleSession(product({ sessions: [SOLO_OPEN] }), CHECK_NOW)?.id,
   "s-solo",
 );
 // 🔴 這一條是重點：兩場以上絕不預選。從多場裡挑一場，會讓「我選過了」與「系統幫我選了」
 //    在畫面上長得一樣，而下一步就是收錢。
-check("兩場 → 不預選", directSoleSession(EVENT), null);
+check("兩場 → 不預選", directSoleSession(EVENT, CHECK_NOW), null);
 // 🔴 額滿那一場預選了也按不下去，畫面會變成「已經選好卻不能報名」，比沒選更難懂。
-check("剛好一場但額滿 → 不預選", directSoleSession(product({ sessions: [SOLO_FULL] })), null);
-check("沒有場次 → 不預選", directSoleSession(product({ sessions: [] })), null);
-check("書（本來就沒有場次）→ 不預選", directSoleSession(BOOK), null);
+check(
+  "剛好一場但額滿 → 不預選",
+  directSoleSession(product({ sessions: [SOLO_FULL] }), CHECK_NOW),
+  null,
+);
+check("沒有場次 → 不預選", directSoleSession(product({ sessions: [] }), CHECK_NOW), null);
+check("書（本來就沒有場次）→ 不預選", directSoleSession(BOOK, CHECK_NOW), null);
 // 🔴 capacity 是壞資料（null）時不預選。機制是 `> 0`，不是 `?? 0`：JS 裡 `null - 0`
 //    等於 0（不是 NaN），所以 remainingForSession() 回 0 就被擋下來了。
 //    （這一條做過突變測試：拿掉 `> 0` 判斷它會轉紅；動 `?? 0` 不會——因為那段執行時
 //    走不到，它只是型別需要。）
 check(
   "capacity 是壞資料 → 不預選",
-  directSoleSession(product({ sessions: [session("s-bad", null, 0, 0)] })),
+  directSoleSession(product({ sessions: [session("s-bad", null, 0, 0)] }), CHECK_NOW),
   null,
 );
 // 回傳的是**那一場物件本人**，不是複製品：呼叫端會拿它去 directSeatLimit()，
 // 拿到不同的物件會讓上限算在錯的場次上。
 checkTrue(
   "回傳的是場次物件本人（同一個參考）",
-  directSoleSession(product({ sessions: [SOLO_OPEN] })) === SOLO_OPEN,
+  directSoleSession(product({ sessions: [SOLO_OPEN] }), CHECK_NOW) === SOLO_OPEN,
 );
 
 // 路由真的用了它 —— 不是宣告了一支沒人呼叫的函式。
 const detailSrc = readFile("src/routes/events.$slug.tsx");
 checkTrue(
   "活動頁的 sessionId 初始值來自 directSoleSession()",
-  /useState<string \| null>\(\s*\(\) => directSoleSession\(product\)\?\.id \?\? null,?\s*\)/.test(
+  // 2026-11：預選用 loader 帶下來的時間（loadedAt），SSR 與第一次 hydrate 才一致。
+  /useState<string \| null>\(\s*\(\) => directSoleSession\(product, loadedAt\)\?\.id \?\? null,?\s*\)/.test(
     detailSrc,
   ),
 );

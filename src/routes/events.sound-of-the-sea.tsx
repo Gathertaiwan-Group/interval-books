@@ -9,10 +9,13 @@ import { pageMeta } from "@/lib/seo/head";
 import { eventEnded, landingEventLd, storeAddressFromMatches } from "@/lib/seo/pages";
 import {
   directAnySeatsLeft,
+  directBookingClosed,
   directCheckoutSearch,
   directSeatLimit,
+  directSelectedSession,
   directSoleSession,
 } from "@/lib/direct-checkout";
+import { useBookingNow } from "@/hooks/use-booking-now";
 import { bookstoreInterior, imageFor } from "@/lib/images";
 import {
   fetchActiveProductForEventSlug,
@@ -128,7 +131,8 @@ const WAVE_DIVIDER: React.CSSProperties = {
 };
 
 export const Route = createFileRoute("/events/sound-of-the-sea")({
-  loader: async () => fetchActiveProductForEventSlug(EVENT_SLUG),
+  // now：「場次開始了沒」的判斷時間點，SSR 與第一次 hydrate 共用（見 useBookingNow）。
+  loader: async () => ({ ...(await fetchActiveProductForEventSlug(EVENT_SLUG)), now: Date.now() }),
   // SEO（2026-11 健檢）：Event JSON-LD 的日期、地點、價格取自售票商品的場次與票種
   // （與報名區同一份資料），名稱與描述用這一頁的 PAGE 常數。
   head: ({ loaderData, matches }) => ({
@@ -169,6 +173,13 @@ function SoundOfTheSea() {
     ogImage: imageFor(POSTER_KEY, ""),
   });
 
+  // 場次一開始（isSessionClosedForBooking，與結帳同一條規則）就不能報名：報名區換成
+  // EventEndedNotice，頂欄、英雄區、手機底部列的「立即報名」改寫「活動已結束」。
+  const { product, now: loadedAt } = Route.useLoaderData();
+  const now = useBookingNow(loadedAt, product?.sessions ?? []);
+  const bookingClosed =
+    product !== null && (eventEnded(null, product) || directBookingClosed(product, now));
+
   // 稿的 html 是 scroll-behavior: smooth（頁內錨點滑動）。只在這一頁開，離開時還原。
   useEffect(() => {
     const html = document.documentElement;
@@ -181,20 +192,20 @@ function SoundOfTheSea() {
 
   return (
     <div style={THEME} className="min-h-screen bg-(--sos-paper) pb-24 text-foreground sm:pb-0">
-      <TopBar />
-      <Hero />
+      <TopBar bookingClosed={bookingClosed} />
+      <Hero bookingClosed={bookingClosed} />
       <Quote />
       <Teacher />
       <PictureBook />
       <EventInfo />
       <About />
       <Past />
-      <Registration />
+      <Registration now={now} bookingClosed={bookingClosed} />
       <footer className="py-10 text-center text-sm text-muted-foreground">
         <p className={`${SERIF} text-primary`}>小時光書店</p>
         <p className="mt-2">胡海音《海的聲音》手作繪本分享會</p>
       </footer>
-      <BottomBar />
+      <BottomBar bookingClosed={bookingClosed} />
     </div>
   );
 }
@@ -209,7 +220,13 @@ function SectionHead({ eyebrow, title }: { eyebrow: string; title: string }) {
   );
 }
 
-function TopBar() {
+/**
+ * 每一個場次都已開始時，指向 #register 的錨點改寫成這一句（與 EventEndedNotice 的按鈕
+ * 同一句）。不隱藏：英雄區少一顆主要按鈕版面會跳，而且 #register 那裡就是結束說明。
+ */
+const RESERVE_ENDED_LABEL = "活動已結束";
+
+function TopBar({ bookingClosed }: { bookingClosed: boolean }) {
   return (
     <header className="absolute inset-x-0 top-0 z-20">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
@@ -237,14 +254,14 @@ function TopBar() {
           href="#register"
           className="rounded-full border border-primary px-4 py-1.5 text-sm text-primary transition hover:bg-primary hover:text-primary-foreground"
         >
-          立即報名
+          {bookingClosed ? RESERVE_ENDED_LABEL : "立即報名"}
         </a>
       </div>
     </header>
   );
 }
 
-function Hero() {
+function Hero({ bookingClosed }: { bookingClosed: boolean }) {
   return (
     <section className="relative flex min-h-[92vh] items-center overflow-hidden">
       <img
@@ -276,7 +293,7 @@ function Hero() {
             href="#register"
             className={`mt-10 inline-flex items-center gap-3 rounded-md bg-primary px-8 py-4 text-base tracking-widest text-primary-foreground ${SOFT} transition hover:opacity-90`}
           >
-            立即報名 <span aria-hidden="true">→</span>
+            {bookingClosed ? RESERVE_ENDED_LABEL : "立即報名"} <span aria-hidden="true">→</span>
           </a>
         </div>
       </div>
@@ -608,8 +625,8 @@ function Past() {
  *    PlanPicker 自己顯示。沒選好場次與方案時按鈕是 <button disabled>，不是 <Link>：
  *    「沒選就去結帳」在 DOM 裡不存在。理由與 events.city-salon-0922.tsx 相同。
  */
-function Registration() {
-  const { product, unavailable } = Route.useLoaderData();
+function Registration({ now, bookingClosed }: { now: number; bookingClosed: boolean }) {
+  const { product, unavailable, now: loadedAt } = Route.useLoaderData();
   return (
     <section id="register" className="scroll-mt-6 bg-(--sos-ocean) py-20 sm:py-28">
       <div className="mx-auto max-w-2xl px-5">
@@ -628,7 +645,12 @@ function Registration() {
               報名尚未開放。開放之後會在這裡放上報名方式。
             </p>
           ) : (
-            <Booking product={product} />
+            <Booking
+              product={product}
+              loadedAt={loadedAt}
+              now={now}
+              bookingClosed={bookingClosed}
+            />
           )}
         </div>
       </div>
@@ -637,20 +659,34 @@ function Registration() {
 }
 
 /** 唯一場次底下，第一個還能買的方案（＝稿上一打開就是「入場（含下午茶）× 1」）。 */
-function firstOpenPlanId(session: ShopSession | null): string | null {
-  return session?.plans.find((p) => isPlanAvailable(p))?.id ?? null;
+function firstOpenPlanId(session: ShopSession | null, now: number): string | null {
+  return session?.plans.find((p) => isPlanAvailable(p, now))?.id ?? null;
 }
 
-function Booking({ product }: { product: ShopProduct }) {
+function Booking({
+  product,
+  loadedAt,
+  now,
+  bookingClosed,
+}: {
+  product: ShopProduct;
+  /** loader 的 now：預選只在第一次 render 算，用它才與 SSR 一致。 */
+  loadedAt: number;
+  /** useBookingNow() 的值。 */
+  now: number;
+  /** 每一個場次都已開始或已結束（由頁面判斷，英雄區用同一個值）。 */
+  bookingClosed: boolean;
+}) {
   const [sessionId, setSessionId] = useState<string | null>(
-    () => directSoleSession(product)?.id ?? null,
+    () => directSoleSession(product, loadedAt)?.id ?? null,
   );
   const [planId, setPlanId] = useState<string | null>(() =>
-    firstOpenPlanId(directSoleSession(product)),
+    firstOpenPlanId(directSoleSession(product, loadedAt), loadedAt),
   );
   const [qty, setQty] = useState(1);
 
-  const selectedSession = product.sessions.find((s) => s.id === sessionId) ?? null;
+  // 選中的場次一開始就不算選中，按鈕回到 <button disabled>。
+  const selectedSession = directSelectedSession(product, sessionId, now);
   const needsPlan = selectedSession !== null && selectedSession.plans.length > 0;
   const selectedPlan = selectedSession?.plans.find((p) => p.id === planId) ?? null;
   const readyToBook = selectedSession !== null && (!needsPlan || selectedPlan !== null);
@@ -659,17 +695,18 @@ function Booking({ product }: { product: ShopProduct }) {
   const unitPrice = selectedPlan ? selectedPlan.price : product.price;
   const lineLabel = selectedPlan ? selectedPlan.title.zh : "入場（含下午茶）";
 
-  // 最後一個場次結束了（與 /events「已結束」分頁同一條規則）→ 只列場次與票價、
-  // 不顯示「尚餘名額」、不能報名（2026-11 SEO 驗收 #2）。
-  if (eventEnded(null, product)) return <EventEndedNotice product={product} />;
+  // 最後一個場次結束了（與 /events「已結束」分頁同一條規則），或每一個場次都已開始
+  // （isSessionClosedForBooking）→ 只列場次與票價、不顯示「尚餘名額」、不能報名。
+  if (bookingClosed) return <EventEndedNotice product={product} />;
 
-  if (!directAnySeatsLeft(product)) {
+  if (!directAnySeatsLeft(product, now)) {
     return (
       <>
         <SessionList
           sessions={product.sessions}
           showSeatsRemaining={product.showSeatsRemaining}
           basePrice={product.price}
+          now={now}
         />
         <p className="mt-6 text-sm leading-relaxed text-muted-foreground">
           本場次名額已滿。若仍希望參加，歡迎來電 {PHONE} 由我們為您安排候補。
@@ -684,10 +721,11 @@ function Booking({ product }: { product: ShopProduct }) {
         sessions={product.sessions}
         showSeatsRemaining={product.showSeatsRemaining}
         basePrice={product.price}
+        now={now}
         selectedId={sessionId}
         onSelect={(id) => {
           setSessionId(id);
-          setPlanId(firstOpenPlanId(product.sessions.find((s) => s.id === id) ?? null));
+          setPlanId(firstOpenPlanId(product.sessions.find((s) => s.id === id) ?? null, now));
           setQty(1);
         }}
       />
@@ -760,7 +798,7 @@ function Booking({ product }: { product: ShopProduct }) {
   );
 }
 
-function BottomBar() {
+function BottomBar({ bookingClosed }: { bookingClosed: boolean }) {
   return (
     <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-(--sos-paper)/95 px-4 py-3 backdrop-blur sm:hidden">
       <a
@@ -768,7 +806,9 @@ function BottomBar() {
         className="flex items-center justify-between rounded-md bg-primary px-5 py-3.5 text-primary-foreground"
       >
         <span className="text-sm">11/6（五）14:00｜NT$300</span>
-        <span className="font-medium tracking-widest">立即報名 →</span>
+        <span className="font-medium tracking-widest">
+          {bookingClosed ? RESERVE_ENDED_LABEL : "立即報名"} →
+        </span>
       </a>
     </div>
   );

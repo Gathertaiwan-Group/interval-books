@@ -10,6 +10,14 @@
  */
 import { IMG } from "./images";
 
+/**
+ * 每一個梯次都已開始（或已結束）時，指向 #register 的「預約」錨點改寫成這一句。
+ * 與 EventEndedNotice 的按鈕同一句話。不隱藏：英雄區少一顆主要按鈕版面會跳（用戶端
+ * 時間校正後才變的那一刻尤其明顯），而且 #register 那裡就是 EventEndedNotice 的說明，
+ * 點下去仍然有東西可看。由 src/routes/events.kungtung.tsx 判斷後傳進來。
+ */
+export const RESERVE_ENDED_LABEL = "活動已結束";
+
 export function SkipLink() {
   return (
     <a href="#register" className="kt-skip-link">
@@ -18,7 +26,7 @@ export function SkipLink() {
   );
 }
 
-export function SiteHeader() {
+export function SiteHeader({ bookingClosed }: { bookingClosed: boolean }) {
   return (
     <header className="kt-site-header">
       <a href="#top" className="kt-brand-mark">
@@ -57,7 +65,7 @@ export function SiteHeader() {
           href="#register"
           className="items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 hidden sm:inline-flex"
         >
-          預約旅程
+          {bookingClosed ? RESERVE_ENDED_LABEL : "預約旅程"}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="24"
@@ -80,7 +88,7 @@ export function SiteHeader() {
   );
 }
 
-export function Hero() {
+export function Hero({ bookingClosed }: { bookingClosed: boolean }) {
   return (
     <section id="top" className="kt-cinematic-hero">
       <img
@@ -117,7 +125,7 @@ export function Hero() {
             href="#register"
             className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 kt-journey-button"
           >
-            預約這趟文化旅程
+            {bookingClosed ? RESERVE_ENDED_LABEL : "預約這趟文化旅程"}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="24"
@@ -572,7 +580,7 @@ export function Moments() {
   );
 }
 
-export function Itinerary() {
+export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
   return (
     <section id="itinerary" className="kt-section-band">
       <div className="kt-editorial-container">
@@ -705,7 +713,7 @@ export function Itinerary() {
             href="#register"
             className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 kt-journey-button"
           >
-            預約這趟文化旅程
+            {bookingClosed ? RESERVE_ENDED_LABEL : "預約這趟文化旅程"}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="24"

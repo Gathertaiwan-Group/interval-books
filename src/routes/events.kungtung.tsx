@@ -10,10 +10,13 @@ import { pageMeta } from "@/lib/seo/head";
 import { eventEnded, landingEventLd, storeAddressFromMatches } from "@/lib/seo/pages";
 import {
   directAnySeatsLeft,
+  directBookingClosed,
   directCheckoutSearch,
   directSeatLimit,
+  directSelectedSession,
   directSoleSession,
 } from "@/lib/direct-checkout";
+import { useBookingNow } from "@/hooks/use-booking-now";
 import { imageFor } from "@/lib/images";
 import {
   WISH_FIELD_ERROR_TEXT,
@@ -38,6 +41,7 @@ import {
   Itinerary,
   Moments,
   Price,
+  RESERVE_ENDED_LABEL,
   SiteFooter,
   SiteHeader,
   SkipLink,
@@ -104,7 +108,8 @@ const BUTTON =
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2";
 
 export const Route = createFileRoute("/events/kungtung")({
-  loader: async () => fetchActiveProductForEventSlug(EVENT_SLUG),
+  // now：「梯次開始了沒」的判斷時間點，SSR 與第一次 hydrate 共用（見 useBookingNow）。
+  loader: async () => ({ ...(await fetchActiveProductForEventSlug(EVENT_SLUG)), now: Date.now() }),
   // SEO（2026-11 健檢）：Event JSON-LD 的日期、地點、價格取自售票商品的場次與票種
   // （與報名區同一份資料），名稱與描述用這一頁的 PAGE 常數。
   head: ({ loaderData, matches }) => ({
@@ -151,6 +156,13 @@ function KungtungJourney() {
     };
   }, []);
 
+  // 梯次一開始（isSessionClosedForBooking，與結帳同一條規則）就不能報名：報名區換成
+  // EventEndedNotice，英雄區等指向 #register 的「預約」錨點改寫「活動已結束」。
+  const { product, now: loadedAt } = Route.useLoaderData();
+  const now = useBookingNow(loadedAt, product?.sessions ?? []);
+  const bookingClosed =
+    product !== null && (eventEnded(null, product) || directBookingClosed(product, now));
+
   // 原站：報名區進入畫面時，手機底部的「預約」列收起來。
   const [formVisible, setFormVisible] = useState(false);
   useEffect(() => {
@@ -167,21 +179,21 @@ function KungtungJourney() {
     <div className="kt-root">
       <main className="kt-tour-page">
         <SkipLink />
-        <SiteHeader />
-        <Hero />
+        <SiteHeader bookingClosed={bookingClosed} />
+        <Hero bookingClosed={bookingClosed} />
         <Story />
         <Values />
         <Hosts />
         <Moments />
-        <Itinerary />
+        <Itinerary bookingClosed={bookingClosed} />
         <Space />
         <Price />
         <Faq />
-        <Registration />
+        <Registration now={now} bookingClosed={bookingClosed} />
         <NextJourney />
         <TripNotice />
         <SiteFooter />
-        <MobileReserve formVisible={formVisible} />
+        <MobileReserve formVisible={formVisible} bookingClosed={bookingClosed} />
       </main>
     </div>
   );
@@ -255,8 +267,8 @@ function MailIcon() {
  * 🔴 不自己算任何座位數字——上限一律問 directSeatLimit()，剩餘由 SessionPicker／
  *    PlanPicker 自己顯示。沒選好場次與方案時按鈕是 <button disabled>，不是 <Link>。
  */
-function Registration() {
-  const { product, unavailable } = Route.useLoaderData();
+function Registration({ now, bookingClosed }: { now: number; bookingClosed: boolean }) {
+  const { product, unavailable, now: loadedAt } = Route.useLoaderData();
   return (
     <section id="register" className="kt-registration-section kt-section-band">
       <div className="kt-editorial-container kt-registration-layout">
@@ -308,7 +320,12 @@ function Registration() {
             ) : (
               // 這一頁只有中文版：共用的場次／票種元件也固定顯示中文。
               <FixedLanguage lang="zh">
-                <Booking product={product} />
+                <Booking
+                  product={product}
+                  loadedAt={loadedAt}
+                  now={now}
+                  bookingClosed={bookingClosed}
+                />
               </FixedLanguage>
             )}
           </div>
@@ -319,20 +336,34 @@ function Registration() {
 }
 
 /** 唯一梯次底下，第一個還能買的票種（＝一般旅程價・兩人一房）。 */
-function firstOpenPlanId(session: ShopSession | null): string | null {
-  return session?.plans.find((p) => isPlanAvailable(p))?.id ?? null;
+function firstOpenPlanId(session: ShopSession | null, now: number): string | null {
+  return session?.plans.find((p) => isPlanAvailable(p, now))?.id ?? null;
 }
 
-function Booking({ product }: { product: ShopProduct }) {
+function Booking({
+  product,
+  loadedAt,
+  now,
+  bookingClosed,
+}: {
+  product: ShopProduct;
+  /** loader 的 now：預選只在第一次 render 算，用它才與 SSR 一致。 */
+  loadedAt: number;
+  /** useBookingNow() 的值。 */
+  now: number;
+  /** 每一個梯次都已開始或已結束（由頁面判斷，英雄區用同一個值）。 */
+  bookingClosed: boolean;
+}) {
   const [sessionId, setSessionId] = useState<string | null>(
-    () => directSoleSession(product)?.id ?? null,
+    () => directSoleSession(product, loadedAt)?.id ?? null,
   );
   const [planId, setPlanId] = useState<string | null>(() =>
-    firstOpenPlanId(directSoleSession(product)),
+    firstOpenPlanId(directSoleSession(product, loadedAt), loadedAt),
   );
   const [qty, setQty] = useState(1);
 
-  const selectedSession = product.sessions.find((s) => s.id === sessionId) ?? null;
+  // 選中的梯次一開始就不算選中，按鈕回到 <button disabled>。
+  const selectedSession = directSelectedSession(product, sessionId, now);
   const needsPlan = selectedSession !== null && selectedSession.plans.length > 0;
   const selectedPlan = selectedSession?.plans.find((p) => p.id === planId) ?? null;
   const readyToBook = selectedSession !== null && (!needsPlan || selectedPlan !== null);
@@ -341,17 +372,18 @@ function Booking({ product }: { product: ShopProduct }) {
   const unitPrice = selectedPlan ? selectedPlan.price : product.price;
   const lineLabel = selectedPlan ? selectedPlan.title.zh : "旅程費用";
 
-  // 最後一個場次結束了（與 /events「已結束」分頁同一條規則）→ 只列場次與票價、
-  // 不顯示「尚餘名額」、不能報名（2026-11 SEO 驗收 #2）。
-  if (eventEnded(null, product)) return <EventEndedNotice product={product} />;
+  // 最後一個場次結束了（與 /events「已結束」分頁同一條規則），或每一個梯次都已開始
+  // （isSessionClosedForBooking）→ 只列場次與票價、不顯示「尚餘名額」、不能報名。
+  if (bookingClosed) return <EventEndedNotice product={product} />;
 
-  if (!directAnySeatsLeft(product)) {
+  if (!directAnySeatsLeft(product, now)) {
     return (
       <>
         <SessionList
           sessions={product.sessions}
           showSeatsRemaining={product.showSeatsRemaining}
           basePrice={product.price}
+          now={now}
         />
         <p className="text-sm leading-relaxed text-muted-foreground">
           本梯次名額已滿。若仍希望參加，歡迎來電 {PHONE} 由我們為您安排候補。
@@ -366,10 +398,11 @@ function Booking({ product }: { product: ShopProduct }) {
         sessions={product.sessions}
         showSeatsRemaining={product.showSeatsRemaining}
         basePrice={product.price}
+        now={now}
         selectedId={sessionId}
         onSelect={(id) => {
           setSessionId(id);
-          setPlanId(firstOpenPlanId(product.sessions.find((s) => s.id === id) ?? null));
+          setPlanId(firstOpenPlanId(product.sessions.find((s) => s.id === id) ?? null, now));
           setQty(1);
         }}
       />
@@ -672,7 +705,13 @@ function NextJourney() {
   );
 }
 
-function MobileReserve({ formVisible }: { formVisible: boolean }) {
+function MobileReserve({
+  formVisible,
+  bookingClosed,
+}: {
+  formVisible: boolean;
+  bookingClosed: boolean;
+}) {
   return (
     <div className="kt-mobile-reserve" data-form-visible={formVisible ? "true" : "false"}>
       <div>
@@ -680,7 +719,7 @@ function MobileReserve({ formVisible }: { formVisible: boolean }) {
         <span>／人・知友 NT$16,800</span>
       </div>
       <a href="#register" className={`${BUTTON} kt-journey-button`}>
-        預約這趟文化旅程
+        {bookingClosed ? RESERVE_ENDED_LABEL : "預約這趟文化旅程"}
         <ArrowUpRight />
       </a>
     </div>

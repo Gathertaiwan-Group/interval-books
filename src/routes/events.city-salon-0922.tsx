@@ -12,10 +12,13 @@ import { eventEnded, landingEventLd, storeAddressFromMatches } from "@/lib/seo/p
 import { CARD } from "@/lib/feature-layout";
 import {
   directAnySeatsLeft,
+  directBookingClosed,
   directCheckoutSearch,
   directSeatLimit,
+  directSelectedSession,
   directSoleSession,
 } from "@/lib/direct-checkout";
+import { useBookingNow } from "@/hooks/use-booking-now";
 import { imageFor } from "@/lib/images";
 import { fetchActiveProductForEventSlug, type ShopProduct } from "@/lib/shop";
 
@@ -184,7 +187,8 @@ export const Route = createFileRoute("/events/city-salon-0922")({
   // 報名走站上既有的那一套：商品（product_type='event'）→ 場次 → 直接結帳 →
   // reserve_session_seat() → event_registrations。名單因此直接出現在
   // /admin/registrations，不需要為這一場另外做一個後台。
-  loader: async () => fetchActiveProductForEventSlug(EVENT_SLUG),
+  // now：「場次開始了沒」的判斷時間點，SSR 與第一次 hydrate 共用（見 useBookingNow）。
+  loader: async () => ({ ...(await fetchActiveProductForEventSlug(EVENT_SLUG)), now: Date.now() }),
   // SEO（2026-11 健檢）：Event JSON-LD 的日期、地點、價格取自售票商品的場次與票種
   // （與報名區同一份資料），名稱與描述用這一頁的 PAGE 常數。
   head: ({ loaderData, matches }) => ({
@@ -229,6 +233,13 @@ function CitySalon() {
     ogImage: imageFor(OG_IMAGE_KEY, ""),
   });
 
+  // 場次一開始（isSessionClosedForBooking，與結帳同一條規則）就不能報名：回覆區換成
+  // EventEndedNotice，共同主辦條與英雄區的「確認出席」錨點改寫「活動已結束」。
+  const { product, now: loadedAt } = Route.useLoaderData();
+  const now = useBookingNow(loadedAt, product?.sessions ?? []);
+  const bookingClosed =
+    product !== null && (eventEnded(null, product) || directBookingClosed(product, now));
+
   return (
     <PageShell>
       {/* 鼠尾草綠只有徽章與少數重點用得到，不值得進全站 token；用一個頁面層級的
@@ -245,13 +256,13 @@ function CitySalon() {
           } as React.CSSProperties
         }
       >
-        <CohostBar />
-        <Hero />
+        <CohostBar bookingClosed={bookingClosed} />
+        <Hero bookingClosed={bookingClosed} />
         <Curation />
         <Speakers />
         <Agenda />
         <Paths />
-        <Registration />
+        <Registration now={now} bookingClosed={bookingClosed} />
         <Venue />
       </div>
     </PageShell>
@@ -260,7 +271,13 @@ function CitySalon() {
 
 // ── 共同主辦條 ────────────────────────────────────────────────────────────────
 
-function CohostBar() {
+/**
+ * 每一個場次都已開始時，指向 #rsvp 的錨點改寫成這一句（與 EventEndedNotice 的按鈕
+ * 同一句）。不隱藏：英雄區少一顆主要按鈕版面會跳，而且 #rsvp 那裡就是結束說明。
+ */
+const RESERVE_ENDED_LABEL = "活動已結束";
+
+function CohostBar({ bookingClosed }: { bookingClosed: boolean }) {
   return (
     <div className="border-b border-border bg-oat/60">
       <div className="container-editorial flex flex-wrap items-center justify-between gap-3 py-3">
@@ -269,7 +286,7 @@ function CohostBar() {
           href="#rsvp"
           className="text-xs tracking-widest border border-foreground px-4 py-2 hover:bg-foreground hover:text-primary-foreground transition-colors"
         >
-          專屬邀請席位確認
+          {bookingClosed ? RESERVE_ENDED_LABEL : "專屬邀請席位確認"}
         </a>
       </div>
     </div>
@@ -378,7 +395,7 @@ function MetaRow({ item }: { item: (typeof SALON.meta)[number] }) {
  * 四列資訊）改成靠左，因為那是要「讀」的資訊，置中的長段落在寬螢幕上每一行的起點
  * 都不一樣，讀起來很累。
  */
-function Hero() {
+function Hero({ bookingClosed }: { bookingClosed: boolean }) {
   return (
     <section className="relative overflow-hidden">
       <Botanical corner="tl" />
@@ -455,7 +472,7 @@ function Hero() {
               href="#rsvp"
               className="inline-block border border-[var(--salon-green)] px-8 py-4 tracking-widest text-[var(--salon-green)] transition-colors hover:bg-[var(--salon-green)] hover:text-primary-foreground"
             >
-              確認出席 / 預約席位
+              {bookingClosed ? RESERVE_ENDED_LABEL : "確認出席 / 預約席位"}
             </a>
           </div>
         </div>
@@ -598,8 +615,8 @@ function Paths() {
  * 沒有選場次時上限鎖 1、按鈕是 <button disabled> 而不是 <Link>——「沒選場次就去
  * 結帳」在 DOM 裡不存在任何一條路徑。
  */
-function Registration() {
-  const { product, unavailable } = Route.useLoaderData();
+function Registration({ now, bookingClosed }: { now: number; bookingClosed: boolean }) {
+  const { product, unavailable, now: loadedAt } = Route.useLoaderData();
 
   if (unavailable) {
     return (
@@ -621,7 +638,7 @@ function Registration() {
   }
   return (
     <RsvpShell>
-      <SeatBooking product={product} />
+      <SeatBooking product={product} loadedAt={loadedAt} now={now} bookingClosed={bookingClosed} />
     </RsvpShell>
   );
 }
@@ -643,25 +660,39 @@ function RsvpShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SeatBooking({ product }: { product: ShopProduct }) {
+function SeatBooking({
+  product,
+  loadedAt,
+  now,
+  bookingClosed,
+}: {
+  product: ShopProduct;
+  /** loader 的 now：預選只在第一次 render 算，用它才與 SSR 一致。 */
+  loadedAt: number;
+  /** useBookingNow() 的值。 */
+  now: number;
+  /** 每一個場次都已開始或已結束（由頁面判斷，英雄區用同一個值）。 */
+  bookingClosed: boolean;
+}) {
   const [sessionId, setSessionId] = useState<string | null>(
-    () => directSoleSession(product)?.id ?? null,
+    () => directSoleSession(product, loadedAt)?.id ?? null,
   );
   const [planId, setPlanId] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
 
-  const selectedSession = product.sessions.find((s) => s.id === sessionId) ?? null;
+  // 選中的場次一開始就不算選中，按鈕回到 <button disabled>。
+  const selectedSession = directSelectedSession(product, sessionId, now);
   // 這一場現在沒有票種，但後台隨時可以加（/admin/registrations 的方案編輯器）。
   // 加了之後這一段就會自動出現，不用再回來改這個檔案。
   const needsPlan = selectedSession !== null && selectedSession.plans.length > 0;
   const selectedPlan = selectedSession?.plans.find((p) => p.id === planId) ?? null;
   const readyToBook = selectedSession !== null && (!needsPlan || selectedPlan !== null);
   const seatLimit = selectedSession ? directSeatLimit(product, selectedSession, selectedPlan) : 1;
-  const anySeats = directAnySeatsLeft(product);
+  const anySeats = directAnySeatsLeft(product, now);
 
-  // 最後一個場次結束了（與 /events「已結束」分頁同一條規則）→ 只列場次與票價、
-  // 不顯示「尚餘名額」、不能報名（2026-11 SEO 驗收 #2）。
-  if (eventEnded(null, product)) return <EventEndedNotice product={product} />;
+  // 最後一個場次結束了（與 /events「已結束」分頁同一條規則），或每一個場次都已開始
+  // （isSessionClosedForBooking）→ 只列場次與票價、不顯示「尚餘名額」、不能報名。
+  if (bookingClosed) return <EventEndedNotice product={product} />;
 
   if (!anySeats) {
     return (
@@ -670,6 +701,7 @@ function SeatBooking({ product }: { product: ShopProduct }) {
           sessions={product.sessions}
           showSeatsRemaining={product.showSeatsRemaining}
           basePrice={product.price}
+          now={now}
         />
         <p className="mt-6 text-sm leading-relaxed text-muted-foreground">
           本場次席位已滿。若仍希望出席，歡迎來電 {SALON.phone} 由我們為您安排候補。
@@ -684,6 +716,7 @@ function SeatBooking({ product }: { product: ShopProduct }) {
         sessions={product.sessions}
         showSeatsRemaining={product.showSeatsRemaining}
         basePrice={product.price}
+        now={now}
         selectedId={sessionId}
         onSelect={(id) => {
           setSessionId(id);

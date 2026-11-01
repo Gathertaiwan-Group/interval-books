@@ -150,9 +150,49 @@ export function directSeatLimit(
  * ⚠️ 只拿來決定「要不要畫報名區」，**不是數量上限**。名字裡沒有 limit 就是為了讓
  *    「拿它去夾數量」看起來是錯的 —— 因為那正是這一期在防的那個 bug。
  */
-export function directAnySeatsLeft(product: ShopProduct): boolean {
-  const limit = directSeatLimit(product, null);
+export function directAnySeatsLeft(product: ShopProduct, now: number): boolean {
+  const limit = directSeatLimit(directOpenProduct(product, now), null);
   return limit === null || limit > 0;
+}
+
+/**
+ * 只留下**還收報名**的場次（isSessionClosedForBooking，與結帳、資料庫同一條規則）的
+ * 同一件商品。已開始的場次在活動頁上照列、標「已結束」，但不能算進「還有沒有位子」——
+ * 否則早場已開始、晚場額滿時，頁面會因為早場還有空位而畫出一個什麼都選不了的選擇器。
+ *
+ * `now` **必填**：活動頁一律傳 loader 帶下來、再由 useBookingNow() 推進的那個時間，
+ * SSR 與第一次 hydrate 才會是同一個答案（見 src/hooks/use-booking-now.ts）。
+ */
+export function directOpenProduct(product: ShopProduct, now: number): ShopProduct {
+  const open = product.sessions.filter((s) => !isSessionClosedForBooking(s, now));
+  return open.length === product.sessions.length ? product : { ...product, sessions: open };
+}
+
+/**
+ * 整件商品都不能再報名了：**有場次、而且每一場都已開始。** 活動頁拿它決定要不要換成
+ * EventEndedNotice（報名按鈕停用、文案改「活動已結束」）。
+ *
+ * 沒有場次 → false：那是「還沒公布」或「名額已滿」的畫面，不是「已結束」。
+ */
+export function directBookingClosed(product: ShopProduct, now: number): boolean {
+  return (
+    product.sessions.length > 0 && product.sessions.every((s) => isSessionClosedForBooking(s, now))
+  );
+}
+
+/**
+ * 客人選中的那一場——**只回還收報名的場次。** 選中之後場次剛好開始（頁面開著、時間
+ * 走過 starts_at），回 null，報名按鈕就回到 <button disabled>，DOM 裡不再有去結帳的
+ * <Link>。不必清掉 state：時間只會往前走，那一場不會再變回可選。
+ */
+export function directSelectedSession(
+  product: ShopProduct,
+  sessionId: string | null,
+  now: number,
+): ShopSession | null {
+  if (sessionId === null) return null;
+  const s = product.sessions.find((x) => x.id === sessionId) ?? null;
+  return s && !isSessionClosedForBooking(s, now) ? s : null;
 }
 
 /**
@@ -178,9 +218,11 @@ export function directAnySeatsLeft(product: ShopProduct): boolean {
  *    真正擋住壞資料的是 `> 0` 本身：capacity 是 null 時 `null - 0` 在 JS 裡等於 0（不是
  *    NaN），remainingForSession() 回 0，於是不預選。這條有測試守著，也做過突變測試。
  */
-export function directSoleSession(product: ShopProduct): ShopSession | null {
+export function directSoleSession(product: ShopProduct, now: number): ShopSession | null {
   if (product.sessions.length !== 1) return null;
   const only = product.sessions[0];
+  // 已開始的那一場不預選：與額滿同一個理由（預選一個按不下去的場次比沒選更難懂）。
+  if (isSessionClosedForBooking(only, now)) return null;
   return (directSeatLimit(product, only) ?? 0) > 0 ? only : null;
 }
 

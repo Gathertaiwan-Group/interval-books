@@ -11,10 +11,13 @@ import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fetchEventBySlug, fetchEventCategories, findEventSlugIgnoringCase } from "@/lib/cms";
 import {
   directAnySeatsLeft,
+  directBookingClosed,
   directCheckoutSearch,
   directSeatLimit,
+  directSelectedSession,
   directSoleSession,
 } from "@/lib/direct-checkout";
+import { useBookingNow } from "@/hooks/use-booking-now";
 import { EVENT_LIST_FIELDS } from "@/lib/event-blocks";
 import { imageFor } from "@/lib/images";
 import { fetchActiveProductForEventSlug, type ShopProduct } from "@/lib/shop";
@@ -190,7 +193,10 @@ export const Route = createFileRoute("/events/$slug")({
       ? await fetchActiveProductForEventSlug(event.slug)
       : { product: null, unavailable: false };
 
-    return { event, unavailable, categories, booking };
+    // 「場次開始了沒」的判斷時間點（isSessionClosedForBooking 的 now）。跟著 loader 資料
+    // 序列化，SSR 與第一次 hydrate 用同一個值（不會 #418）；掛載後由 useBookingNow()
+    // 校正成現在並在下一個場次開始時推進。與 /checkout 的 loader 同一個做法（a61488a）。
+    return { event, unavailable, categories, booking, now: Date.now() };
   },
   // SEO（2026-11 健檢）：title「{活動名}｜{日期}｜小時光書店」、描述取摘要＋內文、
   // 分享圖用活動封面、JSON-LD 輸出 Event（日期地點價格來自售票商品的場次）與麵包屑。
@@ -268,8 +274,10 @@ function EventDetail() {
   // 清單區塊取出來的是字串陣列，而 t() 只吃 Localized 字串，所以這裡要拿 lang
   // 自己選語系（規則與 t() 一致：當前語系沒東西就退回 zh）。
   const { t, lang } = useLang();
-  const { event, unavailable, categories, booking } = Route.useLoaderData();
+  const { event, unavailable, categories, booking, now: loadedAt } = Route.useLoaderData();
   const site = useSiteContent();
+  // 在任何 early return 之前（hook 規則）。
+  const now = useBookingNow(loadedAt, booking.product?.sessions ?? []);
   const { ui } = site;
 
   const seo = eventSeo(event, booking.product, PAGE, storeAddressOf(site));
@@ -309,7 +317,11 @@ function EventDetail() {
   const cta = registrationCta(event.registrationType, event.externalUrl, booking);
   // 最後一個場次結束了（與 /events「已結束」分頁同一條規則）→ 報名區只列場次與票價、
   // 不顯示「尚餘名額」、不能報名（2026-11 SEO 驗收 #2）。
-  const ended = eventEnded(event.isoDate, booking.product);
+  // 2026-11：或者每一個場次都已開始（isSessionClosedForBooking，與結帳同一條規則）——
+  // 不必等到隔天，時間一到就換成這個畫面。
+  const ended =
+    eventEnded(event.isoDate, booking.product) ||
+    (booking.product !== null && directBookingClosed(booking.product, now));
 
   return (
     <PageShell>
@@ -459,12 +471,13 @@ function EventDetail() {
               eyebrowClassName="eyebrow text-2xl"
             />
           ) : cta.kind === "internal" ? (
-            <RegistrationPanel product={cta.product} />
+            <RegistrationPanel product={cta.product} loadedAt={loadedAt} now={now} />
           ) : (
             <>
               <SessionList
                 sessions={booking.product?.sessions ?? []}
                 basePrice={booking.product?.price ?? null}
+                now={now}
                 // 商品還沒建立時沒有旗標可讀，退回「顯示」——那是 0029 的欄位預設，
                 // 也是這一支之前的行為。（這條分支的 sessions 本來就是空的。）
                 showSeatsRemaining={booking.product?.showSeatsRemaining ?? true}
@@ -515,17 +528,29 @@ function EventDetail() {
  * **不預選** —— 預選一個按不下去的場次，畫面會變成「已經選好了卻不能報名」，那比沒選
  * 更難懂。額滿時維持 null，客人看到的是場次上的「已額滿」。
  */
-function RegistrationPanel({ product }: { product: ShopProduct }) {
+function RegistrationPanel({
+  product,
+  loadedAt,
+  now,
+}: {
+  product: ShopProduct;
+  /** loader 的 now：預選只在第一次 render 算，用它才與 SSR 一致。 */
+  loadedAt: number;
+  /** useBookingNow() 的值：場次開始了沒。 */
+  now: number;
+}) {
   const t = useT();
   // 只在第一次 render 算一次。sessions 來自 loader，不會在這個元件的生命週期裡變。
   const [sessionId, setSessionId] = useState<string | null>(
-    () => directSoleSession(product)?.id ?? null,
+    () => directSoleSession(product, loadedAt)?.id ?? null,
   );
   // 0036：這個場次選了哪個方案。跟 sessionId 一樣只活在這個元件裡，不進購物車。
   const [planId, setPlanId] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
 
-  const selectedSession = product.sessions.find((s) => s.id === sessionId) ?? null;
+  // 選中的場次一開始就不算選中（directSelectedSession → isSessionClosedForBooking），
+  // 按鈕回到 <button disabled>，DOM 裡不再有去結帳的 <Link>。
+  const selectedSession = directSelectedSession(product, sessionId, now);
   // 這個場次有沒有開方案——有的話報名前必須先選一個，沒有就照 0020 之後的行為，
   // 選完場次直接看得到數量與按鈕。
   const needsPlan = selectedSession !== null && selectedSession.plans.length > 0;
@@ -537,7 +562,7 @@ function RegistrationPanel({ product }: { product: ShopProduct }) {
   //    選了方案時上限問的是那個方案（min(方案剩餘單位, floor(場次剩餘位子 /
   //    seatsPerUnit))，同樣是 cartInputFor() 算的，這一頁仍然不自己算）。
   const seatLimit = selectedSession ? directSeatLimit(product, selectedSession, selectedPlan) : 1;
-  const anySeats = directAnySeatsLeft(product);
+  const anySeats = directAnySeatsLeft(product, now);
 
   return (
     <>
@@ -546,6 +571,7 @@ function RegistrationPanel({ product }: { product: ShopProduct }) {
           sessions={product.sessions}
           showSeatsRemaining={product.showSeatsRemaining}
           basePrice={product.price}
+          now={now}
           selectedId={sessionId}
           onSelect={(id) => {
             setSessionId(id);
@@ -561,6 +587,7 @@ function RegistrationPanel({ product }: { product: ShopProduct }) {
           sessions={product.sessions}
           showSeatsRemaining={product.showSeatsRemaining}
           basePrice={product.price}
+          now={now}
         />
       )}
 

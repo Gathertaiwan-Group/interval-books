@@ -5,12 +5,19 @@ import { ArrowLeft } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { PRODUCT_TYPE_LABELS, SEATS_LEFT_LABEL } from "@/components/shop/labels";
 import { PlanPicker } from "@/components/shop/PlanPicker";
-import { SessionPicker } from "@/components/shop/SessionPicker";
+import { EventEndedNotice, SessionPicker } from "@/components/shop/SessionPicker";
 import { PriceTag, QuantityStepper, StockBadge } from "@/components/shop/ShopBits";
 import { useT } from "@/i18n/LanguageContext";
 import type { Localized } from "@/i18n/types";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { cartInputFor, useCart } from "@/lib/cart";
+import {
+  directBookingClosed,
+  directOpenProduct,
+  directSelectedSession,
+} from "@/lib/direct-checkout";
+import { isSessionClosedForBooking } from "@/lib/event-status";
+import { useBookingNow } from "@/hooks/use-booking-now";
 import { imageFor } from "@/lib/images";
 import { pageMeta } from "@/lib/seo/head";
 import { productSeo } from "@/lib/seo/pages";
@@ -108,7 +115,8 @@ export const Route = createFileRoute("/shop/$slug")({
       }
       throw notFound();
     }
-    return { product, unavailable };
+    // now：「場次開始了沒」的判斷時間點，SSR 與第一次 hydrate 共用（見 useBookingNow）。
+    return { product, unavailable, now: Date.now() };
   },
   // SEO（2026-11 健檢）：title「{品名}｜{類別}｜小時光書店」、描述取摘要＋介紹文、
   // JSON-LD 輸出 Product（刊物另標 Book）與麵包屑。組裝在 src/lib/seo/pages.ts#productSeo。
@@ -132,8 +140,10 @@ export const Route = createFileRoute("/shop/$slug")({
 
 function ProductDetail() {
   const t = useT();
-  const { product, unavailable } = Route.useLoaderData();
+  const { product, unavailable, now: loadedAt } = Route.useLoaderData();
   const { ui } = useSiteContent();
+  // 場次開始了沒（isSessionClosedForBooking）。在 early return 之前（hook 規則）。
+  const now = useBookingNow(loadedAt, product?.sessions ?? []);
   const addItem = useCart((s) => s.addItem);
   const [qty, setQty] = useState(1);
   /**
@@ -142,7 +152,11 @@ function ProductDetail() {
    * 而灰的原因看不出來。
    */
   const [sessionId, setSessionId] = useState<string | null>(
-    () => product?.sessions.find((s) => remainingForSession(s) > 0)?.id ?? null,
+    () =>
+      product?.sessions.find(
+        // 已開始的場次不預設（2026-11）：與額滿同一個理由。用 loader 的時間，SSR 才一致。
+        (s) => !isSessionClosedForBooking(s, loadedAt) && remainingForSession(s) > 0,
+      )?.id ?? null,
   );
   // 0036：這個場次選了哪個方案。跟 sessionId 一樣只活在這個元件裡。
   const [planId, setPlanId] = useState<string | null>(null);
@@ -169,9 +183,12 @@ function ProductDetail() {
   }
 
   const isBooking = product.productType === "event" || product.productType === "journey";
+  // 已開始的場次不算選中（directSelectedSession → isSessionClosedForBooking）。
   const selectedSession: ShopSession | null = isBooking
-    ? (product.sessions.find((s) => s.id === sessionId) ?? null)
+    ? directSelectedSession(product, sessionId, now)
     : null;
+  // 每一個場次都已開始：報名區換成 EventEndedNotice（與活動頁同一個畫面）。
+  const bookingClosed = isBooking && directBookingClosed(product, now);
   // 0036：這個場次有沒有開方案——有的話得先選一個才能加入購物車。
   const needsPlan = selectedSession !== null && selectedSession.plans.length > 0;
   const selectedPlan = selectedSession?.plans.find((p) => p.id === planId) ?? null;
@@ -183,7 +200,13 @@ function ProductDetail() {
   // 可能只剩 1 個。這裡改走 cartInputFor()（跟購物車行、direct-checkout 同一個
   // 算式），不自己重算——理由與那兩個檔案完全一樣：算法只能有一份。沒選場次
   // （或沒有方案）時它自己會落回商品層級／場次層級的數字，那只是給徽章看的。
-  const remaining = cartInputFor(product, 1, selectedSession, selectedPlan).limit;
+  // 已開始的場次不算進「還剩幾位」（沒選場次時那是跨場次最大值）。
+  const remaining = cartInputFor(
+    isBooking ? directOpenProduct(product, now) : product,
+    1,
+    selectedSession,
+    selectedPlan,
+  ).limit;
   const soldOut = isBooking ? (remaining ?? 0) <= 0 : isSoldOut(product);
   /**
    * 徽章那一行整個不畫的條件。**只對報名商品成立** —— goods/book 的徽章講的是
@@ -193,7 +216,7 @@ function ProductDetail() {
 
   function handleAdd() {
     // `product` is narrowed above, but the closure needs its own guard.
-    if (!product || soldOut) return;
+    if (!product || soldOut || bookingClosed) return;
     if (isBooking && !selectedSession) {
       toast.error(t(PAGE.pickSessionFirst));
       return;
@@ -224,7 +247,7 @@ function ProductDetail() {
           <img
             src={imageFor(product.imageKey, curatedImg)}
             alt={t(product.title)}
-            className={`h-full w-full object-cover ${soldOut ? "opacity-60" : ""}`}
+            className={`h-full w-full object-cover ${soldOut || bookingClosed ? "opacity-60" : ""}`}
           />
         </div>
 
@@ -247,7 +270,7 @@ function ProductDetail() {
                  那是「你買不到了」，跟「還剩幾件／幾位」不是同一件事。
               旗標關掉時只有**報名商品**的剩餘那一句消失（連整個 <div> 一起，否則
               會留下一條 mt-5 的空白）；書與選物的「僅剩 N 件」與它無關，那不是名額。 */}
-          {soldOut ? (
+          {bookingClosed ? null : soldOut ? (
             <div className="mt-5">
               <StockBadge tone="alert">{t(ui.buttons.soldOut)}</StockBadge>
             </div>
@@ -273,10 +296,15 @@ function ProductDetail() {
 
           {/* 場次選擇。只有活動／策旅會渲染，而且**先於**數量選擇 —— 上限是選中
               那一場的剩餘，所以順序反過來會讓數量先被一個還沒決定的上限夾住。 */}
-          {isBooking ? (
+          {/* 每一個場次都已開始（2026-11）：與活動頁同一個結束畫面——場次標「已結束」、
+              按鈕停用、沒有加入購物車的路。 */}
+          {bookingClosed ? (
+            <EventEndedNotice product={product} />
+          ) : isBooking ? (
             <SessionPicker
               sessions={product.sessions}
               showSeatsRemaining={product.showSeatsRemaining}
+              now={now}
               selectedId={sessionId}
               onSelect={(id) => {
                 setSessionId(id);
@@ -303,7 +331,7 @@ function ProductDetail() {
             />
           ) : null}
 
-          {soldOut ? (
+          {bookingClosed ? null : soldOut ? (
             <p className="text-sm leading-relaxed text-muted-foreground">{t(PAGE.soldOutNote)}</p>
           ) : (
             <div className="flex flex-wrap items-center gap-4">
@@ -330,7 +358,7 @@ function ProductDetail() {
               </Link>
             </div>
           )}
-          {!readyToBook && !soldOut ? (
+          {!readyToBook && !soldOut && !bookingClosed ? (
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
               {selectedSession === null ? t(PAGE.pickSessionFirst) : t(PAGE.pickPlanFirst)}
             </p>

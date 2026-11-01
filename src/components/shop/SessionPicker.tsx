@@ -28,11 +28,18 @@
  *    實際效果是「新的呼叫端忘記傳」與「這場活動要顯示」在型別上長得一樣 ——
  *    於是漏傳會靜默地退回舊行為，而那正是這個開關被加進來要修掉的東西。
  *    必填之後，漏傳是一個 tsc 錯誤。
+ *
+ * ── now：場次開始了沒（2026-11）────────────────────────────────────────────
+ * 已開始的場次（isSessionClosedForBooking，與結帳伺服器、資料庫 0049 同一條規則）
+ * 標「已結束」、不能選、不印「尚餘名額」。逐場次判斷：同一個活動早場開始了、晚場照常。
+ * `now` 一樣**必填、沒有預設值**——預設 Date.now() 會讓 SSR 與 hydrate 各拿一個時間，
+ * 開場那一秒就是 #418。呼叫端傳 useBookingNow()（src/hooks/use-booking-now.ts）的值。
  */
 import { useT } from "@/i18n/LanguageContext";
 import type { Localized } from "@/i18n/types";
 import { formatPrice, remainingForSession, type ShopProduct, type ShopSession } from "@/lib/shop";
 import { SEATS_LEFT_LABEL } from "@/components/shop/labels";
+import { isSessionClosedForBooking } from "@/lib/event-status";
 
 const COPY: Record<
   | "chooseSession"
@@ -77,8 +84,11 @@ export function SessionPicker({
   onSelect,
   showSeatsRemaining,
   basePrice = null,
+  now,
 }: {
   sessions: ShopSession[];
+  /** 判斷場次是否已開始的時間點（useBookingNow）。**必填**——理由見檔頭。 */
+  now: number;
   /** 目前選中的場次 id，還沒選就是 null。 */
   selectedId: string | null;
   onSelect: (sessionId: string) => void;
@@ -108,24 +118,31 @@ export function SessionPicker({
       {sessions.map((session) => {
         const left = remainingForSession(session);
         const full = left <= 0;
-        const selected = session.id === selectedId;
+        // 已開始的場次：不能選、標「已結束」、不印剩餘名額。比額滿更優先——開始了就
+        // 沒有「還剩幾位」可言。已開始的場次即使 selectedId 指著它也不畫成選中。
+        const closed = isSessionClosedForBooking(session, now);
+        const selected = !closed && session.id === selectedId;
         // 🔴 額滿優先，旗標只管「還剩幾位」那一句。null = 這一行整個不畫
         //    （不是畫一個空的 <span>，那會留下一條 8px 的空白邊距）。
-        const note = full
-          ? t(COPY.sessionFull)
-          : showSeatsRemaining
-            ? `${t(SEATS_LEFT_LABEL)} ${left}`
-            : null;
+        const note = closed
+          ? t(COPY.sessionEnded)
+          : full
+            ? t(COPY.sessionFull)
+            : showSeatsRemaining
+              ? `${t(SEATS_LEFT_LABEL)} ${left}`
+              : null;
+        const unavailable = closed || full;
         return (
           <button
             key={session.id}
             type="button"
-            disabled={full}
+            disabled={unavailable}
+            data-session-closed={closed ? "true" : undefined}
             aria-pressed={selected}
             onClick={() => onSelect(session.id)}
             className={`block w-full border p-4 text-left transition-colors ${
               selected ? "border-foreground" : "border-border hover:border-foreground/50"
-            } ${full ? "cursor-not-allowed opacity-50" : ""}`}
+            } ${unavailable ? "cursor-not-allowed opacity-50" : ""}`}
           >
             <span className="block text-sm">{t(session.title)}</span>
             <span className="mt-1 block text-xs text-muted-foreground">
@@ -171,8 +188,14 @@ export function SessionList({
   showSeatsRemaining,
   basePrice = null,
   ended = false,
+  now,
 }: {
   sessions: ShopSession[];
+  /**
+   * 判斷場次是否已開始的時間點（useBookingNow）。已開始的那幾場標「已結束」。
+   * **必填**；只有 EventEndedNotice（整個活動已結束，`ended` 蓋過一切）傳 null。
+   */
+  now: number | null;
   /**
    * 這場活動要不要印「尚餘名額 N」（products.show_seats_remaining）。
    * **必填、沒有預設值** —— 理由見檔頭。額滿不受它影響。
@@ -198,7 +221,8 @@ export function SessionList({
             const left = remainingForSession(session);
             // 與 SessionPicker 同一條規則、同一個順序：額滿優先，旗標只管剩餘。
             // 已結束最優先（2026-11 SEO 驗收 #2：結束的活動不再印「尚餘名額」）。
-            const note = ended
+            const closed = ended || (now !== null && isSessionClosedForBooking(session, now));
+            const note = closed
               ? t(COPY.sessionEnded)
               : left <= 0
                 ? t(COPY.sessionFull)
@@ -212,7 +236,11 @@ export function SessionList({
                   ? [{ key: "base", label: null, price: basePrice }]
                   : [];
             return (
-              <li key={session.id} className="border border-border p-4">
+              <li
+                key={session.id}
+                className="border border-border p-4"
+                data-session-closed={closed ? "true" : undefined}
+              >
                 <span className="block text-sm">{t(session.title)}</span>
                 <span className="mt-1 block text-xs text-muted-foreground">
                   {formatSessionWhen(session.startsAt)}
@@ -243,6 +271,8 @@ export function SessionList({
  *
  * 「已結束」由呼叫端判斷（src/lib/seo/pages.ts 的 eventEnded() → event-status.ts 的
  * isEventEnded()），與 /events「已結束」分頁同一條規則。詳情頁與三個著陸頁都用這一個。
+ * 2026-11 起另一個入口：每一個場次都已開始（direct-checkout.ts 的 directBookingClosed()
+ * → isSessionClosedForBooking()），即使還沒過最後一個場次的結束日，也換成這個畫面。
  */
 export function EventEndedNotice({
   product,
@@ -261,6 +291,7 @@ export function EventEndedNotice({
         showSeatsRemaining={false}
         basePrice={product.price}
         ended
+        now={null}
       />
       <div data-event-ended="true">
         {heading ? <p className={eyebrowClassName}>{heading}</p> : null}

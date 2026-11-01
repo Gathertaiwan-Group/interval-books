@@ -252,17 +252,22 @@ checkTrue(
 checkTrue("EventEndedNotice 的按鈕 disabled", /<button[\s\S]{0,60}disabled/.test(notice));
 checkTrue(
   "SessionList 已結束優先於尚餘名額",
-  /const note = ended\s*\?\s*t\(COPY\.sessionEnded\)/.test(picker),
+  /const closed = ended \|\|[^;]*;\s*const note = closed\s*\?\s*t\(COPY\.sessionEnded\)/.test(
+    picker,
+  ),
 );
 checkTrue("SessionList 印票價（JSON-LD 的價格看得到）", /formatPrice\(p\.price\)/.test(picker));
 
 const routes = {
   "src/routes/events.$slug.tsx": /ended && booking\.product \? \(\s*<EventEndedNotice/,
-  "src/routes/events.kungtung.tsx": /if \(eventEnded\(null, product\)\) return <EventEndedNotice/,
+  // 2026-11：著陸頁的 bookingClosed = eventEnded(null, product) || directBookingClosed(…)，
+  // 英雄區錨點與報名區用同一個值（session-start-booking-selftest 另外守 directBookingClosed）。
+  "src/routes/events.kungtung.tsx":
+    /eventEnded\(null, product\) \|\| directBookingClosed\(product, now\)[\s\S]*if \(bookingClosed\) return <EventEndedNotice/,
   "src/routes/events.city-salon-0922.tsx":
-    /if \(eventEnded\(null, product\)\) return <EventEndedNotice/,
+    /eventEnded\(null, product\) \|\| directBookingClosed\(product, now\)[\s\S]*if \(bookingClosed\) return <EventEndedNotice/,
   "src/routes/events.sound-of-the-sea.tsx":
-    /if \(eventEnded\(null, product\)\) return <EventEndedNotice/,
+    /eventEnded\(null, product\) \|\| directBookingClosed\(product, now\)[\s\S]*if \(bookingClosed\) return <EventEndedNotice/,
 };
 for (const [rel, re] of Object.entries(routes)) {
   const src = readFile(rel);

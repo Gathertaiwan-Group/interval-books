@@ -994,7 +994,9 @@ checkTrue(
 // 路由確實換上了元件。
 checkTrue(
   "shop.$slug.tsx import 了 SessionPicker",
-  /import \{ SessionPicker \} from "@\/components\/shop\/SessionPicker";/.test(slugRouteCode),
+  /import \{ (EventEndedNotice, )?SessionPicker \} from "@\/components\/shop\/SessionPicker";/.test(
+    slugRouteCode,
+  ),
 );
 checkTrue(
   "shop.$slug.tsx 真的把它渲染出來（不是只 import）",
@@ -1002,7 +1004,7 @@ checkTrue(
 );
 checkTrue(
   "只有 isBooking 才渲染場次選擇器",
-  /\{isBooking \? \(\s*<SessionPicker\b/.test(slugRouteCode),
+  /(\{|: )isBooking \? \(\s*<SessionPicker\b/.test(slugRouteCode),
 );
 
 // 抽完要刪乾淨 —— 原本那段 inline JSX 一個標籤都不可以留在路由裡。
@@ -1048,7 +1050,11 @@ check("SessionPicker 不自己持有選中狀態（沒有 useState）", /useStat
 checkTrue("selectedId 由 props 傳入", /selectedId: string \| null;/.test(pickerCode));
 
 // 行為不可以變的三件事。
-checkTrue("額滿的場次仍然不能點", /disabled=\{full\}/.test(pickerCode));
+// 2026-11：已開始的場次（isSessionClosedForBooking）也不能點，與額滿合成 unavailable。
+checkTrue(
+  "額滿的場次仍然不能點",
+  /const unavailable = closed \|\| full;[\s\S]{0,200}disabled=\{unavailable\}/.test(pickerCode),
+);
 checkTrue(
   "沒有場次時仍然顯示 noSessions 而不是空白",
   /sessions\.length === 0/.test(pickerCode) && /COPY\.noSessions/.test(pickerCode),
@@ -2224,6 +2230,9 @@ if (renderMod) {
   });
   // 999 / 1 是正式庫那場工作坊的實際數字（remaining = 998，就是「尚餘名額 999」
   // 這個問題的來源）。5 / 5 是額滿的對照組。
+  // 場次 startsAt 是 2026-09-05 02:00Z；這一段測的是名額顯示，判斷時間放在開場前一天，
+  // 不讓「已開始 → 已結束」（2026-11，另見 session-start-booking-selftest）蓋過去。
+  const BEFORE_START = Date.parse("2026-09-04T02:00:00.000Z");
   const openSession = mkSession("open", 999, 1);
   const fullSession = mkSession("full", 5, 5);
   const REMAINING_TEXT = "998";
@@ -2235,10 +2244,13 @@ if (renderMod) {
         selectedId: null,
         onSelect: () => {},
         showSeatsRemaining,
+        now: BEFORE_START,
       }),
     );
   const renderList = (session, showSeatsRemaining) =>
-    renderMod.render(h(renderMod.SessionList, { sessions: [session], showSeatsRemaining }));
+    renderMod.render(
+      h(renderMod.SessionList, { sessions: [session], showSeatsRemaining, now: BEFORE_START }),
+    );
 
   for (const [name, renderOne] of [
     ["SessionPicker", renderPicker],
@@ -2340,7 +2352,7 @@ checkTrue(
 );
 checkTrue(
   "🔴 售罄／已額滿排在旗標**前面**（順序反過來就是「額滿卻看不出來」）",
-  /\{soldOut \? \([\s\S]{0,300}?\) : hideSeatsBadge \? null : \(/.test(slugRouteCode),
+  /(\{|: )soldOut \? \([\s\S]{0,300}?\) : hideSeatsBadge \? null : \(/.test(slugRouteCode),
 );
 checkTrue(
   "隱藏的是整個徽章區塊（不是只把字清掉留一條空白邊距）",
