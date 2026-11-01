@@ -834,6 +834,15 @@ export const MIGRATION_LEDGER = Object.freeze([
     // （public.orders 的 alter table 與 comment on column）。
     touches: ["orders_payments"],
   },
+  {
+    file: "0049_reserve_session_seat_reject_started.sql",
+    note: "場次開始後不收新訂單（縱深防禦）：reserve_session_seat() 加第 ④b 步，鎖到場次列之後讀 starts_at，starts_at <= now()（DB 時間）或 null 就 raise 'SESSION_STARTED:<id>'（check_violation），位置在 ⑤ 超額／⑥ 佔位／⑦ 寫參加者之前，raise 時什麼都沒寫。函式本體取自正式庫 pg_get_functiondef（= 0020 版），只加 v_starts_at 變數、select 多讀 starts_at、④b 一段；簽章與回傳形狀不變（5 參數 returns integer），create or replace 不 drop。security definer／search_path=public、只 grant service_role 照 0020 重申，comment on function 更新。呼叫端只有 createOrder()（新訂單），付款回呼／補付款／匯款確認／後台改狀態／expire／release 都不經過它",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：session_seats（event_sessions、
+    // reserve_session_seat、seats_taken —— 函式本體逐字沿用的鎖場次與佔位）、event_registrations
+    // （⑦ 寫參加者，逐字沿用）、order_expiry（識別字 order_items —— ② 鎖同訂單場次與 ③ 驗品項
+    // 的唯讀查詢，逐字沿用；expire_unpaid_orders 沒有碰）。
+    touches: ["event_registrations", "order_expiry", "session_seats"],
+  },
 ]);
 
 /** 磁碟上的 migration 檔名，排序過。空目錄 = 丟例外（那不是「沒有違規」）。 */

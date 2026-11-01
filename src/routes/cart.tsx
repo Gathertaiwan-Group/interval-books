@@ -60,6 +60,11 @@ const PAGE = {
     ja: "現在お取り扱いがありません",
   },
   soldOutLine: { zh: "此商品已售完", en: "Sold out", ja: "完売しました" },
+  sessionEndedLine: {
+    zh: "此場次已結束，無法報名",
+    en: "This sitting has already started or ended",
+    ja: "この回は開始または終了しました",
+  },
   cappedToast: {
     zh: "已達可購買數量上限",
     en: "That is all we have available",
@@ -202,7 +207,11 @@ function Cart() {
                     {gone ? (
                       <div className="mt-3">
                         <StockBadge tone="alert">
-                          {line.unavailable === "delisted" ? t(PAGE.delisted) : t(PAGE.soldOutLine)}
+                          {line.unavailable === "delisted"
+                            ? t(PAGE.delisted)
+                            : line.unavailable === "session_ended"
+                              ? t(PAGE.sessionEndedLine)
+                              : t(PAGE.soldOutLine)}
                         </StockBadge>
                       </div>
                     ) : (

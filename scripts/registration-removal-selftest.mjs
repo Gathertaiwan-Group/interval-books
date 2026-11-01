@@ -131,7 +131,13 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 被單筆移除過時兩者相等）；expire 的 4c／4d 合成一句，認領條件（含 0034 匯款 3 天）、商品
   // 庫存、products.seats_taken、inv 保留、取消訂單、付款嘗試、回傳值逐字沿用 0036。另 revoke
   // registration_removal_log 的 sequence 權限。這支自檢的斷言重讀過，原樣成立。
-  reviewedThrough: "0045_plan_units_release_by_registrations.sql",
+  // ── 0049_reserve_session_seat_reject_started.sql 的重讀結論 ── create or replace 了
+  // reserve_session_seat()（簽章、回傳形狀、security definer、search_path、只 grant
+  // service_role 都不變），只多一步 ④b：鎖到場次列之後 starts_at <= now() 就 raise
+  // SESSION_STARTED，位置在 ⑤ 超額／⑥ 佔位／⑦ 寫參加者之前，raise 時什麼都沒寫。①–④、⑤–⑦
+  // 逐字沿用 0020；release_session_seat、expire_unpaid_orders、admin_delete_*、付款與
+  // 訂單欄位一個都沒動。這一支的連線段建的測試場次都在 now() 之後，斷言原樣成立。
+  reviewedThrough: "0049_reserve_session_seat_reject_started.sql",
 });
 checkTrue("0044 有 begin; / commit;", /^begin;$/m.test(sql0044) && /^commit;$/m.test(sql0044));
 

@@ -301,6 +301,22 @@ const PAGE = {
     en: "That sitting is full. Have a look at the other sittings on the event page.",
     ja: "この回は満席です。イベントページで他の回もご覧ください。",
   },
+  // 場次已經開始或結束（isSessionClosedForBooking）。直接結帳的連結與購物車兩條路共用。
+  directSessionEndedTitle: {
+    zh: "此場次已結束",
+    en: "This sitting has ended",
+    ja: "この回は終了しました",
+  },
+  directSessionEnded: {
+    zh: "此場次已結束，無法報名。歡迎回到活動頁看看其他場次與活動。",
+    en: "This sitting has already started or ended, so registration is closed. Have a look at the other sittings and events.",
+    ja: "この回はすでに開始または終了したため、お申し込みいただけません。他の回やイベントもご覧ください。",
+  },
+  sessionEndedWarning: {
+    zh: "購物車中有場次已經結束，無法報名，請先回到購物車移除。",
+    en: "Your cart holds a sitting that has already started or ended. Please remove it in the cart first.",
+    ja: "カートに開始または終了した回が含まれています。カートで削除してからお進みください。",
+  },
   directClamped: {
     zh: "報名人數已調整為這一場目前還剩下的名額。",
     en: "The number of places has been adjusted to what is still left in this sitting.",
@@ -335,6 +351,8 @@ function directProblemText(reason: DirectFailureReason) {
       return PAGE.directPlanRequired;
     case "sold_out":
       return PAGE.directSoldOut;
+    case "session_ended":
+      return PAGE.directSessionEnded;
   }
 }
 
@@ -376,6 +394,10 @@ export const Route = createFileRoute("/checkout/")({
   loader: async () => ({
     catalogue: await fetchActiveProducts(),
     paymentOptions: await fetchPaymentOptions(),
+    // 「場次是否已開始」的判斷時間點（resolveDirectCheckout 的 now）。跟著 loader 資料
+    // 一起序列化，SSR 與 client 首次渲染用的是**同一個**時間，客人電腦時鐘偏掉也不會
+    // 在開場那一刻 hydration 不一致。真正算數的仍是伺服器 priceLines() 那一道。
+    now: Date.now(),
   }),
   head: () => ({
     meta: [
@@ -394,7 +416,7 @@ function Checkout() {
   const t = useT();
   const { lang } = useLang();
   const navigate = useNavigate();
-  const { catalogue, paymentOptions } = Route.useLoaderData();
+  const { catalogue, paymentOptions, now: loadedAt } = Route.useLoaderData();
   const { ui } = useSiteContent();
 
   useDocumentMeta({
@@ -426,16 +448,20 @@ function Checkout() {
   } = Route.useSearch();
   const direct = useMemo(
     () =>
-      resolveDirectCheckout(catalogue.products, {
-        product: directProduct,
-        session: directSession,
-        qty: directQty,
-        // 🔴 0036 漏掉的那一個。少了它，只要場次開了票種，resolveDirectCheckout()
-        //    就會以 plan_required 拒絕——站內「我要報名」按鈕直接撞錯誤頁。之所以
-        //    一直沒人踩到，是因為在此之前正式庫沒有任何場次開過方案。
-        plan: directPlan,
-      }),
-    [catalogue.products, directProduct, directSession, directQty, directPlan],
+      resolveDirectCheckout(
+        catalogue.products,
+        {
+          product: directProduct,
+          session: directSession,
+          qty: directQty,
+          // 🔴 0036 漏掉的那一個。少了它，只要場次開了票種，resolveDirectCheckout()
+          //    就會以 plan_required 拒絕——站內「我要報名」按鈕直接撞錯誤頁。之所以
+          //    一直沒人踩到，是因為在此之前正式庫沒有任何場次開過方案。
+          plan: directPlan,
+        },
+        loadedAt,
+      ),
+    [catalogue.products, directProduct, directSession, directQty, directPlan, loadedAt],
   );
   const directMode = direct !== null;
   const directItems = useMemo<CartLine[]>(() => (direct?.ok ? [direct.line] : NO_ITEMS), [direct]);
@@ -508,6 +534,9 @@ function Checkout() {
 
   const buyable = useMemo(() => items.filter((i) => !i.unavailable), [items]);
   const hasUnavailable = items.length > buyable.length;
+  /** 購物車裡有場次已經開始／結束 —— 講清楚是這個原因，而不是籠統的「無法購買」。 */
+  const hasEndedSession = items.some((i) => i.unavailable === "session_ended");
+  const unavailableText = hasEndedSession ? PAGE.sessionEndedWarning : PAGE.unavailableWarning;
 
   /**
    * Whether anything in the cart has to be posted. Read from the live
@@ -706,7 +735,7 @@ function Checkout() {
   async function onSubmit(values: CheckoutFormValues) {
     if (buyable.length === 0) return;
     if (hasUnavailable) {
-      toast.error(t(PAGE.unavailableWarning));
+      toast.error(t(unavailableText));
       return;
     }
     // 欄位沒顯示（只有票券）時：客人看不到、也改不了這一欄，所以不可以拿它擋送出。
@@ -835,7 +864,11 @@ function Checkout() {
       <PageShell>
         <PageHeader
           eyebrow={`Checkout  ／  ${t(PAGE.eyebrowSuffix)}`}
-          title={t(PAGE.directProblemTitle)}
+          title={t(
+            direct.reason === "session_ended"
+              ? PAGE.directSessionEndedTitle
+              : PAGE.directProblemTitle,
+          )}
         />
         <section className="container-editorial pb-32">
           <div className="border border-border p-10">
@@ -868,7 +901,18 @@ function Checkout() {
         <PageHeader eyebrow={`Checkout  ／  ${t(PAGE.eyebrowSuffix)}`} title={t(PAGE.title)} />
         <section className="container-editorial pb-32">
           <div className="border border-border p-10">
-            <p className="text-sm text-muted-foreground">{t(PAGE.empty)}</p>
+            {/* 購物車裡只剩買不到的品項（例如場次已結束）時，「購物車是空的」是一句與
+                事實不符的話 —— 要講原因，並給一條回購物車移除的路。 */}
+            {hasUnavailable ? (
+              <p className="text-sm text-clay">
+                {t(unavailableText)}{" "}
+                <Link to="/cart" className="underline underline-offset-4">
+                  {t(PAGE.backToCart)}
+                </Link>
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t(PAGE.empty)}</p>
+            )}
             <Link
               to="/shop"
               className="mt-8 inline-block border border-foreground px-5 py-3 text-xs tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
@@ -896,7 +940,7 @@ function Checkout() {
           )}
           {hasUnavailable && (
             <p className="mb-8 border border-clay p-5 text-sm text-clay">
-              {t(PAGE.unavailableWarning)}{" "}
+              {t(unavailableText)}{" "}
               <Link to="/cart" className="underline underline-offset-4">
                 {t(PAGE.backToCart)}
               </Link>

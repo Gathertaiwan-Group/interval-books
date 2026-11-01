@@ -124,3 +124,44 @@ export function latestSessionEndIso(
   }
   return best;
 }
+
+/**
+ * 這一個**場次**還收不收報名：**場次開始的那一刻起就不收。** 結帳（伺服器端
+ * priceLines()、直接結帳 resolveDirectCheckout()、購物車 syncFromCatalogue()）與
+ * 資料庫 reserve_session_seat()（0049 第 ④b 步）用的是同一條規則。
+ *
+ * ── 為什麼不直接用上面的 isEventEnded() ─────────────────────────────────────
+ * isEventEnded() 是給**活動頁與列表**用的，它回答「這場活動要不要移到已結束」，
+ * 刻意寬鬆：以「日」為單位、最晚場次結束日的**隔天**才算結束、而且是整個活動一個
+ * 答案。拿它來擋下單會漏三種情況：
+ *
+ *   1. 早上十點的工作坊，當天下午還能下單（日粒度）。
+ *   2. 多日策旅（池上 10/23–10/25）開始後一路到 10/25 結束都還能報名。
+ *   3. 同一個活動有早場與晚場：早場已開始、晚場還沒 —— 活動沒結束，但早場那個
+ *      場次 id 不該再收人。這只能逐場次判斷。
+ *
+ * 所以這裡判的是「場次」不是「活動」，比的是 starts_at 這個**時間點**不是日期。
+ *
+ * ── 時區 ─────────────────────────────────────────────────────────────────
+ * starts_at 是 timestamptz，ISO 字串帶時區位移，Date.parse() 得到的是絕對時間點；
+ * 跟 Date.now() 比是兩個絕對時間點互比，伺服器跑在 UTC 或台北都是同一個答案。
+ * （上面那幾支要寫死 Asia/Taipei，是因為它們要算「哪一天」；這裡不算日期。）
+ *
+ * ── 讀不懂的時間 → 當作已開始（fail closed）────────────────────────────────
+ * 跟 isPastEvent() 的「判不出來就留在進行中」方向相反，因為這裡在收錢：判不出來就
+ * 不讓下單，最壞是客人來問；反方向是賣出一個已經開始的場次。event_sessions.starts_at
+ * 是 NOT NULL timestamptz，正常資料走不到這一支。
+ *
+ * ⚠️ 只管**建立新訂單**。已經成立的訂單（付款回呼、補付款、匯款確認、後台改狀態）
+ *    一律不經過這裡 —— 匯款單 3 天內付款確認、期間場次剛好開始，確認仍然要成功。
+ */
+export function isSessionClosedForBooking(
+  session: { startsAt?: string | null },
+  now: number = Date.now(),
+): boolean {
+  const raw = session.startsAt;
+  if (!raw) return true;
+  const t = Date.parse(raw);
+  if (Number.isNaN(t)) return true;
+  return t <= now;
+}

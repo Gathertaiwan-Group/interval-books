@@ -59,13 +59,14 @@ import type {
   ShopSession,
 } from "@/lib/shop";
 import { isPlanAvailable, remainingFor, remainingForPlan, remainingForSession } from "@/lib/shop";
+import { isSessionClosedForBooking } from "@/lib/event-status";
 
 /**
  * Why a line can no longer be bought. Kept as a reason rather than a boolean so
  * the UI can tell the shopper which of the two happened — they are not the same
  * news, and "sold out" is the one worth waiting for.
  */
-export type CartUnavailableReason = "delisted" | "sold_out";
+export type CartUnavailableReason = "delisted" | "sold_out" | "session_ended";
 
 /**
  * One line in the cart.
@@ -357,7 +358,12 @@ export const useCart = create<CartStore>()(
             : session
               ? remainingForSession(session)
               : remainingFor(p);
-          const qty = clampToLimit(line.qty, limit);
+          // 場次已經開始（或結束）：放進購物車之後才開始的那一種。不清掉這一行、也不
+          // 動數量（客人要看得到是哪一場），只標成 session_ended —— 跟 sold_out 不同，
+          // 等待不會讓它回來。規則與伺服器 priceLines() 同一支 isSessionClosedForBooking()；
+          // 這裡用的是瀏覽器的時間，只是提示，伺服器那一道才算數。
+          const ended = session !== null && isSessionClosedForBooking(session);
+          const qty = ended ? line.qty : clampToLimit(line.qty, limit);
           const next: CartLine = {
             ...line,
             slug: p.slug,
@@ -374,7 +380,7 @@ export const useCart = create<CartStore>()(
             planSeatsPerUnit: plan ? plan.seatsPerUnit : 1,
             limit,
             qty,
-            unavailable: qty <= 0 ? "sold_out" : undefined,
+            unavailable: ended ? "session_ended" : qty <= 0 ? "sold_out" : undefined,
           };
 
           const same =

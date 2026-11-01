@@ -142,6 +142,7 @@ import { normalizeInvoiceChoice } from "@/lib/invoice-format";
 import { getRemittanceAccount } from "@/server/repos/site-settings";
 import { computeReferralDiscount, resolveReferralCode } from "@/lib/referral";
 import { findReferrerForCheckout } from "@/server/repos/referrals";
+import { isSessionClosedForBooking } from "@/lib/event-status";
 
 /** Columns checkout needs from public.products. Price is re-read, never trusted. */
 const PRODUCT_COLUMNS =
@@ -165,8 +166,8 @@ type ProductRow = {
   status: string;
 };
 
-/** 名額的真相在這張表（0020）。 */
-const SESSION_COLUMNS = "id, product_id, capacity, seats_taken, status";
+/** 名額的真相在這張表（0020）。starts_at：場次開始後不收新訂單（isSessionClosedForBooking）。 */
+const SESSION_COLUMNS = "id, product_id, capacity, seats_taken, status, starts_at";
 
 type SessionRow = {
   id: string;
@@ -174,6 +175,7 @@ type SessionRow = {
   capacity: number;
   seats_taken: number;
   status: string;
+  starts_at: string;
 };
 
 /**
@@ -416,6 +418,16 @@ async function priceLines(items: CheckoutPayload["items"]): Promise<PricedLine[]
       // prober which session ids exist.
       if (!session || session.status !== "open" || session.product_id !== p.id) {
         throw new CheckoutError("product_unavailable");
+      }
+      // 場次已經開始（或結束）→ 不收新訂單。判斷基準是**伺服器**的現在時間，網址與
+      // 購物車帶來的任何東西都不參與；規則只有一份，在 isSessionClosedForBooking()
+      // （src/lib/event-status.ts，檔頭寫了為什麼不用 isEventEnded()）。
+      //
+      // 這一條**可以**講得比上面清楚：走到這裡，場次 id 已經被證實存在、開著、屬於
+      // 這件商品 —— 「它已經開始了」是活動頁上本來就公開的事，不是 oracle。
+      // 真正握著列鎖的第二道是 reserve_session_seat() 第 ④b 步（0049），用 DB 的 now()。
+      if (isSessionClosedForBooking({ startsAt: session.starts_at })) {
+        throw new CheckoutError("session_ended");
       }
 
       // 0036：這一行有沒有選方案。四種失敗（不存在／不屬於這個場次／已下架／
@@ -1323,8 +1335,15 @@ export async function createOrder(
         // a closed sitting, a participant count that does not match the
         // quantity — means the payload was edited or this file has a bug, and
         // neither is worth a specific sentence in the shop's three languages.
+        // 0049：SESSION_STARTED 是 priceLines() 讀完場次之後、這一刻之前場次剛好開始
+        // （或只有資料庫擋得到的那一種）。客人看得懂的一句話，跟 priceLines() 同一個碼。
+        const message = error.message ?? "";
         throw new CheckoutError(
-          (error.message ?? "").includes("NO_SEATS_LEFT") ? "no_seats_left" : "order_failed",
+          message.includes("NO_SEATS_LEFT")
+            ? "no_seats_left"
+            : message.includes("SESSION_STARTED")
+              ? "session_ended"
+              : "order_failed",
         );
       }
       reservedItemIds.push(orderItemId);

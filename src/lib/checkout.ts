@@ -277,6 +277,7 @@ export type CheckoutErrorCode =
   | "product_unavailable"
   | "insufficient_stock"
   | "no_seats_left"
+  | "session_ended"
   | "shipping_address_required"
   | "order_failed"
   | "payment_unavailable"
@@ -312,6 +313,13 @@ export const CHECKOUT_ERROR_COPY: Record<CheckoutErrorCode, Localized> = {
     zh: "名額已滿，訂單沒有成立。請回到購物車調整數量。",
     en: "There are no places left, so no order was created. Please adjust the quantity in your cart.",
     ja: "空き枠がないため、ご注文は成立していません。カートで数量をご調整ください。",
+  },
+  // 場次已經開始或結束（isSessionClosedForBooking，src/lib/event-status.ts）。
+  session_ended: {
+    // 不提「回到購物車」：直接結帳（活動頁帶網址進來）那條路的品項根本不在購物車裡。
+    zh: "這個場次已經結束，無法報名，訂單沒有成立。",
+    en: "This sitting has already started or ended, so registration is closed. No order was created.",
+    ja: "この回はすでに開始または終了したため、お申し込みいただけません。ご注文は成立していません。",
   },
   shipping_address_required: {
     zh: "這筆訂單需要寄送地址。",

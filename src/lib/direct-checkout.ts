@@ -31,6 +31,7 @@
  */
 import { cartInputFor, type CartLine } from "@/lib/cart";
 import type { ShopPlan, ShopProduct, ShopSession } from "@/lib/shop";
+import { isSessionClosedForBooking } from "@/lib/event-status";
 
 /**
  * 數量上限的天花板，與伺服器端 checkoutPayloadSchema 的
@@ -99,13 +100,17 @@ export function isDirectCheckout(search: DirectCheckoutSearch): boolean {
  *                    跟 session_required 同一個理由，priceLines() 會用同一句
  *                    product_unavailable 拒絕，這裡先攔下來給一句看得懂的話
  *   sold_out         這一場（或選中的那個方案）已經沒有名額
+ *   session_ended    這一場已經開始或結束（isSessionClosedForBooking）。網址是客人手上
+ *                    會存起來、會轉貼的東西，活動頁拿掉報名入口之後它還在 —— 這裡在
+ *                    畫面上先擋，伺服器 priceLines() 與 reserve_session_seat() 再擋兩次
  */
 export type DirectFailureReason =
   | "product_gone"
   | "session_required"
   | "session_gone"
   | "plan_required"
-  | "sold_out";
+  | "sold_out"
+  | "session_ended";
 
 export type DirectResolution =
   | {
@@ -231,6 +236,7 @@ export function buildDirectLine(
 export function resolveDirectCheckout(
   products: ShopProduct[],
   search: DirectCheckoutSearch,
+  now: number = Date.now(),
 ): DirectResolution | null {
   if (!isDirectCheckout(search)) return null;
 
@@ -242,6 +248,8 @@ export function resolveDirectCheckout(
   if (!search.session) return { ok: false, reason: "session_required" };
   const session = product.sessions.find((s) => s.id === search.session) ?? null;
   if (!session) return { ok: false, reason: "session_gone" };
+  // 在方案與名額之前判：已經開始的場次，「方案沒指定」或「滿了」都不是客人該聽到的話。
+  if (isSessionClosedForBooking(session, now)) return { ok: false, reason: "session_ended" };
 
   // 0036：這一場有沒有方案要先問場次自己（session.plans），不是問網址參數存不存在
   // ——沒有方案的場次即使網址帶了 plan 也不需要它，buildDirectLine() 會忽略掉。

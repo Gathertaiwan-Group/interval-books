@@ -262,13 +262,16 @@ check("supabase 只被 stub 過一次（沒有被拿來換掉別的模組）", s
 // 假資料。**兩個場次、名額不同** —— 這是這一支最重要的一組資料，見檔頭。
 // -----------------------------------------------------------------------------
 const L = (s) => ({ zh: s, en: s, ja: s });
-function session(id, capacity, seatsTaken, sortOrder = 0, plans = []) {
+// ⚠️ startsAt 預設在很遠的未來：場次開始後不收新訂單（isSessionClosedForBooking），
+//    寫死一個會過去的日期，這一支會在那一天自己轉紅。測「已開始」的地方另外傳。
+const FUTURE_START = "2099-09-05T02:00:00.000Z";
+function session(id, capacity, seatsTaken, sortOrder = 0, plans = [], startsAt = FUTURE_START) {
   return {
     id,
     productId: "prod-event",
     title: L(id),
     location: L("台北"),
-    startsAt: "2026-09-05T02:00:00.000Z",
+    startsAt,
     endsAt: null,
     capacity,
     seatsTaken,
@@ -501,6 +504,52 @@ check("而且仍然組得出品項", buildDirectLine(BOOK, EVENING, 1).ok, true)
 check("書的數量照樣夾在庫存上", resolve({ product: "a-book", qty: "99" }).line.qty, 7);
 
 // =============================================================================
+// [6c] 🔴 執行：場次已經開始／結束 → session_ended（手動組網址的那個漏洞）
+// =============================================================================
+console.log("\n[6c] 🔴 執行：已開始的場次不能直接結帳");
+{
+  const START = "2026-09-05T02:00:00.000Z"; // 台北 9/5 10:00
+  const t = Date.parse(START);
+  const STARTED = session("s-started", 30, 3, 0, [], START);
+  const cat = [product({ sessions: [STARTED, EVENING] }), BOOK];
+  const go = (sessionId, now) =>
+    resolveDirectCheckout(
+      cat,
+      { product: "event-yokky-flow-0905", session: sessionId, qty: 1 },
+      now,
+    );
+  check("開始 1 秒後 → session_ended", go("s-started", t + 1000).reason, "session_ended");
+  check("開始的那一刻（等於）→ session_ended", go("s-started", t).reason, "session_ended");
+  check("開始後兩個月 → session_ended", go("s-started", t + 60 * 86400000).reason, "session_ended");
+  checkTrue("開始前 1 秒 → 照常組得出品項", go("s-started", t - 1000).ok);
+  checkTrue(
+    "同一件商品的另一場（還沒開始）→ 照常組得出品項（逐場次判，不是整個活動）",
+    go("s-evening", t + 1000).ok,
+  );
+  checkTrue(
+    "書不受影響（就算網址帶了已開始的場次）",
+    resolveDirectCheckout(cat, { product: "a-book", session: "s-started", qty: 1 }, t + 1000).ok,
+  );
+  // 已開始又額滿：講「已結束」，不講「滿了」（等待不會讓它回來）。
+  const STARTED_FULL = session("s-started-full", 3, 3, 0, [], START);
+  check(
+    "已開始＋額滿 → session_ended（先判時間）",
+    resolveDirectCheckout(
+      [product({ sessions: [STARTED_FULL] })],
+      { product: "event-yokky-flow-0905", session: "s-started-full" },
+      t + 1000,
+    ).reason,
+    "session_ended",
+  );
+  // 不傳 now ＝ 現在時間。2026-09-05 已經過去，這一條證明預設值真的接上了時鐘。
+  check(
+    "不傳 now 時用現在時間（2026-09-05 的場次已開始）",
+    resolveDirectCheckout(cat, { product: "event-yokky-flow-0905", session: "s-started" }).reason,
+    "session_ended",
+  );
+}
+
+// =============================================================================
 // [7] 執行：sessionId / lineKey / productType 三樣都帶到底
 // =============================================================================
 console.log("\n[7] 執行：品項與購物車行完全等價");
@@ -649,6 +698,44 @@ check(
 if (shouldClearCartAfterOrder(settled, CART_TOKEN)) useCart.getState().clear();
 check("對照組：購物車結帳那一條真的清得掉", useCart.getState().items.length, 0);
 
+// =============================================================================
+// [8b] 🔴 執行：購物車裡的場次之後開始了 → syncFromCatalogue 標 session_ended
+// =============================================================================
+console.log("\n[8b] 🔴 執行：購物車裡的過期場次");
+{
+  const PAST = session("s-past", 30, 3, 0, [], "2026-09-05T02:00:00.000Z");
+  const SOON = session("s-soon", 30, 3, 0, [], FUTURE_START);
+  // 放進購物車的那一刻場次還沒開始（目錄裡的 startsAt 是未來）……
+  const before = product({ sessions: [session("s-past", 30, 3), SOON] });
+  const BOOK2 = product({ id: "b9", slug: "book-9", productType: "book", stock: 5 });
+  useCart.getState().clear();
+  useCart.getState().addItem(cartInputFor(before, 1, before.sessions[0]));
+  useCart.getState().addItem(cartInputFor(before, 2, SOON));
+  useCart.getState().addItem(cartInputFor(BOOK2, 1));
+  useCart.getState().syncFromCatalogue([before, BOOK2]);
+  check(
+    "放進去時三行都買得到",
+    useCart.getState().items.map((i) => i.unavailable ?? "ok"),
+    ["ok", "ok", "ok"],
+  );
+  // ……之後那一場開始了（目錄重讀，startsAt 已經過去）。
+  const after = product({ sessions: [PAST, SOON] });
+  useCart.getState().syncFromCatalogue([after, BOOK2]);
+  const byKey = new Map(useCart.getState().items.map((i) => [i.sessionId ?? i.productId, i]));
+  check("🔴 已開始的那一場 → session_ended", byKey.get("s-past")?.unavailable, "session_ended");
+  check("那一行沒有被刪掉（客人要看得到是哪一場）", useCart.getState().items.length, 3);
+  check("數量沒被改成 0", byKey.get("s-past")?.qty, 1);
+  check("同一活動還沒開始的另一場照常可買", byKey.get("s-soon")?.unavailable, undefined);
+  check("書照常可買", byKey.get("b9")?.unavailable, undefined);
+  // 結帳頁與購物車頁的「能不能結帳」都看 unavailable（buyable／canCheckout）。
+  check(
+    "可結帳的行剩兩行（已開始的被排除在小計之外）",
+    useCart.getState().items.filter((i) => !i.unavailable).length,
+    2,
+  );
+  useCart.getState().clear();
+}
+
 // 旗標的邊界。
 check("空 token 不會被當成「不要清」", cartKeptForOrder(""), false);
 rememberCartKept(DIRECT_TOKEN);
@@ -692,7 +779,7 @@ checkTrue(
 );
 checkTrue(
   "品項走共用的 resolveDirectCheckout",
-  /resolveDirectCheckout\(catalogue\.products/.test(checkoutCode),
+  /resolveDirectCheckout\(\s*catalogue\.products/.test(checkoutCode),
 );
 // 🔴 上面那一條只看得到「有呼叫」，看不到**傳了什麼**。0036 加了 plan，而結帳頁的
 //    解構與傳入各漏了一個，這條照樣全綠 —— 代價是正式庫只要有任何一個場次開了票種，
@@ -713,9 +800,11 @@ const searchFields = [...searchTypeBlock[1].matchAll(/^\s*(\w+)\??:/gm)].map((m)
 // 對照組：確認解出來的真的是那四個，免得哪天 regex 改壞了還一路綠。
 check("DirectCheckoutSearch 的欄位", searchFields.join(","), "plan,product,qty,session");
 
-const directCallArg = /resolveDirectCheckout\(catalogue\.products,\s*\{([\s\S]*?)\}\s*\)/.exec(
-  checkoutCode,
-);
+// 第三個參數是 loader 帶下來的判斷時間（場次是否已開始，見 session-ended-checkout-selftest）。
+const directCallArg =
+  /resolveDirectCheckout\(\s*catalogue\.products,\s*\{([\s\S]*?)\},\s*loadedAt,?\s*\)/.exec(
+    checkoutCode,
+  );
 if (!directCallArg) {
   throw new Error(
     "切不出 resolveDirectCheckout 的第二個參數 —— checkout.index.tsx 換了寫法就要一起改這支自檢",
@@ -755,6 +844,8 @@ const REASON_COPY = {
   // 0036：第五種原因——這一場開了方案但網址沒帶（或帶的不屬於這一場）。
   plan_required: "directPlanRequired",
   sold_out: "directSoldOut",
+  // 第六種：場次已經開始／結束（isSessionClosedForBooking）。
+  session_ended: "directSessionEnded",
 };
 for (const [reason, key] of Object.entries(REASON_COPY)) {
   checkTrue(
@@ -769,8 +860,8 @@ for (const [reason, key] of Object.entries(REASON_COPY)) {
     ),
   );
 }
-// 五種原因不可以共用同一句話（0036 加了 plan_required，從四種變五種）。
-check("五句文案互不相同", new Set(Object.values(REASON_COPY)).size, 5);
+// 六種原因不可以共用同一句話（0036 加了 plan_required，從四種變五種；session_ended 第六種）。
+check("六句文案互不相同", new Set(Object.values(REASON_COPY)).size, 6);
 // 這幾種失敗要有自己的畫面，不可以掉回「購物車是空的」那個空狀態。
 checkTrue(
   "🔴 直接結帳失敗時渲染自己的畫面",
@@ -788,7 +879,7 @@ checkTrue(
   // 0036：多了 plan_required 這第五種——這一場開了方案但網址沒帶（或帶的不
   // 屬於這一場）。型別現在寫成多行 union（見 direct-checkout.ts），這裡改成
   // 逐個比對五個字面值都在，而不是釘死單行的排版。
-  "對照組：五種原因就是 DirectFailureReason 的全部",
+  "對照組：六種原因就是 DirectFailureReason 的全部",
   (() => {
     const src = stripComments(readFile("src/lib/direct-checkout.ts"));
     const start = src.indexOf("export type DirectFailureReason =");
@@ -800,6 +891,7 @@ checkTrue(
       "session_gone",
       "plan_required",
       "sold_out",
+      "session_ended",
     ];
     return (
       reasons.every((r) => block.includes(`"${r}"`)) &&

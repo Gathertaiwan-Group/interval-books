@@ -189,7 +189,13 @@ assertMigrationDependencies(check, MIG_DIR, {
   // ── 0048_order_needs_contact.sql 的重讀結論 ── 只對 public.orders 加 needs_contact boolean
   // not null default false（＋comment on column）。沒有改任何函式、CHECK、trigger、排程或 grant，
   // 既有欄位與 expire_unpaid_orders() 不變；這一支的斷言原樣成立。
-  reviewedThrough: "0048_order_needs_contact.sql",
+  // ── 0049_reserve_session_seat_reject_started.sql 的重讀結論 ── create or replace 了
+  // reserve_session_seat()（簽章、回傳形狀、security definer、search_path、只 grant
+  // service_role 都不變），只多一步 ④b：鎖到場次列之後 starts_at <= now() 就 raise
+  // SESSION_STARTED，位置在 ⑤ 超額／⑥ 佔位／⑦ 寫參加者之前，raise 時什麼都沒寫。①–④、⑤–⑦
+  // 逐字沿用 0020；release_session_seat、expire_unpaid_orders、admin_delete_*、付款與
+  // 訂單欄位一個都沒動。這一支的連線段建的測試場次都在 now() 之後，斷言原樣成立。
+  reviewedThrough: "0049_reserve_session_seat_reject_started.sql",
 });
 
 // =============================================================================

@@ -580,9 +580,11 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
     // admin_delete_order()、admin_archive_order() 原樣成立。
     // 0047（後台作廢發票）只動 invoices（三個 nullable 欄位＋三支作廢函式），public.orders
     // 只被唯讀 select；admin_delete_order()、admin_archive_order() 與訂單／付款處理沒動。
-    "supabase/migrations 剛好 48 個 .sql 檔（0001–0047 原封不動 + 0048 匯款需聯繫旗標）",
+    // 0049（場次開始後不收新訂單）只 create or replace reserve_session_seat() 加一步時間檢查，
+    // 呼叫端只有 createOrder()；admin_delete_order()、admin_archive_order() 與訂單／付款處理沒動。
+    "supabase/migrations 剛好 49 個 .sql 檔（0001–0048 原封不動 + 0049 場次開始後不收新訂單）",
     migFiles.length,
-    48,
+    49,
   );
 }
 
