@@ -879,6 +879,11 @@ export const MIGRATION_LEDGER = Object.freeze([
     // event_sessions／seats_taken 場次段與 is_localized_list 清單驗證；這兩段沒有改）。
     touches: ["events_shape", "localized_list", "products_availability", "session_seats"],
   },
+  {
+    file: "0053_mcp_image_upload_staging.sql",
+    note: "MCP 圖片直傳的私有暫存 bucket mcp-image-uploads（public=false、2 MiB、只收 webp/jpeg/png、沒有任何 storage.objects policy）。create_image_upload_url 的 signed upload URL 指向這裡，finalize_image_upload 驗過才轉存 site-images。",
+    touches: ["storage"],
+  },
 ]);
 
 /** 磁碟上的 migration 檔名，排序過。空目錄 = 丟例外（那不是「沒有違規」）。 */

@@ -145,8 +145,28 @@ function getPinned(
 
 export type FetchedImage = { bytes: Uint8Array; info: ImageInfo; finalUrl: string };
 
-export async function fetchRemoteImage(raw: string): Promise<FetchedImage> {
+export type FetchRemoteImageOptions = {
+  /**
+   * 額外的主機白名單（只用在 upload_image_file：ChatGPT 給的下載網址只能是 OpenAI 的檔案網域）。
+   * 檢查**第一跳**的主機；之後的 redirect 由 OpenAI 那端決定，照樣每一跳都過公開位址檢查
+   * （resolvePublic），所以白名單之外的轉址也連不到內網。upload_image_from_url 不帶這個選項，
+   * 規則維持原樣、沒有放寬也沒有收緊。
+   */
+  allowHost?: (hostname: string) => boolean;
+  /** allowHost 不過時的錯誤訊息。 */
+  hostError?: (hostname: string) => string;
+};
+
+export async function fetchRemoteImage(
+  raw: string,
+  opts: FetchRemoteImageOptions = {},
+): Promise<FetchedImage> {
   let url = assertUrlShape(raw);
+  if (opts.allowHost && !opts.allowHost(url.hostname.toLowerCase())) {
+    throw new McpInputError(
+      opts.hostError ? opts.hostError(url.hostname) : `不接受這個主機：${url.hostname}`,
+    );
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);

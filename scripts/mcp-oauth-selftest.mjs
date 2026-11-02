@@ -839,9 +839,9 @@ async function codeFor(client, redirectUri, userId = ADMIN, now) {
     { isActiveAdmin: fakeAdmin, oauthStore: oc.__TEST_ONLY__.defaultStore() },
   );
   check(
-    "handleMcpRequest：靜態 token → tools/list 34 支（30 支＋create_event／create_journey／create_shop_product＋0052 set_event_status）",
+    "handleMcpRequest：靜態 token → tools/list 38 支（30 支＋create_event／create_journey／create_shop_product＋0052 set_event_status＋4 支直接上傳圖片）",
     [viaStatic.status, await toolsCount(viaStatic)],
-    [200, 34],
+    [200, 38],
   );
   check("靜態 token 不查 profiles", lookups.length, 0);
   const viaOauth = await http.handleMcpRequest(
@@ -849,9 +849,9 @@ async function codeFor(client, redirectUri, userId = ADMIN, now) {
     { isActiveAdmin: fakeAdmin, oauthStore: oc.__TEST_ONLY__.defaultStore() },
   );
   check(
-    "handleMcpRequest：OAuth token → tools/list 34 支",
+    "handleMcpRequest：OAuth token → tools/list 38 支",
     [viaOauth.status, await toolsCount(viaOauth)],
-    [200, 34],
+    [200, 38],
   );
   check("🔴 OAuth 每次呼叫都查一次 profiles（用 token 裡的 user id）", lookups, [ADMIN]);
   admins.delete(ADMIN);
@@ -884,6 +884,40 @@ async function codeFor(client, redirectUri, userId = ADMIN, now) {
     });
     check("🔴 非 admin 的 OAuth token 呼叫 create_event（dry_run）→ 401", denied.status, 401);
     check("那一次有查 profiles（不是靠快取放行）", lookups.length, before + 1);
+  }
+  {
+    // 直接上傳圖片的四支工具也走同一道閘門：非 admin 的 OAuth token → 401，handler 根本不會跑。
+    const uploadCalls = {
+      upload_image_base64: { file_name: "a.png", content_type: "image/png", data: "iVBORw0KGgo=" },
+      create_image_upload_url: { file_name: "a.png", content_type: "image/png", size: 100 },
+      finalize_image_upload: { upload_id: "x" },
+      upload_image_file: {
+        file: { download_url: "https://files.oaiusercontent.com/x", file_id: "file_1" },
+      },
+    };
+    for (const [name, args] of Object.entries(uploadCalls)) {
+      const before = lookups.length;
+      const denied = await http.handleMcpRequest(
+        new Request(RESOURCE, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            accept: "application/json, text/event-stream",
+            authorization: `Bearer ${r1.access_token}`,
+            "mcp-protocol-version": "2025-11-25",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 10,
+            method: "tools/call",
+            params: { name, arguments: args },
+          }),
+        }),
+        { isActiveAdmin: fakeAdmin, oauthStore: oc.__TEST_ONLY__.defaultStore() },
+      );
+      check(`🔴 非 admin 的 OAuth token 呼叫 ${name} → 401`, denied.status, 401);
+      check(`${name}：那一次有查 profiles`, lookups.length, before + 1);
+    }
   }
   checkTrue(
     "那個 401 帶 resource_metadata",

@@ -48,6 +48,7 @@ import {
   runCreateEvent,
   runCreateShopProduct,
 } from "./create-tools";
+import { UPLOAD_TOOL_INPUTS } from "./image-upload";
 
 /* ------------------------------------------------------------------ 共用 */
 
@@ -112,10 +113,36 @@ const imageArg = (what: string) =>
     .nullable()
     .optional()
     .describe(
-      `${what}：填 upload_image_from_url 回傳的 key（storage:… 開頭）或這個站 site-images 的公開網址；null 代表清掉。`,
+      `${what}：填上傳工具（upload_image_from_url／upload_image_base64／upload_image_file／finalize_image_upload）回傳的 key（storage:… 開頭）或這個站 site-images 的公開網址；null 代表清掉。`,
     );
 
 /** 寫入工具的固定說明尾巴。 */
+/** 三種上傳情境各用哪一支 —— 每一支上傳工具的說明都附上，模型不論先看到哪一支都選得對。 */
+const UPLOAD_GUIDE =
+  "\n【選哪一支上傳】有公開 https 網址 → upload_image_from_url；能執行 curl 指令 → create_image_upload_url＋finalize_image_upload；" +
+  "ChatGPT 生成或使用者貼上的圖片 → upload_image_file；只能把圖轉成 base64 → upload_image_base64。" +
+  "上傳只是存素材：還要再呼叫 update_event／create_event 等工具把回傳的 key 填進 image_key，圖片才會出現在頁面上。" +
+  "\n[Which upload tool] Public https URL → upload_image_from_url. Can run curl → create_image_upload_url then finalize_image_upload. " +
+  "Image generated in ChatGPT or attached in chat → upload_image_file. Can only send base64 → upload_image_base64. " +
+  "Uploading only stores the asset; call update_event / create_event etc. with the returned key as image_key to show it on a page.";
+
+/** 上傳工具共用的回傳形狀。 */
+function uploadResult(
+  stored: { key: string; url: string },
+  summary: Record<string, unknown>,
+  audit: "recorded" | "log_only",
+) {
+  return {
+    written: true,
+    key: stored.key,
+    url: stored.url,
+    ...summary,
+    audit: audit === "recorded" ? "recorded" : "log_only（稽核表寫入失敗，紀錄只在伺服器 log）",
+    next_step:
+      "圖片已存進網站，但還沒出現在任何頁面。把 key 填進 update_event／create_event／create_journey／create_shop_product／update_shop_product／update_speaker 的 image_key（或 update_publication 的 cover_image_key）。",
+  };
+}
+
 const WRITE_NOTE =
   "預設 dry_run=true，只回傳差異；確認後以 dry_run=false 再呼叫一次才會寫入。只送要改的欄位，沒送的欄位維持原值。";
 
@@ -523,6 +550,9 @@ export const TOOL_INPUTS = {
 
   /* 新增（./create-tools.ts） */
   ...CREATE_TOOL_INPUTS,
+
+  /* 直接上傳圖片（./image-upload.ts）。只上傳素材、不改任何頁面，所以沒有 dry_run。 */
+  ...UPLOAD_TOOL_INPUTS,
 } as const;
 
 export type ToolName = keyof typeof TOOL_INPUTS;
@@ -546,6 +576,17 @@ export const WRITE_TOOLS: readonly ToolName[] = [
   "create_shop_product",
 ];
 
+/**
+ * 直接上傳圖片的工具（./image-upload.ts）。會寫進 storage、記稽核，但**不改任何頁面**，
+ * 所以刻意不在 WRITE_TOOLS（那份清單的規矩是「預設 dry_run=true」）。
+ */
+export const UPLOAD_TOOLS: readonly ToolName[] = [
+  "create_image_upload_url",
+  "finalize_image_upload",
+  "upload_image_base64",
+  "upload_image_file",
+];
+
 type Args<N extends ToolName> = z.output<(typeof TOOL_INPUTS)[N]>;
 
 /* ------------------------------------------------------------------ 註冊 */
@@ -559,6 +600,8 @@ export function registerContentTools(server: McpServer): void {
       annotations: ToolAnnotations;
       /** 只有新增工具用：同一支 schema 包成「驗證失敗也交給 handler 記稽核」。 */
       auditInvalid?: boolean;
+      /** tools/list 的 _meta（upload_image_file 用 openai/fileParams）。 */
+      _meta?: Record<string, unknown>;
     },
     fn: (args: Args<N>) => Promise<TextResult>,
   ) {
@@ -569,6 +612,7 @@ export function registerContentTools(server: McpServer): void {
         description: meta.description,
         annotations: meta.annotations,
         inputSchema: meta.auditInvalid ? auditedInputSchema(TOOL_INPUTS[name]) : TOOL_INPUTS[name],
+        ...(meta._meta ? { _meta: meta._meta } : {}),
       },
       // SDK 已經用同一支 schema 驗過並套上預設值；這裡的轉型只是把型別接回來。
       (async (args: unknown) => safe(() => fn(args as Args<N>))) as never,
@@ -1727,7 +1771,8 @@ export function registerContentTools(server: McpServer): void {
       title: "從網址上傳圖片",
       description:
         "從一個公開 https 網址抓圖（JPEG／PNG／WebP，2MB 以內），存進網站的圖片空間，回傳可以填進其他工具 image_key 的 key 與公開網址。" +
-        "伺服器端不會重新壓縮：超過長邊 1600px 或不是 WebP 時會在結果裡警告。dry_run=true 只檢查不存。",
+        "伺服器端不會重新壓縮：超過長邊 1600px 或不是 WebP 時會在結果裡警告。dry_run=true 只檢查不存。" +
+        UPLOAD_GUIDE,
       annotations: { ...WRITE, idempotentHint: false, openWorldHint: true },
     },
     async (args) => {
@@ -1750,14 +1795,8 @@ export function registerContentTools(server: McpServer): void {
           next_step: "檢查通過，尚未存檔。用同一個網址加上 dry_run=false 再呼叫一次才會存進網站。",
         });
       }
-      const { uploadSiteImage, ImageUploadError } = await import("@/server/storage");
-      let uploaded: { key: string; url: string };
-      try {
-        uploaded = await uploadSiteImage(new File([fetched.bytes as BlobPart], "remote-image"));
-      } catch (err) {
-        if (err instanceof ImageUploadError) throw new McpInputError(err.message);
-        throw err;
-      }
+      const { storeSiteImageBytes } = await import("./image-upload");
+      const uploaded = await storeSiteImageBytes(fetched.bytes);
       const { writeMcpAudit } = await import("./audit");
       const audit = await writeMcpAudit({
         tool: "upload_image_from_url",
@@ -1776,6 +1815,170 @@ export function registerContentTools(server: McpServer): void {
         next_step:
           "把 key 填進 create_event／create_journey／create_shop_product／update_event／update_shop_product／update_speaker 的 image_key（或 update_publication 的 cover_image_key）。",
       });
+    },
+  );
+
+  /* ============================================================ 直接上傳圖片（./image-upload.ts） */
+  // 只上傳素材、不改任何頁面：沒有 dry_run。稽核只記檔名、大小、格式、key ——
+  // 不記 base64 內容、不記 ChatGPT 的 download_url、不記 signed URL（都帶簽章或就是圖本身）。
+
+  add(
+    "create_image_upload_url",
+    {
+      title: "取得圖片直傳網址（能跑 curl 的 AI 用）",
+      description:
+        "給能執行指令的 AI（Claude Code、Codex）：拿一個 10 分鐘內有效、只能傳一次的上傳網址，用回傳的 curl 指令把本機圖片直接傳上去，" +
+        "**傳完一定要呼叫 finalize_image_upload(upload_id)**，伺服器檢查過（JPEG／PNG／WebP、2MB 以內、內容真的是圖片）才會存進網站並回傳 key。" +
+        "路徑由伺服器決定，不能指定。" +
+        UPLOAD_GUIDE,
+      annotations: { ...WRITE, idempotentHint: false },
+    },
+    async (args) => {
+      const up = await import("./image-upload");
+      const fileName = up.cleanFileName(args.file_name);
+      up.assertDeclaredSize(args.size);
+      const { uploadId, uploadUrl } = await up.createStagedUpload(args.content_type);
+      const { writeMcpAudit } = await import("./audit");
+      const audit = await writeMcpAudit({
+        tool: "create_image_upload_url",
+        entity: "site_image_upload",
+        entity_id: uploadId,
+        action: "create",
+        changes: { file_name: fileName, content_type: args.content_type, size: args.size },
+      });
+      return jsonText({
+        upload_id: uploadId,
+        upload_url: uploadUrl,
+        method: "PUT",
+        headers: { "Content-Type": args.content_type, "x-upsert": "false" },
+        curl: up.curlLine(uploadUrl, args.content_type),
+        expires_in_seconds: up.UPLOAD_WINDOW_SECONDS,
+        max_bytes: up.MCP_IMAGE_MAX_BYTES,
+        audit: audit === "recorded" ? "recorded" : "log_only（稽核表寫入失敗，紀錄只在伺服器 log）",
+        next_step:
+          "1) 用上面的 curl 把檔案傳上去（Content-Type 要跟宣告一致）；2) 呼叫 finalize_image_upload，upload_id 填這個值，拿到 key（storage:… 開頭）；" +
+          "3) 把 key 填進 update_event／create_event 等工具的 image_key，圖片才會出現在頁面上。10 分鐘內沒 finalize 就要重新申請。",
+      });
+    },
+  );
+
+  add(
+    "finalize_image_upload",
+    {
+      title: "完成圖片直傳（檢查並存進網站）",
+      description:
+        "create_image_upload_url 的第二步：用 curl 傳完之後呼叫。伺服器讀回檔案，檢查 magic bytes（真的是 JPEG／PNG／WebP、與宣告一致）、尺寸、2MB 上限，" +
+        "合格才存進網站並回傳 key（storage:… 開頭）；不合格或超過 10 分鐘就刪掉暫存檔並回錯。每個 upload_id 只能 finalize 一次。" +
+        "上傳後還要再呼叫 update_event、create_event 等工具把 key 填進 image_key，圖片才會出現在頁面上。",
+      annotations: { ...WRITE, idempotentHint: false },
+    },
+    async (args) => {
+      const up = await import("./image-upload");
+      const { validated, stored } = await up.finalizeStagedUpload(args.upload_id);
+      const summary = {
+        source: "signed_upload",
+        upload_id: args.upload_id,
+        ...up.imageSummary(validated),
+      };
+      const { writeMcpAudit } = await import("./audit");
+      const audit = await writeMcpAudit({
+        tool: "finalize_image_upload",
+        entity: "site_image",
+        entity_id: stored.key,
+        action: "upload",
+        changes: { ...summary, key: stored.key },
+      });
+      return jsonText(uploadResult(stored, summary, audit));
+    },
+  );
+
+  add(
+    "upload_image_base64",
+    {
+      title: "上傳圖片（base64）",
+      description:
+        "給只能把圖片轉成文字放進參數的 AI（例如網頁版 Claude）：data 放圖片的 base64，伺服器解碼後檢查 magic bytes（真的是 JPEG／PNG／WebP、與 content_type 一致）與大小，" +
+        "合格就存進網站並回傳 key（storage:… 開頭）。原檔上限 2MB（base64 約 2,796,204 字）；太大請先壓縮，或能跑指令就改用 create_image_upload_url。" +
+        UPLOAD_GUIDE,
+      annotations: { ...WRITE, idempotentHint: false },
+    },
+    async (args) => {
+      const up = await import("./image-upload");
+      const fileName = up.cleanFileName(args.file_name);
+      const bytes = up.decodeBase64Image(args.data);
+      const validated = up.validateImageBytes(bytes, args.content_type);
+      const stored = await up.storeSiteImageBytes(validated.bytes);
+      const summary = { source: "base64", file_name: fileName, ...up.imageSummary(validated) };
+      const { writeMcpAudit } = await import("./audit");
+      // 🔴 不放 args.data：稽核只記檔名、大小、格式、key。
+      const audit = await writeMcpAudit({
+        tool: "upload_image_base64",
+        entity: "site_image",
+        entity_id: stored.key,
+        action: "upload",
+        changes: { ...summary, key: stored.key },
+      });
+      return jsonText(uploadResult(stored, summary, audit));
+    },
+  );
+
+  add(
+    "upload_image_file",
+    {
+      title: "上傳 ChatGPT 對話裡的圖片",
+      description:
+        "ChatGPT 生成或使用者貼上的圖片，請用這支：把對話裡的圖片檔交給 file 參數（ChatGPT 會自動帶 download_url／file_id），" +
+        "伺服器只從 OpenAI 的檔案網域下載，檢查 magic bytes（JPEG／PNG／WebP）與 2MB 上限後存進網站並回傳 key（storage:… 開頭）。" +
+        "如果 ChatGPT 無法把生成的圖當成檔案交出來，請使用者先把圖下載、再貼回對話，然後重試。" +
+        UPLOAD_GUIDE,
+      annotations: { ...WRITE, idempotentHint: false, openWorldHint: true },
+      // OpenAI Apps SDK：列在這裡的參數，ChatGPT 會換成 {download_url, file_id, mime_type?, file_name?}。
+      _meta: { "openai/fileParams": ["file"] },
+    },
+    async (args) => {
+      const up = await import("./image-upload");
+      const { fetchRemoteImage } = await import("./remote-image");
+      let host = "";
+      try {
+        host = new URL(args.file.download_url).hostname;
+      } catch {
+        throw new McpInputError("file.download_url 不是合法網址");
+      }
+      const fetched = await fetchRemoteImage(args.file.download_url, {
+        allowHost: up.isOpenAIFileHost,
+        hostError: (h) =>
+          `下載網址的主機 ${h} 不是 OpenAI 的檔案網域（只接受 ${up.OPENAI_FILE_HOST_SUFFIXES.map((x) => `*.${x}`).join("、")}）。` +
+          "一般網址請改用 upload_image_from_url。",
+      });
+      const declared =
+        args.file.mime_type && args.file.mime_type in up.MCP_IMAGE_TYPES
+          ? args.file.mime_type
+          : null;
+      if (args.file.mime_type && !declared) {
+        throw new McpInputError(
+          `檔案類型 ${args.file.mime_type} 不收。只收 JPEG、PNG、WebP 圖片；SVG、HTML、GIF、AVIF 等格式一律不收。`,
+        );
+      }
+      const fileName = args.file.file_name ? up.cleanFileName(args.file.file_name) : null;
+      const validated = up.validateImageBytes(fetched.bytes, declared);
+      const stored = await up.storeSiteImageBytes(validated.bytes);
+      const summary = {
+        source: "chatgpt_file",
+        file_id: args.file.file_id,
+        file_name: fileName,
+        download_host: host,
+        ...up.imageSummary(validated),
+      };
+      const { writeMcpAudit } = await import("./audit");
+      // 🔴 不放 download_url（帶簽章）。
+      const audit = await writeMcpAudit({
+        tool: "upload_image_file",
+        entity: "site_image",
+        entity_id: stored.key,
+        action: "upload",
+        changes: { ...summary, key: stored.key },
+      });
+      return jsonText(uploadResult(stored, summary, audit));
     },
   );
 

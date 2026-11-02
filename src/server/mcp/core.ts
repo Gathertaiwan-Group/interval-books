@@ -534,7 +534,7 @@ export function imageKeyFromArg(
   if (m) return `storage:${m[1]}`;
   if (allowed.includes(v)) return v;
   throw new McpInputError(
-    "圖片要先用 upload_image_from_url 存進網站，再把它回傳的 key（storage:… 開頭）填進來。",
+    "圖片要先用上傳工具（upload_image_from_url／upload_image_base64／upload_image_file／create_image_upload_url＋finalize_image_upload）存進網站，再把它回傳的 key（storage:… 開頭）填進來。",
   );
 }
 

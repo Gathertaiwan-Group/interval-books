@@ -544,6 +544,11 @@ const EXPECTED_TOOLS = [
   "create_event",
   "create_journey",
   "create_shop_product",
+  // 2026-11-02 直接上傳圖片（src/server/mcp/image-upload.ts；行為測試在下面 [9]）
+  "create_image_upload_url",
+  "finalize_image_upload",
+  "upload_image_base64",
+  "upload_image_file",
 ];
 {
   const names = Object.keys(tools.TOOL_INPUTS).sort();
