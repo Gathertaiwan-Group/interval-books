@@ -133,9 +133,9 @@ const HOME = {
   factJourneyValue: { zh: "台東", en: "Taitung", ja: "台東" },
   factJourneyUnit: { zh: "文化策旅", en: "cultural journeys", ja: "文化の旅" },
   factJourneyNote: {
-    zh: "與 INNTERVAL 馥自然人文空間共同策劃",
-    en: "Co-hosted with INNTERVAL in Taitung",
-    ja: "台東の INNTERVAL と共同企画",
+    zh: "從主理人在台東的姊妹空間「馥自然」出發",
+    en: "Setting out from our sister space in Taitung",
+    ja: "台東の姉妹スペース「馥自然」から",
   },
 
   pillarsKicker: { zh: "我們做的事", en: "What we do", ja: "私たちのこと" },
@@ -167,9 +167,9 @@ const HOME = {
   goChar: { zh: "行", en: "Go", ja: "行" },
   goTitle: { zh: "走進土地的策旅", en: "Journeys into the land", ja: "土地へ歩み入る旅" },
   goBody: {
-    zh: "與台東 INNTERVAL 馥自然人文空間一起規劃旅程，跟著書與作者走到現場——公東教堂、池上秋收。",
-    en: "Journeys planned with INNTERVAL in Taitung, following books and their authors to the places they describe — the Kung-Tung chapel, the Chishang harvest.",
-    ja: "台東の INNTERVAL と企画する旅。本と作家に導かれて現地へ——公東教会、池上の秋の収穫。",
+    zh: "主理人 Alice 在台東另有一處人文空間 INNTERVAL 馥自然。我們從那裡出發，跟著書與作者走到現場——公東教堂、池上秋收。",
+    en: "Our founder Alice also runs INNTERVAL, a small cultural space in Taitung. From there we follow books and their authors to the places they describe — the Kung-Tung chapel, the Chishang harvest.",
+    ja: "店主 Alice は台東で INNTERVAL 馥自然という空間も営んでいます。そこを拠点に、本と作家に導かれて現地へ——公東教会、池上の秋の収穫。",
   },
   goCta: { zh: "看策旅", en: "See journeys", ja: "旅を見る" },
   imgReadAlt: {
@@ -850,7 +850,8 @@ function Index() {
               title: t(j.title),
               category: `${t(j.days)} ／ ${t(j.theme)}`,
               date: e.date,
-              image: e.imageKey ? imageFor(e.imageKey, journeyImg) : journeyImg,
+              // 首頁上方「行」已經用了那張固定意象圖，這裡沒有封面就不放圖，避免同一張照片重複出現。
+              image: e.imageKey ? imageFor(e.imageKey, journeyImg) : null,
               link: link ? { kind: "href" as const, ...link } : null,
             };
           }),
