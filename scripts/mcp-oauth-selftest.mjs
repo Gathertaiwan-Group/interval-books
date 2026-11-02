@@ -207,7 +207,23 @@ let localClient;
     Boolean(oc.registerClient({ redirect_uris: ["http://127.0.0.1:9999/cb"] }, SECRET).client_id),
   );
 
+  for (const good of [
+    "https://chatgpt.com/connector_platform_oauth_redirect",
+    "https://chatgpt.com/connector/oauth/abc_DEF-123",
+  ]) {
+    checkTrue(
+      `ChatGPT callback 可以註冊 ${good}`,
+      Boolean(oc.registerClient({ client_name: "ChatGPT", redirect_uris: [good] }, SECRET).client_id),
+    );
+  }
+
   for (const bad of [
+    "https://chatgpt.com/connector/oauth/abc/../../evil",
+    "https://chatgpt.com/connector/oauth/",
+    "https://chatgpt.com/connector/oauth/abc?x=1",
+    "https://chatgpt.com.evil.example/connector_platform_oauth_redirect",
+    "http://chatgpt.com/connector_platform_oauth_redirect",
+    "https://chatgpt.com/other",
     "https://evil.example/cb",
     "https://claude.ai/api/mcp/auth_callback/../../x",
     "https://claude.ai.evil.example/api/mcp/auth_callback",
