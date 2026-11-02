@@ -2,19 +2,21 @@ import { Link } from "@tanstack/react-router";
 import { Facebook, Instagram } from "lucide-react";
 import { useT } from "@/i18n/LanguageContext";
 import { useSiteContent } from "@/lib/site-content";
+import { RestMark } from "./RestMark";
 
 export function SiteFooter() {
   const t = useT();
   const { ui, site, contactEmail, siteUrl, phones, social } = useSiteContent();
   return (
-    <footer className="mt-32 border-t border-border/60 bg-[oklch(0.96_0.014_82)]/60">
-      <div className="container-editorial py-16 grid gap-12 md:grid-cols-4">
+    <footer className="mt-24 md:mt-32 border-t border-border/60 bg-[oklch(0.96_0.014_82)]/60">
+      <div className="container-editorial py-16 md:py-20 grid gap-12 md:grid-cols-4">
         <div className="md:col-span-2">
+          <RestMark className="mb-6 text-clay/80" />
           {/* h2（2026-11 SEO 健檢 L4）：頁尾在每頁的 h1 之後，h3 會讓只有一個 h1 的頁面跳級。
               h1–h5 共用同一組 base 樣式，class 不變，畫面不變。 */}
           <h2 className="font-serif text-2xl">{t(ui.brand)}</h2>
           <p className="eyebrow mt-2 text-[0.6rem]">{t(ui.brandSub)}</p>
-          <p className="mt-6 text-sm leading-relaxed text-muted-foreground max-w-sm">
+          <p className="mt-6 text-sm leading-[1.9] text-muted-foreground max-w-sm">
             {t(site.shortDesc)}
           </p>
         </div>

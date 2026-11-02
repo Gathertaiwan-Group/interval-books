@@ -33,21 +33,21 @@ export function SiteHeader() {
   ] as const;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
-      <div className="container-editorial flex items-center justify-between py-5 gap-6">
+    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur-md">
+      <div className="container-editorial flex items-center justify-between py-4 gap-6">
         <Link to="/" className="flex flex-col leading-tight" onClick={() => setOpen(false)}>
-          <span className="font-serif text-xl tracking-tight">{t(ui.brand)}</span>
+          <span className="font-serif text-[1.35rem] tracking-tight">{t(ui.brand)}</span>
           <span className="eyebrow mt-1 text-[0.6rem]">{t(ui.brandSub)}</span>
         </Link>
 
-        <nav className="hidden lg:flex items-center gap-6 text-[0.8rem] text-foreground/80">
+        <nav className="hidden lg:flex items-center gap-7 text-[0.875rem] tracking-[0.06em] text-foreground/75">
           {NAV.map((n) => (
             <Link
               key={n.to}
               to={n.to}
               activeOptions={{ exact: n.exact }}
-              activeProps={{ className: "text-foreground font-medium" }}
-              className="hover-underline transition-colors hover:text-foreground"
+              activeProps={{ className: "text-foreground after:w-full" }}
+              className="hover-underline py-1 transition-colors hover:text-foreground"
             >
               {n.label}
             </Link>
@@ -80,6 +80,7 @@ export function SiteHeader() {
           <CartLink label={t(ui.nav.cart)} onNavigate={() => setOpen(false)} />
           <button
             aria-label="Menu"
+            aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
             className="flex h-10 w-10 items-center justify-center text-foreground"
           >
