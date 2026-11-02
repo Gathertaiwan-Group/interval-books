@@ -512,9 +512,18 @@ check(
   const quickImporters = srcFiles
     .filter((p) => /["']@\/server\/event-quick-create["']/.test(stripTs(readFile(p))))
     .map(rel);
-  check("只有 fns/events.ts 匯入 event-quick-create", quickImporters, [
+  // 第二個呼叫端是遠端 MCP 的 create_event／create_journey（src/server/mcp/create-tools.ts）：
+  // server-only，只有通過 MCP 閘門的請求進得來（靜態 MCP_TOKEN，或 OAuth 且每次重查
+  // profiles 是 admin）—— 與上面「MCP 寫入工具」同一個理由，額度的決定權沒有交給新的人。
+  check("只有 fns/events.ts 與 MCP 新增工具匯入 event-quick-create", quickImporters.sort(), [
     "src/lib/admin/fns/events.ts",
+    "src/server/mcp/create-tools.ts",
   ]);
+  const createToolsSrc = readFile(join(ROOT, "src/server/mcp/create-tools.ts"));
+  checkTrue(
+    "create-tools.ts 有 server-only 標記",
+    createToolsSrc.includes('import "@tanstack/react-start/server-only"'),
+  );
 }
 
 const translateSrc = readFile(SERVER_TRANSLATE);

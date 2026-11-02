@@ -839,9 +839,9 @@ async function codeFor(client, redirectUri, userId = ADMIN, now) {
     { isActiveAdmin: fakeAdmin, oauthStore: oc.__TEST_ONLY__.defaultStore() },
   );
   check(
-    "handleMcpRequest：靜態 token → tools/list 30 支",
+    "handleMcpRequest：靜態 token → tools/list 33 支（30 支＋create_event／create_journey／create_shop_product）",
     [viaStatic.status, await toolsCount(viaStatic)],
-    [200, 30],
+    [200, 33],
   );
   check("靜態 token 不查 profiles", lookups.length, 0);
   const viaOauth = await http.handleMcpRequest(
@@ -849,9 +849,9 @@ async function codeFor(client, redirectUri, userId = ADMIN, now) {
     { isActiveAdmin: fakeAdmin, oauthStore: oc.__TEST_ONLY__.defaultStore() },
   );
   check(
-    "handleMcpRequest：OAuth token → tools/list 30 支",
+    "handleMcpRequest：OAuth token → tools/list 33 支",
     [viaOauth.status, await toolsCount(viaOauth)],
-    [200, 30],
+    [200, 33],
   );
   check("🔴 OAuth 每次呼叫都查一次 profiles（用 token 裡的 user id）", lookups, [ADMIN]);
   admins.delete(ADMIN);
@@ -860,6 +860,31 @@ async function codeFor(client, redirectUri, userId = ADMIN, now) {
     oauthStore: oc.__TEST_ONLY__.defaultStore(),
   });
   check("🔴 被降成非 admin → 下一次呼叫就 401（token 還沒到期）", revoked.status, 401);
+  {
+    // 新增工具也走同一道閘門：非 admin 的 OAuth token 呼叫 create_event（連 dry_run 都）→ 401。
+    const before = lookups.length;
+    const createCall = new Request(RESOURCE, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        authorization: `Bearer ${r1.access_token}`,
+        "mcp-protocol-version": "2025-11-25",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 9,
+        method: "tools/call",
+        params: { name: "create_event", arguments: { title: "x", dry_run: true } },
+      }),
+    });
+    const denied = await http.handleMcpRequest(createCall, {
+      isActiveAdmin: fakeAdmin,
+      oauthStore: oc.__TEST_ONLY__.defaultStore(),
+    });
+    check("🔴 非 admin 的 OAuth token 呼叫 create_event（dry_run）→ 401", denied.status, 401);
+    check("那一次有查 profiles（不是靠快取放行）", lookups.length, before + 1);
+  }
   checkTrue(
     "那個 401 帶 resource_metadata",
     /resource_metadata=/.test(revoked.headers.get("www-authenticate") ?? ""),

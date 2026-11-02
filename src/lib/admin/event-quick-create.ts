@@ -64,6 +64,11 @@ export type QuickSessionInput = {
 export type QuickPlanInput = {
   name: string;
   price: number;
+  /**
+   * 一張票佔幾個座位（雙人票＝2）。選填，省略＝1。後台一頁新增的表單不送這一欄
+   * （一律 1）；遠端 MCP 的 create_event／create_journey 可以送。
+   */
+  seats_per_unit?: number;
 };
 
 export type QuickCreateInput = {
@@ -80,6 +85,11 @@ export type QuickCreateInput = {
   publish: boolean;
   /** 策旅卡片上的「主題」（一句話）。選填；留空就用分類的名稱（分類本來就有三語）。 */
   theme: string;
+  /**
+   * 摘要（列表卡片那一句）。選填，留空＝從簡介第一段自動截（deriveSummary）。
+   * 後台一頁新增的表單不送這一欄；遠端 MCP 可以送。
+   */
+  summary?: string;
 };
 
 /* ------------------------------------------------------------------ *
@@ -100,6 +110,7 @@ export const DEFAULT_PLAN_NAME = "一般票";
 /** 長度上限。說明與 src/server/translate.ts 的 MAX_INPUT_CHARS（2000）同一個數字。 */
 export const QUICK_LIMITS = {
   title: 120,
+  summary: 300,
   description: 2000,
   location: 200,
   planName: 60,
@@ -107,6 +118,7 @@ export const QUICK_LIMITS = {
   plans: 10,
   capacity: 9999,
   price: 1_000_000,
+  seatsPerUnit: 20,
 } as const;
 
 export function emptySession(kind: QuickKind = "event"): QuickSessionInput {
@@ -345,6 +357,44 @@ export function deriveSummary(description: string): string {
   return chars.length > SUMMARY_MAX ? `${chars.slice(0, SUMMARY_MAX - 1).join("")}…` : firstPara;
 }
 
+/** 摘要：有填就用（trim），沒填就從簡介第一段截。 */
+export function summaryOf(v: Pick<QuickCreateInput, "summary" | "description">): string {
+  const s = (v.summary ?? "").trim();
+  return s || deriveSummary(v.description.trim());
+}
+
+/** 票種的「每張票佔幾個座位」：沒送＝1。 */
+export function seatsPerUnitOf(p: QuickPlanInput): number {
+  return p.seats_per_unit === undefined ? 1 : p.seats_per_unit;
+}
+
+/**
+ * 票種的名額（以「張」計，0036 event_session_plans.capacity）＝場次名額 ÷ 每張票人數，
+ * 無條件捨去。每張 1 人時就等於場次名額（後台一頁新增一直以來的寫法）。
+ */
+export function planCapacityFor(sessionCapacity: number, seatsPerUnit: number): number {
+  return Math.floor(sessionCapacity / Math.max(1, seatsPerUnit));
+}
+
+/**
+ * 「場次已經開始／過去」的錯誤（key 同 validateQuickCreate）。
+ *
+ * ⚠️ 後台一頁新增**不呼叫**這一支（店家補登已經辦過的活動是合法的）；遠端 MCP 的
+ *    create_event／create_journey 呼叫它 —— AI 把年份猜錯是最常見的失誤，要擋下來。
+ */
+export function pastSessionErrors(v: QuickCreateInput, nowMs: number): QuickCreateErrors {
+  const e: QuickCreateErrors = {};
+  v.sessions.forEach((s, i) => {
+    if (!isValidDate(s.date) || !isValidTime(s.start)) return;
+    const startsMs = Date.parse(taipeiLocalToIso(s.date, s.start));
+    if (startsMs <= nowMs) {
+      e[`sessions.${i}.date`] =
+        `場次開始時間 ${s.date} ${s.start}（台北時間）已經過去，請改成未來的日期與時間`;
+    }
+  });
+  return e;
+}
+
 /* ------------------------------------------------------------------ *
  * 驗證
  * ------------------------------------------------------------------ */
@@ -367,6 +417,9 @@ export function validateQuickCreate(v: QuickCreateInput): QuickCreateErrors {
     e.title = `活動名稱最多 ${QUICK_LIMITS.title} 字`;
 
   if (!v.category.trim()) e.category = "請選一個分類";
+
+  const summary = (v.summary ?? "").trim();
+  if ([...summary].length > QUICK_LIMITS.summary) e.summary = `摘要最多 ${QUICK_LIMITS.summary} 字`;
 
   const description = v.description.trim();
   if (!description) e.description = "請寫幾句活動簡介";
@@ -416,6 +469,12 @@ export function validateQuickCreate(v: QuickCreateInput): QuickCreateErrors {
       seen.add(name);
       if (!isInt(p.price) || p.price < 0) e[`${k}.price`] = "價格要是 0 以上的整數";
       else if (p.price > QUICK_LIMITS.price) e[`${k}.price`] = "價格太大了";
+      const spu = seatsPerUnitOf(p);
+      if (!isInt(spu) || spu < 1) e[`${k}.seats_per_unit`] = "每張票的人數至少 1（整數）";
+      else if (spu > QUICK_LIMITS.seatsPerUnit)
+        e[`${k}.seats_per_unit`] = `每張票最多 ${QUICK_LIMITS.seatsPerUnit} 人`;
+      else if (internal && v.sessions.some((s) => isInt(s.capacity) && s.capacity < spu))
+        e[`${k}.seats_per_unit`] = "每張票的人數不能超過場次名額";
     });
   }
 
@@ -445,7 +504,7 @@ export function stringsToTranslate(v: QuickCreateInput): string[] {
   const out = new Set<string>();
   out.add(v.title.trim());
   out.add(v.description.trim());
-  out.add(deriveSummary(v.description));
+  out.add(summaryOf(v));
   if (v.mode !== "external") {
     for (const s of v.sessions) {
       const loc = s.location.trim();
@@ -486,8 +545,11 @@ export type QuickSessionPayload = {
 export type QuickPlanPayload = {
   title: Localized;
   price: number;
-  /** 每張票佔 1 個座位；票種名額＝場次名額，真正的上限由場次那一層管。 */
-  seats_per_unit: 1;
+  /**
+   * 每張票佔幾個座位（後台一頁新增一律 1）。票種名額＝場次名額 ÷ 這個數（無條件捨去，
+   * 見 planCapacityFor），真正的上限由場次那一層管。
+   */
+  seats_per_unit: number;
   sort_order: number;
 };
 
@@ -522,7 +584,7 @@ export function buildQuickCreatePlan(
   const event: QuickEventPayload = {
     slug: opts.slug,
     title: localizedOf(v.title.trim(), tr),
-    summary: localizedOf(deriveSummary(description), tr),
+    summary: localizedOf(summaryOf(v), tr),
     description: localizedOf(description, tr),
     display_date: deriveDisplayDate(v.sessions),
     iso_date: deriveIsoDate(v.sessions),
@@ -554,7 +616,7 @@ export function buildQuickCreatePlan(
       ? v.plans.map((p, i) => ({
           title: localizedOf(p.name.trim(), tr),
           price: p.price,
-          seats_per_unit: 1,
+          seats_per_unit: seatsPerUnitOf(p),
           sort_order: i + 1,
         }))
       : [];

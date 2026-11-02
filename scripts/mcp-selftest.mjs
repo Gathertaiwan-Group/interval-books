@@ -538,6 +538,10 @@ const EXPECTED_TOOLS = [
   "update_collaboration",
   "update_page_blocks",
   "upload_image_from_url",
+  // 2026-11-02 新增（src/server/mcp/create-tools.ts；行為測試在 mcp-create-selftest.mjs）
+  "create_event",
+  "create_journey",
+  "create_shop_product",
 ];
 {
   const names = Object.keys(tools.TOOL_INPUTS).sort();
@@ -594,11 +598,36 @@ const EXPECTED_TOOLS = [
     [banned.test("list_orders"), banned.test("sort_order")],
     [true, false],
   );
+  // 唯一的例外：新增活動／策旅要連同場次與報名方式一起建（走後台一頁新增同一支
+  // src/server/event-quick-create.ts）。名單寫死在這裡，多一個欄位、或出現在別支工具上都會紅。
+  const ALLOWED_FIELDS = new Set([
+    "create_event.sessions",
+    "create_event.registration_mode",
+    "create_journey.sessions",
+    "create_journey.registration_mode",
+  ]);
   const bannedFields = [];
+  const allowedHit = [];
   for (const [n, s] of Object.entries(tools.TOOL_INPUTS)) {
-    for (const f of Object.keys(s.shape)) if (banned.test(f)) bannedFields.push(`${n}.${f}`);
+    for (const f of Object.keys(s.shape)) {
+      if (!banned.test(f)) continue;
+      if (ALLOWED_FIELDS.has(`${n}.${f}`)) allowedHit.push(`${n}.${f}`);
+      else bannedFields.push(`${n}.${f}`);
+    }
   }
   check("沒有任何一支工具收排除領域的欄位（庫存、場次、名額、金流…）", bannedFields, []);
+  check(
+    "例外只有 create_event／create_journey 的 sessions、registration_mode（名單逐字）",
+    allowedHit.sort(),
+    [...ALLOWED_FIELDS].sort(),
+  );
+  check(
+    "🔴 create_shop_product 沒有任何庫存欄位",
+    Object.keys(tools.TOOL_INPUTS.create_shop_product.shape).filter((f) =>
+      /stock|inventory|inv_|quantity/.test(f),
+    ),
+    [],
+  );
 
   for (const n of tools.WRITE_TOOLS) {
     const shape = tools.TOOL_INPUTS[n].shape;
@@ -616,6 +645,9 @@ const EXPECTED_TOOLS = [
     update_collaboration: { id: "x" },
     update_page_blocks: { page_slug: "index", blocks: [{ block_key: "k", value: "v" }] },
     upload_image_from_url: { url: "https://example.com/a.jpg" },
+    create_event: { title: "t", category: "c", description: "d" },
+    create_journey: { title: "t", category: "c", description: "d" },
+    create_shop_product: { product_type: "book", title: "t", summary: "s", price: 100 },
   };
   check(
     "每一支寫入工具都有最小輸入樣本",
@@ -628,6 +660,13 @@ const EXPECTED_TOOLS = [
       `🔴 ${n}：沒送 dry_run → 預設 true（不會意外寫入）`,
       parsed.success && parsed.data.dry_run,
       true,
+    );
+  }
+  for (const n of ["create_event", "create_journey", "create_shop_product"]) {
+    check(
+      `🔴 ${n}：沒送 publish → 預設 false（草稿）`,
+      tools.TOOL_INPUTS[n].safeParse(minimal[n]).data?.publish,
+      false,
     );
   }
   const del = tools.TOOL_INPUTS.delete_news.safeParse({ id: "x", dry_run: false });
@@ -784,6 +823,32 @@ console.log("\n[7] MCP 協定");
     true,
   );
   check("update_news 只要求 id", upd?.inputSchema?.required, ["id"]);
+  for (const n of ["create_event", "create_journey", "create_shop_product"]) {
+    const t = (list.json?.result?.tools ?? []).find((x) => x.name === n);
+    const d = t?.description ?? "";
+    checkTrue(
+      `${n} 的說明寫清楚「預設草稿」「dry_run 預設 true」`,
+      d.includes("預設建成草稿") && d.includes("預設 dry_run=true"),
+    );
+    check(
+      `${n} 的 JSON Schema：dry_run 預設 true`,
+      t?.inputSchema?.properties?.dry_run?.default,
+      true,
+    );
+    check(
+      `${n} 的 JSON Schema：publish 預設 false`,
+      t?.inputSchema?.properties?.publish?.default,
+      false,
+    );
+    check(`${n} 標 idempotentHint=false`, t?.annotations?.idempotentHint, false);
+  }
+  checkTrue(
+    "create_shop_product 的說明寫清楚「不設庫存」",
+    (
+      (list.json?.result?.tools ?? []).find((x) => x.name === "create_shop_product")?.description ??
+      ""
+    ).includes("不設庫存"),
+  );
   const listNews = (list.json?.result?.tools ?? []).find((t) => t.name === "list_news");
   check("讀取工具標 readOnlyHint", listNews?.annotations?.readOnlyHint, true);
   const delNews = (list.json?.result?.tools ?? []).find((t) => t.name === "delete_news");

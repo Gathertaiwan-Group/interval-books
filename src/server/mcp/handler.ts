@@ -15,7 +15,7 @@ export const MCP_INSTRUCTIONS = `小時光書店（www.intervalbooks.tw）網站
 
 【能做什麼】
 讀：最新消息、活動（含票券／場次／票種的唯讀摘要）、策旅、選物與書籍商品、地方刊物、選品、講者、合作、頁面文案、店家基本資訊、活動分類。
-寫：新增／修改／刪除最新消息；修改活動與策旅的文案、封面、分類、講者、顯示日期與公開狀態；修改選物／書籍的文案、圖片、售價與上下架；修改刊物、講者、合作；修改頁面文案區塊的文字；從網址上傳圖片。
+寫：新增／修改／刪除最新消息；新增活動（create_event）與策旅（create_journey），一次建好活動頁、售票商品、場次、票種（策旅另加卡片）；新增書或選物（create_shop_product，不設庫存）；修改活動與策旅的文案、封面、分類、講者、顯示日期與公開狀態；修改選物／書籍的文案、圖片、售價與上下架；修改刊物、講者、合作；修改頁面文案區塊的文字；從網址上傳圖片。
 
 【寫入流程】
 1. 每一支寫入工具預設 dry_run=true，只回傳「改前 → 改後」差異，不會寫入。
@@ -25,20 +25,21 @@ export const MCP_INSTRUCTIONS = `小時光書店（www.intervalbooks.tw）網站
 5. 刪除只開放最新消息，而且要 dry_run=false 加 confirm=true；只想隱藏請改 is_published=false。
 6. 圖片要先用 upload_image_from_url 存進網站，再把回傳的 key 填進 image_key。
 7. 改價會在結果裡列出舊價 → 新價。每一筆寫入都會留下稽核紀錄（actor=mcp）。
+8. 新增活動／策旅／商品（create_*）預設建成草稿（publish=false），網站上看不到；dry_run=true 回傳「將會建立什麼」的完整預覽（每次呼叫都記稽核）。時間一律台北時間。新增商品不設庫存，由店員在後台處理後再上架。
 
 【不開放（請到 /admin 後台處理）】
-訂單、付款、發票、退款；活動報名名單與任何個人資料；人員帳號與權限；進銷存（庫存、進貨、廠商）；付款帳戶與通知信設定；活動／策旅的票價、場次、票種、名額的建立與修改；網址代稱；頁面區塊的新增或刪除。
+訂單、付款、發票、退款；活動報名名單與任何個人資料；人員帳號與權限；進銷存（庫存、進貨、廠商）與商品庫存數量；付款帳戶與通知信設定；既有活動／策旅的票價、場次、票種、名額的修改（新增時一起建立的除外）；既有資料的網址代稱；頁面區塊的新增或刪除。
 
 ---
 
 Interval Books (www.intervalbooks.tw) website content MCP.
 
 Read: news, events (with a read-only summary of ticket product / sessions / plans), journeys, shop goods & books, local publications, curated picks, speakers, collaborations, page copy, store info, event categories.
-Write: create / update / delete news; update event & journey copy, cover, category, speaker, display date and visibility; update goods/book copy, image, price and status; update publications, speakers, collaborations; update the text of existing page copy blocks; upload an image from a URL.
+Write: create / update / delete news; create an event (create_event) or journey (create_journey) together with its ticket product, sessions and ticket types; create a book or goods product (create_shop_product, no stock); update event & journey copy, cover, category, speaker, display date and visibility; update goods/book copy, image, price and status; update publications, speakers, collaborations; update the text of existing page copy blocks; upload an image from a URL.
 
-Every write tool defaults to dry_run=true and returns a before/after diff without writing. Show the diff to the user, then call again with dry_run=false to apply. Send only the fields you want to change. Localized fields accept a Chinese string (en/ja are auto-translated) or {"zh","en","ja"}. Deleting is allowed for news only and needs dry_run=false plus confirm=true. Upload images first with upload_image_from_url and use the returned key. Price changes report old → new. Every write is audit-logged with actor "mcp".
+Every write tool defaults to dry_run=true and returns a before/after diff without writing. Show the diff to the user, then call again with dry_run=false to apply. Send only the fields you want to change. Localized fields accept a Chinese string (en/ja are auto-translated) or {"zh","en","ja"}. Deleting is allowed for news only and needs dry_run=false plus confirm=true. Upload images first with upload_image_from_url and use the returned key. Price changes report old → new. Every write is audit-logged with actor "mcp". create_* tools default to a draft (publish=false) and to dry_run=true (a full preview of what would be created; every call, including dry runs, is audit-logged). Times are Asia/Taipei. New products have no stock set; staff handle stock in the back office before listing.
 
-Not available (use the /admin back office): orders, payments, invoices, refunds; event registrations and any personal data; staff accounts and permissions; inventory (stock, purchases, vendors); payment-account and notification-email settings; creating or changing ticket prices, sessions, plans or capacity; URL slugs; adding or removing page blocks.`;
+Not available (use the /admin back office): orders, payments, invoices, refunds; event registrations and any personal data; staff accounts and permissions; inventory (stock, purchases, vendors); payment-account and notification-email settings; changing ticket prices, sessions, plans or capacity of existing events (creating them with a new event is allowed); stock quantities; slugs of existing records; adding or removing page blocks.`;
 
 let handler: ((request: Request) => Promise<Response>) | null = null;
 

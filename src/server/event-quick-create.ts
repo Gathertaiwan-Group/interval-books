@@ -16,16 +16,25 @@
  * 第 1–3 步之間不是一個資料庫交易（三支 repo 各自一個請求），所以失敗時照相反順序
  * 刪掉**這一次建立的那幾列**（票種隨場次 on delete cascade）。因為發布是最後一步，
  * 清理失敗的最壞情況也只是一份前台看不到的草稿，錯誤訊息會講出它的 id。
+ *
+ * ── 兩個呼叫端，同一條路 ─────────────────────────────────────────────────
+ *   後台  fns/events.ts#createEventQuick（adminFnMiddleware）→ createEventQuick()
+ *   MCP   src/server/mcp/create-tools.ts（create_event／create_journey，過了 MCP 閘門）
+ *         → prepareEventQuick()（dry_run 只跑到這裡，回傳計畫當預覽）→ commitEventQuick()
+ * createEventQuick() 就是 prepare + commit，後台的行為一個字都沒變。
  */
 import "@tanstack/react-start/server-only";
 import {
   buildJourneyCard,
   buildQuickCreatePlan,
   pickUniqueSlug,
+  planCapacityFor,
   slugBaseFor,
   stringsToTranslate,
   validateQuickCreate,
   type QuickCreateInput,
+  type QuickCreatePlan,
+  type QuickJourneyCardPayload,
   type Translations,
 } from "@/lib/admin/event-quick-create";
 import { todayInTaipei } from "@/lib/event-status";
@@ -46,13 +55,37 @@ export type QuickCreateResult = {
   untranslated: number;
 };
 
-async function translateAll(texts: string[]): Promise<{ map: Translations; failed: number }> {
+/**
+ * 呼叫端自己給好的英日文（遠端 MCP 的 {"zh","en","ja"}）。key 是中文原文。
+ * 兩個語言都給了 → 那段中文不送翻譯；只給一個 → 照樣翻，缺的那個用翻譯補。
+ */
+export type PresetTranslations = Map<string, { en?: string; ja?: string }>;
+
+async function translateAll(
+  texts: string[],
+  preset: PresetTranslations = new Map(),
+): Promise<{ map: Translations; failed: number }> {
   const map: Translations = new Map();
-  if (texts.length === 0) return { map, failed: 0 };
+  const todo = texts.filter((t) => {
+    const p = preset.get(t);
+    return !(p?.en?.trim() && p?.ja?.trim());
+  });
+  const merge = () => {
+    for (const [zh, p] of preset) {
+      const t = map.get(zh);
+      const en = p.en?.trim() || t?.en || "";
+      const ja = p.ja?.trim() || t?.ja || "";
+      if (en || ja) map.set(zh, { en, ja });
+    }
+  };
+  if (todo.length === 0) {
+    merge();
+    return { map, failed: 0 };
+  }
   const { translateToEnJa } = await import("@/server/translate");
   let failed = 0;
   await Promise.all(
-    texts.map(async (text) => {
+    todo.map(async (text) => {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
         const result = await Promise.race([
@@ -74,32 +107,48 @@ async function translateAll(texts: string[]): Promise<{ map: Translations; faile
       }
     }),
   );
+  merge();
   return { map, failed };
 }
 
-export async function createEventQuick(input: QuickCreateInput): Promise<QuickCreateResult> {
+/** prepareEventQuick() 的結果：寫入前就決定好的一切（dry_run 拿它當預覽）。 */
+export type PreparedQuickCreate = {
+  input: QuickCreateInput;
+  slug: string;
+  plan: QuickCreatePlan;
+  journeyCard: QuickJourneyCardPayload | null;
+  untranslated: number;
+};
+
+/**
+ * 驗證 → 讀排序與已用代稱 → 翻譯 → 算出寫入計畫。**只讀不寫。**
+ *
+ * @param opts.slug    呼叫端指定的網址代稱（遠端 MCP）。呼叫端負責先確認格式與沒有撞號；
+ *                     省略＝照後台規則用第一場日期 YYYYMMDD 自動挑一個空的。
+ * @param opts.preset  呼叫端給好的英日文（見 PresetTranslations）。
+ */
+export async function prepareEventQuick(
+  input: QuickCreateInput,
+  opts: { slug?: string; preset?: PresetTranslations } = {},
+): Promise<PreparedQuickCreate> {
   const errors = validateQuickCreate(input);
   const firstError = Object.values(errors)[0];
   if (firstError) throw new Error(`表單有欄位需要修正：${firstError}`);
 
-  const { listEvents, listTakenEventSlugs, upsertEventWithProduct, removeEvent } =
-    await import("@/server/repos/events");
-  const { upsertEventSession, upsertEventSessionPlan, removeEventSession } =
-    await import("@/server/repos/event-sessions");
-  const { removeProduct } = await import("@/server/repos/products");
-  const { listJourneys, upsertJourney, removeJourney } = await import("@/server/repos/journeys");
+  const { listEvents, listTakenEventSlugs } = await import("@/server/repos/events");
+  const { listJourneys } = await import("@/server/repos/journeys");
   const { getEventCategoryById } = await import("@/server/repos/event-categories");
   const isJourney = input.kind === "journey";
 
-  const base = slugBaseFor(input.sessions, todayInTaipei());
+  const base = opts.slug ?? slugBaseFor(input.sessions, todayInTaipei());
   const [events, taken, translated] = await Promise.all([
     listEvents(),
-    listTakenEventSlugs(base),
-    translateAll(stringsToTranslate(input)),
+    opts.slug ? Promise.resolve([] as string[]) : listTakenEventSlugs(base),
+    translateAll(stringsToTranslate(input), opts.preset),
   ]);
   // 與組裝器「新增」同一個規則：排在目前最後一場的後面。
   const sortOrder = events.reduce((max, e) => Math.max(max, e.sort_order), 0) + 1;
-  const slug = pickUniqueSlug(base, taken);
+  const slug = opts.slug ?? pickUniqueSlug(base, taken);
   const plan = buildQuickCreatePlan(input, {
     slug,
     sortOrder,
@@ -116,6 +165,28 @@ export async function createEventQuick(input: QuickCreateInput): Promise<QuickCr
           : ((await getEventCategoryById(input.category))?.label ?? null),
       })
     : null;
+
+  return { input, slug, plan, journeyCard, untranslated: translated.failed };
+}
+
+export async function createEventQuick(input: QuickCreateInput): Promise<QuickCreateResult> {
+  return commitEventQuick(await prepareEventQuick(input));
+}
+
+/**
+ * 照 prepareEventQuick() 算好的計畫寫入（順序見檔頭）。寫入前再跑一次 validateQuickCreate。
+ */
+export async function commitEventQuick(prepared: PreparedQuickCreate): Promise<QuickCreateResult> {
+  const { input, slug, plan, journeyCard } = prepared;
+  const errors = validateQuickCreate(input);
+  const firstError = Object.values(errors)[0];
+  if (firstError) throw new Error(`表單有欄位需要修正：${firstError}`);
+
+  const { upsertEventWithProduct, removeEvent } = await import("@/server/repos/events");
+  const { upsertEventSession, upsertEventSessionPlan, removeEventSession } =
+    await import("@/server/repos/event-sessions");
+  const { removeProduct } = await import("@/server/repos/products");
+  const { upsertJourney, removeJourney } = await import("@/server/repos/journeys");
 
   let eventId: string | null = null;
   let journeyId: string | null = null;
@@ -155,7 +226,7 @@ export async function createEventQuick(input: QuickCreateInput): Promise<QuickCr
           title: p.title,
           price: p.price,
           seats_per_unit: p.seats_per_unit,
-          capacity: s.capacity,
+          capacity: planCapacityFor(s.capacity, p.seats_per_unit),
           status: "open",
           sort_order: p.sort_order,
         });
@@ -226,6 +297,6 @@ export async function createEventQuick(input: QuickCreateInput): Promise<QuickCr
     sessionIds,
     planIds,
     journeyId,
-    untranslated: translated.failed,
+    untranslated: prepared.untranslated,
   };
 }

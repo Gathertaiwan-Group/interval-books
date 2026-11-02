@@ -430,6 +430,11 @@ export type NewGoodsInput = {
   product_type: "goods" | "book";
   title: L;
   summary: L;
+  /**
+   * 長說明。選填，省略＝沿用 summary（後台精簡表單不送這一欄）。遠端 MCP 的
+   * create_shop_product 可以另外給。
+   */
+  description?: L;
   price: number;
   stock: number | null;
   image_key: string | null;
@@ -442,7 +447,7 @@ export type NewGoodsInput = {
  * 「新增商品 › 一般商品」那一張精簡表單 → productSchema 的完整 payload。
  *
  * 精簡表單只問必要的幾格；其餘欄位的預設值寫在這裡一次：
- *   · description 沿用 summary（DB 要求三語齊備，商品頁的長說明之後在「編輯」補）
+ *   · description 沒給就沿用 summary（DB 要求三語齊備，商品頁的長說明之後在「編輯」補）
  *   · requires_shipping true（goods/book 都是實體）
  *   · 不關聯任何來源（source_type/source_id null）
  */
@@ -454,7 +459,7 @@ export function buildNewGoodsPayload(input: NewGoodsInput) {
     source_id: null,
     title: input.title,
     summary: input.summary,
-    description: input.summary,
+    description: input.description ?? input.summary,
     price: input.price,
     compare_at_price: null,
     stock: input.stock,

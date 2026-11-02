@@ -15,7 +15,11 @@
  * 這裡的每一支都假設呼叫端已經通過 src/server/mcp/core.ts#gateMcpRequest()（與 repos
  * 假設呼叫端通過 adminFnMiddleware 是同一個模型）。能做什麼由**這個檔案註冊了哪些工具**
  * 決定 —— 這份清單就是白名單。訂單、金流、發票、報名名單、人員權限、進銷存、付款與寄信
- * 設定、票價／場次／票種的建立與修改，一支都沒有註冊。
+ * 設定、既有活動的票價／場次／票種修改，一支都沒有註冊。
+ *
+ * 例外是「新增」：create_event／create_journey 會連同場次與票種一起建（走後台一頁新增
+ * 同一支 src/server/event-quick-create.ts），create_shop_product 建一般商品但不寫庫存。
+ * 三支的實作在 ./create-tools.ts。
  *
  * ── dry_run ───────────────────────────────────────────────────────────────
  * 每一支寫入工具預設 dry_run=true：回傳「改之前 → 改之後」的差異，不寫入。要真的寫，
@@ -37,6 +41,13 @@ import {
   type TextResult,
   type Translator,
 } from "./core";
+import {
+  auditedInputSchema,
+  CREATE_TOOL_INPUTS,
+  CREATE_TOOL_META,
+  runCreateEvent,
+  runCreateShopProduct,
+} from "./create-tools";
 
 /* ------------------------------------------------------------------ 共用 */
 
@@ -51,6 +62,14 @@ const WRITE: ToolAnnotations = {
   readOnlyHint: false,
   destructiveHint: false,
   idempotentHint: true,
+  openWorldHint: false,
+};
+
+/** 新增：不是冪等的（同樣參數呼叫兩次會被「名稱重複」擋下，但語意上是建立）。 */
+const CREATE: ToolAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
   openWorldHint: false,
 };
 
@@ -466,6 +485,9 @@ export const TOOL_INPUTS = {
     url: z.string().url().max(2000).describe("圖片的公開 https 網址（JPEG／PNG／WebP，2MB 以內）"),
     dry_run: dryRunArg,
   }),
+
+  /* 新增（./create-tools.ts） */
+  ...CREATE_TOOL_INPUTS,
 } as const;
 
 export type ToolName = keyof typeof TOOL_INPUTS;
@@ -483,6 +505,9 @@ export const WRITE_TOOLS: readonly ToolName[] = [
   "update_collaboration",
   "update_page_blocks",
   "upload_image_from_url",
+  "create_event",
+  "create_journey",
+  "create_shop_product",
 ];
 
 type Args<N extends ToolName> = z.output<(typeof TOOL_INPUTS)[N]>;
@@ -492,7 +517,13 @@ type Args<N extends ToolName> = z.output<(typeof TOOL_INPUTS)[N]>;
 export function registerContentTools(server: McpServer): void {
   function add<N extends ToolName>(
     name: N,
-    meta: { title: string; description: string; annotations: ToolAnnotations },
+    meta: {
+      title: string;
+      description: string;
+      annotations: ToolAnnotations;
+      /** 只有新增工具用：同一支 schema 包成「驗證失敗也交給 handler 記稽核」。 */
+      auditInvalid?: boolean;
+    },
     fn: (args: Args<N>) => Promise<TextResult>,
   ) {
     server.registerTool(
@@ -501,7 +532,7 @@ export function registerContentTools(server: McpServer): void {
         title: meta.title,
         description: meta.description,
         annotations: meta.annotations,
-        inputSchema: TOOL_INPUTS[name],
+        inputSchema: meta.auditInvalid ? auditedInputSchema(TOOL_INPUTS[name]) : TOOL_INPUTS[name],
       },
       // SDK 已經用同一支 schema 驗過並套上預設值；這裡的轉型只是把型別接回來。
       (async (args: unknown) => safe(() => fn(args as Args<N>))) as never,
@@ -1523,8 +1554,30 @@ export function registerContentTools(server: McpServer): void {
         ...summary,
         audit: audit === "recorded" ? "recorded" : "log_only（稽核表寫入失敗，紀錄只在伺服器 log）",
         next_step:
-          "把 key 填進 update_event／update_shop_product／update_speaker 的 image_key（或 update_publication 的 cover_image_key）。",
+          "把 key 填進 create_event／create_journey／create_shop_product／update_event／update_shop_product／update_speaker 的 image_key（或 update_publication 的 cover_image_key）。",
       });
     },
+  );
+
+  /* ============================================================ 新增（./create-tools.ts） */
+  // 稽核在 create-tools.ts 的 withAudit() 裡記（含 dry_run 與被擋下的呼叫），錯誤也在那裡
+  // 轉成文字；外面再包一層 safe() 只是保險。
+
+  add(
+    "create_event",
+    { ...CREATE_TOOL_META.create_event, annotations: CREATE, auditInvalid: true },
+    async (args) => runCreateEvent("event", args),
+  );
+
+  add(
+    "create_journey",
+    { ...CREATE_TOOL_META.create_journey, annotations: CREATE, auditInvalid: true },
+    async (args) => runCreateEvent("journey", args),
+  );
+
+  add(
+    "create_shop_product",
+    { ...CREATE_TOOL_META.create_shop_product, annotations: CREATE, auditInvalid: true },
+    async (args) => runCreateShopProduct(args, { translator }),
   );
 }
