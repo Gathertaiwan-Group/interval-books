@@ -93,11 +93,11 @@ const HOME = {
     en: "Read a place\nin its own words.",
     ja: "一冊の地域誌から、\nひとつの土地を読む。",
   },
-  /** {n} 換成刊物份數；讀不到份數時換成 countFallback。 */
+  /** 首屏說明句（業主 11/2 指定精簡、只提台灣）。若有 {n} 會換成刊物份數。 */
   lede: {
-    zh: "我們是華山紅磚六合院裡的風土誌書店。以土地為線索選書，典藏台灣與日本 {n} 份地方刊物；也辦讀書會與講座，和你一起走進台東。",
-    en: "We are a bookstore of place in Huashan’s Red Brick Courtyard. We choose books by the land they come from, keep an archive of {n} local publications from Taiwan and Japan, host reading circles and talks — and travel together to Taitung.",
-    ja: "華山・紅煉瓦六合院にある、風土をテーマにした書店です。土地を手がかりに本を選び、台湾と日本の地域刊行物 {n} 冊を所蔵。読書会やトークを開き、台東への旅もご一緒します。",
+    zh: "華山紅磚六合院裡的風土誌書店。以土地為線索選書，典藏台灣各地的地方刊物。",
+    en: "A bookstore of place in Huashan’s Red Brick Courtyard — books chosen by the land they come from, and an archive of local publications from across Taiwan.",
+    ja: "華山・紅煉瓦六合院の風土誌書店。土地を手がかりに本を選び、台湾各地の地域刊行物を所蔵しています。",
   },
   countFallback: { zh: "逾百", en: "over 100", ja: "百以上の" },
   ctaPrimary: {
@@ -129,12 +129,12 @@ const HOME = {
     en: "Author talks and workshops",
     ja: "作家の話、手しごとのワークショップ",
   },
-  factJourneyValue: { zh: "台東", en: "Taitung", ja: "台東" },
+  factJourneyValue: { zh: "台灣", en: "Taiwan", ja: "台湾" },
   factJourneyUnit: { zh: "文化策旅", en: "cultural journeys", ja: "文化の旅" },
   factJourneyNote: {
-    zh: "從主理人在台東的姊妹空間「馥自然」出發",
-    en: "Setting out from our sister space in Taitung",
-    ja: "台東の姉妹スペース「馥自然」から",
+    zh: "跟著書與作者，走進土地的現場",
+    en: "Following books and their authors to the places they describe",
+    ja: "本と作家に導かれ、土地の現場へ",
   },
 
   pillarsKicker: { zh: "我們做的事", en: "What we do", ja: "私たちのこと" },
