@@ -19,10 +19,11 @@
  * 沒驗過的檔案已經有公開網址了。所以：
  *   1. signed URL 指向**私有**的 mcp-image-uploads（0053，2MB、只收三種 MIME），路徑由
  *      伺服器產生 `<簽發秒數>-<uuid>.<ext>`，呼叫端一個字都不能指定；token 綁死這個路徑、
- *      不開 upsert，所以同一張 URL 傳一次之後就不能再覆寫。
- *   2. finalize 由伺服器把它讀回來 → 走跟 base64 同一條驗證（magic bytes、尺寸可解析、
- *      ≤2MB、與宣告格式一致）→ uploadSiteImage() 存進 site-images（新的 uuid）→ 刪掉暫存檔。
- *      不合格一樣刪掉暫存檔並回錯。
+ *      不開 upsert，所以同一張 URL 傳一次之後就不能再覆寫（409）。
+ *   2. finalize 先寫 `used/<upload_id>` 標記搶「認領」（一個 upload_id 只能 finalize 一次），
+ *      把檔案讀回來 → 走跟 base64 同一條驗證（magic bytes、尺寸可解析、≤2MB、與宣告格式
+ *      一致）→ uploadSiteImage() 存進 site-images（新的 uuid）→ 用 0 byte 墓碑覆蓋暫存檔
+ *      （大檔不留、路徑一直被佔住，同一張 URL 從此只會 409）。不合格一樣寫墓碑並回錯。
  *   3. 「短效」由 finalize 執行：簽發超過 UPLOAD_WINDOW_SECONDS（10 分鐘）的暫存檔，
  *      finalize 只會刪掉、不會入庫。即使 Supabase 那端 token 還沒過期，傳上去也沒有用。
  *   最終 key 在 finalize 才發（`storage:<uuid>.<ext>`，副檔名由實際內容決定），沒驗過的
@@ -35,7 +36,8 @@
  *     upload_image_from_url 相同，見 remote-image.ts），所以只**警告**（imageWarnings）。
  *   · 稽核不記 base64 內容、不記 ChatGPT 的 download_url（帶簽章）、不記 signed URL 的 token。
  *   · 上傳了但沒被任何頁面使用的檔案不清理（site-images 本來就是這樣）；暫存 bucket 裡
- *     沒 finalize 的檔案也不清理，它是私有的，沒有公開網址。
+ *     沒 finalize 的檔案（≤2MB）與每次 finalize 留下的兩個 0 byte 物件也不清理，它是私有的，
+ *     沒有公開網址。
  */
 import "@tanstack/react-start/server-only";
 import { z } from "zod4";
@@ -73,7 +75,14 @@ export const MCP_UPLOAD_STAGING_BUCKET = "mcp-image-uploads";
 export const UPLOAD_WINDOW_SECONDS = 10 * 60;
 
 /** ChatGPT 檔案下載網址只放行 OpenAI 自己的網域（含子網域）。 */
-export const OPENAI_FILE_HOST_SUFFIXES = ["oaiusercontent.com", "openai.com"] as const;
+// 官方文件沒寫 download_url 的主機（developers.openai.com/apps-sdk/reference 只說是暫時網址），
+// 所以只放 OpenAI 自己擁有的三個網域；每一跳轉址都要在白名單內（remote-image.ts）。
+// 業主實測若被擋，錯誤訊息會寫出實際主機名，確認是 OpenAI 的再加進來。
+export const OPENAI_FILE_HOST_SUFFIXES = [
+  "oaiusercontent.com",
+  "openai.com",
+  "chatgpt.com",
+] as const;
 
 const ALLOWED_NAME_EXT = new Set(["jpg", "jpeg", "png", "webp"]);
 
@@ -292,32 +301,64 @@ export async function createStagedUpload(contentType: McpImageType) {
   return { uploadId, uploadUrl: data.signedUrl };
 }
 
+/** finalize 的「認領」標記放在這個前綴底下（同一個私有 bucket）。 */
+const CLAIM_PREFIX = "used/";
+
 /**
- * 讀回暫存檔 → 驗證 → 存進 site-images。**不論成功失敗都刪掉暫存檔**（成功後它沒用了；
- * 失敗的是不合格的檔案；過期的是不再接受的檔案）。
+ * 讀回暫存檔 → 驗證 → 存進 site-images。
+ *
+ * ── 為什麼不是「處理完就刪掉」──────────────────────────────────────────────
+ * Supabase 的 signed upload token 在 hosted 版大約 2 小時有效、我們調不短；它擋第二次上傳
+ * 靠的是「同一路徑已經有物件 → 409」。處理完若把暫存檔刪掉，路徑空出來，同一個 token 又
+ * 能再傳一次。所以處理完（不論成功失敗）都用 0 byte 的**墓碑**覆蓋原路徑：大檔不留著，
+ * 路徑也一直被佔住，這張 URL 從此只會回 409。
+ *
+ * ── 並發 ──────────────────────────────────────────────────────────────────
+ * 開頭先用 upsert:false 寫一個 `used/<upload_id>` 標記當「認領」：storage 的唯一鍵保證
+ * 同一個 upload_id 只有一個 finalize 搶得到，其他的回「已經 finalize 過」。檔案還沒傳上去
+ * 的那一次會把標記收回，傳好之後可以再 finalize。
  */
 export async function finalizeStagedUpload(uploadId: string, nowMs = Date.now()) {
   const parsed = parseUploadId(uploadId);
   if (!parsed) throw new McpInputError("upload_id 格式不對，請用 create_image_upload_url 回傳的值");
   const { supabaseAdmin } = await import("@/server/supabase-admin");
   const bucket = supabaseAdmin().storage.from(MCP_UPLOAD_STAGING_BUCKET);
-  const remove = async () => {
-    const { error } = await bucket.remove([uploadId]);
-    if (error) console.error(`[mcp] 刪除暫存上傳檔失敗 ${uploadId}：${error.message}`);
+  const declared = (Object.entries(MCP_IMAGE_TYPES).find(([, ext]) => ext === parsed.ext)?.[0] ??
+    "image/png") as McpImageType;
+  const tombstone = async () => {
+    const { error } = await bucket.upload(uploadId, new Uint8Array(0), {
+      contentType: declared,
+      upsert: true,
+    });
+    if (error) console.error(`[mcp] 暫存上傳檔寫墓碑失敗 ${uploadId}：${error.message}`);
   };
 
   const age = Math.floor(nowMs / 1000) - parsed.issuedAt;
   if (age > UPLOAD_WINDOW_SECONDS || age < -60) {
-    await remove();
+    await tombstone();
     throw new McpInputError(
       "這個上傳網址已經超過 10 分鐘，不再接受。請重新呼叫 create_image_upload_url 拿一個新的網址再傳一次。",
     );
   }
 
+  const claim = `${CLAIM_PREFIX}${uploadId}`;
+  const claimed = await bucket.upload(claim, new Uint8Array(0), {
+    contentType: declared,
+    upsert: false,
+  });
+  if (claimed.error) {
+    throw new McpInputError(
+      "這個 upload_id 已經 finalize 過了（每個只能 finalize 一次）。要再傳一張圖，請重新呼叫 create_image_upload_url。",
+    );
+  }
+
   const { data, error } = await bucket.download(uploadId);
   if (error || !data) {
+    // 還沒傳上去：把認領收回，傳好之後可以再呼叫一次。
+    const { error: unclaimError } = await bucket.remove([claim]);
+    if (unclaimError) console.error(`[mcp] 收回認領標記失敗 ${claim}：${unclaimError.message}`);
     throw new McpInputError(
-      "找不到這次上傳的檔案：可能還沒用 curl 傳上去、傳失敗了，或已經 finalize 過了（每個 upload_id 只能 finalize 一次）。",
+      "找不到這次上傳的檔案：可能還沒用 curl 傳上去，或傳失敗了。請先上傳，再呼叫一次 finalize_image_upload。",
     );
   }
   try {
@@ -325,12 +366,10 @@ export async function finalizeStagedUpload(uploadId: string, nowMs = Date.now())
       throw new McpInputError(`圖片 ${mb(data.size)}MB 超過上限 2MB。`);
     }
     const bytes = new Uint8Array(await data.arrayBuffer());
-    const declared = (Object.entries(MCP_IMAGE_TYPES).find(([, ext]) => ext === parsed.ext)?.[0] ??
-      null) as McpImageType | null;
     const validated = validateImageBytes(bytes, declared);
     const stored = await storeSiteImageBytes(validated.bytes);
     return { validated, stored };
   } finally {
-    await remove();
+    await tombstone();
   }
 }

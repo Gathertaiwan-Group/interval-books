@@ -1868,7 +1868,7 @@ export function registerContentTools(server: McpServer): void {
       title: "完成圖片直傳（檢查並存進網站）",
       description:
         "create_image_upload_url 的第二步：用 curl 傳完之後呼叫。伺服器讀回檔案，檢查 magic bytes（真的是 JPEG／PNG／WebP、與宣告一致）、尺寸、2MB 上限，" +
-        "合格才存進網站並回傳 key（storage:… 開頭）；不合格或超過 10 分鐘就刪掉暫存檔並回錯。每個 upload_id 只能 finalize 一次。" +
+        "合格才存進網站並回傳 key（storage:… 開頭）；不合格或超過 10 分鐘就作廢這張上傳網址並回錯。每個 upload_id 只能 finalize 一次（檔案還沒傳上去時可以傳好再呼叫）。" +
         "上傳後還要再呼叫 update_event、create_event 等工具把 key 填進 image_key，圖片才會出現在頁面上。",
       annotations: { ...WRITE, idempotentHint: false },
     },
@@ -1951,7 +1951,7 @@ export function registerContentTools(server: McpServer): void {
           "一般網址請改用 upload_image_from_url。",
       });
       const declared =
-        args.file.mime_type && args.file.mime_type in up.MCP_IMAGE_TYPES
+        args.file.mime_type && Object.hasOwn(up.MCP_IMAGE_TYPES, args.file.mime_type)
           ? args.file.mime_type
           : null;
       if (args.file.mime_type && !declared) {

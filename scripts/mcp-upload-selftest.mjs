@@ -22,7 +22,7 @@
  * 需要 Node ≥ 22.18（原生 TypeScript type stripping）＋ ≥ 22.15（module.registerHooks）。
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { registerHooks } from "node:module";
@@ -130,6 +130,15 @@ function freshMock() {
           return {
             upload: async (name, bytes, opts) => {
               m.storage.push({ bucket, op: "upload", name, opts, size: bytes.byteLength });
+              if (bucket === "mcp-image-uploads") {
+                if (m.staging.has(name) && !opts?.upsert) {
+                  return {
+                    data: null,
+                    error: { statusCode: "409", message: "The resource already exists" },
+                  };
+                }
+                m.staging.set(name, Buffer.from(bytes));
+              }
               return { data: { path: name }, error: null };
             },
             createSignedUploadUrl: async (name) => {
@@ -223,6 +232,8 @@ async function call(name, args, token) {
 }
 const KEY_RE = /^storage:[0-9a-f-]{36}\.(webp|jpg|png)$/;
 const siteUploads = (m) => m.storage.filter((s) => s.bucket === "site-images" && s.op === "upload");
+/** finalize 處理完之後：原路徑是 0 byte 墓碑（signed URL 之後只會 409）、有認領標記。 */
+const tombstoned = (m, id) => m.staging.get(id)?.length === 0 && m.staging.has(`used/${id}`);
 
 // -----------------------------------------------------------------------------
 console.log("\n[1] upload_image_base64");
@@ -428,9 +439,8 @@ let issued = null;
   );
   check("存進 site-images 一次", siteUploads(m).length, 1);
   checkTrue(
-    "暫存檔刪掉了",
-    m.storage.some((s) => s.op === "remove" && s.bucket === "mcp-image-uploads") &&
-      m.staging.size === 0,
+    "🔴 暫存檔換成 0 byte 墓碑＋認領標記（大檔不留、同一張 URL 之後只會 409）",
+    tombstoned(m, issued.upload_id),
   );
   const again = await call("finalize_image_upload", { upload_id: issued.upload_id });
   check(
@@ -442,10 +452,39 @@ let issued = null;
 {
   const m = reset();
   const id = up.newUploadId("image/png");
+  const early = await call("finalize_image_upload", { upload_id: id });
+  check("還沒傳就 finalize → 回錯、不存", [early.isError, siteUploads(m).length], [true, 0]);
+  check("認領標記收回了（傳好之後可以再 finalize）", m.staging.has(`used/${id}`), false);
+  m.staging.set(id, PNG_1x1);
+  const later = await call("finalize_image_upload", { upload_id: id });
+  check(
+    "傳好之後再 finalize → 成功",
+    [later.isError, siteUploads(m).length],
+    [false, 1],
+    later.text,
+  );
+}
+{
+  const m = reset();
+  const id = up.newUploadId("image/png");
+  m.staging.set(id, PNG_1x1);
+  const [a, b] = await Promise.all([
+    call("finalize_image_upload", { upload_id: id }),
+    call("finalize_image_upload", { upload_id: id }),
+  ]);
+  check(
+    "🔴 同時 finalize 兩次 → 只有一次成功、只存一份",
+    [[a.isError, b.isError].filter((x) => !x).length, siteUploads(m).length],
+    [1, 1],
+  );
+}
+{
+  const m = reset();
+  const id = up.newUploadId("image/png");
   m.staging.set(id, HTML);
   const r = await call("finalize_image_upload", { upload_id: id });
   check("🔴 直傳了 HTML（假裝 png）→ 擋下、不存", [r.isError, siteUploads(m).length], [true, 0]);
-  check("不合格的暫存檔也刪掉", m.staging.size, 0);
+  checkTrue("不合格的暫存檔也換成墓碑", tombstoned(m, id));
 }
 {
   const m = reset();
@@ -453,9 +492,9 @@ let issued = null;
   m.staging.set(id, Buffer.from(SVG));
   const r = await call("finalize_image_upload", { upload_id: id });
   check(
-    "🔴 直傳了 SVG → 擋下、刪掉",
-    [r.isError, siteUploads(m).length, m.staging.size],
-    [true, 0, 0],
+    "🔴 直傳了 SVG → 擋下、換成墓碑",
+    [r.isError, siteUploads(m).length, tombstoned(m, id)],
+    [true, 0, true],
   );
 }
 {
@@ -471,8 +510,8 @@ let issued = null;
   m.staging.set(id, PNG_1x1);
   const r = await call("finalize_image_upload", { upload_id: id });
   check(
-    "🔴 超過 10 分鐘 → 擋下、刪掉、不存",
-    [r.isError, siteUploads(m).length, m.staging.size],
+    "🔴 超過 10 分鐘 → 擋下、換成墓碑、不存",
+    [r.isError, siteUploads(m).length, m.staging.get(id)?.length],
     [true, 0, 0],
   );
   checkTrue("錯誤訊息叫你重新申請", r.text.includes("create_image_upload_url"), r.text);
@@ -537,6 +576,26 @@ const FILE = (url, extra = {}) => ({
     r.text,
   );
   check("擋在下載之前就拒絕的不會存", siteUploads(m).length, 0);
+}
+{
+  check(
+    "OpenAI 網域判斷（含子網域、拒絕仿冒）",
+    [
+      "files.oaiusercontent.com",
+      "oaiusercontent.com",
+      "cdn.openai.com",
+      "chatgpt.com",
+      "oaiusercontent.com.evil.com",
+      "evil-openai.com",
+      "openai.com.cn",
+    ].map(up.isOpenAIFileHost),
+    [true, true, true, true, false, false, false],
+  );
+  const remoteSrc = readFileSync(join(SRC, "server/mcp/remote-image.ts"), "utf8");
+  checkTrue(
+    "🔴 轉址目的地也要過白名單（每一跳都 checkHost）",
+    /url = checkHost\(assertUrlShape\(new URL\(hop\.location, url\)\.href\)\)/.test(remoteSrc),
+  );
 }
 {
   const m = reset();
