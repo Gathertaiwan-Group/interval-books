@@ -42,9 +42,9 @@ const PAGE_META = {
    * fitDescription() 會偵測）時才用。
    */
   description: {
-    zh: "小時光風土誌書店（Interval Books）在台北華山文創園區紅磚六合院西7-3館。以土地為線索選書，典藏台灣與日本的地方刊物，也舉辦讀書會、講座與工作坊，並帶你走進台東的文化策旅。",
-    en: "Interval Books is a bookstore of place in Taipei's Huashan 1914 park: books chosen by the land, local publications from Taiwan and Japan, talks, Taitung trips.",
-    ja: "小時光 風土誌書店（Interval Books）は台北・華山1914文化創意産業園区 紅煉瓦六合院 西7-3館の書店。土地を手がかりに本を選び、台湾と日本の地域誌を所蔵。読書会やトーク、ワークショップ、台東への旅も企画しています。",
+    zh: "小時光風土誌書店（Interval Books）在台北華山文創園區紅磚六合院西7-3館。以土地為線索選書，典藏台灣與日本的地方刊物，也舉辦讀書會、講座與工作坊，並帶你走進台灣各地的文化策旅。",
+    en: "Interval Books is a bookstore of place in Taipei's Huashan 1914 park: books chosen by the land, local publications from Taiwan and Japan, talks, and journeys across Taiwan.",
+    ja: "小時光 風土誌書店（Interval Books）は台北・華山1914文化創意産業園区 紅煉瓦六合院 西7-3館の書店。土地を手がかりに本を選び、台湾と日本の地域誌を所蔵。読書会やトーク、ワークショップ、台湾各地への旅も企画しています。",
   },
 };
 
@@ -118,9 +118,9 @@ const HOME = {
   },
   factArchiveUnit: { zh: "份地方刊物", en: "local publications", ja: "冊の地域刊行物" },
   factArchiveNote: {
-    zh: "台灣與日本，到店翻閱",
-    en: "From Taiwan and Japan, read in store",
-    ja: "台湾と日本、店頭で閲覧",
+    zh: "一本一本從各地收來，歡迎到店翻閱",
+    en: "Gathered one by one, open to browse in store",
+    ja: "一冊ずつ各地から集めて、店頭で閲覧できます",
   },
   factGatherValue: { zh: "每月", en: "Monthly", ja: "毎月" },
   factGatherUnit: { zh: "讀書會與講座", en: "reading circles & talks", ja: "読書会とトーク" },
@@ -166,9 +166,9 @@ const HOME = {
   goChar: { zh: "行", en: "Go", ja: "行" },
   goTitle: { zh: "走進土地的策旅", en: "Journeys into the land", ja: "土地へ歩み入る旅" },
   goBody: {
-    zh: "主理人 Alice 在台東另有一處人文空間 INNTERVAL 馥自然。我們從那裡出發，跟著書與作者走到現場——公東教堂、池上秋收。",
-    en: "Our founder Alice also runs INNTERVAL, a small cultural space in Taitung. From there we follow books and their authors to the places they describe — the Kung-Tung chapel, the Chishang harvest.",
-    ja: "店主 Alice は台東で INNTERVAL 馥自然という空間も営んでいます。そこを拠点に、本と作家に導かれて現地へ——公東教会、池上の秋の収穫。",
+    zh: "跟著書與作者走出書店，到故事發生的地方——一座教堂、一片稻田、一條老街。每一趟策旅，都是把書讀到現場。",
+    en: "We follow books and their authors out of the shop to the places they describe — a chapel, a rice field, an old street. Every journey is a way of reading on site.",
+    ja: "本と作家に導かれて書店を出て、物語の舞台へ——教会、田んぼ、古い街並み。どの旅も、本を現地で読むためのものです。",
   },
   goCta: { zh: "看策旅", en: "See journeys", ja: "旅を見る" },
   imgReadAlt: {
