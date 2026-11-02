@@ -1572,6 +1572,18 @@ export type AdminPhoneOrderOptions = {
   remittanceLast5: string | null;
 };
 
+/**
+ * 讀回電話報名訂單時，無法確定它已經**完整**建好（讀不到、或報名列還沒寫齊——同一個
+ * idempotencyKey 的第一個請求還在跑）。呼叫端**不可以**接著標記已收款，只能請店員
+ * 到列表確認；而且不可以說「訂單沒有成立」，因為它可能已經成立了。
+ */
+export class AdminPhoneOrderUncertainError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AdminPhoneOrderUncertainError";
+  }
+}
+
 export type PlacedAdminPhoneOrder = {
   orderId: string;
   orderNo: string;
@@ -1601,7 +1613,7 @@ export async function createAdminPhoneOrder(
     .maybeSingle();
   if (error || !data) {
     if (error) console.error(`[repo/orders] 電話報名讀回訂單失敗：${error.code} ${error.message}`);
-    throw new CheckoutError("order_failed");
+    throw new AdminPhoneOrderUncertainError("read_back_failed");
   }
   const row = data as unknown as {
     id: string;
@@ -1609,6 +1621,16 @@ export async function createAdminPhoneOrder(
     total: number;
     payment_status: string;
   };
+
+  // 重送短路（createOrder() 第 0 步）只看 orders 那一列在不在；同一個 key 的第一個請求
+  // 可能還在寫 order_items／占名額（而且之後還可能因名額不足整張刪掉）。報名列數要等於
+  // 這張單應有的座位數（priceLines() 已經強制 participants.length = 座位數），才算建好。
+  const expectedSeats = payload.items.reduce((n, it) => n + (it.participants?.length ?? 0), 0);
+  const { countOrderRegistrations } = await import("@/server/repos/phone-orders");
+  const registered = await countOrderRegistrations(row.id);
+  if (registered !== expectedSeats) {
+    throw new AdminPhoneOrderUncertainError("registrations_incomplete");
+  }
   return {
     orderId: row.id,
     orderNo: row.order_no,

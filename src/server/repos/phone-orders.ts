@@ -160,3 +160,19 @@ export async function loadAdminEmail(userId: string): Promise<string | null> {
   const email = (data as { email?: unknown } | null)?.email;
   return typeof email === "string" && email.trim() ? email.trim() : null;
 }
+
+/**
+ * 這張訂單已經寫進去幾位參加者。createAdminPhoneOrder() 用它確認「重送讀回來的那張單
+ * 已經建好」（見那裡的說明）。讀失敗回 -1（＝不確定）。
+ */
+export async function countOrderRegistrations(orderId: string): Promise<number> {
+  const { data, error } = await supabaseAdmin()
+    .from("event_registrations")
+    .select("id")
+    .eq("order_id", orderId);
+  if (error) {
+    console.error(`[repo/phone-orders] 讀報名列失敗：${error.code} ${error.message}`);
+    return -1;
+  }
+  return (data ?? []).length;
+}

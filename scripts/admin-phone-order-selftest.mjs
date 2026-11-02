@@ -256,8 +256,12 @@ const ALMOST_FULL = "00000000-0000-4000-8000-00000000000c";
 
 function world(opts = {}) {
   let inserted = null;
+  let seats = opts.existingSeats ?? 0;
   return {
     answer(q) {
+      if (q.table === "event_registrations" && q.op === "select") {
+        return { data: Array.from({ length: seats }, (_, i) => ({ id: `r${i}` })), error: null };
+      }
       if (q.table === "orders" && q.op === "select") {
         if (opts.existingOrder) return { data: opts.existingOrder, error: null };
         // createAdminPhoneOrder() 建完之後用 idempotency_key + source 讀回來。
@@ -310,6 +314,10 @@ function world(opts = {}) {
         if (r) return r;
       }
       if (name === "commit_inventory_reservations") return { data: 0, error: null };
+      if (name === "reserve_session_seat") {
+        seats += args.p_participants.length;
+        return { data: args.p_quantity, error: null };
+      }
       if (name === "settle_free_order") {
         return { data: [{ settled: true, reason: "settled", order_no: "IB-TEST" }], error: null };
       }
@@ -373,7 +381,7 @@ async function run(w, data) {
   } catch (err) {
     return {
       ok: false,
-      code: err?.code ?? String(err),
+      code: err?.code ?? err?.name ?? String(err),
       log: db.log,
       notified: globalThis.__notified,
     };
@@ -518,8 +526,39 @@ console.log("\n[8] 重複送出（同一個 idempotencyKey）");
     }),
     input(),
   );
-  checkTrue("回原本那張單", res.ok && res.r.orderId === "o-old");
+  check(
+    "報名還沒寫齊（第一個請求還在跑）→ 結果不確定，不讓呼叫端標記已收款",
+    res.code,
+    "AdminPhoneOrderUncertainError",
+  );
   check("🔴 沒有第二次 insert、沒有再占名額", wrote(res.log).length, 0);
+
+  const done = await run(
+    world({
+      existingSeats: 2,
+      existingOrder: {
+        id: "o-old",
+        order_no: "IB-OLD",
+        public_token: "tok-old",
+        total: 2400,
+        status: "processing",
+        payment_status: "paid",
+        payment_method: "transfer",
+      },
+    }),
+    input(),
+  );
+  checkTrue("第一個請求已完成 → 回原本那張單", done.ok && done.r.orderId === "o-old");
+  check("   一樣沒有任何寫入", wrote(done.log).length, 0);
+}
+
+console.log("\n[8b] 不勾寄信 → 不把信箱交給光貿（發票開立通知）");
+{
+  const inv = stripComments(readFile("src/server/repos/invoices.ts"));
+  checkTrue(
+    "getOrderForInvoice 讀 notify_customer，false 時 customerEmail 給空字串",
+    /notify_customer/.test(inv) && /o\.notify_customer === false \? ""/.test(inv),
+  );
 }
 
 console.log("\n[9] 前台結帳的 insert 形狀沒變");

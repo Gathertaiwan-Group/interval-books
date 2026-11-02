@@ -50,7 +50,8 @@ export const createPhoneOrderAdmin = createServerFn({ method: "POST" })
   .inputValidator(phoneOrderSchema)
   .handler(async ({ data, context }): Promise<CreatePhoneOrderResult> => {
     const { buildPhoneOrderPayload, phoneOrderPaidNote } = await import("@/lib/admin/phone-order");
-    const { createAdminPhoneOrder } = await import("@/server/repos/orders");
+    const { createAdminPhoneOrder, AdminPhoneOrderUncertainError } =
+      await import("@/server/repos/orders");
     const { CheckoutError, CHECKOUT_ERROR_COPY } = await import("@/lib/checkout");
 
     let placed;
@@ -67,6 +68,15 @@ export const createPhoneOrderAdmin = createServerFn({ method: "POST" })
           data.payment.status === "paid" && data.payment.last5 ? data.payment.last5 : null,
       });
     } catch (err) {
+      if (err instanceof AdminPhoneOrderUncertainError) {
+        // 訂單可能已經成立（或同一筆送出還在處理中）——不標記已收款、也不說「沒有成立」。
+        console.error(`[admin/phone-orders] 建單結果不確定：${err.message}`);
+        return {
+          ok: false,
+          message:
+            "這筆報名可能已經建立（或還在處理中）。請先到訂單列表的「後台電話報名」分頁確認，不要再送一次。",
+        };
+      }
       if (err instanceof CheckoutError) {
         return {
           ok: false,

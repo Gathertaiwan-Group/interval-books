@@ -234,7 +234,7 @@ export async function getOrderForInvoice(
     db
       .from("orders")
       .select(
-        "id, order_no, customer_name, customer_email, subtotal, shipping_fee, discount, total, payment_status",
+        "id, order_no, customer_name, customer_email, subtotal, shipping_fee, discount, total, payment_status, notify_customer",
       )
       .eq("id", orderId)
       .maybeSingle(),
@@ -259,7 +259,9 @@ export async function getOrderForInvoice(
       id: String(o.id),
       orderNo: String(o.order_no),
       customerName: String(o.customer_name ?? ""),
-      customerEmail: String(o.customer_email ?? ""),
+      // 0050：後台電話報名沒勾「寄信給客人」→ 不把信箱送給 Amego（BuyerEmailAddress 是選填；
+      // 送了光貿會寄發票開立通知給客人）。發票照開，號碼在後台訂單頁看得到。
+      customerEmail: o.notify_customer === false ? "" : String(o.customer_email ?? ""),
       subtotal: Number(o.subtotal ?? 0),
       shippingFee: Number(o.shipping_fee ?? 0),
       discount: Number(o.discount ?? 0),
