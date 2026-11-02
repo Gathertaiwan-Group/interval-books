@@ -13,9 +13,11 @@
  */
 import { supabase } from "@/lib/supabase";
 import type { Localized } from "@/i18n/types";
+import { caseInsensitiveMatch, exactIlikePattern } from "@/lib/seo/core";
 
-/** 原始 Excel 的兩張工作表。對應 publications.sheet 的 CHECK。 */
-export type PublicationSheet = "tw" | "jp";
+import { regionGroupOf, type PublicationSheet } from "./publication-regions";
+
+export type { PublicationSheet } from "./publication-regions";
 
 export type PublicationEntry = {
   id: string;
@@ -89,23 +91,14 @@ function toEntry(r: Row): PublicationEntry | null {
 
 /**
  * Card-shaped publication — everything PublicationEntry has except `intro`
- * and `externalUrl`. Both fields only ever appear inside the "刊物介紹"
- * expand panel in PublicationsPanel.tsx, which starts closed for every card
- * and never runs a route loader on toggle (same "loader preloads once, no
- * per-interaction refetch" shape as the rest of this storefront). /shop's
- * loader used to preload all 126 publications' `intro` up front regardless —
- * measured at roughly 227KB of the page's ~330KB SSR payload (2026-09 前台
- * 載入速度優化), almost all of it text nobody reads unless they click "+" on
- * that specific title.
+ * and `externalUrl`. /shop's loader used to preload all 126 publications'
+ * `intro` up front — measured at roughly 227KB of the page's ~330KB SSR
+ * payload (2026-09 前台載入速度優化).
  *
- * fetchPublicationsForList() below is the list-safe read (used by /shop);
- * fetchPublicationDetail() fetches the two omitted fields for exactly one
- * publication, on demand, when its card is expanded — see
- * PublicationsPanel.tsx. fetchPublications() above is left untouched (still
- * correct, just currently unused after this change) rather than deleted,
- * matching this file's existing functions/types, which nothing else in the
- * repo imports as of this writing — a later cleanup pass can remove it once
- * that is confirmed to still hold.
+ * 2026-11（M4）起，介紹文住在每一本自己的頁面 /publications/$slug（SSR 輸出、
+ * fetchPublicationBySlug()），列表卡片直接連過去；原本「點開卡片才現查介紹」的
+ * fetchPublicationDetail() 已經沒有呼叫端，一併拿掉。列表仍然不帶 intro。
+ * fetchPublications() 仍然沒有呼叫端，保留原樣。
  */
 export type PublicationListEntry = Omit<PublicationEntry, "intro" | "externalUrl">;
 
@@ -172,41 +165,92 @@ export async function fetchPublicationsForList(): Promise<PublicationListResult>
 }
 
 /**
- * The two fields a publication card only needs once expanded. Runs the same
- * anon client as every other read in this file (see the header — RLS, not
- * this function, is what keeps unpublished rows out of reach), called
- * directly from the browser by PublicationsPanel's "刊物介紹" toggle.
+ * 一本刊物的完整資料（/publications/$slug，2026-11 M4）。intro 只在這裡、在 SSR 讀——
+ * 列表（fetchPublicationsForList）仍然不帶 intro，理由見上面 PublicationListEntry 的檔頭。
  *
- * `null` means "could not read it" — the caller must show a temporarily-
- * unavailable state, never blank text standing in for a real (empty) intro.
- * `id` comes from a row the visitor can already see in the list they were
- * just shown, so this is not exposing anything fetchPublicationsForList()
- * did not already make visible for that same row.
+ * 回傳語意與 src/lib/shop.ts#fetchActiveProductBySlug 相同：
+ *   publication: null + unavailable: false → 查無此刊物（路由回 404）
+ *   publication: null + unavailable: true  → 讀取失敗（路由回 503，不讓爬蟲以為頁面不見了）
  */
-export async function fetchPublicationDetail(
-  id: string,
-): Promise<{ intro: Localized; externalUrl: string | null } | null> {
+export async function fetchPublicationBySlug(
+  slug: string,
+): Promise<{ publication: PublicationEntry | null; unavailable: boolean }> {
   const db = supabase;
-  if (!db) return null;
+  if (!db) return { publication: null, unavailable: true };
   try {
     const { data, error } = await db
       .from("publications")
-      .select("intro, external_url")
-      .eq("id", id)
+      .select(COLUMNS)
+      .eq("slug", slug)
       .eq("is_published", true)
       .maybeSingle();
-    if (error || !data) {
-      console.warn(`[publications] detail unavailable for ${id} — ${error?.message ?? "no row"}`);
-      return null;
+    if (error) {
+      console.warn(`[publications] detail unavailable for ${slug} — ${error.message}`);
+      return { publication: null, unavailable: true };
     }
-    const row = data as unknown as Row;
-    const intro = loc(row.intro);
-    if (!intro) return null;
-    return { intro, externalUrl: nullableStr(row.external_url) };
+    if (!data) return { publication: null, unavailable: false };
+    const entry = toEntry(data as unknown as Row);
+    // 列存在但三語欄位壞掉：當成讀取失敗（503），不是 404——那一本確實在。
+    return entry
+      ? { publication: entry, unavailable: false }
+      : { publication: null, unavailable: true };
   } catch (err) {
     console.warn(
-      `[publications] detail unavailable for ${id} — ${err instanceof Error ? err.message : String(err)}`,
+      `[publications] detail unavailable for ${slug} — ${err instanceof Error ? err.message : String(err)}`,
     );
+    return { publication: null, unavailable: true };
+  }
+}
+
+/**
+ * /publications/TW-001 → 不分大小寫再找一次，剛好一筆而且大小寫不同才回傳正確寫法
+ * （路由 301 過去）。與 shop.ts#findActiveProductSlugIgnoringCase 同一套。
+ */
+export async function findPublicationSlugIgnoringCase(slug: string): Promise<string | null> {
+  const db = supabase;
+  const pattern = exactIlikePattern(slug);
+  if (!db || !pattern) return null;
+  try {
+    const { data, error } = await db
+      .from("publications")
+      .select("slug")
+      .eq("is_published", true)
+      .ilike("slug", pattern)
+      .limit(5);
+    if (error || !Array.isArray(data)) return null;
+    return caseInsensitiveMatch(
+      slug,
+      (data as unknown as Row[]).map((r) => String(r.slug ?? "")),
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 某件商品對應的刊物（/shop/$slug 用：有對應刊物的商品頁，canonical 指向刊物頁）。
+ * 讀不到、沒有對應 → null（商品頁照原樣自我 canonical）。
+ */
+export async function fetchPublicationForProduct(
+  productId: string,
+): Promise<{ slug: string; title: Localized; intro: Localized } | null> {
+  const db = supabase;
+  if (!db || !productId) return null;
+  try {
+    const { data, error } = await db
+      .from("publications")
+      .select("slug, title, intro")
+      .eq("product_id", productId)
+      .eq("is_published", true)
+      .order("seq", { ascending: true })
+      .limit(1);
+    if (error || !Array.isArray(data) || data.length === 0) return null;
+    const row = data[0] as unknown as Row;
+    const title = loc(row.title);
+    const intro = loc(row.intro);
+    if (typeof row.slug !== "string" || !row.slug || !title || !intro) return null;
+    return { slug: row.slug, title, intro };
+  } catch {
     return null;
   }
 }
@@ -245,129 +289,16 @@ export async function fetchPublications(): Promise<PublicationsResult> {
 }
 
 // -----------------------------------------------------------------------------
-// 關注地域的粗分類
+// 關注地域的粗分類 —— 規則在 ./publication-regions.ts（純函式，selftest 直接 import）。
 // -----------------------------------------------------------------------------
-/**
- * publications.region 是原文照抄的自由文字：「基隆-八斗子」「坪林北勢溪流域」
- * 「日本全國」「南部農漁村」都是原始資料裡的寫法。要能篩選就得有粗分類，而粗分類
- * 放在這裡而不是資料庫裡，理由有兩個：
- *
- *   1. 分類規則會改（今天「東北角」算新北，明天可能想獨立成一組），而原文不會改。
- *      規則寫在程式碼裡，改規則是一次部署；寫進資料庫就變成一次資料遷移。
- *   2. 原文才是可核對的東西。後台編輯的是原文，不是分類 —— 沒有人要維護第二份
- *      互相矛盾的欄位。
- *
- * 比對方式是**依序**找第一個出現的關鍵字，所以順序有意義：「新北」要排在
- * 「坪林／淡水／竹圍」這些鄉鎮名之前沒有關係（它們互不包含），但「高雄-屏東」
- * 這種橫跨兩地的寫法會落在先出現的那一組。
- */
-type RegionGroup = {
-  key: string;
-  label: Localized;
-  /** 只要 region 含有其中任一字串就歸到這一組。 */
-  match: string[];
-};
-
-const TW_GROUPS: RegionGroup[] = [
-  { key: "keelung", label: { zh: "基隆", en: "Keelung", ja: "基隆" }, match: ["基隆"] },
-  {
-    key: "new-taipei",
-    label: { zh: "新北", en: "New Taipei", ja: "新北" },
-    match: ["新北", "坪林", "淡水", "竹圍", "東北角"],
-  },
-  { key: "taipei", label: { zh: "台北", en: "Taipei", ja: "台北" }, match: ["台北", "臺北"] },
-  { key: "taoyuan", label: { zh: "桃園", en: "Taoyuan", ja: "桃園" }, match: ["桃園"] },
-  { key: "hsinchu", label: { zh: "新竹", en: "Hsinchu", ja: "新竹" }, match: ["新竹"] },
-  { key: "miaoli", label: { zh: "苗栗", en: "Miaoli", ja: "苗栗" }, match: ["苗栗"] },
-  { key: "taichung", label: { zh: "台中", en: "Taichung", ja: "台中" }, match: ["台中", "臺中"] },
-  { key: "changhua", label: { zh: "彰化", en: "Changhua", ja: "彰化" }, match: ["彰化", "鹿港"] },
-  { key: "nantou", label: { zh: "南投", en: "Nantou", ja: "南投" }, match: ["南投"] },
-  { key: "chiayi", label: { zh: "嘉義", en: "Chiayi", ja: "嘉義" }, match: ["嘉義"] },
-  {
-    key: "tainan",
-    label: { zh: "台南", en: "Tainan", ja: "台南" },
-    match: ["台南", "臺南", "曾文溪"],
-  },
-  {
-    key: "kaohsiung",
-    label: { zh: "高雄", en: "Kaohsiung", ja: "高雄" },
-    match: ["高雄", "美濃", "鹽埕"],
-  },
-  { key: "pingtung", label: { zh: "屏東", en: "Pingtung", ja: "屏東" }, match: ["屏東"] },
-  { key: "yilan", label: { zh: "宜蘭", en: "Yilan", ja: "宜蘭" }, match: ["宜蘭", "龜山島"] },
-  { key: "hualien", label: { zh: "花蓮", en: "Hualien", ja: "花蓮" }, match: ["花蓮"] },
-  {
-    key: "taitung",
-    label: { zh: "台東", en: "Taitung", ja: "台東" },
-    match: ["台東", "臺東", "綠島", "蘭嶼"],
-  },
-  { key: "penghu", label: { zh: "澎湖", en: "Penghu", ja: "澎湖" }, match: ["澎湖"] },
-  { key: "kinmen", label: { zh: "金門", en: "Kinmen", ja: "金門" }, match: ["金門"] },
-  { key: "hongkong", label: { zh: "香港", en: "Hong Kong", ja: "香港" }, match: ["香港"] },
-];
-
-const JP_GROUPS: RegionGroup[] = [
-  { key: "hokkaido", label: { zh: "北海道", en: "Hokkaido", ja: "北海道" }, match: ["北海道"] },
-  { key: "akita", label: { zh: "秋田", en: "Akita", ja: "秋田" }, match: ["秋田"] },
-  { key: "yamagata", label: { zh: "山形", en: "Yamagata", ja: "山形" }, match: ["山形"] },
-  { key: "fukushima", label: { zh: "福島", en: "Fukushima", ja: "福島" }, match: ["福島", "福嶋"] },
-  { key: "tochigi", label: { zh: "栃木", en: "Tochigi", ja: "栃木" }, match: ["栃木"] },
-  { key: "yamanashi", label: { zh: "山梨", en: "Yamanashi", ja: "山梨" }, match: ["山梨"] },
-  {
-    key: "kanagawa",
-    label: { zh: "神奈川", en: "Kanagawa", ja: "神奈川" },
-    match: ["神奈川"],
-  },
-  { key: "nara", label: { zh: "奈良", en: "Nara", ja: "奈良" }, match: ["奈良"] },
-  { key: "shimane", label: { zh: "島根", en: "Shimane", ja: "島根" }, match: ["島根"] },
-  { key: "kyushu", label: { zh: "九州", en: "Kyushu", ja: "九州" }, match: ["九州"] },
-  {
-    key: "nationwide",
-    label: { zh: "日本全國", en: "Nationwide", ja: "日本全国" },
-    match: ["日本全國", "日本全国"],
-  },
-];
-
-/** 落不進任何一組的：跨區域、全台、主題性的，以及原始資料填錯的那一筆。 */
-export const REGION_GROUP_OTHER: RegionGroup = {
-  key: "other",
-  label: { zh: "跨區域／其他", en: "Cross-region / Other", ja: "広域・その他" },
-  match: [],
-};
-
-export function regionGroupsFor(sheet: PublicationSheet): RegionGroup[] {
-  return sheet === "tw" ? TW_GROUPS : JP_GROUPS;
-}
-
-/**
- * 一本刊物的地域分類鍵。找不到就是 REGION_GROUP_OTHER.key。
- *
- * 參數型別是 PublicationListEntry（2026-09）：只讀 sheet/region，intro／
- * externalUrl 從來沒被用過。PublicationEntry 仍然能直接傳進來（它是
- * PublicationListEntry 多兩個欄位），呼叫端不必轉型。
- */
-export function regionGroupOf(entry: Pick<PublicationListEntry, "sheet" | "region">): string {
-  for (const g of regionGroupsFor(entry.sheet)) {
-    if (g.match.some((m) => entry.region.includes(m))) return g.key;
-  }
-  return REGION_GROUP_OTHER.key;
-}
-
-/** 這批刊物實際用到的地域分類，照 regionGroupsFor 的順序，其他放最後。 */
-export function presentRegionGroups(
-  entries: PublicationListEntry[],
-  sheet: PublicationSheet,
-): RegionGroup[] {
-  const used = new Set(entries.filter((e) => e.sheet === sheet).map(regionGroupOf));
-  const groups = regionGroupsFor(sheet).filter((g) => used.has(g.key));
-  if (used.has(REGION_GROUP_OTHER.key)) groups.push(REGION_GROUP_OTHER);
-  return groups;
-}
-
-export const SHEET_LABELS: Record<PublicationSheet, Localized> = {
-  tw: { zh: "台灣刊物", en: "Taiwan", ja: "台湾の刊行物" },
-  jp: { zh: "日本刊物", en: "Japan", ja: "日本の刊行物" },
-};
+export {
+  REGION_GROUP_OTHER,
+  presentRegionGroups,
+  regionGroupOf,
+  regionGroupsFor,
+  SHEET_LABELS,
+  type RegionGroup,
+} from "./publication-regions";
 
 // -----------------------------------------------------------------------------
 // 首頁「地方刊物典藏」區塊（2026-11 首頁改版）

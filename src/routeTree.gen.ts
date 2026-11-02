@@ -20,7 +20,6 @@ import { Route as JourneysRouteImport } from './routes/journeys'
 import { Route as NewsRouteImport } from './routes/news'
 import { Route as PartnershipRouteImport } from './routes/partnership'
 import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as PublicationsRouteImport } from './routes/publications'
 import { Route as VisitRouteImport } from './routes/visit'
 import { Route as AccountForgotRouteImport } from './routes/account_.forgot'
 import { Route as AccountLoginRouteImport } from './routes/account_.login'
@@ -39,6 +38,8 @@ import { Route as EventsKungtungRouteImport } from './routes/events.kungtung'
 import { Route as EventsSoundOfTheSeaRouteImport } from './routes/events.sound-of-the-sea'
 import { Route as NewsSplatRouteImport } from './routes/news.$'
 import { Route as OauthAuthorizeRouteImport } from './routes/oauth/authorize'
+import { Route as PublicationsIndexRouteImport } from './routes/publications.index'
+import { Route as PublicationsSlugRouteImport } from './routes/publications.$slug'
 import { Route as ShopIndexRouteImport } from './routes/shop.index'
 import { Route as ShopSlugRouteImport } from './routes/shop.$slug'
 import { Route as VendorShellRouteImport } from './routes/vendor/_shell'
@@ -178,11 +179,6 @@ const PrivacyRoute = PrivacyRouteImport.update({
   path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PublicationsRoute = PublicationsRouteImport.update({
-  id: '/publications',
-  path: '/publications',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const VisitRoute = VisitRouteImport.update({
   id: '/visit',
   path: '/visit',
@@ -271,6 +267,16 @@ const NewsSplatRoute = NewsSplatRouteImport.update({
 const OauthAuthorizeRoute = OauthAuthorizeRouteImport.update({
   id: '/oauth/authorize',
   path: '/oauth/authorize',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PublicationsIndexRoute = PublicationsIndexRouteImport.update({
+  id: '/publications/',
+  path: '/publications/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PublicationsSlugRoute = PublicationsSlugRouteImport.update({
+  id: '/publications/$slug',
+  path: '/publications/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopIndexRoute = ShopIndexRouteImport.update({
@@ -741,7 +747,6 @@ export interface FileRoutesByFullPath {
   '/news': typeof NewsRouteWithChildren
   '/partnership': typeof PartnershipRoute
   '/privacy': typeof PrivacyRoute
-  '/publications': typeof PublicationsRoute
   '/visit': typeof VisitRoute
   '/account/forgot': typeof AccountForgotRoute
   '/account/login': typeof AccountLoginRoute
@@ -758,12 +763,14 @@ export interface FileRoutesByFullPath {
   '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
   '/news/$': typeof NewsSplatRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
+  '/publications/$slug': typeof PublicationsSlugRoute
   '/shop/$slug': typeof ShopSlugRoute
   '/vendor': typeof VendorShellRouteWithChildren
   '/vendor/login': typeof VendorLoginRoute
   '/vendor/pending': typeof VendorPendingRoute
   '/checkout/': typeof CheckoutIndexRoute
   '/events/': typeof EventsIndexRoute
+  '/publications/': typeof PublicationsIndexRoute
   '/shop/': typeof ShopIndexRoute
   '/admin/artists': typeof AdminShellArtistsRoute
   '/admin/categories': typeof AdminShellCategoriesRoute
@@ -856,7 +863,6 @@ export interface FileRoutesByTo {
   '/news': typeof NewsRouteWithChildren
   '/partnership': typeof PartnershipRoute
   '/privacy': typeof PrivacyRoute
-  '/publications': typeof PublicationsRoute
   '/visit': typeof VisitRoute
   '/account/forgot': typeof AccountForgotRoute
   '/account/login': typeof AccountLoginRoute
@@ -872,11 +878,13 @@ export interface FileRoutesByTo {
   '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
   '/news/$': typeof NewsSplatRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
+  '/publications/$slug': typeof PublicationsSlugRoute
   '/shop/$slug': typeof ShopSlugRoute
   '/vendor/login': typeof VendorLoginRoute
   '/vendor/pending': typeof VendorPendingRoute
   '/checkout': typeof CheckoutIndexRoute
   '/events': typeof EventsIndexRoute
+  '/publications': typeof PublicationsIndexRoute
   '/shop': typeof ShopIndexRoute
   '/admin/artists': typeof AdminShellArtistsRoute
   '/admin/categories': typeof AdminShellCategoriesRoute
@@ -966,7 +974,6 @@ export interface FileRoutesById {
   '/news': typeof NewsRouteWithChildren
   '/partnership': typeof PartnershipRoute
   '/privacy': typeof PrivacyRoute
-  '/publications': typeof PublicationsRoute
   '/visit': typeof VisitRoute
   '/account_/forgot': typeof AccountForgotRoute
   '/account_/login': typeof AccountLoginRoute
@@ -983,12 +990,14 @@ export interface FileRoutesById {
   '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
   '/news/$': typeof NewsSplatRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
+  '/publications/$slug': typeof PublicationsSlugRoute
   '/shop/$slug': typeof ShopSlugRoute
   '/vendor/_shell': typeof VendorShellRouteWithChildren
   '/vendor/login': typeof VendorLoginRoute
   '/vendor/pending': typeof VendorPendingRoute
   '/checkout/': typeof CheckoutIndexRoute
   '/events/': typeof EventsIndexRoute
+  '/publications/': typeof PublicationsIndexRoute
   '/shop/': typeof ShopIndexRoute
   '/admin/_shell/artists': typeof AdminShellArtistsRoute
   '/admin/_shell/categories': typeof AdminShellCategoriesRoute
@@ -1083,7 +1092,6 @@ export interface FileRouteTypes {
     | '/news'
     | '/partnership'
     | '/privacy'
-    | '/publications'
     | '/visit'
     | '/account/forgot'
     | '/account/login'
@@ -1100,12 +1108,14 @@ export interface FileRouteTypes {
     | '/events/sound-of-the-sea'
     | '/news/$'
     | '/oauth/authorize'
+    | '/publications/$slug'
     | '/shop/$slug'
     | '/vendor'
     | '/vendor/login'
     | '/vendor/pending'
     | '/checkout/'
     | '/events/'
+    | '/publications/'
     | '/shop/'
     | '/admin/artists'
     | '/admin/categories'
@@ -1198,7 +1208,6 @@ export interface FileRouteTypes {
     | '/news'
     | '/partnership'
     | '/privacy'
-    | '/publications'
     | '/visit'
     | '/account/forgot'
     | '/account/login'
@@ -1214,11 +1223,13 @@ export interface FileRouteTypes {
     | '/events/sound-of-the-sea'
     | '/news/$'
     | '/oauth/authorize'
+    | '/publications/$slug'
     | '/shop/$slug'
     | '/vendor/login'
     | '/vendor/pending'
     | '/checkout'
     | '/events'
+    | '/publications'
     | '/shop'
     | '/admin/artists'
     | '/admin/categories'
@@ -1307,7 +1318,6 @@ export interface FileRouteTypes {
     | '/news'
     | '/partnership'
     | '/privacy'
-    | '/publications'
     | '/visit'
     | '/account_/forgot'
     | '/account_/login'
@@ -1324,12 +1334,14 @@ export interface FileRouteTypes {
     | '/events/sound-of-the-sea'
     | '/news/$'
     | '/oauth/authorize'
+    | '/publications/$slug'
     | '/shop/$slug'
     | '/vendor/_shell'
     | '/vendor/login'
     | '/vendor/pending'
     | '/checkout/'
     | '/events/'
+    | '/publications/'
     | '/shop/'
     | '/admin/_shell/artists'
     | '/admin/_shell/categories'
@@ -1423,7 +1435,6 @@ export interface RootRouteChildren {
   NewsRoute: typeof NewsRouteWithChildren
   PartnershipRoute: typeof PartnershipRoute
   PrivacyRoute: typeof PrivacyRoute
-  PublicationsRoute: typeof PublicationsRoute
   VisitRoute: typeof VisitRoute
   AccountForgotRoute: typeof AccountForgotRoute
   AccountLoginRoute: typeof AccountLoginRoute
@@ -1439,12 +1450,14 @@ export interface RootRouteChildren {
   EventsKungtungRoute: typeof EventsKungtungRoute
   EventsSoundOfTheSeaRoute: typeof EventsSoundOfTheSeaRoute
   OauthAuthorizeRoute: typeof OauthAuthorizeRoute
+  PublicationsSlugRoute: typeof PublicationsSlugRoute
   ShopSlugRoute: typeof ShopSlugRoute
   VendorShellRoute: typeof VendorShellRouteWithChildren
   VendorLoginRoute: typeof VendorLoginRoute
   VendorPendingRoute: typeof VendorPendingRoute
   CheckoutIndexRoute: typeof CheckoutIndexRoute
   EventsIndexRoute: typeof EventsIndexRoute
+  PublicationsIndexRoute: typeof PublicationsIndexRoute
   ShopIndexRoute: typeof ShopIndexRoute
   EventsKungtungHostsAliceRoute: typeof EventsKungtungHostsAliceRoute
   EventsKungtungHostsFanYishunRoute: typeof EventsKungtungHostsFanYishunRoute
@@ -1527,13 +1540,6 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/publications': {
-      id: '/publications'
-      path: '/publications'
-      fullPath: '/publications'
-      preLoaderRoute: typeof PublicationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/visit': {
@@ -1660,6 +1666,20 @@ declare module '@tanstack/react-router' {
       path: '/oauth/authorize'
       fullPath: '/oauth/authorize'
       preLoaderRoute: typeof OauthAuthorizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/publications/': {
+      id: '/publications/'
+      path: '/publications'
+      fullPath: '/publications/'
+      preLoaderRoute: typeof PublicationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/publications/$slug': {
+      id: '/publications/$slug'
+      path: '/publications/$slug'
+      fullPath: '/publications/$slug'
+      preLoaderRoute: typeof PublicationsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop/': {
@@ -2518,7 +2538,6 @@ const rootRouteChildren: RootRouteChildren = {
   NewsRoute: NewsRouteWithChildren,
   PartnershipRoute: PartnershipRoute,
   PrivacyRoute: PrivacyRoute,
-  PublicationsRoute: PublicationsRoute,
   VisitRoute: VisitRoute,
   AccountForgotRoute: AccountForgotRoute,
   AccountLoginRoute: AccountLoginRoute,
@@ -2534,12 +2553,14 @@ const rootRouteChildren: RootRouteChildren = {
   EventsKungtungRoute: EventsKungtungRoute,
   EventsSoundOfTheSeaRoute: EventsSoundOfTheSeaRoute,
   OauthAuthorizeRoute: OauthAuthorizeRoute,
+  PublicationsSlugRoute: PublicationsSlugRoute,
   ShopSlugRoute: ShopSlugRoute,
   VendorShellRoute: VendorShellRouteWithChildren,
   VendorLoginRoute: VendorLoginRoute,
   VendorPendingRoute: VendorPendingRoute,
   CheckoutIndexRoute: CheckoutIndexRoute,
   EventsIndexRoute: EventsIndexRoute,
+  PublicationsIndexRoute: PublicationsIndexRoute,
   ShopIndexRoute: ShopIndexRoute,
   EventsKungtungHostsAliceRoute: EventsKungtungHostsAliceRoute,
   EventsKungtungHostsFanYishunRoute: EventsKungtungHostsFanYishunRoute,

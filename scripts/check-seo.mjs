@@ -9,6 +9,9 @@
  *   - robots.txt 有 Sitemap 一行、擋後台；sitemap.xml 是合法 XML，抽查網址都回 200
  *   - 轉址：尾斜線 308／301、/EVENTS 301 到 /events；?utm_source 的 canonical 是乾淨網址
  *   - noindex：/admin/login 有 robots noindex 與 X-Robots-Tag；404 頁回 404 且 noindex
+ *   - 地方刊物（2026-11 M4）：/publications 總覽、/publications/<slug> 的 SSR 內容（介紹、購買或
+ *     到店翻閱、同地區推薦）、404／大小寫 301、/shop/pub-* 與 /shop?tab=publications 的 canonical
+ *     指向刊物頁、sitemap 刊物頁三語數量（見 checkPublications()）
  *   - 英日文網址（2026-11 /en /ja）：<html lang>、canonical 指自己、hreflang 三語＋x-default 且
  *     互相對應、站內連結帶前綴、中文限定著陸頁的英日版 noindex、私密頁 404、轉址、Vary、
  *     sitemap 的 xhtml:link（見 checkLanguageVersions()）
@@ -131,6 +134,12 @@ function requiredFieldProblems(n) {
       need(/^https:\/\//.test(it.item ?? ""), `ListItem[${i}].item 絕對網址`);
     });
   }
+  if (t.includes("Book")) {
+    need(n.name, "Book.name");
+    need(/^https:\/\//.test(n.url ?? ""), "Book.url 絕對網址");
+    need(n.description, "Book.description");
+    need(n.publisher?.name, "Book.publisher");
+  }
   if (t.includes("BookStore")) {
     need(n.name, "BookStore.name");
     need(n.address?.streetAddress, "BookStore.address");
@@ -208,17 +217,24 @@ const PAGES = [
   },
   { path: "/journeys", canonical: `${ORIGIN}/journeys`, ld: ["Organization"] },
   { path: "/shop", canonical: `${ORIGIN}/shop`, ld: ["Organization"] },
+  // 2026-11 M4：地方刊物有自己的總覽頁與每一本的頁。/shop?tab=publications、/shop/pub-*
+  // 的 canonical 改指向刊物頁，改在 checkPublications() 檢查（它們的 og:url ≠ 自己的網址）。
   {
-    path: "/shop?tab=publications",
-    canonical: `${ORIGIN}/shop?tab=publications`,
-    ld: ["Organization"],
+    path: "/publications",
+    canonical: `${ORIGIN}/publications`,
+    ld: ["Organization", "BreadcrumbList"],
+  },
+  {
+    path: "/publications/tw-001",
+    canonical: `${ORIGIN}/publications/tw-001`,
+    ld: ["Book", "Product", "BreadcrumbList"],
+  },
+  {
+    path: "/publications/tw-003",
+    canonical: `${ORIGIN}/publications/tw-003`,
+    ld: ["Book", "BreadcrumbList"],
   },
   { path: "/shop?tab=curated", canonical: `${ORIGIN}/shop?tab=curated`, ld: ["Organization"] },
-  {
-    path: "/shop/pub-tw-001",
-    canonical: `${ORIGIN}/shop/pub-tw-001`,
-    ld: ["Product", "BreadcrumbList"],
-  },
   { path: "/about", canonical: `${ORIGIN}/about`, ld: ["BookStore"] },
   { path: "/partnership", canonical: `${ORIGIN}/partnership`, ld: ["Organization"] },
   { path: "/curation", canonical: `${ORIGIN}/curation`, ld: ["Organization"] },
@@ -575,8 +591,9 @@ const LANG_PAGES = [
   "/events/InntervalChishang.1023",
   "/journeys",
   "/shop",
-  "/shop?tab=publications",
-  "/shop/pub-tw-001",
+  "/publications",
+  "/publications/tw-001",
+  "/publications/tw-003",
   "/about",
   "/curation",
   "/privacy",
@@ -739,11 +756,144 @@ async function checkLanguageVersions() {
   }
 }
 
+// =============================================================================
+// 地方刊物（2026-11 SEO 健檢 M4）
+// =============================================================================
+
+const textOf = (html) =>
+  decode(html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+const hrefsOf = (html) => [...html.matchAll(/<a\b[^>]*>/g)].map((m) => attrsOf(m[0]).href ?? "");
+
+async function checkPublications() {
+  console.log("\n[地方刊物]");
+  const index = await get("/publications");
+  const indexHtml = await index.text();
+  ok(`/publications 200（不再 301）`, index.status === 200, `實得 ${index.status}`);
+  const cardLinks = new Set(
+    hrefsOf(indexHtml).filter((h) => /^\/publications\/[a-z]{2}-\d{3}$/.test(h)),
+  );
+  ok(`/publications SSR 連到每一本（${cardLinks.size} 本）`, cardLinks.size >= 100);
+  ok(
+    "/publications 封面 lazy loading",
+    /<img[^>]*loading="lazy"[^>]*>/.test(indexHtml) &&
+      !/<img[^>]*src="https:\/\/[a-z0-9]+\.supabase\.co\/storage[^"]*publications\//.test(
+        indexHtml,
+      ),
+  );
+
+  const tw001 = await (await get("/publications/tw-001")).text();
+  const tw001Text = textOf(tw001);
+  ok("tw-001 SSR 有刊名 h1", parseHead(tw001).h1[0] === "東北風", parseHead(tw001).h1.join("/"));
+  const intro = /data-testid="publication-intro"[^>]*>([\s\S]*?)<\/p>/.exec(tw001)?.[1] ?? "";
+  ok(`tw-001 SSR 有完整介紹（${len(textOf(intro))} 字）`, len(textOf(intro)) >= 60);
+  ok("tw-001 有「購買這本」連到 /shop/pub-tw-001", hrefsOf(tw001).includes("/shop/pub-tw-001"));
+  ok("tw-001 顯示價格", /NT\$\d/.test(tw001Text));
+  ok("tw-001 麵包屑連到 /publications", hrefsOf(tw001).includes("/publications"));
+  const related001 = hrefsOf(tw001).filter(
+    (h) => /^\/publications\/tw-\d{3}$/.test(h) && h !== "/publications/tw-001",
+  );
+  ok(
+    `tw-001 同地區推薦 1–6 本（${new Set(related001).size}）`,
+    new Set(related001).size >= 1 && new Set(related001).size <= 6,
+  );
+
+  const tw003 = await (await get("/publications/tw-003")).text();
+  ok("tw-003（沒商品）顯示「歡迎到店翻閱」", textOf(tw003).includes("歡迎到店翻閱"));
+  ok("tw-003 有來訪資訊連結 /about", hrefsOf(tw003).includes("/about"));
+  ok("tw-003 沒有購買連結", !hrefsOf(tw003).some((h) => h.startsWith("/shop/pub-")));
+
+  console.log("\n[地方刊物：404 與轉址]");
+  for (const p of ["/publications/no-such-slug", "/en/publications/tw-999"]) {
+    const r = await get(p);
+    const h = parseHead(await r.text());
+    ok(`${p} → 404（${r.status}）`, r.status === 404);
+    ok(
+      `${p} noindex`,
+      h.meta("robots").some((v) => /noindex/.test(v)),
+    );
+  }
+  for (const [from, status, to] of [
+    ["/publications/TW-001", [301], "/publications/tw-001"],
+    ["/Publications/tw-001", [301], "/publications/tw-001"],
+    ["/ja/publications/TW-001", [301], "/ja/publications/tw-001"],
+    ["/publications/tw-001/", [308], "/publications/tw-001"],
+  ]) {
+    const r = await get(from);
+    const loc = (r.headers.get("location") ?? "").replace(/^https?:\/\/[^/]+/, "");
+    ok(`${from} → ${r.status} ${loc}`, status.includes(r.status) && loc === to);
+    await r.arrayBuffer();
+  }
+
+  console.log("\n[地方刊物：canonical 收斂]");
+  for (const [path, canonical] of [
+    ["/shop/pub-tw-001", `${ORIGIN}/publications/tw-001`],
+    ["/en/shop/pub-tw-001", `${ORIGIN}/en/publications/tw-001`],
+    ["/shop?tab=publications", `${ORIGIN}/publications`],
+  ]) {
+    const r = await get(path);
+    const html = await r.text();
+    const h = parseHead(html);
+    ok(`${path} 200`, r.status === 200, `實得 ${r.status}`);
+    ok(
+      `${path} canonical → ${canonical}`,
+      h.canonicals.length === 1 && h.canonicals[0] === canonical,
+      h.canonicals.join(","),
+    );
+    ok(`${path} 沒有 hreflang`, alternatesOf(html).length === 0);
+    ok(`${path} 沒有 noindex`, !h.meta("robots").some((v) => /noindex/.test(v)));
+    if (path.includes("/shop/pub-")) {
+      const target = canonical.slice(ORIGIN.length);
+      ok(`${path} 連到刊物頁 ${target}`, hrefsOf(html).includes(target));
+    } else {
+      ok(
+        `${path} 的刊物卡連到各自的刊物頁`,
+        hrefsOf(html).some((x) => /^\/publications\/[a-z]{2}-\d{3}$/.test(x)),
+      );
+    }
+  }
+  const home = await (await get("/")).text();
+  ok(
+    "首頁的刊物封面連到刊物頁",
+    hrefsOf(home).filter((x) => /^\/publications\/[a-z]{2}-\d{3}$/.test(x)).length >= 1,
+  );
+  ok(
+    "首頁沒有連到 /shop?tab=publications",
+    !hrefsOf(home).some((x) => x.startsWith("/shop?tab=publications")),
+  );
+  const shop = await (await get("/shop")).text();
+  ok("/shop 分頁列「地方刊物」連到 /publications", hrefsOf(shop).includes("/publications"));
+
+  console.log("\n[地方刊物：sitemap]");
+  const xml = await (await get("/sitemap.xml")).text();
+  const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => decode(m[1]));
+  const count = (prefix) =>
+    locs.filter((l) => new RegExp(`^${ORIGIN}${prefix}/publications/[a-z]{2}-\\d{3}$`).test(l))
+      .length;
+  const zh = count("");
+  const en = count("/en");
+  const ja = count("/ja");
+  console.log(`  刊物頁：中文 ${zh}、英文 ${en}、日文 ${ja}（合計 ${zh + en + ja}）`);
+  ok(`sitemap 中文刊物頁 ≥ 100（${zh}）`, zh >= 100);
+  ok("sitemap 英日文刊物頁不多於中文", en <= zh && ja <= zh);
+  ok("sitemap 有 /publications", locs.includes(`${ORIGIN}/publications`));
+  ok(
+    "sitemap 沒有 /shop?tab=publications",
+    !locs.some((l) => l.includes("/shop?tab=publications")),
+  );
+  ok(
+    "sitemap 沒有 /shop/pub-tw-001（canonical 是刊物頁）",
+    !locs.some((l) => /\/shop\/pub-tw-001$/.test(l)),
+  );
+}
+
 console.log(`→ SEO_BASE = ${BASE}`);
 await checkRobotsAndSitemap();
 for (const page of PAGES) await checkPage(page);
 await checkRedirectsAndNoindex();
 await checkLanguageVersions();
+await checkPublications();
 
 console.log(`\n${"─".repeat(52)}`);
 console.log(`check-seo: pass=${pass} fail=${fail}`);

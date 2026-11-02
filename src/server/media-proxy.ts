@@ -12,9 +12,19 @@
  *
  * ⚠️ 沒有做縮圖：Supabase 的 image transformation 是按原圖數量計費的付費功能，這一期不開。
  */
-import { MEDIA_PROXY_PREFIX, storageUpstreamUrl } from "@/lib/images";
+import { MEDIA_OBJECT_NAME_RE, MEDIA_PROXY_PREFIX, storageUpstreamUrl } from "@/lib/images";
 
 const IMMUTABLE = "public, max-age=31536000, s-maxage=31536000, immutable";
+/**
+ * 刊物封面（publications/tw-001.jpg，2026-11 M4）：名字不是 uuid，理論上可能被原地換圖，
+ * 所以不給 immutable。瀏覽器一天、CDN 七天，過期後一天內先吐舊的再背景更新。
+ */
+const LONG = "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400";
+
+/** uuid 檔名（同名永遠同一張圖）→ immutable 一年；其他允許的名字 → LONG。 */
+export function mediaCacheControl(name: string): string {
+  return MEDIA_OBJECT_NAME_RE.test(name) ? IMMUTABLE : LONG;
+}
 
 export async function handleMediaProxy(request: Request, pathname: string): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -44,7 +54,7 @@ export async function handleMediaProxy(request: Request, pathname: string): Prom
   if (length) headers.set("content-length", length);
   const etag = res.headers.get("etag");
   if (etag) headers.set("etag", etag);
-  headers.set("cache-control", IMMUTABLE);
+  headers.set("cache-control", mediaCacheControl(name));
   headers.set("x-content-type-options", "nosniff");
   return new Response(request.method === "HEAD" ? null : res.body, { status: 200, headers });
 }

@@ -224,7 +224,9 @@ const FILES = {
   index: "src/routes/index.tsx",
   visit: "src/routes/visit.tsx",
   contact: "src/routes/contact.tsx",
-  publications: "src/routes/publications.tsx",
+  // 2026-11 M4：/publications 從轉址變回真正的總覽頁（檔名改成 publications.index.tsx，
+  // 才能跟 /publications/$slug 並存而不變成它的 layout）。
+  publications: "src/routes/publications.index.tsx",
   curated: "src/routes/curated.tsx",
   productsPanel: "src/components/shop/ProductsPanel.tsx",
   publicationsPanel: "src/components/shop/PublicationsPanel.tsx",
@@ -239,7 +241,7 @@ for (const [key, rel] of Object.entries(FILES)) {
   src[key] = readFile(join(ROOT, rel));
 }
 // 轉址頁刻意很短（只有檔頭註解 + 一個 beforeLoad），門檻分開設。
-const MIN_LEN = { visit: 300, contact: 300, publications: 300, curated: 300 };
+const MIN_LEN = { visit: 300, contact: 300, curated: 300 };
 for (const key of Object.keys(FILES)) {
   const min = MIN_LEN[key] ?? 1200;
   checkTrue(`${FILES[key]} 長度 > ${min}`, src[key].length > min);
@@ -306,12 +308,14 @@ checkFalse("SiteHeader 沒有用回 ui.nav.shop", headerNavKeys.has("shop"));
 // =============================================================================
 // [2] 四個舊網址 = 真的轉址路由
 // =============================================================================
-console.log("\n[2] 四個舊網址轉址（不是 404、不是留著空頁）");
+console.log("\n[2] 三個舊網址轉址（不是 404、不是留著空頁）；/publications 變回真的頁面");
 
+// 2026-11 M4：/publications 不再轉址——每一本刊物有了自己的頁（/publications/$slug），
+// 這裡回到刊物總覽。下面的 [2b] 守它「真的是一頁」，而且不會再 throw redirect（避免跟
+// 舊的 /publications → /shop?tab=publications 301 一起形成迴圈）。
 const REDIRECTS = [
   { key: "visit", route: "/visit", to: "/about", tab: null },
   { key: "contact", route: "/contact", to: "/about", tab: null },
-  { key: "publications", route: "/publications", to: "/shop", tab: "publications" },
   { key: "curated", route: "/curated", to: "/shop", tab: "curated" },
 ];
 
@@ -344,17 +348,34 @@ for (const r of REDIRECTS) {
   check(`${r.route} 落在 ${r.tab ?? "（無 tab）"} 分頁`, searchTab, r.tab);
 }
 
+{
+  const { path, options } = routeParts(ast.publications);
+  check("publications.index.tsx 宣告成 /publications/", path, "/publications/");
+  checkTrue("/publications 有 component（真的畫一頁）", hasProp(options, "component"));
+  checkTrue("/publications 有 loader", hasProp(options, "loader"));
+  let throwsRedirect = false;
+  walk(options, (n) => {
+    if (
+      n.type === "ThrowStatement" &&
+      n.argument?.type === "CallExpression" &&
+      n.argument.callee?.name === "redirect"
+    )
+      throwsRedirect = true;
+  });
+  checkFalse("/publications 不再 throw redirect()（不會跟舊 301 形成迴圈）", throwsRedirect);
+}
+
 // check-meta 產出的報告要跟磁碟上的路由檔對得起來（報告不是舊的）。
 const metaReport = JSON.parse(readFile(join(ROOT, "reports/meta-audit.json")));
 check("meta 稽核 0 個問題", metaReport.summary.totalIssues, 0);
 // 44b4933（業主：「把網站最新消息的功能移除」）把 /news 與 /news/$ 改成 301 轉首頁，
 // 所以從四條變成六條；那一支 commit 沒同步這裡，main 的 Tests 因此紅了一次。
-check("meta 報告認定的轉址路由就是這六條", [...metaReport.summary.redirectRouteList].sort(), [
+// 2026-11 M4：/publications 變回真的頁面，剩五條。
+check("meta 報告認定的轉址路由就是這五條", [...metaReport.summary.redirectRouteList].sort(), [
   "/contact",
   "/curated",
   "/news",
   "/news.$",
-  "/publications",
   "/visit",
 ]);
 check(
@@ -482,9 +503,12 @@ for (const panel of PANEL_WIRING) {
 // 初始資料，它是點擊之後才發生的動作，跟 handleAdd() 呼叫 addItem()（購物車
 // mutation）是同一個類別，不是這條規則想擋的那種。允許清單只放這一個名字，
 // 任何其他 fetch* 仍然會讓下面轉紅。
+//
+// 2026-11 M4：刊物介紹搬到每一本自己的頁（/publications/$slug，SSR），卡片直接連過去，
+// fetchPublicationDetail() 拿掉了——PublicationsPanel 回到「不自己讀任何資料」。
 const PANEL_FETCH_ALLOWLIST = {
   productsPanel: [],
-  publicationsPanel: ["fetchPublicationDetail"],
+  publicationsPanel: [],
   curatedPanel: [],
 };
 for (const key of ["productsPanel", "publicationsPanel", "curatedPanel"]) {
@@ -738,6 +762,21 @@ check(
   "首頁的選品入口直接落在 products 分頁（商品卡的「查看全部」）",
   strOf(propValue(shopLinkWithTab?.props?.search ?? null, "tab")),
   "products",
+);
+
+// 2026-11 M4：首頁的「地方刊物典藏」入口連到 /publications，六張封面各自連到那一本的頁。
+checkTrue('首頁有 <Link to="/publications">', indexTargets.includes("/publications"));
+checkTrue(
+  '首頁的刊物封面連到 <Link to="/publications/$slug">',
+  indexTargets.includes("/publications/$slug"),
+);
+checkFalse(
+  "首頁沒有任何連結還指向 /shop?tab=publications（那是舊網址，canonical 已收斂到 /publications）",
+  indexLinks.some(
+    (e) =>
+      strOf(e.props.to) === "/shop" &&
+      strOf(propValue(e.props.search ?? null, "tab")) === "publications",
+  ),
 );
 
 // =============================================================================

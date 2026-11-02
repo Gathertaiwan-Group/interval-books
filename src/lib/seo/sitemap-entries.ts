@@ -14,6 +14,10 @@
  *   · 策旅卡片指著的站內頁：卡片在 /journeys 上，journeys.updated_at 不是那一頁的內容，
  *     所以這一筆不帶 lastmod（那一頁自己的那筆會帶）。
  *   · 沒有資料列的頁（寫死在程式碼裡的著陸頁子頁）：不輸出 lastmod。
+ *   · 地方刊物（2026-11 M4）：/publications ＝ 所有刊物＋刊物商品的最新一筆；
+ *     /publications/<slug> ＝ 那一本＋它的商品（頁面上印價格）。
+ *     有對應刊物的商品頁（/shop/pub-*）canonical 指向刊物頁，**不列**；
+ *     舊網址 /shop?tab=publications canonical 指向 /publications，也不列。
  *
  * 🔴 **絕不放部署時間或「現在」**：沒有 updated_at 可用就不輸出 lastmod。
  *
@@ -59,6 +63,8 @@ export type SitemapSource = {
   events: SitemapEventRow[];
   /** 上架中的商品（含活動票券）。 */
   products: Array<{
+    /** products.id —— 對應刊物的商品要用它認出來（2026-11 M4）。 */
+    id?: string;
     slug: string;
     productType: string;
     updatedAt: Ts;
@@ -66,6 +72,16 @@ export type SitemapSource = {
   }>;
   journeys: Array<{ externalUrl: string; updatedAt: Ts }>;
   publicationsLatest: Ts;
+  /**
+   * 已發布的刊物（2026-11 M4）。沒給（舊的呼叫端／測試）→ 不列刊物頁、/shop/pub-* 照舊列。
+   * content：刊名＋介紹（與頁面 head() 的 publicationTranslation 相同）。
+   */
+  publications?: Array<{
+    slug: string;
+    productId: string | null;
+    updatedAt: Ts;
+    content?: SitemapContent;
+  }>;
   curatedLatest: Ts;
 };
 
@@ -172,14 +188,33 @@ export function buildSitemapEntries(src: SitemapSource, today = todayInTaipei())
     lastmod: latestOf(src.products.map((p) => p.updatedAt)),
     langs: staticLangs("shop"),
   });
+  // 地方刊物總覽（2026-11 M4 起是 /publications；/shop?tab=publications canonical 指向這裡、不列）。
   entries.push({
-    path: "/shop?tab=publications",
+    path: "/publications",
     lastmod: latestOf([
       src.publicationsLatest,
       ...src.products.filter((p) => p.slug.startsWith("pub-")).map((p) => p.updatedAt),
     ]),
     langs: staticLangs("publications"),
   });
+
+  // 每一本刊物自己的頁。lastmod 算進它的商品（頁面印價格與庫存）。
+  const productById = new Map(src.products.filter((p) => p.id).map((p) => [p.id as string, p]));
+  const linkedProductIds = new Set<string>();
+  for (const pub of src.publications ?? []) {
+    const slug = pub.slug.trim();
+    if (!slug) continue;
+    const product = pub.productId ? productById.get(pub.productId) : undefined;
+    // 與 shop.$slug.tsx 同一條件：只有「書」的商品頁會把 canonical 指向刊物頁。
+    if (product && pub.productId && product.productType === "book") {
+      linkedProductIds.add(pub.productId);
+    }
+    entries.push({
+      path: `/publications/${slug}`,
+      lastmod: latestOf([pub.updatedAt, product?.updatedAt]),
+      langs: langsOf(pub.content),
+    });
+  }
 
   // 活動（含著陸頁：/events/kungtung 等靜態路由的 slug 跟活動列相同，sitemapXml 會去重）
   const eventLangs = new Map<string, Lang[]>();
@@ -211,6 +246,8 @@ export function buildSitemapEntries(src: SitemapSource, today = todayInTaipei())
   for (const p of src.products) {
     const slug = p.slug.trim();
     if (!slug || p.productType === "event" || p.productType === "journey") continue;
+    // 對應到刊物的商品頁：canonical 是刊物頁（上面已列），這裡不重複列。
+    if (p.id && linkedProductIds.has(p.id)) continue;
     const path = `/shop/${slug}`;
     entries.push({ path, lastmod: p.updatedAt ?? null, langs: langsFor(path, p.content) });
   }

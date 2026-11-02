@@ -50,7 +50,8 @@ const EVENTS: LocalCrumb = {
 const SHOP: LocalCrumb = { name: { zh: "選物", en: "Shop", ja: "ショップ" }, path: "/shop" };
 const PUBLICATIONS: LocalCrumb = {
   name: { zh: "地方刊物", en: "Local Publications", ja: "地域の刊行物" },
-  path: "/shop?tab=publications",
+  // 2026-11 M4：地方刊物有自己的總覽頁（/publications），不再是 /shop 的分頁網址。
+  path: "/publications",
 };
 
 /** 麵包屑一段 → 該語言（名稱缺就用中文；路徑加上 /en、/ja 前綴）。 */

@@ -1,17 +1,16 @@
 {
-  "generatedAt": "2026-10-29T06:06:15.486Z",
+  "generatedAt": "2026-11-02T14:13:44.973Z",
   "summary": {
-    "routesAudited": 30,
-    "redirectRoutes": 6,
+    "routesAudited": 31,
+    "redirectRoutes": 5,
     "redirectRouteList": [
       "/contact",
       "/curated",
       "/news.$",
       "/news",
-      "/publications",
       "/visit"
     ],
-    "metaAudited": 24,
+    "metaAudited": 26,
     "languages": [
       "zh",
       "en",
@@ -33,7 +32,7 @@
         "ogTitle",
         "ogDescription"
       ],
-      "approxChecks": 288
+      "approxChecks": 312
     }
   },
   "routes": {
@@ -193,10 +192,16 @@
       "redirect": false,
       "issues": []
     },
-    "/publications": {
-      "file": "src/routes/publications.tsx",
+    "/publications.$slug": {
+      "file": "src/routes/publications.$slug.tsx",
       "ok": true,
-      "redirect": true,
+      "redirect": false,
+      "issues": []
+    },
+    "/publications.index": {
+      "file": "src/routes/publications.index.tsx",
+      "ok": true,
+      "redirect": false,
       "issues": []
     },
     "/shop.$slug": {

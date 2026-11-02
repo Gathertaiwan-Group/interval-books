@@ -11,6 +11,11 @@
  *    但對得上商品的是 0 筆 —— 把買不到的 144 項跟 20 件商品排進同一個格狀清單，客人
  *    會以為那些都是商品。分頁的意義就是讓「這個能買、那個不能」看得出來。
  *
+ * 2026-11（SEO 健檢 M4）：地方刊物有了自己的總覽頁 /publications（每一本也有 /publications/$slug）。
+ * 分頁列的「地方刊物」那一格直接連過去；舊網址 /shop?tab=publications 照常顯示同一份清單，
+ * 但 canonical 指向 /publications、不進 sitemap。不做 301 的理由見 src/routes/publications.index.tsx
+ * 檔頭（舊的 /publications → 這裡的 301 存在訪客瀏覽器裡，反向再轉會變成迴圈）。
+ *
  * 分頁狀態放在 ?tab= 而不是純 useState，因為 /publications 與 /curated 這兩個舊網址
  * 要轉址進「對應的分頁」—— 沒有網址就沒有可轉的目標。順帶讓分頁可以被分享、上一頁
  * 也回得去。loader 沒有宣告 loaderDeps，所以換分頁不會重跑任何一次讀取。
@@ -183,6 +188,8 @@ export const Route = createFileRoute("/shop/")({
           ),
           image: ogImg,
           type: "website",
+          // ?tab=publications 是舊網址：內容與 /publications 相同，canonical 收斂到那裡。
+          canonicalPath: tab === "publications" ? "/publications" : undefined,
         },
       ),
     };
@@ -239,22 +246,36 @@ function Shop() {
         data-testid="shop-tabs"
         aria-label={t(p.block("tabs.label", PAGE.tabsLabel))}
       >
-        {tabs.map((tabItem) => (
-          <Link
-            key={tabItem.key}
-            to="/shop"
-            search={{ tab: tabItem.key }}
-            data-testid={`shop-tab-${tabItem.key}`}
-            aria-current={active === tabItem.key ? "page" : undefined}
-            className={`-mb-px border-b-2 pb-3 transition-colors ${
-              active === tabItem.key
-                ? "border-foreground text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {tabItem.label}
-          </Link>
-        ))}
+        {tabs.map((tabItem) => {
+          const className = `-mb-px border-b-2 pb-3 transition-colors ${
+            active === tabItem.key
+              ? "border-foreground text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`;
+          // 地方刊物：連到它自己的總覽頁（canonical），不是 ?tab=publications。
+          return tabItem.key === "publications" ? (
+            <Link
+              key={tabItem.key}
+              to="/publications"
+              data-testid={`shop-tab-${tabItem.key}`}
+              aria-current={active === tabItem.key ? "page" : undefined}
+              className={className}
+            >
+              {tabItem.label}
+            </Link>
+          ) : (
+            <Link
+              key={tabItem.key}
+              to="/shop"
+              search={{ tab: tabItem.key }}
+              data-testid={`shop-tab-${tabItem.key}`}
+              aria-current={active === tabItem.key ? "page" : undefined}
+              className={className}
+            >
+              {tabItem.label}
+            </Link>
+          );
+        })}
       </nav>
 
       <div className="pt-12" data-testid={`shop-panel-${active}`}>

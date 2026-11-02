@@ -81,11 +81,11 @@ export const STATIC_PUBLIC_PATHS: readonly string[] = [
 const STATIC_SET = new Set(STATIC_PUBLIC_PATHS);
 
 /**
- * 只有一段動態參數的前台路由（/events/$slug、/shop/$slug）。第一段大小寫統一成小寫，
+ * 只有一段動態參數的前台路由（/events/$slug、/shop/$slug、/publications/$slug）。第一段大小寫統一成小寫，
  * **slug 本身原樣保留**——活動代稱是大小寫敏感的（例：InntervalChishang.1023），
  * 把它轉小寫就是把一個活的網址轉成 404。
  */
-const DYNAMIC_SINGLE_SEGMENT = ["events", "shop"];
+const DYNAMIC_SINGLE_SEGMENT = ["events", "shop", "publications"];
 
 /**
  * 路徑的標準形：去掉尾斜線、壓掉連續斜線、固定路徑轉小寫。

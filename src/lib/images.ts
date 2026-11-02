@@ -70,15 +70,29 @@ export const MEDIA_PROXY_PREFIX = "/media/site-images/";
 /** 代理只接受 uploadSiteImage() 會產生的檔名：uuid + 圖片副檔名。 */
 export const MEDIA_OBJECT_NAME_RE = /^[0-9a-f-]{36}\.(webp|jpg|jpeg|png|gif|avif)$/i;
 
+/**
+ * 地方刊物封面的匯入檔名（2026-11 M4）：`publications/tw-001.jpg`。126 張是當初整批匯入的，
+ * 不是 uploadSiteImage() 產生的 uuid，所以原本不走代理、直接用 Supabase 的公開網址（每次瀏覽
+ * 都要重新驗證、CDN 不存）。刊物頁與總覽頁都要顯示它們，改走同一個代理。
+ * ⚠️ 這種名字理論上可以在 Storage 裡被原地覆蓋（後台上傳一律產生新 uuid，不會覆蓋它們），
+ *    所以快取不給 immutable 一年，見 media-proxy.ts 的 mediaCacheControl()。
+ */
+export const MEDIA_PUBLICATION_COVER_RE = /^publications\/(tw|jp)-\d{3}\.(webp|jpg|jpeg|png)$/i;
+
+/** 代理接受的物件名稱。 */
+export function isProxiableObjectName(objectName: string): boolean {
+  return MEDIA_OBJECT_NAME_RE.test(objectName) || MEDIA_PUBLICATION_COVER_RE.test(objectName);
+}
+
 function storagePublicUrl(objectName: string): string | null {
   if (!SUPABASE_URL || !objectName) return null;
-  if (MEDIA_OBJECT_NAME_RE.test(objectName)) return `${MEDIA_PROXY_PREFIX}${objectName}`;
+  if (isProxiableObjectName(objectName)) return `${MEDIA_PROXY_PREFIX}${objectName}`;
   return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${objectName}`;
 }
 
 /** 代理要轉去的上游網址（server 端用）。 */
 export function storageUpstreamUrl(objectName: string): string | null {
-  if (!SUPABASE_URL || !MEDIA_OBJECT_NAME_RE.test(objectName)) return null;
+  if (!SUPABASE_URL || !isProxiableObjectName(objectName)) return null;
   return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${objectName}`;
 }
 

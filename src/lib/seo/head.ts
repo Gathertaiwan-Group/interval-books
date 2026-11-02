@@ -18,7 +18,7 @@ import type { Lang, Localized } from "@/i18n/types";
 import { absoluteUrl, alternateUrls, canonicalUrl, ldMeta, WEBSITE_ID, type JsonLd } from "./core";
 import { HREFLANG, indexableLangs, LD_LANGUAGE, OG_LOCALE, type PageTranslation } from "./i18n";
 
-export type OgType = "website" | "article" | "product" | "profile";
+export type OgType = "website" | "article" | "product" | "profile" | "book";
 
 /** head().meta 的一個項目。 */
 export type MetaEntry = NonNullable<NonNullable<AnyRouteMatch["meta"]>[number]>;
@@ -58,6 +58,13 @@ export type PageMetaOpts = {
   jsonLd?: JsonLd[];
   /** 這一頁的英日文有沒有翻譯（noindex 規則，見 i18n.ts 的 isLangIndexable）。預設 "full"。 */
   translation?: PageTranslation;
+  /**
+   * canonical 指向**另一頁**（不含語言前綴的路徑，例："/publications/tw-001"）。2026-11 M4：
+   * 內容與刊物頁幾乎相同的 /shop/pub-*、舊網址 /shop?tab=publications 用它把訊號集中到刊物頁。
+   * 有設定時：canonical／og:url 指向那一頁的同語言版本；不輸出 hreflang 與 WebPage 節點
+   * （hreflang 只該出現在 canonical 頁上，WebPage 由那一頁自己輸出）。
+   */
+  canonicalPath?: string;
 };
 
 /**
@@ -86,7 +93,10 @@ export function pageHead(
   const ogTitle = pick(opts.ogTitle ?? opts.title);
   const ogDescription = pick(opts.ogDescription ?? opts.description);
   const image = absoluteUrl(opts.image);
-  const canonical = canonicalUrl(path, search, lang);
+  const canonical = opts.canonicalPath
+    ? canonicalUrl(opts.canonicalPath, undefined, lang)
+    : canonicalUrl(path, search, lang);
+  const selfCanonical = !opts.canonicalPath;
 
   const meta: MetaEntry[] = [
     { title },
@@ -111,7 +121,7 @@ export function pageHead(
   // 中文限定的著陸頁：/en、/ja 版本的內容仍是中文，JSON-LD 照實標中文。
   const inLanguage = LD_LANGUAGE[opts.translation === "zh-only" ? "zh" : lang];
   for (const data of opts.jsonLd ?? []) meta.push(ld(withInLanguage(data, inLanguage)));
-  if (indexable) {
+  if (indexable && selfCanonical) {
     meta.push(
       ld({
         "@context": "https://schema.org",
@@ -125,16 +135,18 @@ export function pageHead(
     );
   }
 
-  const links: LinkEntry[] = indexable
-    ? [
-        { rel: "canonical", href: canonical },
-        ...alternateUrls(path, search, langs).map((a) => ({
-          rel: "alternate",
-          hrefLang: a.lang === "x-default" ? "x-default" : HREFLANG[a.lang],
-          href: a.href,
-        })),
-      ]
-    : [];
+  const links: LinkEntry[] = !indexable
+    ? []
+    : !selfCanonical
+      ? [{ rel: "canonical", href: canonical }]
+      : [
+          { rel: "canonical", href: canonical },
+          ...alternateUrls(path, search, langs).map((a) => ({
+            rel: "alternate",
+            hrefLang: a.lang === "x-default" ? "x-default" : HREFLANG[a.lang],
+            href: a.href,
+          })),
+        ];
   return { meta, links };
 }
 

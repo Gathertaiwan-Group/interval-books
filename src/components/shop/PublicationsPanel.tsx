@@ -14,6 +14,11 @@
  * 所以「之後在後台補完定價」不需要動這一頁：後台把某一本連上庫存商品之後，
  * 下一次載入這一頁就長出購買鈕。
  *
+ * 2026-11（SEO 健檢 M4）：每一本刊物有自己的頁面 /publications/$slug。卡片的封面、刊名與
+ * 「刊物介紹 →」都連過去（介紹文在那一頁 SSR 輸出）；原本「點開卡片才現查介紹」的展開區
+ * 拿掉了。這個元件同時用在 /publications（總覽頁，showIntro=false，標題由 PageHeader 出）
+ * 與 /shop?tab=publications（舊網址，canonical 指向 /publications）。
+ *
  * 篩選（2026-10 改版）：國家三段切換＋一個「地區」原生下拉，取代原本約 30 顆的
  * 「關注地域」chips。篩選狀態仍然只是這個元件的 useState（sheet／region），沒有
  * 進網址——網址上只有 shop.index.tsx 的 ?tab=。篩選的純函式在
@@ -21,7 +26,7 @@
  */
 import { Link } from "@tanstack/react-router";
 import { ChevronDown } from "lucide-react";
-import { Fragment, useEffect, useId, useMemo, useState } from "react";
+import { Fragment, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   ALL_REGIONS,
@@ -41,7 +46,6 @@ import { cartInputFor, useCart } from "@/lib/cart";
 import { CARD } from "@/lib/feature-layout";
 import { imageFor } from "@/lib/images";
 import {
-  fetchPublicationDetail,
   SHEET_LABELS,
   type PublicationListEntry,
   type PublicationListResult,
@@ -75,13 +79,6 @@ const COPY = {
   publisherLabel: { zh: "製作單位", en: "Published by", ja: "発行" },
   issuesLabel: { zh: "集數", en: "Issues", ja: "号" },
   readMore: { zh: "刊物介紹", en: "About this title", ja: "この刊行物について" },
-  visitSite: { zh: "前往刊物網站", en: "Visit publication site", ja: "刊行物のサイトへ" },
-  detailLoading: { zh: "載入中…", en: "Loading…", ja: "読み込み中…" },
-  detailUnavailable: {
-    zh: "刊物介紹暫時無法載入，請稍後再試。",
-    en: "Could not load this introduction. Please try again shortly.",
-    ja: "紹介文を読み込めませんでした。しばらくしてからお試しください。",
-  },
   displayOnly: {
     zh: "此本僅供店內展示",
     en: "On display in store only",
@@ -120,10 +117,13 @@ export function PublicationsPanel({
   page,
   list,
   catalogue,
+  showIntro = true,
 }: {
   page: PageContent | null;
   list: PublicationListResult;
   catalogue: ShopListCardResult;
+  /** false：頁面自己的 PageHeader 已經印了同一組標題與介紹（/publications）。 */
+  showIntro?: boolean;
 }) {
   const t = useT();
   const p = pageText(page);
@@ -137,7 +137,6 @@ export function PublicationsPanel({
 
   const [sheet, setSheet] = useState<SheetFilter>("all");
   const [region, setRegion] = useState<string>(ALL_REGIONS);
-  const [open, setOpen] = useState<string | null>(null);
   const regionSelectId = useId();
 
   const sheetFiltered = useMemo(() => entriesForSheet(publications, sheet), [publications, sheet]);
@@ -155,12 +154,10 @@ export function PublicationsPanel({
     setSheet(next);
     // 原本選的地區在新的國家底下還有刊物就留著，沒有才回到「所有地區」。
     setRegion(regionAfterSheetChange(publications, next, region));
-    setOpen(null);
   }
 
   function changeRegion(next: string) {
     setRegion(next);
-    setOpen(null);
   }
 
   const optgroupLabel: Record<NonNullable<RegionOptionGroup["group"]>, string> = {
@@ -176,7 +173,9 @@ export function PublicationsPanel({
 
   return (
     <>
-      <PanelIntro title={t(p.title(COPY.title))} intro={t(p.intro(COPY.intro))} />
+      {showIntro ? (
+        <PanelIntro title={t(p.title(COPY.title))} intro={t(p.intro(COPY.intro))} />
+      ) : null}
 
       {unavailable ? (
         <section className="container-editorial pb-32">
@@ -289,8 +288,6 @@ export function PublicationsPanel({
                   key={entry.id}
                   entry={entry}
                   product={entry.productId ? (productById.get(entry.productId) ?? null) : null}
-                  open={open === entry.id}
-                  onToggle={() => setOpen(open === entry.id ? null : entry.id)}
                   text={p}
                   soldOutLabel={t(ui.buttons.soldOut)}
                   addToCartLabel={t(ui.buttons.addToCart)}
@@ -318,33 +315,15 @@ export function PanelIntro({ title, intro }: { title: string; intro: string }) {
 type CardProps = {
   entry: PublicationListEntry;
   product: ShopProductCard | null;
-  open: boolean;
-  onToggle: () => void;
   text: ReturnType<typeof pageText>;
   soldOutLabel: string;
   addToCartLabel: string;
   viewProductLabel: string;
 };
 
-/**
- * 「刊物介紹」展開內容——intro／externalUrl 不在 list props 裡（見
- * lib/publications.ts#PublicationListEntry 檔頭），點開才現查那一本。
- *
- * "idle" 一路留著直到真的展開過一次；展開後轉 "loading" → "loaded"／"error"
- * 就不會回頭，收合再展開不會重打一次網路（跟這個 storefront 其餘地方「loader
- * 只讀一次、不重複讀」是同一種姿態，只是這裡的「loader」換成使用者的一次點擊）。
- */
-type DetailState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "loaded"; intro: Localized; externalUrl: string | null }
-  | { status: "error" };
-
 function PublicationCard({
   entry,
   product,
-  open,
-  onToggle,
   text,
   soldOutLabel,
   addToCartLabel,
@@ -352,39 +331,6 @@ function PublicationCard({
 }: CardProps) {
   const t = useT();
   const addItem = useCart((s) => s.addItem);
-  const [detail, setDetail] = useState<DetailState>({ status: "idle" });
-
-  // ⚠️ deps 只有 [open, entry.id]，刻意不含 detail.status。
-  //
-  // 原本寫成 `[open, detail.status, entry.id]`：effect 裡 setDetail("loading")
-  // 之後，status 從 idle 變成 loading 又會讓這個 effect 自己重跑一次——重跑會
-  // 先執行上一輪的 cleanup（把上一輪那個 fetch 的 `cancelled` 設成
-  // true），但新的這一輪一看 `detail.status !== "idle"` 就直接 return，不會
-  // 開一個新的 fetch 去接手。結果是唯一在飛的那個 fetch 已經被標成
-  // cancelled，它的 `.then()` 回來時直接被吞掉——畫面永遠卡在
-  // 「Loading…」，用瀏覽器點開任何一本刊物都能重現。
-  //
-  // 拿掉 detail.status 之後，這個 effect 只在 open／entry.id 真的改變時才會
-  // 重新建立（重新展開同一本會再打一次，這是刻意的取捨：比起用
-  // ref 精確快取「這本已經查過」，重複一次小小的單列查詢便宜得多，也不會
-  // 卡在上面這個坑裡）。
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    setDetail({ status: "loading" });
-    fetchPublicationDetail(entry.id).then((result) => {
-      if (cancelled) return;
-      setDetail(
-        result
-          ? { status: "loaded", intro: result.intro, externalUrl: result.externalUrl }
-          : { status: "error" },
-      );
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, entry.id]);
-
   const soldOut = product !== null && isSoldOut(product);
   const remaining = product ? remainingFor(product) : null;
   const low = !soldOut && remaining !== null && remaining > 0 && remaining <= LOW_STOCK_THRESHOLD;
@@ -402,8 +348,8 @@ function PublicationCard({
   }
 
   // 卡片外框用前台共用的 CARD（src/lib/feature-layout.ts），但不加 CARD_HOVER：
-  // 這張卡本身不是連結，可以點的是裡面的「刊物介紹」與購買鈕——首頁不可點的
-  // 策旅卡也是這樣處理。
+  // 整張卡不是一個連結（裡面還有購買鈕，連結不能包按鈕）。封面、刊名、「刊物介紹 →」
+  // 各自連到 /publications/$slug。
   return (
     <article
       id={entry.slug}
@@ -412,20 +358,41 @@ function PublicationCard({
       data-purchasable={product !== null && !soldOut ? "yes" : "no"}
       className={`${CARD} scroll-mt-24`}
     >
-      <div className="aspect-[4/3] overflow-hidden bg-muted">
+      {/* 封面：126 張全部在同一頁，一律 lazy＋async decode，只有捲到附近才下載。
+          width/height 是 4:3 的版面比例（卡片實際寬約 360px），讓瀏覽器先保留位置。
+          這張連結跟下面的刊名指向同一頁，從無障礙樹拿掉、不進 tab 順序，避免同一個連結念兩次。 */}
+      <Link
+        to="/publications/$slug"
+        params={{ slug: entry.slug }}
+        tabIndex={-1}
+        aria-hidden="true"
+        className="block aspect-[4/3] overflow-hidden bg-muted"
+      >
         <img
           src={imageFor(entry.coverImageKey, bookstoreImg)}
           alt={t(entry.title)}
+          width={480}
+          height={360}
           loading="lazy"
+          decoding="async"
           className={`h-full w-full object-contain ${soldOut ? "opacity-60" : ""}`}
         />
-      </div>
+      </Link>
 
       <div className="flex flex-1 flex-col p-5 md:p-6">
         <p className="eyebrow text-sm tracking-widest">
           {entry.region || t(SHEET_LABELS[entry.sheet])}
         </p>
-        <h3 className="font-serif text-xl mt-3 leading-snug">{t(entry.title)}</h3>
+        <h3 className="font-serif text-xl mt-3 leading-snug">
+          <Link
+            to="/publications/$slug"
+            params={{ slug: entry.slug }}
+            data-testid="publication-link"
+            className="hover-underline"
+          >
+            {t(entry.title)}
+          </Link>
+        </h3>
         <p className="mt-2 text-xs text-muted-foreground">
           <span className="opacity-70">{t(text.block("publisherLabel", COPY.publisherLabel))}</span>{" "}
           {t(entry.publisher)}
@@ -437,43 +404,13 @@ function PublicationCard({
           </p>
         )}
 
-        <button
-          onClick={onToggle}
-          aria-expanded={open}
+        <Link
+          to="/publications/$slug"
+          params={{ slug: entry.slug }}
           className="mt-5 self-start text-xs tracking-widest text-clay hover-underline"
         >
-          {t(text.block("readMore", COPY.readMore))} {open ? "−" : "+"}
-        </button>
-
-        {open && (
-          <div className="mt-4 border-l-2 border-clay/40 pl-5">
-            {detail.status === "loaded" ? (
-              <>
-                <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                  {t(detail.intro)}
-                </p>
-                {detail.externalUrl && (
-                  <a
-                    href={detail.externalUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-4 inline-block text-xs tracking-widest text-clay hover-underline"
-                  >
-                    {t(text.block("visitSite", COPY.visitSite))} →
-                  </a>
-                )}
-              </>
-            ) : detail.status === "error" ? (
-              <p className="text-sm text-muted-foreground">
-                {t(text.block("detailUnavailable", COPY.detailUnavailable))}
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {t(text.block("detailLoading", COPY.detailLoading))}
-              </p>
-            )}
-          </div>
-        )}
+          {t(text.block("readMore", COPY.readMore))} →
+        </Link>
 
         <div className="mt-auto pt-6">
           {product === null ? (

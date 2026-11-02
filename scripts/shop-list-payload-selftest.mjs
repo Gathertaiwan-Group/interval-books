@@ -280,7 +280,7 @@ checkFalse(
 // description 只在 /shop/$slug 詳情頁才顯示是同一類問題）。修法是 list 版讀取
 // 不含 intro/externalUrl，點開哪一本才現查那一本——見
 // src/lib/publications.ts#fetchPublicationDetail 檔頭。
-console.log("\n[4b] PublicationsPanel.tsx／publications.ts —— intro 點開才現查，不再隨列表預載");
+console.log("\n[4b] PublicationsPanel.tsx／publications.ts —— intro 不隨列表預載（在刊物頁 SSR）");
 
 checkFalse(
   "entry.intro 不再被直接讀取（entry 是 list 版，沒有這個欄位）",
@@ -290,37 +290,18 @@ checkFalse(
   "entry.externalUrl 也不再被直接讀取",
   /entry\.externalUrl\b/.test(src.publicationsPanel),
 );
+// 2026-11 M4：「點開卡片才現查介紹」的展開區拿掉了——介紹文改到每一本自己的頁面
+// /publications/$slug 在 SSR 輸出（那一頁才讀 intro，見 fetchPublicationBySlug()）。
+// 列表仍然不帶 intro：下面守「卡片連到刊物頁」，以及 PublicationsPanel 不再自己讀資料。
 checkTrue(
-  "正面控制組：展開後改畫 detail.intro（點開才現查回來的那一份）",
-  /\{t\(detail\.intro\)\}/.test(src.publicationsPanel),
+  "正面控制組：卡片連到 /publications/$slug（介紹在那一頁）",
+  /to="\/publications\/\$slug"/.test(src.publicationsPanel),
 );
-checkTrue(
-  "PublicationsPanel import 了 fetchPublicationDetail",
-  /import \{[^}]*\bfetchPublicationDetail\b[^}]*\} from "@\/lib\/publications";/.test(
-    src.publicationsPanel,
-  ),
+checkFalse(
+  "PublicationsPanel 不再 import／呼叫 fetchPublicationDetail（展開現查拿掉了）",
+  /fetchPublicationDetail/.test(src.publicationsPanel),
 );
-checkTrue(
-  "展開時（open 變 true）才觸發 fetchPublicationDetail，不是掛載就打",
-  /useEffect\(\(\) => \{[\s\S]{0,300}?if \(!open[\s\S]{0,300}?fetchPublicationDetail\(entry\.id\)/.test(
-    src.publicationsPanel,
-  ),
-);
-// 🔴 這條防的是瀏覽器實測抓到的真 bug（純靜態掃描抓不到，記錄在這裡是唯一的
-// 事後防線）：deps 陣列原本寫成 [open, detail.status, entry.id]。effect 裡
-// setDetail("loading") 之後 status 從 idle 變 loading，deps 變了讓 effect
-// 自己重跑一次——重跑會先跑上一輪的 cleanup（把飛在半路的那個 fetch 標成
-// cancelled），新的這一輪一看 status 不是 idle 就直接 return、不會有新 fetch
-// 接手。結果是唯一在飛的請求已經被標成 cancelled，`.then()` 回來時被吞掉，
-// 畫面永遠卡在「Loading…」——瀏覽器裡點開任何一本刊物的「刊物介紹」都會重現
-// （用力等多久都不會變成看得到內文）。deps 陣列只能是 [open, entry.id]。
-const effectMatch = src.publicationsPanel.match(/useEffect\(\(\) => \{[\s\S]*?\}, (\[[^\]]*\]\))/);
-checkTrue("找得到 fetchPublicationDetail 那個 useEffect 的 deps 陣列", effectMatch !== null);
-check(
-  "deps 陣列是 [open, entry.id]——不含 detail.status（含了會讓正在飛的 fetch 被自己的 cleanup 吞掉，永遠卡在 Loading）",
-  effectMatch?.[1].replace(/\s/g, ""),
-  "[open,entry.id])",
-);
+checkFalse("PublicationsPanel 不再有 useEffect 現查", /useEffect\(/.test(src.publicationsPanel));
 
 const publicationsSrc = stripTs(readFile(join(ROOT, "src/lib/publications.ts")));
 checkTrue(
@@ -338,10 +319,14 @@ for (const mustHave of ["id", "slug", "title", "publisher", "region", "cover_ima
   checkTrue(`CARD_COLUMNS 仍然含 ${mustHave}（瘦身不是清空）`, pubCardColumns.includes(mustHave));
 }
 checkTrue(
-  "fetchPublicationDetail() 存在，真的 select intro",
-  /export async function fetchPublicationDetail[\s\S]{0,500}?\.select\("intro, external_url"\)/.test(
+  "fetchPublicationBySlug() 存在，單一本用完整 COLUMNS（含 intro）",
+  /export async function fetchPublicationBySlug[\s\S]{0,600}?\.select\(COLUMNS\)/.test(
     publicationsSrc,
   ),
+);
+checkFalse(
+  "fetchPublicationDetail() 已移除（沒有呼叫端）",
+  /export async function fetchPublicationDetail/.test(publicationsSrc),
 );
 checkTrue(
   "fetchPublicationsForList() 存在，查詢用 CARD_COLUMNS",

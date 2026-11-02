@@ -21,6 +21,8 @@ import { useBookingNow } from "@/hooks/use-booking-now";
 import { imageFor } from "@/lib/images";
 import { langFromMatches, pageHead } from "@/lib/seo/head";
 import { contentTranslation, productSeo } from "@/lib/seo/pages";
+import { publicationPath, publicationTranslation } from "@/lib/seo/publication";
+import { fetchPublicationForProduct } from "@/lib/publications";
 import { unavailableHeaders } from "@/lib/seo/status";
 import {
   fetchActiveProductBySlug,
@@ -90,6 +92,11 @@ const PAGE = {
     ja: "商品情報を読み込めませんでした。しばらくしてからお試しください。",
   },
   aboutThis: { zh: "關於這件", en: "About this item", ja: "この商品について" },
+  publicationPage: {
+    zh: "刊物介紹、地區與同地區的其他刊物",
+    en: "About this publication, its region and related titles",
+    ja: "刊行物の紹介・地域・同じ地域の刊行物",
+  },
 };
 
 /**
@@ -115,19 +122,32 @@ export const Route = createFileRoute("/shop/$slug")({
       }
       throw notFound();
     }
+    // 2026-11 M4：地方刊物（publications.product_id 指到這件）有自己的內容主頁
+    // /publications/$slug。商品說明與刊物介紹逐字相同，所以這一頁的 canonical 指向刊物頁
+    // （決策見 src/lib/seo/publication.ts），頁面上也連過去。只有書才查。
+    const publication =
+      product && product.productType === "book"
+        ? await fetchPublicationForProduct(product.id)
+        : null;
     // now：「場次開始了沒」的判斷時間點，SSR 與第一次 hydrate 共用（見 useBookingNow）。
-    return { product, unavailable, now: Date.now() };
+    return { product, unavailable, publication, now: Date.now() };
   },
   // SEO（2026-11 健檢）：title「{品名}｜{類別}｜小時光風土誌書店」、描述取摘要＋介紹文、
   // JSON-LD 輸出 Product（刊物另標 Book）與麵包屑。組裝在 src/lib/seo/pages.ts#productSeo。
   head: ({ loaderData, matches, match }) => {
     const product = loaderData?.product ?? null;
+    const publication = loaderData?.publication ?? null;
     const seo = productSeo(product, PAGE, curatedImg, langFromMatches(matches));
     return {
       ...pageHead(
         { matches, match },
         {
-          translation: contentTranslation(product),
+          // 有對應刊物：canonical 指向刊物頁；可不可收錄跟著刊物頁（同一份刊名＋介紹），
+          // 刊物頁 noindex 的語言版本，這裡也 noindex——不讓 canonical 指向一個 noindex 的頁。
+          canonicalPath: publication ? publicationPath(publication.slug) : undefined,
+          translation: publication
+            ? publicationTranslation(publication)
+            : contentTranslation(product),
           title: seo.title,
           description: seo.description,
           image: seo.image,
@@ -145,7 +165,7 @@ export const Route = createFileRoute("/shop/$slug")({
 
 function ProductDetail() {
   const t = useT();
-  const { product, unavailable, now: loadedAt } = Route.useLoaderData();
+  const { product, unavailable, publication, now: loadedAt } = Route.useLoaderData();
   const { ui } = useSiteContent();
   // 場次開始了沒（isSessionClosedForBooking）。在 early return 之前（hook 規則）。
   const now = useBookingNow(loadedAt, product?.sessions ?? []);
@@ -384,6 +404,19 @@ function ProductDetail() {
           <p className="mt-6 whitespace-pre-line text-base leading-relaxed text-foreground/80">
             {t(product.description)}
           </p>
+          {publication ? (
+            <Link
+              to="/publications/$slug"
+              params={{ slug: publication.slug }}
+              className="link-arrow mt-8"
+              data-testid="product-publication-link"
+            >
+              {t(PAGE.publicationPage)}
+              <span className="arrow" aria-hidden="true">
+                →
+              </span>
+            </Link>
+          ) : null}
         </div>
       </section>
     </PageShell>

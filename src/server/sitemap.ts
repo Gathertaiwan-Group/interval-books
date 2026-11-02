@@ -14,6 +14,7 @@ import { robotsTxt, sitemapXml, type SitemapEntry } from "@/lib/seo/core";
 import type { Localized } from "@/i18n/types";
 import { buildSitemapEntries, latestOf, type SitemapContent } from "@/lib/seo/sitemap-entries";
 import { eventProductSlug } from "@/lib/shop";
+import { publicationTranslationFields } from "@/lib/seo/publication";
 
 /** CDN 快取一小時、過期後一天內可先吐舊的（背景重新整理）。 */
 const SITEMAP_CACHE = "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400";
@@ -109,12 +110,15 @@ export async function collectSitemapEntries(): Promise<SitemapEntry[]> {
     // event_session_plans.session_id 兩條外鍵），活動頁的 lastmod 要算進它們。
     rows(
       "products",
-      "slug,product_type,updated_at,title,summary,description,event_sessions(starts_at,ends_at,updated_at,event_session_plans(updated_at))",
+      "id,slug,product_type,updated_at,title,summary,description,event_sessions(starts_at,ends_at,updated_at,event_session_plans(updated_at))",
       { eq: ["status", "active"] },
     ),
     // 0052：只列上架中的卡片（is_published 由 status 推導）；不靠 RLS 當唯一防線。
     rows("journeys", "external_url,updated_at", { eq: ["is_published", true] }),
-    rows("publications", "updated_at", { latestOnly: true }),
+    // 2026-11 M4：每一本刊物有自己的頁（/publications/<slug>），整份列出來；刊名＋介紹判斷英日文。
+    rows("publications", "slug,product_id,updated_at,title,intro", {
+      eq: ["is_published", true],
+    }),
     rows("curated_items", "updated_at", { latestOnly: true }),
     rows("curated_themes", "updated_at", { latestOnly: true }),
   ]);
@@ -162,6 +166,7 @@ export async function collectSitemapEntries(): Promise<SitemapEntry[]> {
       };
     }),
     products: products.map((p) => ({
+      id: String(p.id ?? ""),
       slug: String(p.slug ?? ""),
       productType: String(p.product_type ?? ""),
       updatedAt: ts(p.updated_at),
@@ -171,7 +176,19 @@ export async function collectSitemapEntries(): Promise<SitemapEntry[]> {
       externalUrl: String(j.external_url ?? ""),
       updatedAt: ts(j.updated_at),
     })),
-    publicationsLatest: ts(publications[0]?.updated_at),
+    publicationsLatest: latestOf(publications.map((p) => ts(p.updated_at))),
+    publications: publications.map((p) => {
+      const title = loc(p.title);
+      const intro = loc(p.intro);
+      // 與頁面 head() 同一支判斷（publicationTranslation）。三語欄位讀不懂 → 頁面那邊是 503
+      // 的頁殼，這裡也不給翻譯資料（視同三語）。
+      return {
+        slug: String(p.slug ?? ""),
+        productId: ts(p.product_id),
+        updatedAt: ts(p.updated_at),
+        content: title && intro ? publicationTranslationFields({ title, intro }) : undefined,
+      };
+    }),
     curatedLatest: latestOf([ts(curatedItems[0]?.updated_at), ts(curatedThemes[0]?.updated_at)]),
   });
 }

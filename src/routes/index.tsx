@@ -737,7 +737,12 @@ function Index() {
                   key={c.slug}
                   className={`w-[42%] shrink-0 snap-start sm:w-auto ${i % 3 === 1 ? "sm:translate-y-8" : ""}`}
                 >
-                  <PublicationsLink hash={c.slug} className="group block" plain>
+                  <Link
+                    to="/publications/$slug"
+                    params={{ slug: c.slug }}
+                    className="group block"
+                    data-testid="home-publication-cover"
+                  >
                     <div className="aspect-[3/4] overflow-hidden bg-background/70 p-3 shadow-[0_18px_36px_-26px_oklch(0.245_0.018_60/0.6)]">
                       <img
                         src={imageFor(c.coverImageKey, exhibitionImg)}
@@ -751,7 +756,7 @@ function Index() {
                     </div>
                     <p className="mt-3 text-sm leading-snug">{t(c.title)}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{c.region}</p>
-                  </PublicationsLink>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -977,31 +982,19 @@ function SubHeader({
 }
 
 /**
- * 連到「選物 →〈地方刊物〉分頁」。
+ * 連到地方刊物總覽頁 /publications（2026-11 M4 起是獨立頁面；原本是 /shop?tab=publications）。
  *
  * 獨立成小元件、放在檔案最後：nav-consolidation-selftest 以「首頁第一個帶 search 的
  * <Link to="/shop">」確認主理人選品的「查看全部」落在 products 分頁；把刊物入口集中在這裡，
  * 那條檢查仍然對準選品那一顆。
  */
-function PublicationsLink({
-  className,
-  children,
-  hash,
-  plain = false,
-}: {
-  className?: string;
-  children: ReactNode;
-  hash?: string;
-  plain?: boolean;
-}) {
+function PublicationsLink({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <Link to="/shop" search={{ tab: "publications" }} hash={hash} className={className}>
+    <Link to="/publications" className={className}>
       {children}
-      {plain ? null : (
-        <span className="arrow" aria-hidden="true">
-          →
-        </span>
-      )}
+      <span className="arrow" aria-hidden="true">
+        →
+      </span>
     </Link>
   );
 }
