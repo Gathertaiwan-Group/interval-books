@@ -10,9 +10,10 @@
  * 與組裝器、/admin/registrations 走的是同三支。seats_taken／units_taken 一個都不碰。
  *
  * ── 寫入順序：任何一步失敗，最多留下一份「沒發布的草稿」，而且會被清掉 ─────
- *   1. 活動＋商品，**一律先存成草稿**（events.is_published=false、商品 draft）
- *   2. 場次 → 3. 票種
- *   4. 要「立即發布」才再存一次活動＋商品，翻成 is_published=true／商品 active
+ *   1. 活動＋商品，**一律先存成草稿**（events.status='draft'；0052 的 trigger 讓商品也是 draft）
+ *   2. 場次 → 3. 票種 → 3b. 策旅卡片（trigger 讓它跟著活動，也是草稿）
+ *   4. 要「直接上架」才呼叫 setEventStatus(live)：0052 admin_set_event_status 一個交易
+ *      同時把活動、票券商品、策旅卡片翻成上架——不會出現「活動上架了、卡片還是草稿」
  * 第 1–3 步之間不是一個資料庫交易（三支 repo 各自一個請求），所以失敗時照相反順序
  * 刪掉**這一次建立的那幾列**（票種隨場次 on delete cascade）。因為發布是最後一步，
  * 清理失敗的最壞情況也只是一份前台看不到的草稿，錯誤訊息會講出它的 id。
@@ -182,7 +183,8 @@ export async function commitEventQuick(prepared: PreparedQuickCreate): Promise<Q
   const firstError = Object.values(errors)[0];
   if (firstError) throw new Error(`表單有欄位需要修正：${firstError}`);
 
-  const { upsertEventWithProduct, removeEvent } = await import("@/server/repos/events");
+  const { upsertEventWithProduct, removeEvent, setEventStatus } =
+    await import("@/server/repos/events");
   const { upsertEventSession, upsertEventSessionPlan, removeEventSession } =
     await import("@/server/repos/event-sessions");
   const { removeProduct } = await import("@/server/repos/products");
@@ -197,8 +199,8 @@ export async function commitEventQuick(prepared: PreparedQuickCreate): Promise<Q
   try {
     // 1. 活動＋商品，先存成草稿。
     const draft = await upsertEventWithProduct(
-      { ...plan.event, is_published: false },
-      plan.product ? { price: plan.product.price, status: "draft" } : null,
+      { ...plan.event, status: "draft" },
+      plan.product ? { price: plan.product.price } : null,
     );
     eventId = draft.event.id;
     productId = draft.product?.id ?? null;
@@ -206,8 +208,8 @@ export async function commitEventQuick(prepared: PreparedQuickCreate): Promise<Q
       throw new Error("建立活動商品失敗：RPC 沒有回傳商品");
     }
 
-    // 2. 場次 → 3. 票種。場次一律 open：前台買不買得到由「活動發布＋商品上架」決定，
-    //    這樣之後在組裝器把草稿發布時，不必再到另一頁一場一場打開。
+    // 2. 場次 → 3. 票種。場次一律 open：前台買不買得到由活動的上架狀態決定（0052），
+    //    這樣之後把草稿上架時，不必再到另一頁一場一場打開。
     for (const s of plan.sessions) {
       const session = await upsertEventSession({
         product_id: productId!,
@@ -234,20 +236,20 @@ export async function commitEventQuick(prepared: PreparedQuickCreate): Promise<Q
       }
     }
 
-    // 3b. 策旅：/journeys 的卡片，同樣先存成草稿。
+    // 3b. 策旅：/journeys 的卡片。它的 external_url 指向這場活動，0052 的 trigger 讓它
+    //     跟著活動的狀態（此時是草稿）。
     if (journeyCard) {
-      const card = await upsertJourney({ ...journeyCard, is_published: false });
+      const card = await upsertJourney(journeyCard);
       journeyId = card.id;
     }
 
-    // 4. 發布是最後一步。
+    // 4. 上架是最後一步，一支 RPC、一個交易（活動＋票券商品＋策旅卡片一起）。
     if (input.publish) {
-      await upsertEventWithProduct(
-        { ...plan.event, id: eventId, is_published: true },
-        plan.product ? { price: plan.product.price, status: "active" } : null,
-      );
-      if (journeyCard && journeyId) {
-        await upsertJourney({ ...journeyCard, id: journeyId, is_published: true });
+      const snap = await setEventStatus(eventId, "live");
+      // 交易已經 commit：這裡不能丟例外（下面的清理會把剛上架的活動刪掉）。trigger 的設計下
+      // consistent 恆為 true，真的出現就記一筆讓人去查。
+      if (!snap.consistent) {
+        console.error("[event-quick-create] 上架後快照不一致，請檢查 0052 trigger：", snap);
       }
     }
   } catch (err) {

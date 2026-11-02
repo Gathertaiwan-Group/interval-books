@@ -590,9 +590,11 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
     // admin_phone）、orders 兩條限 admin_phone 的 CHECK、order_contact_edit_log＋
     // admin_update_phone_order_contacts()。admin_delete_order／admin_archive_order／
     // admin_mark_order_paid 一個字沒動。
-    "supabase/migrations 剛好 51 個 .sql 檔（0001–0050 原封不動 + 0051 電話報名聯絡資料放寬）",
+    // 0052（活動／策旅單一上架狀態）：events／journeys 加 status、票券商品 status 改由 trigger
+    // 推導、admin_upsert_event_with_session 多收 status；orders 與上面三支訂單 RPC 一個字沒動。
+    "supabase/migrations 剛好 52 個 .sql 檔（0001–0051 原封不動 + 0052 單一上架狀態）",
     migFiles.length,
-    51,
+    52,
   );
 }
 

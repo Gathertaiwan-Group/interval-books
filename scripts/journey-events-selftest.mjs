@@ -213,7 +213,7 @@ const fetchEventsBody = cms.slice(
 );
 checkTrue(
   "fetchEvents() 讀 journeys 的 external_url",
-  fetchEventsBody.includes('select("journeys", "external_url")'),
+  fetchEventsBody.includes('select("journeys", "external_url", { eq: ["is_published", true] })'),
 );
 checkTrue(
   "fetchEvents() 回傳前套 excludeJourneyEvents",

@@ -24,6 +24,7 @@ import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/server/supabase-admin";
 import { EVENT_LIST_FIELDS } from "@/lib/event-blocks";
 import type { Localized, LocalizedList } from "@/i18n/types";
+import type { BookingSession, ListingStatus } from "@/lib/listing-status";
 
 /**
  * ⚠️ **部署順序（第二次）：0027 要先套上 live DB，才能推這一行。** 底下多出來的七個
@@ -37,7 +38,7 @@ import type { Localized, LocalizedList } from "@/i18n/types";
  *    後推碼**。
  */
 const COLUMNS =
-  "id, slug, title, summary, description, display_date, iso_date, category, speaker_id, image_key, external_url, registration_type, payment_enabled, is_published, sort_order, highlights, suitable_for, not_suitable_for, takeaways, outline, includes, notes, show_seats_remaining, gallery_keys, created_at, updated_at";
+  "id, slug, title, summary, description, display_date, iso_date, category, speaker_id, image_key, external_url, registration_type, payment_enabled, is_published, status, sort_order, highlights, suitable_for, not_suitable_for, takeaways, outline, includes, notes, show_seats_remaining, gallery_keys, created_at, updated_at";
 
 /** products 的欄位，只取活動後台要顯示的那幾個。 */
 const PRODUCT_COLUMNS = "id, slug, source_id, price, compare_at_price, status, sort_order";
@@ -76,7 +77,13 @@ export type EventRow = {
   external_url: string;
   registration_type: EventRegistrationType;
   payment_enabled: boolean;
+  /**
+   * 🔴 0052：**唯讀的衍生值**（= status === "live"），由資料庫 trigger 維護。RLS 與前台
+   *    仍然讀它，但程式不要寫它——寫了也會被拉回。
+   */
   is_published: boolean;
+  /** 0052：上架狀態的唯一真相（草稿／上架／下架）。見 src/lib/listing-status.ts。 */
+  status: ListingStatus;
   sort_order: number;
   /**
    * 前台要不要印出這場活動的「尚餘名額 N」（0029）。not null default true，所以讀
@@ -129,7 +136,11 @@ export type EventUpsertInput = {
   external_url: string;
   registration_type: EventRegistrationType;
   payment_enabled: boolean;
-  is_published: boolean;
+  /**
+   * 0052：上架狀態。**省略＝不動**（新增時是草稿）。只有 upsertEventWithProduct() 寫得進去
+   * （與內容同一個交易）；只想改狀態走 setEventStatus()。is_published 不再收——它是衍生值。
+   */
+  status?: ListingStatus;
   sort_order: number;
   /** 前台印不印「尚餘名額 N」（0029）。省略時：新增用 true，更新沿用舊值。 */
   show_seats_remaining?: boolean;
@@ -166,6 +177,8 @@ export type EventProductRow = {
   sort_order: number;
   /** public.event_sessions 掛在 products.id 上（0020），不是掛在 events.id 上。 */
   session_count: number;
+  /** 0052：後台列表算「報名中／額滿／已結束」用。只有 listEventProducts() 會帶。 */
+  sessions?: BookingSession[];
 };
 
 /**
@@ -189,7 +202,8 @@ export type EventSessionBrief = {
 export type EventProductInput = {
   price: number;
   compare_at_price?: number | null;
-  status: ProductStatus;
+  /** 🔴 0052：沒有作用——票券商品的狀態由 trigger 跟著活動推導。保留選填只為相容。 */
+  status?: ProductStatus;
   sort_order?: number;
 };
 
@@ -252,7 +266,9 @@ export async function upsertEvent(input: EventUpsertInput): Promise<EventRow> {
         external_url: input.external_url,
         registration_type: input.registration_type,
         payment_enabled: input.payment_enabled,
-        is_published: input.is_published,
+        // 0052：is_published 是 status 的衍生值，這一支不寫狀態（新增＝草稿）；status 也只在
+        //       有給的時候才放進去，省略＝不動。
+        ...(input.status === undefined ? {} : { status: input.status }),
         sort_order: input.sort_order,
         // 0029：省略時 true（＝欄位預設）。這條路徑是 upsert 而不是 patch，漏掉這一欄
         // 會讓「沒送」變成 NULL 而撞上 NOT NULL，不是「沿用舊值」。
@@ -311,7 +327,8 @@ export async function upsertEventWithProduct(
       external_url: input.external_url,
       registration_type: input.registration_type,
       payment_enabled: input.payment_enabled,
-      is_published: input.is_published,
+      // 0052：沒給 status 時整個 key 都不放（SQL 那邊＝沿用舊值；新增＝草稿）。
+      ...(input.status === undefined ? {} : { status: input.status }),
       sort_order: input.sort_order,
       // 0029。**沒給值的時候整個 key 都不放進去**（`...(cond ? {k:v} : {})`），與底下
       // 七個清單欄位同一條規則：SQL 那邊「payload 沒帶這個 key ＝ 這一欄不動」要在
@@ -341,7 +358,7 @@ export async function upsertEventWithProduct(
       ? {
           price: product.price,
           compare_at_price: product.compare_at_price ?? null,
-          status: product.status,
+          // 0052：status 由 trigger 跟著活動推導，這裡不送。
           sort_order: product.sort_order ?? input.sort_order,
         }
       : null,
@@ -464,19 +481,22 @@ export async function listEventProducts(): Promise<Record<string, EventProductRo
 
   const { data: sessions, error: sessionError } = await supabaseAdmin()
     .from("event_sessions")
-    .select("product_id")
+    .select("product_id, starts_at, ends_at, capacity, seats_taken, status")
     .in("product_id", productIds);
 
   if (sessionError) {
     throw new Error(`[repo/events] listEventProducts 數場次失敗：${sessionError.message}`);
   }
 
-  const counts: Record<string, number> = {};
-  for (const s of (sessions ?? []) as { product_id: string }[]) {
-    counts[s.product_id] = (counts[s.product_id] ?? 0) + 1;
+  const byProduct: Record<string, BookingSession[]> = {};
+  for (const s of (sessions ?? []) as (BookingSession & { product_id: string })[]) {
+    const { product_id, ...rest } = s;
+    (byProduct[product_id] ??= []).push(rest);
   }
   for (const key of Object.keys(byEventId)) {
-    byEventId[key].session_count = counts[byEventId[key].id] ?? 0;
+    const list = byProduct[byEventId[key].id] ?? [];
+    byEventId[key].session_count = list.length;
+    byEventId[key].sessions = list;
   }
   return byEventId;
 }
@@ -532,4 +552,43 @@ export async function countEventsByCategory(): Promise<Record<string, number>> {
     counts[row.category] = (counts[row.category] ?? 0) + 1;
   }
   return counts;
+}
+
+/** 0052 event_listing_snapshot()：三個衍生欄位的現況＋是否一致。 */
+export type EventListingSnapshot = {
+  event_id: string;
+  slug: string;
+  status: ListingStatus;
+  is_published: boolean;
+  registration_type: EventRegistrationType;
+  product: { id: string; status: "draft" | "active" | "archived" } | null;
+  journeys: { id: string; status: ListingStatus; is_published: boolean }[];
+  consistent: boolean;
+};
+
+/** 唯讀：給 MCP 預覽與後台顯示。查不到活動回 null。 */
+export async function getEventListingSnapshot(
+  eventId: string,
+): Promise<EventListingSnapshot | null> {
+  const { data, error } = await supabaseAdmin().rpc("event_listing_snapshot", {
+    p_event_id: eventId,
+  });
+  if (error) throw new Error(`[repo/events] 讀上架狀態失敗：${error.message}`);
+  return (data as EventListingSnapshot | null) ?? null;
+}
+
+/**
+ * 改上架狀態：一支 RPC（0052 admin_set_event_status），一個交易——活動的 is_published、
+ * 票券商品的 status、指向它的策旅卡片在同一個交易裡由 trigger 跟著改，不會切到一半。
+ */
+export async function setEventStatus(
+  eventId: string,
+  status: ListingStatus,
+): Promise<EventListingSnapshot & { status_before: ListingStatus; changed: boolean }> {
+  const { data, error } = await supabaseAdmin().rpc("admin_set_event_status", {
+    p_event_id: eventId,
+    p_status: status,
+  });
+  if (error) throw new Error(`[repo/events] 改上架狀態失敗：${error.message}`);
+  return data as EventListingSnapshot & { status_before: ListingStatus; changed: boolean };
 }

@@ -274,11 +274,26 @@ const EVENT_FIELDS = [
   "category",
   "speaker_id",
   "image_key",
-  "is_published",
+  "status",
 ] as const;
 
 const JOURNEY_LOCALIZED = ["title", "summary", "description", "days", "theme"] as const;
-const JOURNEY_FIELDS = [...JOURNEY_LOCALIZED, "is_published"] as const;
+const JOURNEY_FIELDS = [...JOURNEY_LOCALIZED] as const;
+
+/** 0052：活動／策旅的單一上架狀態。 */
+const listingStatusArg = z
+  .enum(["draft", "live", "archived"])
+  .describe(
+    "draft 草稿（網站上看不到）／live 上架（看得到；站內報名可報名，仍受場次時間與名額限制）／archived 下架（看不到，報名紀錄與訂單保留）",
+  );
+
+/** 0052：舊參數。帶了就拒絕，不讓它被 zod 安靜地丟掉、讓 AI 以為已經公開。 */
+const retiredPublishedArg = z
+  .boolean()
+  .optional()
+  .describe(
+    "已停用：上架／下架請改用 set_event_status（status=live／archived／draft）。帶了會被拒絕。",
+  );
 
 const PRODUCT_LOCALIZED = ["title", "summary", "description"] as const;
 const PRODUCT_FIELDS = [
@@ -397,10 +412,12 @@ export const TOOL_INPUTS = {
       .optional()
       .describe("artists.id，見 list_speakers；null＝不指定"),
     image_key: imageArg("封面圖"),
-    is_published: z
-      .boolean()
+    status: listingStatusArg
       .optional()
-      .describe("true 公開／false 隱藏（不影響票券商品的上下架）"),
+      .describe(
+        "上架狀態（選填）。與文案同一個交易寫入，票券商品與策旅卡片會一起跟著。只想改狀態請用 set_event_status。",
+      ),
+    is_published: retiredPublishedArg,
     dry_run: dryRunArg,
   }),
   update_journey: z.object({
@@ -410,7 +427,25 @@ export const TOOL_INPUTS = {
     description: localizedArg("介紹").optional(),
     days: localizedArg("天數文字，例如 3 天 2 夜").optional(),
     theme: localizedArg("主題關鍵字").optional(),
-    is_published: z.boolean().optional(),
+    is_published: retiredPublishedArg,
+    dry_run: dryRunArg,
+  }),
+  set_event_status: z.object({
+    id: z
+      .string()
+      .min(1)
+      .max(200)
+      .optional()
+      .describe("活動的 events.id 或網址代稱（slug）。與 journey_id 二選一。"),
+    journey_id: z
+      .string()
+      .min(1)
+      .max(200)
+      .optional()
+      .describe(
+        "策旅卡片的 journeys.id（選填，與 id 二選一）。卡片連到某場活動時，等於改那場活動的狀態。",
+      ),
+    status: listingStatusArg,
     dry_run: dryRunArg,
   }),
   update_shop_product: z.object({
@@ -499,6 +534,7 @@ export const WRITE_TOOLS: readonly ToolName[] = [
   "delete_news",
   "update_event",
   "update_journey",
+  "set_event_status",
   "update_shop_product",
   "update_publication",
   "update_speaker",
@@ -701,11 +737,15 @@ export function registerContentTools(server: McpServer): void {
     "list_events",
     {
       title: "活動列表",
-      description: "列出所有活動（含未公開），附票券商品的上架狀態與價格（唯讀）。",
+      description:
+        "列出所有活動（含草稿與下架）。status 是唯一的上架狀態（draft 草稿／live 上架／archived 下架）；" +
+        "booking 是上架中的活動依時間與名額推導的報名狀況（報名中／額滿／報名截止／已結束）。票券商品的狀態跟著活動走（唯讀）。",
       annotations: READ_ONLY,
     },
     async () => {
       const { listEvents, listEventProducts } = await import("@/server/repos/events");
+      const { bookingPhase, BOOKING_PHASE_LABEL, LISTING_STATUS_LABEL } =
+        await import("@/lib/listing-status");
       const [rows, products] = await Promise.all([listEvents(), listEventProducts()]);
       return jsonText({
         count: rows.length,
@@ -717,7 +757,18 @@ export function registerContentTools(server: McpServer): void {
           display_date: r.display_date,
           category: r.category,
           speaker_id: r.speaker_id,
-          is_published: r.is_published,
+          status: r.status,
+          status_label: LISTING_STATUS_LABEL[r.status],
+          booking:
+            r.status === "live"
+              ? BOOKING_PHASE_LABEL[
+                  bookingPhase({
+                    registrationType: r.registration_type,
+                    isoDate: r.iso_date,
+                    sessions: products[r.id]?.sessions ?? [],
+                  })
+                ]
+              : undefined,
           sort_order: r.sort_order,
           ticket_product: products[r.id]
             ? {
@@ -751,11 +802,12 @@ export function registerContentTools(server: McpServer): void {
         listEventSessionPlans(),
       ]);
       const sessionIds = new Set(sessions.map((s) => s.id));
+      const { sessions: _bookingSessions, ...ticket } = products[id] ?? { sessions: undefined };
       return jsonText({
         event: row,
         read_only: {
-          note: "以下只供參考；票價、場次、票種、名額請在後台修改。",
-          ticket_product: products[id] ?? null,
+          note: "以下只供參考；票價、場次、票種、名額請在後台修改。上架狀態用 set_event_status 改。",
+          ticket_product: products[id] ? ticket : null,
           sessions,
           plans: plans
             .filter((p) => sessionIds.has(p.session_id))
@@ -778,9 +830,9 @@ export function registerContentTools(server: McpServer): void {
     {
       title: "修改活動內容",
       description:
-        "修改活動的文案（名稱、摘要、介紹）、封面、分類、講者、顯示日期，以及公開／隱藏。" +
-        "走後台同一支 admin_upsert_event_with_session：名稱／摘要／封面會同步到票券商品，但票價與商品上下架**不會**被動到。" +
-        `不能改代稱、報名方式、票價、場次。${WRITE_NOTE}`,
+        "修改活動的文案（名稱、摘要、介紹）、封面、分類、講者、顯示日期，也可以順便改上架狀態 status。" +
+        "走後台同一支 admin_upsert_event_with_session（一個交易）：名稱／摘要／封面會同步到票券商品；帶 status 時票券商品與策旅卡片的上下架一起跟著，票價不會被動到。" +
+        `不能改代稱、報名方式、票價、場次。只想上架／下架請用 set_event_status。${WRITE_NOTE}`,
       annotations: WRITE,
     },
     async (args) => {
@@ -788,6 +840,11 @@ export function registerContentTools(server: McpServer): void {
         import("@/server/repos/events"),
         import("@/lib/admin/schemas"),
       ]);
+      if (args.is_published !== undefined) {
+        throw new McpInputError(
+          "is_published 已停用：活動改成單一上架狀態。請改用 set_event_status（status=live 上架／archived 下架／draft 草稿），或在 update_event 帶 status。",
+        );
+      }
       const row = await getEventById(args.id);
       if (!row) notFound("活動", args.id);
 
@@ -814,7 +871,7 @@ export function registerContentTools(server: McpServer): void {
         patch,
         {
           localized: EVENT_LOCALIZED,
-          plain: ["display_date", "category", "speaker_id", "image_key", "is_published"],
+          plain: ["display_date", "category", "speaker_id", "image_key", "status"],
         },
       );
       const valid = validate<import("@/lib/admin/schemas").EventFormValues>(eventSchema, next);
@@ -830,9 +887,18 @@ export function registerContentTools(server: McpServer): void {
         fields: EVENT_FIELDS,
         translated,
         commit: async () => {
-          // product: null ＝這一次不動商品的價格與狀態；lists: {} ＝七個清單欄位不動。
-          // 與後台「未開啟販售」時送的是同一個形狀（_shell.events.$id.tsx）。
-          const saved = await upsertEventWithProduct({ ...valid, id: row.id, lists: {} }, null);
+          // product: null ＝這一次不動商品的價格；lists: {} ＝七個清單欄位不動。
+          // status 有改才送（0052：省略＝不動），票券商品與策旅卡片由 trigger 在同一個交易跟著。
+          const { status, ...rest } = valid;
+          const saved = await upsertEventWithProduct(
+            {
+              ...rest,
+              id: row.id,
+              lists: {},
+              ...(args.status !== undefined ? { status } : {}),
+            },
+            null,
+          );
           return {
             id: saved.event.id,
             row: pickFields(saved.event as unknown as Record<string, unknown>, [
@@ -850,17 +916,28 @@ export function registerContentTools(server: McpServer): void {
 
   add(
     "list_journeys",
-    { title: "策旅列表", description: "列出所有策旅（含未公開）。", annotations: READ_ONLY },
+    {
+      title: "策旅列表",
+      description:
+        "列出所有策旅卡片（含草稿與下架）。linked_event_id 是這張卡片跟著的那場活動：卡片的上下架跟著活動走，" +
+        "要上架／下架用 set_event_status（帶 id=linked_event_id 或 journey_id）。",
+      annotations: READ_ONLY,
+    },
     async () => {
       const { listJourneys } = await import("@/server/repos/journeys");
-      const rows = await listJourneys();
+      const { listEvents } = await import("@/server/repos/events");
+      const { linkedEventIdFor } = await import("@/lib/journey-events");
+      const { LISTING_STATUS_LABEL } = await import("@/lib/listing-status");
+      const [rows, events] = await Promise.all([listJourneys(), listEvents()]);
       return jsonText({
         count: rows.length,
         journeys: rows.map((r) => ({
           id: r.id,
           title: r.title.zh,
           days: r.days.zh,
-          is_published: r.is_published,
+          status: r.status,
+          status_label: LISTING_STATUS_LABEL[r.status],
+          linked_event_id: linkedEventIdFor(r.external_url, events),
           sort_order: r.sort_order,
         })),
       });
@@ -898,7 +975,7 @@ export function registerContentTools(server: McpServer): void {
     "update_journey",
     {
       title: "修改策旅內容",
-      description: `修改策旅的文案與公開／隱藏。不能改報名方式與票價。${WRITE_NOTE}`,
+      description: `修改策旅卡片的文案。不能改報名方式與票價；上架／下架請用 set_event_status（卡片跟著活動走）。${WRITE_NOTE}`,
       annotations: WRITE,
     },
     async (args) => {
@@ -906,14 +983,20 @@ export function registerContentTools(server: McpServer): void {
         import("@/server/repos/journeys"),
         import("@/lib/admin/schemas"),
       ]);
+      if (args.is_published !== undefined) {
+        throw new McpInputError(
+          "is_published 已停用：策旅卡片的上下架跟著活動走。請改用 set_event_status（journey_id=這張卡片，status=live／archived／draft）。",
+        );
+      }
       const row = await getJourneyById(args.id);
       if (!row) notFound("策旅", args.id);
+      const { is_published: _retired, ...patchArgs } = args;
       const { next, translated } = await applyPatch(
         row as unknown as Record<string, unknown>,
-        args,
+        patchArgs,
         {
           localized: JOURNEY_LOCALIZED,
-          plain: ["is_published"],
+          plain: [],
         },
       );
       const valid = validate<import("@/server/repos/journeys").JourneyUpsertInput>(
@@ -935,6 +1018,143 @@ export function registerContentTools(server: McpServer): void {
           return {
             id: saved.id,
             row: pickFields(saved as unknown as Record<string, unknown>, ["id", ...JOURNEY_FIELDS]),
+          };
+        },
+      });
+    },
+  );
+
+  add(
+    "set_event_status",
+    {
+      title: "活動／策旅上架、下架",
+      description:
+        "把一場活動（或策旅）切到 draft 草稿／live 上架／archived 下架，一句話完成。" +
+        "這是活動與策旅唯一的上架狀態：活動頁、票券商品（能不能結帳）、策旅卡片在同一個資料庫交易裡一起切換，不會出現「看得到卻不能報名」。" +
+        "live＝前台看得到，站內報名的活動可以報名（仍受場次時間與名額限制）；draft＝前台看不到；archived＝前台看不到（舊網址 404），報名紀錄與訂單都保留。" +
+        "用 id（events.id 或網址代稱）指定活動，或用 journey_id 指定策旅卡片（會改它連到的那場活動）。場次各自的開放／關閉不受影響。" +
+        WRITE_NOTE,
+      annotations: WRITE,
+    },
+    async (args) => {
+      if (Boolean(args.id) === Boolean(args.journey_id)) {
+        throw new McpInputError("id（活動）與 journey_id（策旅卡片）要剛好給一個。");
+      }
+      const { listEvents, getEventListingSnapshot, setEventStatus } =
+        await import("@/server/repos/events");
+      const { getJourneyById, setJourneyStatus } = await import("@/server/repos/journeys");
+      const { linkedEventIdFor } = await import("@/lib/journey-events");
+      const { LISTING_STATUS_LABEL, listingToProductStatus } = await import("@/lib/listing-status");
+      const dryRun = args.dry_run !== false;
+      const events = await listEvents();
+
+      let eventId: string | null = null;
+      if (args.id) {
+        const ev = events.find((e) => e.id === args.id) ?? events.find((e) => e.slug === args.id);
+        if (!ev) notFound("活動", args.id);
+        eventId = ev.id;
+      } else {
+        const card = await getJourneyById(args.journey_id as string);
+        if (!card) notFound("策旅", args.journey_id as string);
+        eventId = linkedEventIdFor(card.external_url, events);
+        if (!eventId) {
+          // 孤兒卡片（沒有連到任何活動）：只改卡片本身。
+          return runWrite({
+            tool: "set_event_status",
+            entity: "journey",
+            id: card.id,
+            action: "update",
+            dryRun,
+            before: { status: card.status, is_published: card.is_published },
+            after: { status: args.status, is_published: args.status === "live" },
+            fields: ["status", "is_published"],
+            extra: {
+              title: card.title.zh,
+              note: "這張策旅卡片沒有連到任何活動，只改卡片本身。",
+              status_label: {
+                before: LISTING_STATUS_LABEL[card.status],
+                after: LISTING_STATUS_LABEL[args.status],
+              },
+            },
+            commit: async () => {
+              const r = await setJourneyStatus(card.id, args.status);
+              return { id: card.id, row: r as unknown as Record<string, unknown> };
+            },
+          });
+        }
+      }
+
+      const ev = events.find((e) => e.id === eventId)!;
+      const snap = await getEventListingSnapshot(ev.id);
+      if (!snap) notFound("活動", ev.id);
+      const shape = (s: {
+        status: string;
+        is_published: boolean;
+        product: { status: string } | null;
+        journeys: { id: string; status: string; is_published: boolean }[];
+      }) => ({
+        status: s.status,
+        is_published: s.is_published,
+        ticket_product_status: s.product ? s.product.status : null,
+        journey_cards: s.journeys.map((j) => ({
+          id: j.id,
+          status: j.status,
+          is_published: j.is_published,
+        })),
+      });
+      const before = shape(snap);
+      const after = shape({
+        status: args.status,
+        is_published: args.status === "live",
+        product: snap.product ? { status: listingToProductStatus(args.status) } : null,
+        journeys: snap.journeys.map((j) => ({
+          id: j.id,
+          status: args.status,
+          is_published: args.status === "live",
+        })),
+      });
+      const warnings: string[] = [];
+      if (args.status === "live" && ev.registration_type === "internal" && !snap.product) {
+        warnings.push(
+          "這場是站內報名但還沒有票券商品，上架後看得到、但還不能報名；請到後台活動頁開啟販售並排場次。",
+        );
+      }
+      if (args.status !== "live" && snap.status === "live") {
+        warnings.push(
+          "切離上架後客人就看不到這一頁、也不能再下單；已經成立的訂單與報名紀錄都保留。",
+        );
+      }
+      return runWrite({
+        tool: "set_event_status",
+        entity: "event",
+        id: ev.id,
+        action: "update",
+        dryRun,
+        before,
+        after,
+        fields: ["status", "is_published", "ticket_product_status", "journey_cards"],
+        extra: {
+          title: ev.title.zh,
+          slug: ev.slug,
+          url: `/events/${ev.slug}`,
+          status_label: {
+            before: LISTING_STATUS_LABEL[snap.status],
+            after: LISTING_STATUS_LABEL[args.status],
+          },
+          warnings: warnings.length ? warnings : undefined,
+        },
+        commit: async () => {
+          const res = await setEventStatus(ev.id, args.status);
+          // 已經 commit 了，不丟例外（否則稽核會記成失敗、狀態卻已經改了）；trigger 的設計下
+          // consistent 恆為 true，真的出現就在結果裡講出來。
+          return {
+            id: ev.id,
+            row: {
+              ...shape(res),
+              ...(res.consistent
+                ? {}
+                : { warning: "寫入後檢查發現活動／商品／卡片狀態不一致，請回報管理員" }),
+            },
           };
         },
       });

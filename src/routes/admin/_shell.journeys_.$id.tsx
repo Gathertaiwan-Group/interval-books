@@ -27,9 +27,9 @@ const JOURNEY_ID = /^[A-Za-z0-9._-]{1,128}$/;
 
 export const Route = createFileRoute("/admin/_shell/journeys_/$id")({
   loader: async ({ params }) => {
-    if (!JOURNEY_ID.test(params.id)) return { journey: null };
-    const { getJourneyById } = await import("@/lib/admin/fns/journeys");
-    return { journey: await getJourneyById({ data: { id: params.id } }) };
+    if (!JOURNEY_ID.test(params.id)) return { journey: null, linkedEvent: null };
+    const { getAdminJourneyEditData } = await import("@/lib/admin/fns/journeys");
+    return await getAdminJourneyEditData({ data: { id: params.id } });
   },
   head: ({ loaderData }) => ({
     meta: [
@@ -58,7 +58,7 @@ function JourneyPending() {
 }
 
 function JourneyEditPage() {
-  const { journey } = Route.useLoaderData();
+  const { journey, linkedEvent } = Route.useLoaderData();
   const router = useRouter();
   const navigate = Route.useNavigate();
 
@@ -77,6 +77,10 @@ function JourneyEditPage() {
       // 換一檔策旅＝重新掛載，表單不會跨筆殘留。
       key={journey.id}
       journey={journey}
+      linkedEvent={linkedEvent}
+      onStatusChanged={async () => {
+        await router.invalidate({ sync: true });
+      }}
       onSaved={async () => {
         await router.invalidate({ sync: true });
         if (backIfPreviousIs(router.history, ["/admin/journeys"])) return;

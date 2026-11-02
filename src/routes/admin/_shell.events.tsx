@@ -24,6 +24,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { listEvents } from "@/lib/admin/fns/events";
 import { formatUpdatedAt } from "@/lib/admin/format";
+import {
+  countByStatus,
+  ListingFilterTabs,
+  ListingStatusBadge,
+} from "@/components/admin/ListingStatus";
+import { bookingPhase, parseListingFilter, type ListingFilter } from "@/lib/listing-status";
 
 type EventRow = Awaited<ReturnType<typeof listEvents>>[number];
 
@@ -46,11 +52,17 @@ type EventRow = Awaited<ReturnType<typeof listEvents>>[number];
  *    活動的固定欄位只有一個家。這一頁只剩「有哪些活動、去編哪一場、刪掉哪一場」。
  */
 export const Route = createFileRoute("/admin/_shell/events")({
+  // 0052：列表篩選（全部／草稿／上架／下架）放在網址上，重新整理、回上一頁都還在。
+  validateSearch: (search: Record<string, unknown>): { status?: ListingFilter } => {
+    const f = parseListingFilter(search.status);
+    return f === "all" ? {} : { status: f };
+  },
   // 一支 fn 拿齊（活動、分類、講者、「這場活動的商品」那一欄——一次撈完，不要一場一場問）。
   // 見 src/lib/admin/fns/events.ts 的 getAdminEventsPageData。
   loader: async () => {
     const { getAdminEventsPageData } = await import("@/lib/admin/fns/events");
-    return await getAdminEventsPageData();
+    // now 跟著 loader 資料序列化：SSR 與 hydrate 算出同一個「報名中／額滿」（不會 #418）。
+    return { ...(await getAdminEventsPageData()), now: Date.now() };
   },
   head: () => ({
     meta: [{ title: "活動｜小時光書店後台" }],
@@ -58,19 +70,15 @@ export const Route = createFileRoute("/admin/_shell/events")({
   component: AdminEventsPage,
 });
 
-const PRODUCT_STATUS_LABEL: Record<"draft" | "active" | "archived", string> = {
-  draft: "草稿",
-  active: "已上架",
-  archived: "已下架",
-};
-
 const REGISTRATION_TYPE_LABEL: Record<"external" | "internal", string> = {
   external: "外部連結報名",
   internal: "站內報名",
 };
 
 function AdminEventsPage() {
-  const { events, categories, artists, products } = Route.useLoaderData();
+  const { events, categories, artists, products, now } = Route.useLoaderData();
+  const filter = parseListingFilter(Route.useSearch().status);
+  const navigate = Route.useNavigate();
   const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isListView = pathname === "/admin/events";
@@ -102,6 +110,9 @@ function AdminEventsPage() {
     return categories.find((c) => c.id === id)?.label.zh ?? id;
   }
 
+  const counts = countByStatus(events);
+  const shown = filter === "all" ? events : events.filter((e) => e.status === filter);
+
   function speakerLabel(id: string | null): string {
     if (!id) return "—";
     return artists.find((a) => a.id === id)?.name ?? id;
@@ -113,7 +124,9 @@ function AdminEventsPage() {
         <div>
           <h1 className="text-2xl font-medium">活動</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            共 {events.length} 場。點「編輯」進入活動頁組裝器——那一頁由上到下的順序就是前台的順序。
+            共 {events.length} 場。每場活動只有一個狀態：<strong>草稿</strong>（前台看不到）、
+            <strong>上架</strong>（看得到、可報名）、<strong>下架</strong>（看不到，報名紀錄保留）。
+            點「編輯」在活動頁最上面切換；票券商品與策旅卡片會一起跟著。
           </p>
         </div>
         <Button asChild className="gap-1.5">
@@ -123,6 +136,14 @@ function AdminEventsPage() {
           </Link>
         </Button>
       </div>
+
+      <ListingFilterTabs
+        value={filter}
+        counts={counts}
+        onChange={(next) =>
+          void navigate({ search: next === "all" ? {} : { status: next }, replace: true })
+        }
+      />
 
       <div className="overflow-x-auto rounded-md border border-border">
         <Table>
@@ -134,21 +155,23 @@ function AdminEventsPage() {
               <TableHead>主講人</TableHead>
               <TableHead>顯示日期</TableHead>
               <TableHead>報名方式</TableHead>
-              <TableHead>商品</TableHead>
-              <TableHead className="w-24">狀態</TableHead>
+              <TableHead>票券</TableHead>
+              <TableHead className="w-40">狀態</TableHead>
               <TableHead className="hidden w-36 lg:table-cell">最後更新</TableHead>
               <TableHead className="w-36 text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {events.length === 0 ? (
+            {shown.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
-                  尚無資料，點右上角「新增活動」開始。
+                  {events.length === 0
+                    ? "尚無資料，點右上角「新增活動」開始。"
+                    : "這個狀態下沒有活動。"}
                 </TableCell>
               </TableRow>
             ) : (
-              events.map((e) => (
+              shown.map((e) => (
                 <TableRow key={e.id}>
                   <TableCell className="text-muted-foreground">{e.sort_order}</TableCell>
                   <TableCell className="max-w-sm truncate font-medium">{e.title.zh}</TableCell>
@@ -163,17 +186,12 @@ function AdminEventsPage() {
                     {REGISTRATION_TYPE_LABEL[e.registration_type]}
                     {e.payment_enabled ? "・需付款" : ""}
                   </TableCell>
-                  {/* 「這場活動的商品」。三種狀態要長得不一樣：沒上架、上架了但
-                      還沒排場次、上架且有場次。中間那一種是站內報名最常見的
-                      半成品 —— 商品在、按鈕會出現、但點進去一場都選不到。 */}
+                  {/* 「這場活動的票券」：價格與場次數。上下架**不在這裡**——0052 起票券
+                      商品跟著活動的狀態走（右邊那一欄）。「尚無場次」是站內報名最常見的
+                      半成品：上架了、按鈕會出現、但點進去一場都選不到。 */}
                   <TableCell className="whitespace-nowrap text-muted-foreground">
                     {products[e.id] ? (
                       <span className="flex items-center gap-1.5">
-                        <Badge
-                          variant={products[e.id].status === "active" ? "default" : "secondary"}
-                        >
-                          {PRODUCT_STATUS_LABEL[products[e.id].status]}
-                        </Badge>
                         <span className="text-xs">
                           NT${products[e.id].price.toLocaleString("en-US")}
                           {" ・ "}
@@ -183,13 +201,23 @@ function AdminEventsPage() {
                         </span>
                       </span>
                     ) : (
-                      <span className="text-xs">未上架</span>
+                      <span className="text-xs">
+                        {e.registration_type === "external" ? "外部報名，無票券" : "未開啟販售"}
+                      </span>
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={e.is_published ? "default" : "secondary"}>
-                      {e.is_published ? "已發布" : "草稿"}
-                    </Badge>
+                    <ListingStatusBadge
+                      status={e.status}
+                      phase={bookingPhase(
+                        {
+                          registrationType: e.registration_type,
+                          isoDate: e.iso_date,
+                          sessions: products[e.id]?.sessions ?? [],
+                        },
+                        now,
+                      )}
+                    />
                   </TableCell>
                   <TableCell className="hidden whitespace-nowrap text-muted-foreground lg:table-cell">
                     {formatUpdatedAt(e.updated_at)}

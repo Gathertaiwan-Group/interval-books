@@ -62,6 +62,7 @@ const MOCKED = {
     "listTakenEventSlugs",
     "upsertEventWithProduct",
     "removeEvent",
+    "setEventStatus",
   ],
   "@/server/repos/event-sessions": [
     "upsertEventSession",
@@ -112,6 +113,7 @@ registerHooks({
 const L = (zh) => ({ zh, en: zh, ja: zh });
 const WRITE_FNS = new Set([
   "upsertEventWithProduct",
+  "setEventStatus",
   "upsertEventSession",
   "upsertEventSessionPlan",
   "upsertJourney",
@@ -199,6 +201,16 @@ function freshMock() {
           return Promise.resolve({ id: `plan-${++seq}` });
         case "upsertJourney":
           return Promise.resolve({ id: args[0].id ?? "jo-new" });
+        case "setEventStatus":
+          // 0052 admin_set_event_status 的回傳形狀（一致性快照）。
+          return Promise.resolve({
+            event_id: args[0],
+            status: args[1],
+            is_published: args[1] === "live",
+            consistent: true,
+            status_before: "draft",
+            changed: true,
+          });
         case "upsertProduct":
           return Promise.resolve({ ...args[0], id: "goods-new" });
         case "removeEvent":
@@ -317,7 +329,7 @@ console.log("\n[1] dry_run");
     en: "EN:一起讀《海的聲音》。",
     ja: "JA:一起讀《海的聲音》。",
   });
-  check("預覽：預設草稿", ev?.is_published, false);
+  check("預覽：預設草稿", ev?.status, "draft");
   check(
     "預覽：票券商品 draft、價格＝最低票價",
     r.data?.will_create?.ticket_product?.status === "draft" &&
@@ -397,9 +409,9 @@ console.log("\n[2] 正常建立");
   ]);
   const first = writes(m)[0].args;
   check(
-    "活動先存草稿、商品 draft、價格 350",
-    [first[0].is_published, first[1]?.status, first[1]?.price],
-    [false, "draft", 350],
+    "活動先存草稿（status=draft；0052 商品狀態跟著活動，不另送）、價格 350",
+    [first[0].status, "is_published" in first[0], first[1]?.status, first[1]?.price],
+    ["draft", false, undefined, 350],
   );
   check(
     "活動內容：slug／分類／付費／站內報名",
@@ -442,14 +454,9 @@ console.log("\n[2] 正常建立");
   const r = await call("create_event", { ...EVENT_ARGS, publish: true, dry_run: false });
   const ws = writes(m);
   check(
-    "publish=true：最後一步才發布（活動 is_published、商品 active）",
-    [
-      ws.at(-1)?.name,
-      ws.at(-1)?.args[0].is_published,
-      ws.at(-1)?.args[1]?.status,
-      ws.at(-1)?.args[0].id,
-    ],
-    ["upsertEventWithProduct", true, "active", "ev-new"],
+    "publish=true：最後一步才上架，一支 setEventStatus（0052 一個交易：活動＋票券＋卡片）",
+    [ws.at(-1)?.name, ws.at(-1)?.args[0], ws.at(-1)?.args[1], ws.length],
+    ["setEventStatus", "ev-new", "live", 8],
   );
   check("結果 published=true", r.data?.published, true);
 }
@@ -476,8 +483,8 @@ console.log("\n[2] 正常建立");
   ]);
   const card = writes(m)[3].args[0];
   check(
-    "策旅卡片：草稿、連到活動頁、3天2夜、主題",
-    [card.is_published, card.external_url, card.days.zh, card.theme.zh],
+    "策旅卡片：不自己帶狀態（跟著活動）、連到活動頁、3天2夜、主題",
+    ["is_published" in card || "status" in card, card.external_url, card.days.zh, card.theme.zh],
     [false, "/events/20991204", "3天2夜", "山海與建築"],
   );
   const ses = writes(m)[1].args[0];
@@ -930,11 +937,11 @@ console.log("\n[7] 後台一頁新增（createEventQuick）行為不變");
     publish: true,
     theme: "",
   });
-  check("寫入順序：草稿 → 場次 → 票種 → 發布", names(m), [
+  check("寫入順序：草稿 → 場次 → 票種 → 上架（setEventStatus）", names(m), [
     "upsertEventWithProduct",
     "upsertEventSession",
     "upsertEventSessionPlan",
-    "upsertEventWithProduct",
+    "setEventStatus",
   ]);
   const plan = writes(m)[2].args[0];
   check("票種 seats_per_unit=1、名額＝場次名額", [plan.seats_per_unit, plan.capacity], [1, 25]);

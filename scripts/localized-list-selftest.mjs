@@ -738,7 +738,10 @@ assertMigrationDependencies(check, join(ROOT, "supabase/migrations"), {
   // ——都不是三語 jsonb 欄位，不受這支自檢守的任何一條規則管轄。它也沒有新增
   // 任何 jsonb 欄位或 CHECK 約束。三語清單的欄位清單與 CHECK 不受影響。
   // 原樣成立。
-  reviewedThrough: "0036_event_session_plans.sql",
+  // 2026-11-02 0052_event_listing_status.sql：帳本標了 events_shape／localized_list——它加了
+  // events.status、重寫 admin_upsert_event_with_session（取自正式庫本體，只加 status 三處；七個
+  // 清單欄位的驗證與 coalesce 逐字沿用）。中間的 0037–0050 沒有動到這兩區。本檔斷言重跑全綠。
+  reviewedThrough: "0052_event_listing_status.sql",
 });
 
 // -----------------------------------------------------------------------------

@@ -570,7 +570,10 @@ console.log("\n[4] migration 0041 與帳本");
     // 庫存、products.seats_taken、inv 保留、取消訂單、付款嘗試、回傳值逐字沿用 0036。另 revoke
     // registration_removal_log 的 sequence 權限。這支自檢的斷言重讀過，原樣成立。
     // 0050（後台電話報名）已審：orders 只加有 default／nullable 的欄位（前台 insert 形狀不變）；enqueue_order_email／enqueue_registration_emails 只多 notify_customer 條件（預設 true，前台訂單行為不變）；expire_unpaid_orders 只多一行 source <> 'admin_phone'（前台訂單行為不變）。這支守的不變式原樣成立。
-    reviewedThrough: "0050_admin_phone_orders.sql",
+    // 2026-11-02 0052_event_listing_status.sql：帳本標了 products_availability（只有 source_type='event'
+    // 的票券商品 status 改由 trigger 跟著活動推導）與 session_seats（admin_upsert_event_with_session
+    // 本體的場次段逐字沿用，seats_taken 一個字沒動）。本檔的斷言逐條重跑全綠，原樣成立。
+    reviewedThrough: "0052_event_listing_status.sql",
   });
 }
 

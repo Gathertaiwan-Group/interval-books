@@ -870,6 +870,15 @@ export const MIGRATION_LEDGER = Object.freeze([
     note: "後台電話報名聯絡資料放寬（只限 source='admin_phone'，前台不變）：event_registrations 的 CHECK event_registrations_contactable 換成同名 before insert/update of email,phone,order_id 觸發器（函式 event_registrations_check_contact()，security definer、search_path=''、revoke public/anon/authenticated）——有 email 或 phone 照舊通過，兩者皆空只有所屬 orders.source='admin_phone' 才放行，其餘以同名 check_violation 拒絕。orders 加兩條 CHECK：orders_admin_phone_contact（admin_phone 的 customer_email／customer_phone 至少一個非空白）、orders_admin_phone_notify_email（admin_phone 勾 notify_customer 必須有 customer_email）；customer_email／customer_phone 仍 NOT NULL（沒填存 ''）。新表 order_contact_edit_log（actor_id、order_id、changes jsonb 只記欄位名不存值；RLS on、anon/authenticated 全收、service_role 只 select）與 RPC admin_update_phone_order_contacts(order_id, actor_id, customer jsonb, participants jsonb) returns (updated, reason)：鎖訂單列、限 admin_phone、先驗全部輸入（姓名非空、聯絡至少一項、勾寄信要 email、參加者屬於這張單）再寫、有變動才記一列稽核；security definer、search_path=''、只 grant service_role。reserve_session_seat／enqueue_*／expire_unpaid_orders 一個字沒動",
     touches: ["event_registrations", "orders_payments"],
   },
+  {
+    file: "0052_event_listing_status.sql",
+    note: "活動與策旅的單一上架狀態：events.status／journeys.status（draft／live／archived，not null default 'draft'，CHECK）為唯一真相；trigger 推導 events.is_published、票券商品 products.status（live→active）、連得上活動的策旅卡片（journey_linked_event_id，照抄 src/lib/journey-events.ts 判準）的 status／is_published，直接改衍生欄位會被拉回。依客人現況推定既有資料（is_published→live；未發布且商品 archived→archived；其餘 draft）並對齊衍生欄位。新增 admin_set_event_status／admin_set_journey_status（孤兒卡片）／event_listing_snapshot，admin_upsert_event_with_session 多收 event.status（取自正式庫本體，只加三處）。全部只 grant service_role。",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：products_availability（票券商品
+    // status 的推導與對齊、public.products trigger）、events_shape（public.events 加欄位、trigger、
+    // admin_upsert_event_with_session 本體）、session_seats 與 localized_list（upsert 本體逐字沿用的
+    // event_sessions／seats_taken 場次段與 is_localized_list 清單驗證；這兩段沒有改）。
+    touches: ["events_shape", "localized_list", "products_availability", "session_seats"],
+  },
 ]);
 
 /** 磁碟上的 migration 檔名，排序過。空目錄 = 丟例外（那不是「沒有違規」）。 */

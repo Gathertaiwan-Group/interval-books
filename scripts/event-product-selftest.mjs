@@ -800,10 +800,23 @@ for (const fn of ["events_sync_product_seats_visibility", "products_pull_seats_v
 //    的那一份裡原樣成立（0031 對 show_seats_remaining 一個字都沒動）。
 const MIG_0031_NAME = "0031_event_gallery.sql";
 checkTrue(`${MIG_0031_NAME} 存在`, migrations.includes(MIG_0031_NAME));
+// 2026-11-02：0052_event_listing_status.sql 再重寫一次（取自正式庫本體，只加 status 三處）。
+// 上面 0029／0031 那幾段斷言對 0052 那一份逐條重跑全綠（show_seats_remaining、gallery_keys
+// 一個字沒動）；0052 自己加的三處在下面三條守著。
+const MIG_0052_NAME = "0052_event_listing_status.sql";
 checkTrue(
-  "現在生效的 RPC 就是 0031 那一份",
-  liveRpc.file === MIG_0031_NAME,
+  "現在生效的 RPC 就是 0052 那一份（0031 之後只有 0052 重寫它）",
+  liveRpc.file === MIG_0052_NAME,
   `實際是 ${liveRpc.file}`,
+);
+checkTrue(
+  "0052：status 沒帶就沿用舊值、新增是草稿（不是 live）",
+  /coalesce\(nullif\(v_ev ->> 'status', ''\), v_prev\.status, 'draft'\)/.test(fnBodySql),
+);
+checkTrue("0052：on conflict 時 status 也會被更新", /status\s+= excluded\.status/.test(fnBodySql));
+checkTrue(
+  "0052：帶了 status 就一定要是 draft／live／archived",
+  /not in \('draft', 'live', 'archived'\)/.test(fnBodySql),
 );
 checkTrue(
   "RPC 把活動的旗標寫進 products（v_event.show_seats_remaining）",

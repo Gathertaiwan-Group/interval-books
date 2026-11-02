@@ -1,7 +1,7 @@
 /**
  * 「一頁新增活動」——/admin/events/new 打開的那一頁。
  *
- * 一張表單、由上到下四段（基本 → 場次 → 報名與費用 → 發布）、一顆按鈕，就把一場
+ * 一張表單、由上到下四段（基本 → 場次 → 報名與費用 → 狀態）、一顆按鈕，就把一場
  * 「看得到、買得到」的活動建好：活動＋商品＋場次＋票種，全部走既有的那一套
  * （products → event_sessions → event_session_plans，見 CLAUDE.md 最上面那一節）。
  * 寫入在 src/server/event-quick-create.ts，純邏輯在 src/lib/admin/event-quick-create.ts。
@@ -291,7 +291,7 @@ export function EventQuickCreate({
         sessionCount: result.sessionIds.length,
         planCount: result.planIds.length,
       });
-      toast.success(result.published ? `${copy.noun}已建立並發布` : `${copy.noun}已存成草稿`);
+      toast.success(result.published ? `${copy.noun}已建立並上架` : `${copy.noun}已存成草稿`);
       window.scrollTo({ top: 0, behavior: "smooth" });
       // 列表頁（父路由）的 loader 要拿到這一場。
       await router.invalidate();
@@ -317,15 +317,15 @@ export function EventQuickCreate({
         <div className="rounded-md border border-border p-6 text-center">
           <CheckCircle2 className="mx-auto h-10 w-10 text-primary" />
           <h1 className="mt-3 text-2xl font-medium">
-            {created.published ? `${copy.noun}已建立並發布` : `${copy.noun}已存成草稿`}
+            {created.published ? `${copy.noun}已建立並上架` : `${copy.noun}已存成草稿`}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {created.sessionCount > 0
               ? `已建立 ${created.sessionCount} 個${copy.sessionNoun}${created.planCount > 0 ? `、${created.planCount} 個票種` : ""}${isJourney ? "，以及 /journeys 上的策旅卡片" : ""}。`
               : `這場使用外部連結報名，沒有建立${copy.sessionNoun}。`}
             {created.published
-              ? "前台現在就看得到。"
-              : `草稿前台看不到；確認好之後到「進階編輯」打開「發布狀態」並把商品改成「已上架」${isJourney ? "，策旅卡片則在策旅列表按「編輯」打開發布" : ""}。`}
+              ? `前台現在就看得到${created.sessionCount > 0 ? "，客人可以報名" : ""}${isJourney ? "，策旅卡片也一起上架了" : ""}。`
+              : `草稿前台看不到；確認好之後到「進階編輯」，把最上面的「狀態」改成「上架」再儲存——${isJourney ? "活動頁、票券與策旅卡片" : "活動頁與票券"}會一起上架。`}
           </p>
           {created.untranslated > 0 ? (
             <p className="mt-2 text-sm text-muted-foreground">
@@ -748,16 +748,26 @@ export function EventQuickCreate({
         ) : null}
       </Step>
 
-      {/* ── 4. 發布 ─────────────────────────────────────────────── */}
-      <Step n={4} title="發布">
+      {/* ── 4. 狀態（0052：建好之後只有一個狀態，活動、票券、策旅卡片一起） ─────── */}
+      <Step n={4} title="狀態">
         <RadioGroup
           value={values.publish ? "publish" : "draft"}
           onValueChange={(v) => set("publish", v === "publish")}
           className="grid gap-2 sm:grid-cols-2"
         >
           {[
-            { v: "publish", label: "立即發布", hint: "建好就出現在前台，客人可以報名。" },
-            { v: "draft", label: "先存草稿", hint: "前台看不到，之後在進階編輯打開發布。" },
+            {
+              v: "draft",
+              label: "存成草稿",
+              hint: "前台看不到。之後在進階編輯把「狀態」改成「上架」。",
+            },
+            {
+              v: "publish",
+              label: "直接上架",
+              hint: isJourney
+                ? "建好就出現在前台與策旅列表，客人可以報名。"
+                : "建好就出現在前台，客人可以報名。",
+            },
           ].map((o) => (
             <Label
               key={o.v}
@@ -781,7 +791,7 @@ export function EventQuickCreate({
       {/* ── 送出 ─────────────────────────────────────────────────── */}
       <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-background/95 px-6 py-3 backdrop-blur">
         <p className="text-sm text-muted-foreground">
-          {values.publish ? "建立後立即發布" : "建立後存成草稿"}
+          {values.publish ? "建立後直接上架" : "建立後存成草稿"}
         </p>
         <Button
           type="button"

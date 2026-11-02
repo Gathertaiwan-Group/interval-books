@@ -143,10 +143,11 @@ import { getRemittanceAccount } from "@/server/repos/site-settings";
 import { computeReferralDiscount, resolveReferralCode } from "@/lib/referral";
 import { findReferrerForCheckout } from "@/server/repos/referrals";
 import { isSessionClosedForBooking } from "@/lib/event-status";
+import { ticketSellable } from "@/lib/listing-status";
 
 /** Columns checkout needs from public.products. Price is re-read, never trusted. */
 const PRODUCT_COLUMNS =
-  "id, product_type, title, price, stock, capacity, seats_taken, requires_shipping, status";
+  "id, product_type, title, price, stock, capacity, seats_taken, requires_shipping, status, source_type, source_id";
 
 type ProductRow = {
   id: string;
@@ -164,6 +165,9 @@ type ProductRow = {
   seats_taken: number;
   requires_shipping: boolean;
   status: string;
+  /** 0052：活動票券 → 'event' + events.id，結帳時再確認活動是「上架」（ticketSellable）。 */
+  source_type: string | null;
+  source_id: string | null;
 };
 
 /** 名額的真相在這張表（0020）。starts_at：場次開始後不收新訂單（isSessionClosedForBooking）。 */
@@ -365,6 +369,27 @@ async function priceLines(
   const rows = (data ?? []) as unknown as ProductRow[];
   const byId = new Map(rows.map((r) => [r.id, r]));
 
+  // 0052：活動票券再讀一次活動本身的上架狀態（第二道門，理由見 ticketSellable 的檔頭）。
+  // 只有購物車裡真的有活動票券才查，全是書的購物車往返次數不變。
+  const eventIds = [
+    ...new Set(
+      rows
+        .filter((r) => isBooking(r.product_type) && r.source_type === "event" && r.source_id)
+        .map((r) => r.source_id as string),
+    ),
+  ];
+  const eventStatusById = new Map<string, string>();
+  if (eventIds.length > 0) {
+    const { data: eventRows, error: eventError } = await supabaseAdmin()
+      .from("events")
+      .select("id, status")
+      .in("id", eventIds);
+    if (eventError) throw new CheckoutError("order_failed");
+    for (const e of (eventRows ?? []) as { id: string; status: string }[]) {
+      eventStatusById.set(e.id, e.status);
+    }
+  }
+
   // The sittings this cart claims to be booking, read back from the database.
   // Only queried when the cart actually holds a booking, so an all-books
   // checkout costs exactly the round trips it did before 0020.
@@ -410,6 +435,8 @@ async function priceLines(
   for (const w of wanted.values()) {
     const p = byId.get(w.productId);
     if (!p) throw new CheckoutError("product_unavailable");
+    // 草稿／下架的活動：就算有人自己組出結帳網址也不能下單（與上架中的商品同一句話）。
+    if (!ticketSellable(p, eventStatusById)) throw new CheckoutError("product_unavailable");
 
     let unitPrice = p.price;
     let planTitle: Localized | null = null;

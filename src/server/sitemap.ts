@@ -112,7 +112,8 @@ export async function collectSitemapEntries(): Promise<SitemapEntry[]> {
       "slug,product_type,updated_at,title,summary,description,event_sessions(starts_at,ends_at,updated_at,event_session_plans(updated_at))",
       { eq: ["status", "active"] },
     ),
-    rows("journeys", "external_url,updated_at"),
+    // 0052：只列上架中的卡片（is_published 由 status 推導）；不靠 RLS 當唯一防線。
+    rows("journeys", "external_url,updated_at", { eq: ["is_published", true] }),
     rows("publications", "updated_at", { latestOnly: true }),
     rows("curated_items", "updated_at", { latestOnly: true }),
     rows("curated_themes", "updated_at", { latestOnly: true }),

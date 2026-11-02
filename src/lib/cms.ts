@@ -374,7 +374,7 @@ type SelectOptions = {
   /** Column to sort by (ascending). */
   order?: string;
   /** Restricts the query to rows where `eq[0]` equals `eq[1]`. */
-  eq?: [column: string, value: string];
+  eq?: [column: string, value: string | boolean];
   /**
    * Restricts the query to rows where `in[0]` is one of `in[1]`.
    * Additive (2026-09) — fetchPages() below is the only caller so far; every
@@ -740,7 +740,7 @@ export function eyebrowOf(page: PageContent | null, prefix: string, suffix: stri
 export async function fetchEvents(): Promise<EventEntry[]> {
   const [events, journeyRows] = await Promise.all([
     fetchAllEventRows(),
-    select("journeys", "external_url"),
+    select("journeys", "external_url", { eq: ["is_published", true] }),
   ]);
   const journeyUrls = journeyRows
     ? journeyRows.map((r) => str(r.external_url))
@@ -752,9 +752,13 @@ async function fetchAllEventRows(): Promise<EventEntry[]> {
   const rows = await select(
     "events",
     "id,slug,title,summary,description,display_date,iso_date,category,external_url,image_key,sort_order",
-    { order: "sort_order" },
+    // 0052：只列上架中的活動（is_published 是 events.status='live' 的衍生值）。RLS 也擋，
+    //       這裡明寫條件，不靠 RLS 當唯一防線（與 sitemap 同一個做法）。
+    { order: "sort_order", eq: ["is_published", true] },
   );
-  if (!rows || !rows.length) return FALLBACK_EVENTS;
+  // 讀取失敗才退回內建內容；**讀到零筆是真的零筆**（例如全部下架），不能拿種子資料頂上。
+  if (!rows) return FALLBACK_EVENTS;
+  if (!rows.length) return [];
   const mapped: EventEntry[] = [];
   for (const r of rows) {
     const title = loc(r.title);
@@ -778,7 +782,8 @@ async function fetchAllEventRows(): Promise<EventEntry[]> {
       lastSessionDate: null,
     });
   }
-  if (!mapped.length) return FALLBACK_EVENTS;
+  // 0052：只有「讀取失敗」才退回內建資料；讀到的列都不完整就是沒有可顯示的活動。
+  if (!mapped.length) return [];
   return await attachLastSessionDates(mapped);
 }
 
@@ -800,7 +805,9 @@ export type JourneyEventDateRow = {
 };
 
 export async function fetchJourneyEventDates(): Promise<JourneyEventDateRow[]> {
-  const rows = await select("events", "slug,external_url,display_date,iso_date,image_key");
+  const rows = await select("events", "slug,external_url,display_date,iso_date,image_key", {
+    eq: ["is_published", true],
+  });
   if (!rows || !rows.length) return [];
   const mapped: JourneyEventDateRow[] = rows
     .map((r) => ({
@@ -928,6 +935,8 @@ export async function fetchEventBySlug(slug: string): Promise<EventDetailResult>
         "id,slug,title,summary,description,display_date,iso_date,category,external_url,registration_type,image_key,speaker_id,gallery_keys,highlights,suitable_for,not_suitable_for,takeaways,outline,includes,notes",
       )
       .eq("slug", slug)
+      // 0052：草稿與下架的活動一律 404（is_published 是 status='live' 的衍生值）。
+      .eq("is_published", true)
       .maybeSingle();
 
     if (error) {
@@ -1029,9 +1038,12 @@ export async function fetchJourneys(): Promise<JourneyEntry[]> {
   const rows = await select(
     "journeys",
     "id,title,summary,description,days,theme,external_url,sort_order",
-    { order: "sort_order" },
+    // 0052：只列上架中的卡片（is_published 由 journeys.status／所屬活動推導）。
+    { order: "sort_order", eq: ["is_published", true] },
   );
-  if (!rows || !rows.length) return FALLBACK_JOURNEYS;
+  // 讀取失敗才退回內建內容；讀到零筆＝全部是草稿／下架，就是零筆。
+  if (!rows) return FALLBACK_JOURNEYS;
+  if (!rows.length) return [];
   const mapped: JourneyEntry[] = [];
   for (const r of rows) {
     const title = loc(r.title);
@@ -1050,7 +1062,8 @@ export async function fetchJourneys(): Promise<JourneyEntry[]> {
       externalUrl: str(r.external_url),
     });
   }
-  return mapped.length ? mapped : FALLBACK_JOURNEYS;
+  // 0052：同上——讀取成功就照實回（可能是空的），不拿內建種子資料頂上。
+  return mapped;
 }
 
 /**
@@ -1120,7 +1133,12 @@ export async function findEventSlugIgnoringCase(slug: string): Promise<string | 
   const pattern = exactIlikePattern(slug);
   if (!db || !pattern) return null;
   try {
-    const { data, error } = await db.from("events").select("slug").ilike("slug", pattern).limit(5);
+    const { data, error } = await db
+      .from("events")
+      .select("slug")
+      .eq("is_published", true)
+      .ilike("slug", pattern)
+      .limit(5);
     if (error || !Array.isArray(data)) return null;
     return caseInsensitiveMatch(
       slug,
@@ -1128,5 +1146,37 @@ export async function findEventSlugIgnoringCase(slug: string): Promise<string | 
     );
   } catch {
     return null;
+  }
+}
+
+/**
+ * 0052：寫死版面的活動著陸頁（/events/kungtung、/events/sound-of-the-sea…）用的可見度檢查。
+ *
+ * 那幾頁的文案在程式碼裡，不經過 fetchEventBySlug()，所以草稿／下架時必須另外問一次
+ * 「這場活動現在是不是上架」。規則與 /events/$slug 相同：
+ *   查得到（上架中） → visible
+ *   查不到           → 404（草稿、下架、或代稱不存在）
+ *   讀取失敗         → unavailable：照常渲染頁殼，**不是** 404（資料庫眨一下眼不該讓搜尋引擎以為頁面不見了）
+ */
+export async function fetchEventVisibility(
+  slug: string,
+): Promise<{ visible: boolean; unavailable: boolean }> {
+  const db = supabase;
+  if (!db) return { visible: false, unavailable: true };
+  try {
+    const { data, error } = await db
+      .from("events")
+      .select("id")
+      .eq("slug", slug)
+      .eq("is_published", true)
+      .maybeSingle();
+    if (error) {
+      logFailure(`events/${slug}`, error.message);
+      return { visible: false, unavailable: true };
+    }
+    return { visible: data !== null, unavailable: false };
+  } catch (err) {
+    logFailure(`events/${slug}`, err instanceof Error ? err.message : String(err));
+    return { visible: false, unavailable: true };
   }
 }

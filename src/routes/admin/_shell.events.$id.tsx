@@ -95,6 +95,8 @@ import { ImageField } from "@/components/admin/ImageField";
 import { MirrorNote } from "@/components/admin/MirrorNote";
 import { EventBlockEditor, type EventBlockItem } from "@/components/admin/EventBlockEditor";
 import { EventQuickCreate } from "@/components/admin/EventQuickCreate";
+import { ListingStatusSelect } from "@/components/admin/ListingStatus";
+import { LISTING_STATUS_LABEL } from "@/lib/listing-status";
 import { eventReading } from "@/lib/images";
 import { formatTaipeiDateTime } from "@/lib/taipei-time";
 import { EVENT_BLOCK_KINDS, EVENT_LIST_FIELDS, type EventBlockKind } from "@/lib/event-blocks";
@@ -202,12 +204,6 @@ const SECTION_LABELS: Record<string, string> = {
   ),
 };
 
-const PRODUCT_STATUS_LABEL: Record<"draft" | "active" | "archived", string> = {
-  draft: "草稿",
-  active: "已上架",
-  archived: "已下架",
-};
-
 const REGISTRATION_TYPE_LABEL: Record<"external" | "internal", string> = {
   external: "外部連結報名",
   internal: "站內報名",
@@ -268,7 +264,7 @@ const FIELD_LABELS: Record<string, string> = {
   product: "§4 商品",
   "product.price": "§4 售價",
   "product.compare_at_price": "§4 原價",
-  "product.status": "§4 商品狀態",
+  status: "§1 狀態",
   highlights: "§6 活動亮點",
   takeaways: "§6 帶得走什麼",
   suitable_for: "§7 適合對象",
@@ -326,13 +322,14 @@ function toFormValues(
     // 0029。新增的活動預設**顯示**（＝ 欄位預設，也是 0029 之前的行為）——
     // 關掉名額顯示要是店家的一個明確動作，不是一個安靜的初始值。
     show_seats_remaining: row?.show_seats_remaining ?? true,
-    is_published: row?.is_published ?? true,
+    // 0052：唯一的上架狀態。新增的活動一律從草稿開始——上架要是一個明確的動作。
+    status: row?.status ?? "draft",
     sort_order: row?.sort_order ?? nextSortOrder,
+    // 票券商品的上下架跟著 status（trigger），表單上不再有商品狀態。
     product: product
       ? {
           price: product.price,
           compare_at_price: product.compare_at_price,
-          status: product.status,
           sort_order: product.sort_order,
         }
       : null,
@@ -624,9 +621,7 @@ function AdminEventAssemblerPage() {
     setSellEnabled(on);
     form.setValue(
       "product",
-      on
-        ? (form.getValues("product") ?? { price: 0, compare_at_price: null, status: "active" })
-        : null,
+      on ? (form.getValues("product") ?? { price: 0, compare_at_price: null }) : null,
       { shouldDirty: true },
     );
   }
@@ -686,8 +681,30 @@ function AdminEventAssemblerPage() {
         <Section
           step={nextStep()}
           title="基本資料"
-          description="這一段決定這場活動的身分：網址、分類、主講人、封面與發布狀態。"
+          description="這一段決定這場活動的身分：上架狀態、網址、分類、主講人與封面。"
         >
+          {/* 0052：唯一的狀態選擇器。活動頁、票券商品（能不能結帳）、策旅卡片在按下「儲存」
+              的那一個交易裡一起切換——不再有分散的發布開關與商品狀態。 */}
+          <FormField
+            control={form.control}
+            name="status"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel htmlFor="event-listing-status">狀態</FormLabel>
+                <ListingStatusSelect
+                  id="event-listing-status"
+                  value={field.value ?? "draft"}
+                  onChange={field.onChange}
+                />
+                {event?.status === "live" && field.value && field.value !== "live" ? (
+                  <p className="text-xs text-destructive">
+                    儲存後客人就看不到這場活動、也不能再報名；已成立的訂單與報名紀錄都保留。
+                  </p>
+                ) : null}
+                <FormMessage />
+              </FormItem>
+            )}
+          />
           <FormField
             control={form.control}
             name="slug"
@@ -894,24 +911,6 @@ function AdminEventAssemblerPage() {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="is_published"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>發布狀態</FormLabel>
-                  <div className="flex h-9 items-center gap-2">
-                    <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <span className="text-sm text-muted-foreground">
-                      {field.value ? "已發布" : "草稿"}
-                    </span>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </div>
         </Section>
 
@@ -1104,18 +1103,19 @@ function AdminEventAssemblerPage() {
           <div className="space-y-4 border-t border-border pt-4">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-medium">上架成可報名商品</p>
+                <p className="text-sm font-medium">站內售票</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {product
-                    ? "這場活動已經有商品了。關掉這個開關不會刪掉它，只是這一次儲存不動它。"
-                    : "打開之後，儲存時會同時建立這場活動的商品（/shop/event-代稱）。"}
+                    ? "這場活動已經有票券商品了。關掉這個開關不會刪掉它，只是這一次儲存不動它的價格。"
+                    : "打開之後，儲存時會同時建立這場活動的票券商品（/shop/event-代稱）。"}{" "}
+                  票券能不能買跟著上面的「狀態」：上架才能報名。
                 </p>
               </div>
               <Switch checked={sellEnabled} onCheckedChange={toggleSell} />
             </div>
 
             {sellEnabled ? (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="product.price"
@@ -1160,34 +1160,6 @@ function AdminEventAssemblerPage() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="product.status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>商品狀態</FormLabel>
-                      <Select value={field.value ?? "active"} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {(
-                            Object.keys(
-                              PRODUCT_STATUS_LABEL,
-                            ) as (keyof typeof PRODUCT_STATUS_LABEL)[]
-                          ).map((v) => (
-                            <SelectItem key={v} value={v}>
-                              {PRODUCT_STATUS_LABEL[v]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
             ) : null}
 
@@ -1200,8 +1172,8 @@ function AdminEventAssemblerPage() {
               hint="名額不在商品上，也不在這一頁——名額是場次的屬性。"
             >
               {product
-                ? `/shop/event-${event?.slug} ・ ${PRODUCT_STATUS_LABEL[product.status]} ・ NT$${product.price.toLocaleString("en-US")} ・ ${product.session_count} 個場次`
-                : "尚未上架。"}
+                ? `/shop/event-${event?.slug} ・ 跟著活動狀態（${LISTING_STATUS_LABEL[event?.status ?? "draft"]}） ・ NT$${product.price.toLocaleString("en-US")} ・ ${product.session_count} 個場次`
+                : "尚未開啟站內售票。"}
             </MirrorNote>
           </div>
         </Section>

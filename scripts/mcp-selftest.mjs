@@ -532,6 +532,8 @@ const EXPECTED_TOOLS = [
   "delete_news",
   "update_event",
   "update_journey",
+  // 2026-11-02 0052：活動／策旅單一上架狀態（行為測試在 listing-status-selftest.mjs）
+  "set_event_status",
   "update_shop_product",
   "update_publication",
   "update_speaker",
@@ -639,6 +641,7 @@ const EXPECTED_TOOLS = [
     delete_news: { id: "x" },
     update_event: { id: "x" },
     update_journey: { id: "x" },
+    set_event_status: { id: "x", status: "live" },
     update_shop_product: { id: "x" },
     update_publication: { id: "x" },
     update_speaker: { id: "x" },
@@ -709,7 +712,7 @@ const EXPECTED_TOOLS = [
   const toolsSrc = readFile(join(SRC, "server/mcp/tools.ts"));
   checkTrue(
     "update_event 走 upsertEventWithProduct（與後台同一支 RPC），product 傳 null",
-    /upsertEventWithProduct\(\{[^)]*\},\s*null\)/.test(toolsSrc),
+    /upsertEventWithProduct\(\s*\{[\s\S]*?lists: \{\}[\s\S]*?\},\s*null,?\s*\)/.test(toolsSrc),
   );
   {
     const patch = core.productContentPatch({

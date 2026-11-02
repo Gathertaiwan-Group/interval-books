@@ -42,6 +42,9 @@ import { LocalizedField } from "@/components/admin/LocalizedField";
 import { useUnsavedChangesGuard } from "@/components/admin/UnsavedChangesGuard";
 import { useFormDirty } from "@/lib/admin/form-dirty";
 import { journeySchema, type JourneyFormValues } from "@/lib/admin/schemas";
+import { Link } from "@tanstack/react-router";
+import { ListingStatusBadge, ListingStatusSelect } from "@/components/admin/ListingStatus";
+import { LISTING_STATUS_LABEL, type ListingStatus } from "@/lib/listing-status";
 import type { JourneyRow } from "@/server/repos/journeys";
 
 function journeyToFormValues(row: JourneyRow): JourneyFormValues {
@@ -55,23 +58,43 @@ function journeyToFormValues(row: JourneyRow): JourneyFormValues {
     external_url: row.external_url,
     registration_type: row.registration_type,
     payment_enabled: row.payment_enabled,
-    is_published: row.is_published,
     sort_order: row.sort_order,
   };
 }
 
 type Props = {
   journey: JourneyRow;
+  /** 0052：這張卡片跟著的活動（連得上才有）。有的話狀態只能到活動那邊改。 */
+  linkedEvent: { id: string; title: string; status: ListingStatus } | null;
+  /** 孤兒卡片改完狀態（已寫入）：呼叫端負責 invalidate。 */
+  onStatusChanged: () => Promise<void>;
   /** 存檔成功（已經 allowLeave）：呼叫端負責 invalidate 與換頁。 */
   onSaved: () => Promise<void>;
 };
 
-export function JourneyForm({ journey, onSaved }: Props) {
+export function JourneyForm({ journey, linkedEvent, onSaved, onStatusChanged }: Props) {
   const form = useForm<JourneyFormValues>({
     resolver: zodResolver(journeySchema),
     defaultValues: journeyToFormValues(journey),
   });
   const [saving, setSaving] = useState(false);
+  const [statusSaving, setStatusSaving] = useState(false);
+
+  /** 只有孤兒卡片走得到這裡（連得上活動的卡片畫面上沒有選擇器，RPC 也會拒絕）。 */
+  async function changeOrphanStatus(next: ListingStatus) {
+    if (next === journey.status) return;
+    setStatusSaving(true);
+    try {
+      const { setJourneyStatus } = await import("@/lib/admin/fns/journeys");
+      await setJourneyStatus({ data: { id: journey.id, status: next } });
+      toast.success(`策旅卡片已改成「${LISTING_STATUS_LABEL[next]}」`);
+      await onStatusChanged();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "改狀態失敗，請稍後再試");
+    } finally {
+      setStatusSaving(false);
+    }
+  }
 
   const { dirty } = useFormDirty(form.watch());
   const guard = useUnsavedChangesGuard(dirty);
@@ -201,24 +224,33 @@ export function JourneyForm({ journey, onSaved }: Props) {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="is_published"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>發布狀態</FormLabel>
-                  <div className="flex h-9 items-center gap-2">
-                    <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <span className="text-sm text-muted-foreground">
-                      {field.value ? "已發布" : "草稿"}
-                    </span>
-                  </div>
-                  <FormMessage />
-                </FormItem>
+            {/* 0052：卡片沒有自己的發布開關。連到活動的卡片跟著活動的狀態（活動、票券、
+                卡片同一個交易切換）；只有連不到任何活動的舊卡片才在這裡直接改。 */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">狀態</p>
+              {linkedEvent ? (
+                <div className="space-y-1.5 text-sm">
+                  <ListingStatusBadge status={journey.status} />
+                  <p className="text-xs text-muted-foreground">
+                    跟著活動「{linkedEvent.title}」。要上架或下架，請到{" "}
+                    <Link
+                      to="/admin/events/$id"
+                      params={{ id: linkedEvent.id }}
+                      className="underline underline-offset-2"
+                    >
+                      活動頁
+                    </Link>{" "}
+                    最上面的「狀態」切換，卡片會一起跟著。
+                  </p>
+                </div>
+              ) : (
+                <ListingStatusSelect
+                  value={journey.status}
+                  onChange={(v) => void changeOrphanStatus(v)}
+                  disabled={statusSaving}
+                />
               )}
-            />
+            </div>
           </div>
         </form>
       </Form>

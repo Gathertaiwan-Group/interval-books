@@ -159,6 +159,13 @@ function lower(...parts: (string | null | undefined)[]): string {
     .toLowerCase();
 }
 
+/** 0052：票券商品狀態 → 活動的單一狀態用語（active＝上架）。 */
+const TICKET_STATUS_LABEL: Record<UPProduct["status"], string> = {
+  draft: "草稿",
+  active: "上架",
+  archived: "下架",
+};
+
 function ticketHref(p: UPProduct): string | null {
   if (p.source_type === "event" && p.source_id) return `/admin/events/${p.source_id}`;
   return null;
@@ -216,7 +223,11 @@ export function buildUnifiedRows(input: {
       price: p.price,
       comparePrice: p.compare_at_price,
       published: p.status === "active",
-      statusLabel: PRODUCT_STATUS_LABEL[p.status],
+      // 0052：活動票券的上下架跟著活動的單一狀態（開關是鎖住的，editable=false），
+      //       標籤直接講出來，免得有人以為要在這裡另外上架。
+      statusLabel: href
+        ? `${TICKET_STATUS_LABEL[p.status]}（跟著活動）`
+        : PRODUCT_STATUS_LABEL[p.status],
       ...productStock(p, listed),
       invName: listed?.inv_name ?? null,
       updatedAt: p.updated_at,

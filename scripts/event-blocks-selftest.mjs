@@ -321,7 +321,10 @@ assertMigrationDependencies(check, MIG_DIR, {
   // **後面**，不影響任何一欄的位置。is_localized_list() 的形狀守衛與 v_prev
   // 的讀取也原樣照抄。event_blocks 那張表與 admin_reorder_event_blocks()
   // 0031 一個字都沒提到（它連 event_blocks 這個字都沒出現過）。原樣成立。
-  reviewedThrough: "0036_event_session_plans.sql",
+  // 2026-11-02 0052_event_listing_status.sql：帳本標了 events_shape／localized_list——它加了
+  // events.status、重寫 admin_upsert_event_with_session（取自正式庫本體，只加 status 三處；七個
+  // 清單欄位的驗證與 coalesce 逐字沿用）。中間的 0037–0050 沒有動到這兩區。本檔斷言重跑全綠。
+  reviewedThrough: "0052_event_listing_status.sql",
 });
 
 check(

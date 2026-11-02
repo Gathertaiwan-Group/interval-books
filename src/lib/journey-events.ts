@@ -85,3 +85,31 @@ export function excludeJourneyEvents<T extends { slug: string; externalUrl?: str
   const isJourney = journeyEventMatcher(journeyUrls);
   return events.filter((e) => !isJourney(e));
 }
+
+/**
+ * 0052：這張策旅卡片「跟著」哪一場活動（回 events.id；連不上回 null）。
+ *
+ * 與 SQL public.journey_linked_event_id() 同一套判準——那一支是真相（trigger 用它決定卡片
+ * 的狀態要不要跟著活動），這一支只給後台畫面顯示「跟著活動 X」用：
+ *   · `/events/<slug>`（或本站完整網址）→ 代稱完全相同的那一場；查不到就是孤兒，不再比外部網址
+ *   · 其他 http(s) 網址 → 與活動的 external_url 相同（去頭尾空白、去結尾斜線），多場時取排序最前
+ * 差異：這裡的 slug 會先 decodeURIComponent（SQL 不解碼）；現有代稱都是 ASCII，結果相同。
+ */
+export function linkedEventIdFor(
+  journeyUrl: string | null | undefined,
+  events: ReadonlyArray<{
+    id: string;
+    slug: string;
+    external_url?: string | null;
+    sort_order?: number;
+  }>,
+): string | null {
+  const slug = eventSlugFromJourneyUrl(journeyUrl);
+  if (slug) return events.find((e) => e.slug === slug)?.id ?? null;
+  const ext = normalizeExternal(journeyUrl);
+  if (!ext) return null;
+  const hits = events
+    .filter((e) => normalizeExternal(e.external_url) === ext)
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id.localeCompare(b.id));
+  return hits[0]?.id ?? null;
+}

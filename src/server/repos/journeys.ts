@@ -12,9 +12,10 @@ import "@tanstack/react-start/server-only";
 import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/server/supabase-admin";
 import type { Localized } from "@/i18n/types";
+import type { ListingStatus } from "@/lib/listing-status";
 
 const COLUMNS =
-  "id, title, summary, description, days, theme, external_url, registration_type, payment_enabled, is_published, sort_order, created_at, updated_at";
+  "id, title, summary, description, days, theme, external_url, registration_type, payment_enabled, is_published, status, sort_order, created_at, updated_at";
 
 export type JourneyRow = {
   id: string;
@@ -29,7 +30,13 @@ export type JourneyRow = {
   /** DB CHECK constraint limits this to exactly these two values (supabase/migrations/0001_init.sql:259). */
   registration_type: "external" | "internal";
   payment_enabled: boolean;
+  /** 🔴 0052：衍生值（= status === "live"），trigger 維護，程式不寫。 */
   is_published: boolean;
+  /**
+   * 0052：卡片的上架狀態。連得上活動（external_url 指向 /events/<slug>）的卡片跟著
+   * events.status（trigger 拉）；孤兒卡片才自己改（setJourneyStatus）。
+   */
+  status: ListingStatus;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -46,7 +53,6 @@ export type JourneyUpsertInput = {
   external_url: string;
   registration_type: "external" | "internal";
   payment_enabled: boolean;
-  is_published: boolean;
   sort_order: number;
 };
 
@@ -95,7 +101,8 @@ export async function upsertJourney(input: JourneyUpsertInput): Promise<JourneyR
         external_url: input.external_url,
         registration_type: input.registration_type,
         payment_enabled: input.payment_enabled,
-        is_published: input.is_published,
+        // 0052：不寫 is_published／status。新增＝草稿；連得上活動的卡片由 trigger 跟著活動，
+        //       孤兒卡片改狀態走 setJourneyStatus()。
         sort_order: input.sort_order,
       },
       { onConflict: "id" },
@@ -110,4 +117,29 @@ export async function upsertJourney(input: JourneyUpsertInput): Promise<JourneyR
 export async function removeJourney(id: string): Promise<void> {
   const { error } = await supabaseAdmin().from("journeys").delete().eq("id", id);
   if (error) throw new Error(`[repo/journeys] remove 失敗：${error.message}`);
+}
+
+/** 0052：只給孤兒卡片（連不上任何活動）改狀態；連得上活動的卡片會被 RPC 拒絕。 */
+export async function setJourneyStatus(
+  journeyId: string,
+  status: ListingStatus,
+): Promise<{
+  journey_id: string;
+  status: ListingStatus;
+  is_published: boolean;
+  status_before: ListingStatus;
+  changed: boolean;
+}> {
+  const { data, error } = await supabaseAdmin().rpc("admin_set_journey_status", {
+    p_journey_id: journeyId,
+    p_status: status,
+  });
+  if (error) throw new Error(`[repo/journeys] 改上架狀態失敗：${error.message}`);
+  return data as {
+    journey_id: string;
+    status: ListingStatus;
+    is_published: boolean;
+    status_before: ListingStatus;
+    changed: boolean;
+  };
 }

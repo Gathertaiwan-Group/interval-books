@@ -244,8 +244,17 @@ const registrationFields = {
   payment_enabled: z.boolean(),
 };
 
+/** 0052：草稿／上架／下架。與 events_status_check、src/lib/listing-status.ts 同一組值。 */
+export const listingStatusSchema = z.enum(["draft", "live", "archived"]);
+
 export const eventSchema = z.object({
-  ...publishFields,
+  id: z.string().trim().min(1).optional(),
+  /**
+   * 0052：上架狀態的唯一真相。**省略＝不動**（新增＝草稿）。is_published 不再收——
+   * 它是 status 的衍生值，由資料庫 trigger 維護。
+   */
+  status: listingStatusSchema.optional(),
+  sort_order: z.number().int("排序必須是整數"),
   /**
    * 網址代稱，/events/<slug>（supabase/migrations/0026_event_product_link.sql）。
    *
@@ -328,7 +337,11 @@ export type EventFormValues = z.infer<typeof eventSchema>;
 export const eventProductSchema = z.object({
   price: z.number().int("價格必須是整數").min(0, "價格不能是負數"),
   compare_at_price: z.number().int("原價必須是整數").min(0, "原價不能是負數").nullable().optional(),
-  status: z.enum(["draft", "active", "archived"]),
+  /**
+   * 🔴 0052：票券商品的上下架**跟著活動走**（products_pull_listing_status trigger 會把它拉回
+   *    活動推導的值），這一欄送什麼都沒有作用，只為了相容舊的呼叫端保留成選填。
+   */
+  status: z.enum(["draft", "active", "archived"]).optional(),
   sort_order: z.number().int("排序必須是整數").optional(),
 });
 export type EventProductFormValues = z.infer<typeof eventProductSchema>;
@@ -435,7 +448,10 @@ export const eventCategorySchema = z.object({
 export type EventCategoryFormValues = z.infer<typeof eventCategorySchema>;
 
 export const journeySchema = z.object({
-  ...publishFields,
+  // 0052：沒有 is_published／status。連得上活動的卡片跟著活動；孤兒卡片改狀態走
+  //       setJourneyStatus（fns/journeys.ts），不經過這一支。
+  id: z.string().trim().min(1).optional(),
+  sort_order: z.number().int("排序必須是整數"),
   title: localizedSchema,
   summary: localizedSchema,
   description: localizedSchema,

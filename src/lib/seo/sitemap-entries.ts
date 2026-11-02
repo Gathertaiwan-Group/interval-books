@@ -191,7 +191,12 @@ export function buildSitemapEntries(src: SitemapSource, today = todayInTaipei())
     eventLangs.set(path, langs);
     entries.push({ path, lastmod: eventLastmod(e, today), langs });
   }
-  for (const path of LANDING_SUBPAGES) entries.push({ path, langs: langsFor(path, undefined) });
+  // 0052：子頁跟著所屬活動——活動不是上架（不在 src.events 裡）就不列，與頁面本身的 404 一致。
+  for (const path of LANDING_SUBPAGES) {
+    const parent = path.split("/hosts/")[0];
+    if (!eventLangs.has(parent)) continue;
+    entries.push({ path, langs: langsFor(path, undefined) });
+  }
 
   // 策旅：卡片指著站內頁面的才列（外部網站不是我們的網址）。不帶 lastmod（見檔頭）。
   // 語言跟著那一頁自己的那一筆（活動頁）；不是活動頁 → 依路徑判斷。

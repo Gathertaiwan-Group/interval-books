@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { fetchEventVisibility } from "@/lib/cms";
 import { EventEndedNotice, SessionPicker, SessionList } from "@/components/shop/SessionPicker";
 import { PlanPicker } from "@/components/shop/PlanPicker";
 import { QuantityStepper } from "@/components/shop/ShopBits";
@@ -132,7 +133,15 @@ const WAVE_DIVIDER: React.CSSProperties = {
 
 export const Route = createFileRoute("/events/sound-of-the-sea")({
   // now：「場次開始了沒」的判斷時間點，SSR 與第一次 hydrate 共用（見 useBookingNow）。
-  loader: async () => ({ ...(await fetchActiveProductForEventSlug(EVENT_SLUG)), now: Date.now() }),
+  // 0052：版面寫死在這裡，草稿／下架時要另外擋——活動不是「上架」就 404，與 /events/$slug 同一條規則。
+  loader: async () => {
+    const [visibility, booking] = await Promise.all([
+      fetchEventVisibility(EVENT_SLUG),
+      fetchActiveProductForEventSlug(EVENT_SLUG),
+    ]);
+    if (!visibility.visible && !visibility.unavailable) throw notFound();
+    return { ...booking, now: Date.now() };
+  },
   // SEO（2026-11 健檢）：Event JSON-LD 的日期、地點、價格取自售票商品的場次與票種
   // （與報名區同一份資料），名稱與描述用這一頁的 PAGE 常數。
   head: ({ matches, match, loaderData }) =>

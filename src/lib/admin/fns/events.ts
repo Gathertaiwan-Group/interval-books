@@ -7,7 +7,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { adminFnMiddleware } from "@/lib/admin/middleware";
-import { eventQuickCreateSchema, eventSchema, eventWithProductSchema } from "@/lib/admin/schemas";
+import {
+  eventQuickCreateSchema,
+  eventSchema,
+  eventWithProductSchema,
+  listingStatusSchema,
+} from "@/lib/admin/schemas";
 
 export const listEvents = createServerFn({ method: "GET" })
   .middleware([adminFnMiddleware])
@@ -181,4 +186,16 @@ export const getAdminEventEditorPageData = createServerFn({ method: "GET" })
       id === null ? Promise.resolve([]) : listEventBlocks(id),
     ]);
     return { event, categories, artists, products, sessions, events, blocks };
+  });
+
+/**
+ * 0052：改活動的上架狀態（草稿／上架／下架）。一支 RPC、一個交易：活動的 is_published、
+ * 票券商品的 status、指向它的策旅卡片一起由 trigger 跟著改。後台列表與策旅列表用它。
+ */
+export const setEventStatus = createServerFn({ method: "POST" })
+  .middleware([adminFnMiddleware])
+  .inputValidator(z.object({ id: z.string().trim().min(1), status: listingStatusSchema }))
+  .handler(async ({ data }) => {
+    const { setEventStatus } = await import("@/server/repos/events");
+    return await setEventStatus(data.id, data.status);
   });

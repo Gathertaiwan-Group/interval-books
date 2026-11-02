@@ -531,16 +531,18 @@ checkFalse("🔴 不碰 seats_taken", serverSrc.includes("seats_taken"));
 checkFalse("🔴 不碰 units_taken", serverSrc.includes("units_taken"));
 checkTrue("寫入前在 server 端再驗一次", serverSrc.includes("validateQuickCreate(input)"));
 {
+  // 0052：單一上架狀態。第一次寫入 status: "draft"（票券商品由 trigger 跟著，也是草稿）；
+  //       「直接上架」是最後一步的一支 setEventStatus(eventId, "live")（一個交易：活動＋票券＋卡片）。
   const firstWrite = serverSrc.indexOf("await upsertEventWithProduct(");
-  const draftFlag = serverSrc.indexOf("is_published: false", firstWrite);
-  const publishWrite = serverSrc.indexOf("is_published: true");
+  const draftFlag = serverSrc.indexOf('status: "draft"', firstWrite);
+  const publishWrite = serverSrc.indexOf('await setEventStatus(eventId, "live")');
   const sessionWrite = serverSrc.indexOf("await upsertEventSession(");
   checkTrue(
-    "第一次寫入是草稿（is_published: false）",
+    '第一次寫入是草稿（status: "draft"）',
     firstWrite >= 0 && draftFlag > firstWrite && draftFlag < sessionWrite,
   );
-  checkTrue("發布（is_published: true）排在建場次之後", publishWrite > sessionWrite);
-  checkTrue("草稿時商品是 draft", /status: "draft"/.test(serverSrc));
+  checkTrue("上架（setEventStatus live）排在建場次之後", publishWrite > sessionWrite);
+  checkFalse("🔴 不再自己寫 is_published（衍生值）", /is_published:/.test(serverSrc));
 }
 checkTrue("失敗時刪掉這一次建立的場次", serverSrc.includes("await removeEventSession(id)"));
 checkTrue("失敗時刪掉這一次建立的商品", serverSrc.includes("await removeProduct(productId)"));
@@ -548,9 +550,10 @@ checkTrue("失敗時刪掉這一次建立的活動", serverSrc.includes("await r
 checkTrue("策旅卡片走既有的 upsertJourney()", serverSrc.includes("await upsertJourney("));
 checkTrue("失敗時刪掉這一次建立的策旅卡片", serverSrc.includes("await removeJourney(journeyId)"));
 {
-  const cardDraft = serverSrc.indexOf("is_published: false });");
-  const cardPublish = serverSrc.indexOf("id: journeyId, is_published: true");
-  checkTrue("策旅卡片先存草稿、發布排在最後", cardDraft > 0 && cardPublish > cardDraft);
+  // 0052：卡片不帶自己的狀態（trigger 讓它跟著活動），上架那一步排在建卡片之後。
+  const cardWrite = serverSrc.indexOf("await upsertJourney(journeyCard)");
+  const publish = serverSrc.indexOf('await setEventStatus(eventId, "live")');
+  checkTrue("策旅卡片先建（跟著活動是草稿）、上架排在最後", cardWrite > 0 && publish > cardWrite);
 }
 
 // =============================================================================

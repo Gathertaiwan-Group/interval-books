@@ -1108,13 +1108,18 @@ for (const f of [
   "payment_enabled",
   // 0029：名額顯示的開關。它跟名額、售票是同一類設定，所以在 §4，不是活動內容那一段。
   "show_seats_remaining",
-  "is_published",
+  // 0052：唯一的上架狀態（草稿／上架／下架）。取代原本的 is_published 開關與 product.status 下拉。
+  "status",
   "sort_order",
   "product.price",
   "product.compare_at_price",
-  "product.status",
 ]) {
   checkTrue(`組裝器上有 ${f}`, fieldNames.has(f));
+}
+// 0052：分散的開關一個都不准回來——is_published 是 status 的衍生值、票券商品的狀態跟著活動
+// （products_pull_listing_status trigger 會把這裡填的值蓋掉，一個改了沒用的欄位比沒有更糟）。
+for (const retired of ["is_published", "product.status"]) {
+  checkFalse(`🔴 組裝器沒有 ${retired}（0052 起只剩一個「狀態」）`, fieldNames.has(retired));
 }
 // 那五個投影欄位不准在後台開第二個家。
 for (const forbidden of [

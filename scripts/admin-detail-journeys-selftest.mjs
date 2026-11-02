@@ -84,13 +84,14 @@ console.log("\n[1] 編輯內頁：loader 一支 fn、授權不放寬、pending")
   );
   const loader = edit.slice(edit.indexOf("loader:"), edit.indexOf("head:"));
   checkTrue(
-    "loader 叫 getJourneyById",
-    loader.includes("getJourneyById({ data: { id: params.id } })"),
+    // 0052：改叫 getAdminJourneyEditData（卡片＋它跟著哪一場活動，一支 fn 拿齊）。
+    "loader 叫 getAdminJourneyEditData",
+    loader.includes("getAdminJourneyEditData({ data: { id: params.id } })"),
   );
   check("loader 只叫一支 server fn", (loader.match(/await \w+\(\{ data:/g) ?? []).length, 1);
   checkTrue(
     "🔴 loader 先擋形狀不對的 id（text 主鍵，不用 isUuid）",
-    /if \(!JOURNEY_ID\.test\(params\.id\)\) return \{ journey: null \};[\s\S]*getJourneyById/.test(
+    /if \(!JOURNEY_ID\.test\(params\.id\)\) return \{ journey: null, linkedEvent: null \};[\s\S]*getAdminJourneyEditData/.test(
       loader,
     ),
   );
@@ -182,10 +183,12 @@ console.log("\n[3] 列表");
     /useState(<[^>]*>)?\((initial\w*|loader\w*|journeys)\)/.test(list),
     false,
   );
-  checkTrue("列表 loader 仍是 listJourneys", /listJourneys\(\)/.test(list));
+  // 0052：列表改用 getAdminJourneysPageData（卡片＋連到的活動＋場次，算狀態旁的報名狀況），
+  //       並加了 ?status= 篩選（validateSearch）。仍然沒有 beforeLoad redirect／彈窗網址參數。
+  checkTrue("列表 loader 是 getAdminJourneysPageData", /getAdminJourneysPageData\(\)/.test(list));
   checkTrue(
-    "沒有 beforeLoad redirect（原本就沒有會開彈窗的網址參數）",
-    !/validateSearch|beforeLoad/.test(list),
+    "沒有 beforeLoad redirect（不開彈窗；validateSearch 只收 status 篩選）",
+    !/beforeLoad/.test(list) && /parseListingFilter\(search\.status\)/.test(list),
   );
 }
 

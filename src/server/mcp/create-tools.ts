@@ -13,9 +13,9 @@
  *
  * ── 三個預設，都是「AI 一次呼叫不會讓客人看到東西」 ───────────────────────
  *   · dry_run 預設 true：只回傳「將會建立什麼」與驗證錯誤，不寫入。
- *   · publish 預設 false：建成草稿（活動 is_published=false、票券商品 draft、策旅卡片
- *     不公開；一般商品 status=draft）。要公開必須明確帶 publish=true，或之後用
- *     update_event／update_journey／update_shop_product 上架。
+ *   · publish 預設 false：建成草稿（0052 的單一狀態 events.status='draft'，票券商品與策旅
+ *     卡片由 trigger 跟著；一般商品 status=draft）。publish=true ＝直接上架（一支 RPC 把
+ *     活動、票券商品、策旅卡片一起翻成上架）；之後要上架／下架用 set_event_status。
  *   · 每一次呼叫（預覽、被擋下、寫入成功、寫入失敗）都記一筆 mcp_audit_log。
  *
  * ── 授權 ──────────────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ const publishArg = (what: string) =>
     .boolean()
     .default(false)
     .describe(
-      `預設 false：建成草稿（${what}），網站上看不到。只有明確帶 true 才會直接公開；也可以先建草稿，之後用 update 工具上架。`,
+      `預設 false：建成草稿（${what}），網站上看不到。true＝直接上架（活動、票券商品、策旅卡片一起）；也可以先建草稿，之後用 set_event_status 設 status=live 上架。`,
     );
 
 const slugArg = z
@@ -238,9 +238,7 @@ function eventInputSchema(kind: QuickKind) {
             .describe("策旅卡片上的主題（一句話）。選填：省略＝用分類名稱。"),
         }
       : {}),
-    publish: publishArg(
-      isJourney ? "活動不公開、票券商品 draft、策旅卡片不公開" : "活動不公開、票券商品 draft",
-    ),
+    publish: publishArg(isJourney ? "活動、票券商品、策旅卡片都是草稿" : "活動與票券商品都是草稿"),
     dry_run: dryRunArg,
   });
 }
@@ -395,7 +393,7 @@ export type CreateShopProductArgs = z.output<(typeof CREATE_TOOL_INPUTS)["create
 
 const COMMON_NOTE =
   "🔸 預設 dry_run=true：只回傳「將會建立什麼」的完整預覽（含驗證錯誤），不寫入；把預覽給使用者確認後，用同樣參數加 dry_run=false 再呼叫一次才會建立。" +
-  "🔸 預設建成草稿（publish=false），網站上看不到；要直接公開必須明確帶 publish=true，或之後用 update 工具上架。" +
+  "🔸 預設建成草稿（publish=false），網站上看不到；要直接上架必須明確帶 publish=true，或之後用 set_event_status（活動／策旅）或 update_shop_product（一般商品）上架。" +
   "🔸 時間一律台北時間；開始時間已經過去、結束早於開始、名稱或網址代稱與既有資料重複都會被擋下。" +
   "🔸 每一次呼叫（含 dry_run）都會留稽核紀錄。";
 
@@ -757,13 +755,13 @@ export async function runCreateEvent(kind: QuickKind, args: CreateEventArgs): Pr
         registration_type: plan.event.registration_type,
         payment_enabled: plan.event.payment_enabled,
         external_url: plan.event.external_url || undefined,
-        is_published: input.publish,
+        status: input.publish ? "live" : "draft",
       },
       ticket_product: plan.product
         ? {
             price: plan.product.price,
             status: input.publish ? "active" : "draft",
-            note: "售票商品由活動自動投影（名稱、摘要、圖片跟著活動走）",
+            note: "售票商品由活動自動投影（名稱、摘要、圖片、上下架狀態都跟著活動走）",
           }
         : null,
       sessions: plan.sessions.map((s) => ({
@@ -780,7 +778,13 @@ export async function runCreateEvent(kind: QuickKind, args: CreateEventArgs): Pr
           capacity: planCapacityFor(s.capacity, p.seats_per_unit),
         })),
       })),
-      journey_card: journeyCard ? { ...journeyCard, is_published: input.publish } : undefined,
+      journey_card: journeyCard
+        ? {
+            ...journeyCard,
+            status: input.publish ? "live" : "draft",
+            note: "卡片的上下架跟著活動走",
+          }
+        : undefined,
     };
     const translationNote =
       prepared.untranslated > 0
@@ -802,7 +806,7 @@ export async function runCreateEvent(kind: QuickKind, args: CreateEventArgs): Pr
             `英日文是自動翻譯的，正式呼叫時會重新翻譯；要保證一字不差，請把上面的 en/ja 以 {"zh","en","ja"} 帶進來。` +
             (input.publish
               ? ""
-              : `預設建成草稿，網站上看不到；確認後可用 update_${kind === "journey" ? "journey" : "event"} 設 is_published=true 上架。`),
+              : `預設建成草稿，網站上看不到；建好後可用 set_event_status（status=live）上架${kind === "journey" ? "，策旅卡片會一起上架" : ""}。`),
         },
       };
     }
@@ -823,7 +827,7 @@ export async function runCreateEvent(kind: QuickKind, args: CreateEventArgs): Pr
       result: {
         dry_run: false,
         written: true,
-        message: `已建立${noun}${saved.published ? "（已公開）" : "（草稿，網站上看不到）"}`,
+        message: `已建立${noun}${saved.published ? "（已上架）" : "（草稿，網站上看不到）"}`,
         event_id: saved.eventId,
         journey_id: saved.journeyId ?? undefined,
         product_id: saved.productId,
@@ -839,11 +843,9 @@ export async function runCreateEvent(kind: QuickKind, args: CreateEventArgs): Pr
             : undefined,
         next_step: saved.published
           ? undefined
-          : `這是草稿。要公開：update_event（id=${saved.eventId}）設 is_published=true，並到後台把票券商品上架${
-              saved.journeyId
-                ? `；策旅卡片用 update_journey（id=${saved.journeyId}）設 is_published=true`
-                : ""
-            }。`,
+          : `這是草稿。要上架：set_event_status（id=${saved.eventId}, status=live），活動、票券商品${
+              saved.journeyId ? "、策旅卡片" : ""
+            }會一起上架。`,
       },
     };
   });

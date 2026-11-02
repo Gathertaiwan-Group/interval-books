@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, notFound } from "@tanstack/react-router";
+import { fetchEventVisibility } from "@/lib/cms";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fitDescription } from "@/lib/seo/core";
 import { langFromMatches, pageHead, withLinks } from "@/lib/seo/head";
@@ -37,6 +38,12 @@ const PAGE = {
 const OG_IMAGE_KEY = "storage:3eec0ea5-091b-44f2-8d3a-7b9e65225725.webp";
 
 export const Route = createFileRoute("/events/kungtung_/hosts/alice")({
+  // 0052：主理人子頁跟著公東策旅那一場活動——活動不是「上架」就 404（讀取失敗照常渲染）。
+  loader: async () => {
+    const visibility = await fetchEventVisibility("kungtung");
+    if (!visibility.visible && !visibility.unavailable) throw notFound();
+    return null;
+  },
   head: ({ matches, match }) =>
     withLinks(
       pageHead(
