@@ -68,7 +68,12 @@ const MOCKED = {
     "upsertEventSessionPlan",
     "removeEventSession",
   ],
-  "@/server/repos/products": ["listProducts", "upsertProduct", "removeProduct"],
+  "@/server/repos/products": [
+    "listProducts",
+    "findProductConflicts",
+    "upsertProduct",
+    "removeProduct",
+  ],
   "@/server/repos/journeys": ["listJourneys", "upsertJourney", "removeJourney"],
   "@/server/repos/event-categories": ["getEventCategoryById", "listEventCategories"],
   "@/server/repos/artists": ["getArtistById"],
@@ -168,6 +173,15 @@ function freshMock() {
           return Promise.resolve(s.journeys);
         case "listProducts":
           return Promise.resolve(s.products);
+        case "findProductConflicts": {
+          const { titleZh, slug } = args[0];
+          return Promise.resolve({
+            sameTitle: s.products.filter((p) => p.title.zh === titleZh.trim()),
+            sameSlug: slug
+              ? s.products.filter((p) => p.slug.toLowerCase() === slug.toLowerCase())
+              : [],
+          });
+        }
         case "getEventCategoryById":
           return Promise.resolve(s.categories.find((c) => c.id === args[0]) ?? null);
         case "listEventCategories":
@@ -707,17 +721,27 @@ console.log("\n[4] 權限");
     publish: false,
     registration_mode: "paid",
   });
+  const repoCalls = (m) => m.calls.filter((c) => c.name !== "supabaseAdmin").length;
   check(
-    "🔴 沒經過 MCP 閘門（沒有身分）直接呼叫 → 拒絕、什麼都不做",
-    [direct.isError, m2.calls.length],
+    "🔴 沒經過 MCP 閘門（沒有身分）直接呼叫 → 拒絕、不碰任何 repo",
+    [direct.isError, repoCalls(m2)],
     [true, 0],
+  );
+  check(
+    "被拒絕的那一次也記稽核（rejected、沒有 _actor）",
+    [
+      m2.audits.length,
+      m2.audits[0]?.record?.changes?.outcome,
+      "_actor" in (m2.audits[0]?.record?.changes ?? {}),
+    ],
+    [1, "rejected", false],
   );
   checkTrue("拒絕訊息講出需要認證", direct.content[0].text.includes("沒有通過 MCP 認證"));
   const direct2 = await createTools.runCreateShopProduct(
     { product_type: "book", title: "x", summary: "y", price: 100, dry_run: false, publish: false },
     { translator: async () => null },
   );
-  check("🔴 商品也一樣", [direct2.isError, m2.calls.length], [true, 0]);
+  check("🔴 商品也一樣", [direct2.isError, repoCalls(m2), m2.audits.length], [true, 0, 2]);
 }
 
 // =============================================================================
@@ -808,10 +832,11 @@ const GOODS = { product_type: "book", title: "海的聲音", summary: "一本關
     dry_run: false,
   });
   check(
-    "publish=true → active，並警告不限量",
-    [writes(m)[0]?.args[0]?.status, (r.data?.stock_note ?? "").includes("不限量")],
-    ["active", true],
+    "🔴 publish=true → 擋下（沒有庫存不能直接上架）、不寫入",
+    [r.isError, names(m), r.text.includes("新增商品不能直接上架")],
+    [true, [], true],
   );
+  check("擋下也記稽核", m.audits[0]?.record?.changes?.outcome, "rejected");
 }
 async function rejectedP(label, args, expectText, setup) {
   return rejected(label, "create_shop_product", args, expectText, setup);
@@ -839,6 +864,44 @@ await rejectedP(
     [false, null],
   );
 }
+
+// =============================================================================
+console.log("\n[6b] zod 內建英文訊息換成中文、稽核參數有上限");
+await rejected(
+  "沒送 description → 「必填」",
+  "create_event",
+  { title: "x", category: "reading" },
+  "介紹（description）：必填",
+);
+await rejected(
+  "三語多送 fr → 中文說明",
+  "create_event",
+  { ...EVENT_ARGS, title: { zh: "x", fr: "y" } },
+  "不認得的欄位：fr",
+);
+await rejected(
+  "publish 給字串 → 型別不對",
+  "create_event",
+  { ...EVENT_ARGS, publish: "yes" },
+  "型別不對",
+);
+await rejected("名額給字串 → 自訂中文訊息", "create_event", S({ capacity: "30" }), "名額要是整數");
+{
+  const m = reset();
+  const r = await call("create_event", { ...EVENT_ARGS, description: "長".repeat(30000) });
+  const input = m.audits[0]?.record?.changes?.input;
+  check(
+    "格式錯的超長參數：稽核只存前 16000 字並記原長度",
+    [r.isError, input?.truncated, input?.head?.length, input?.original_chars > 30000],
+    [true, true, 16000, true],
+  );
+  checkTrue("zh 字串上限的錯誤是中文", r.text.includes("最多 2000 字"));
+}
+check(
+  "zhIssueMessage：自訂中文訊息原樣保留",
+  createTools.zhIssueMessage({ code: "too_big", message: "名稱最多 120 字" }),
+  "名稱最多 120 字",
+);
 
 // =============================================================================
 console.log("\n[7] 後台一頁新增（createEventQuick）行為不變");

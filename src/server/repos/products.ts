@@ -99,6 +99,49 @@ export async function listProducts(): Promise<ProductRow[]> {
   return (data ?? []) as ProductRow[];
 }
 
+/**
+ * 新增前的撞名／撞代稱檢查（遠端 MCP 的 create_shop_product 用）。只讀。
+ *
+ * 用精準條件查，不拿 listProducts() 在記憶體裡比：PostgREST 一次最多回 1000 列，
+ * 商品多了全表讀取會漏。title 比的是中文（title->>zh 完全相同）；slug 大小寫不分。
+ */
+export async function findProductConflicts(input: {
+  titleZh: string;
+  slug: string | null;
+}): Promise<{
+  sameTitle: Pick<ProductRow, "id" | "slug" | "product_type" | "status" | "title">[];
+  sameSlug: Pick<ProductRow, "id" | "slug">[];
+}> {
+  const db = supabaseAdmin();
+  const title = input.titleZh.trim();
+  const escapeLike = (v: string) => v.replace(/[\\%_]/g, (c) => `\\${c}`);
+  const [byTitle, bySlug] = await Promise.all([
+    title
+      ? db
+          .from("products")
+          .select("id, slug, product_type, status, title")
+          .eq("title->>zh", title)
+          .limit(20)
+      : Promise.resolve({ data: [], error: null }),
+    input.slug
+      ? db.from("products").select("id, slug").ilike("slug", escapeLike(input.slug)).limit(20)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (byTitle.error) {
+    throw new Error(`[repo/products] findProductConflicts（名稱）失敗：${byTitle.error.message}`);
+  }
+  if (bySlug.error) {
+    throw new Error(`[repo/products] findProductConflicts（代稱）失敗：${bySlug.error.message}`);
+  }
+  return {
+    sameTitle: (byTitle.data ?? []) as Pick<
+      ProductRow,
+      "id" | "slug" | "product_type" | "status" | "title"
+    >[],
+    sameSlug: (bySlug.data ?? []) as Pick<ProductRow, "id" | "slug">[],
+  };
+}
+
 export async function getProductById(id: string): Promise<ProductRow | null> {
   const { data, error } = await supabaseAdmin()
     .from("products")

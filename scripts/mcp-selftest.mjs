@@ -828,7 +828,7 @@ console.log("\n[7] MCP 協定");
     const d = t?.description ?? "";
     checkTrue(
       `${n} 的說明寫清楚「預設草稿」「dry_run 預設 true」`,
-      d.includes("預設建成草稿") && d.includes("預設 dry_run=true"),
+      (d.includes("預設建成草稿") || d.includes("一律建成草稿")) && d.includes("預設 dry_run=true"),
     );
     check(
       `${n} 的 JSON Schema：dry_run 預設 true`,

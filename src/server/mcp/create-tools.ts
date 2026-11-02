@@ -269,7 +269,12 @@ export const CREATE_TOOL_INPUTS = {
     slug: slugArg.describe(
       `網址代稱。選填：省略＝用英文名稱自動產生（加一段亂數避免撞號）。指定的代稱若已被使用會被擋下。${SLUG_RULE}。`,
     ),
-    publish: publishArg("status=draft"),
+    publish: z
+      .boolean()
+      .default(false)
+      .describe(
+        "只能是 false（預設）：商品一律建成草稿（status=draft）。MCP 不設庫存，所以不能一建好就上架；請店員在後台設定庫存或接進銷存後，再用 update_shop_product 設 status=active。",
+      ),
     dry_run: dryRunArg,
   }),
 } as const;
@@ -281,6 +286,69 @@ export type InvalidCreateArgs = {
   __invalid: { path: string; message: string }[];
   __raw: unknown;
 };
+
+/**
+ * zod 的錯誤訊息 → 中文。schema 上自訂的訊息本來就是中文，原樣保留；只有 zod 內建的
+ * 英文預設訊息（沒送必填欄位、型別錯、多餘的 key、三語格式不對…）依 issue code 換成中文。
+ */
+export function zhIssueMessage(issue: {
+  code?: string;
+  message: string;
+  expected?: unknown;
+  keys?: string[];
+  maximum?: unknown;
+  minimum?: unknown;
+}): string {
+  if (/[\u3400-\u9fff]/.test(issue.message)) return issue.message;
+  switch (issue.code) {
+    case "invalid_type":
+      return /received undefined/.test(issue.message)
+        ? "必填，請提供這個欄位"
+        : `型別不對（應為 ${String(issue.expected ?? "?")}）`;
+    case "invalid_union":
+      return '格式不對：三語欄位請給一段中文字串，或 {"zh":…,"en":…,"ja":…}（只收 zh、en、ja 三個 key）';
+    case "unrecognized_keys":
+      return `不認得的欄位：${(issue.keys ?? []).join("、")}（三語欄位只收 zh、en、ja）`;
+    case "too_big":
+      return `太長或太大（上限 ${String(issue.maximum ?? "?")}）`;
+    case "too_small":
+      return `太短或太小（下限 ${String(issue.minimum ?? "?")}）`;
+    case "invalid_value":
+      return "不是允許的值";
+    case "invalid_format":
+      return "格式不對";
+    default:
+      return `格式不正確（${issue.message}）`;
+  }
+}
+
+/** 取出 data 在 path 上的值（拿來判斷「沒送」）。 */
+function valueAt(data: unknown, path: readonly PropertyKey[]): unknown {
+  let cur: unknown = data;
+  for (const k of path) {
+    if (cur === null || typeof cur !== "object") return undefined;
+    cur = (cur as Record<PropertyKey, unknown>)[k];
+  }
+  return cur;
+}
+
+/** 稽核裡的原始參數最多存這麼長（JSON 字元數）；格式錯的呼叫還沒過長度限制。 */
+export const AUDIT_INPUT_MAX_CHARS = 16_000;
+
+export function boundedForAudit(value: unknown): unknown {
+  let text: string;
+  try {
+    text = JSON.stringify(value) ?? "null";
+  } catch {
+    return { unserializable: true };
+  }
+  if (text.length <= AUDIT_INPUT_MAX_CHARS) return value;
+  return {
+    truncated: true,
+    original_chars: text.length,
+    head: text.slice(0, AUDIT_INPUT_MAX_CHARS),
+  };
+}
 
 export function isInvalidArgs(v: unknown): v is InvalidCreateArgs {
   return typeof v === "object" && v !== null && "__invalid" in v;
@@ -307,7 +375,10 @@ export function auditedInputSchema<S extends z.ZodType>(schema: S): S {
         const value: InvalidCreateArgs = {
           __invalid: r.error.issues.map((i) => ({
             path: i.path.map((p) => String(p)).join("."),
-            message: i.message,
+            message:
+              valueAt(data, i.path) === undefined && !/[\u3400-\u9fff]/.test(i.message)
+                ? "必填，請提供這個欄位"
+                : zhIssueMessage(i),
           })),
           __raw: data,
         };
@@ -352,8 +423,10 @@ export const CREATE_TOOL_META: Record<CreateToolName, { title: string; descripti
     description:
       "新增一件一般商品（book 書或 goods 選物），與後台「新增商品 › 一般商品」同一條路。" +
       "只建商品資料：名稱、分類、售價、介紹、圖片、三語。" +
-      "🔸 不設庫存：不寫庫存數字、也不連進銷存（庫存顯示為「不管理」），建好後由店員在後台設定庫存或接進銷存；所以建議維持草稿，等店員處理庫存後再上架。" +
-      COMMON_NOTE.replace("時間一律台北時間；開始時間已經過去、結束早於開始、", ""),
+      "🔸 不設庫存：不寫庫存數字、也不連進銷存（庫存顯示為「不管理」），建好後由店員在後台設定庫存或接進銷存。" +
+      "🔸 預設 dry_run=true：只回傳「將會建立什麼」的完整預覽（含驗證錯誤），不寫入；確認後用同樣參數加 dry_run=false 再呼叫一次才會建立。" +
+      "🔸 一律建成草稿（status=draft），網站上看不到；因為沒有庫存，不能一建好就上架（publish=true 會被擋下）。店員處理庫存後，再用 update_shop_product 設 status=active。" +
+      "🔸 名稱或網址代稱與既有商品重複會被擋下。🔸 每一次呼叫（含 dry_run）都會留稽核紀錄。",
   },
 };
 
@@ -478,6 +551,17 @@ async function withAudit(
   try {
     requireGatedActor();
   } catch (err) {
+    // 正常流量到不了這裡（http.ts 先回 401）；真的到了也記一筆（_actor 會是空的）。
+    await audit(
+      tool,
+      entity,
+      "(未建立)",
+      "rejected",
+      (args as { dry_run?: unknown })?.dry_run !== false,
+      {
+        error: (err as Error).message,
+      },
+    );
     return errText((err as Error).message);
   }
   if (isInvalidArgs(args)) {
@@ -489,14 +573,14 @@ async function withAudit(
     }
     const message = errorsText(errors, kindOf(tool));
     const status = await audit(tool, entity, "(未建立)", "rejected", raw?.dry_run !== false, {
-      input: args.__raw,
+      input: boundedForAudit(args.__raw),
       error: message,
       errors,
     });
     return errText(`${message}\n（稽核：${auditLabel(status)}）`);
   }
   const dryRun = args.dry_run !== false;
-  const input = { ...(args as Record<string, unknown>) };
+  const input = boundedForAudit({ ...(args as Record<string, unknown>) });
   try {
     const out = await fn();
     const status = await audit(tool, entity, out.entityId, out.outcome, dryRun, {
@@ -788,7 +872,7 @@ export async function runCreateShopProduct(
     }
 
     const [
-      { listProducts, upsertProduct },
+      { listProducts, upsertProduct, findProductConflicts },
       { productSchema },
       { buildNewGoodsPayload, slugFromTitle },
     ] = await Promise.all([
@@ -796,19 +880,27 @@ export async function runCreateShopProduct(
       import("@/lib/admin/schemas"),
       import("@/lib/admin/unified-products"),
     ]);
-    const products = await listProducts();
+    const titleZhForLookup = toArg(args.title)?.zh ?? "";
+    const [products, conflicts] = await Promise.all([
+      listProducts(),
+      findProductConflicts({ titleZh: titleZhForLookup, slug: args.slug ?? null }),
+    ]);
 
-    const titleZh = toArg(args.title)?.zh ?? "";
-    const dup = products.find(
-      (p) =>
-        (p.product_type === "goods" || p.product_type === "book") && p.title.zh.trim() === titleZh,
+    if (args.publish === true) {
+      errors.publish =
+        "新增商品不能直接上架（MCP 不設庫存，直接上架會變成不限量販售）。請拿掉 publish 或設 false；店員在後台設定庫存後，再用 update_shop_product 設 status=active";
+    }
+    const titleZh = titleZhForLookup;
+    // 精準查（不靠 listProducts 全表：PostgREST 一次最多回 1000 列，商品多了會漏）。
+    const dup = conflicts.sameTitle.find(
+      (p) => p.product_type === "goods" || p.product_type === "book",
     );
     if (dup) {
       errors.title = `已經有同名的商品「${titleZh}」（id ${dup.id}，狀態 ${dup.status}）。請換一個名稱；要改既有的請用 update_shop_product`;
     }
     if (args.slug) {
       const lower = args.slug.toLowerCase();
-      if (products.some((p) => p.slug.toLowerCase() === lower)) {
+      if (conflicts.sameSlug.some((p) => p.slug.toLowerCase() === lower)) {
         errors.slug = `網址代稱「${args.slug}」已經被使用了，請換一個（或不要送，讓系統自動產生）`;
       }
     }
@@ -836,7 +928,7 @@ export async function runCreateShopProduct(
       price: args.price,
       stock: null, // 🔴 不設庫存：null＝「不管理」，與後台新增表單的預設相同。見檔頭。
       image_key: imageKey,
-      publish: args.publish === true,
+      publish: false, // 一律草稿：publish=true 在上面就被擋下了。
       slug,
       sort_order: sortOrder,
     });
@@ -864,10 +956,7 @@ export async function runCreateShopProduct(
       auto_translated: translated.length ? translated : undefined,
     };
     const stockNote =
-      "庫存沒有設定（MCP 不碰庫存）。上架前請店員到後台「商品」設定庫存數量，或從「進銷存」上架連動庫存；" +
-      (valid.status === "active"
-        ? "⚠️ 這件商品會直接上架，而且在店員設定前不限量販售。"
-        : "目前是草稿，網站上看不到。");
+      "庫存沒有設定（MCP 不碰庫存）。上架前請店員到後台「商品」設定庫存數量，或從「進銷存」上架連動庫存；目前是草稿，網站上看不到。";
 
     if (dryRun) {
       return {
@@ -897,16 +986,13 @@ export async function runCreateShopProduct(
       result: {
         dry_run: false,
         written: true,
-        message: `已建立商品${row.status === "active" ? "（已上架）" : "（草稿，網站上看不到）"}`,
+        message: "已建立商品（草稿，網站上看不到）",
         product_id: row.id,
         slug: row.slug,
         status: row.status,
         created: preview,
         stock_note: stockNote,
-        next_step:
-          row.status === "active"
-            ? undefined
-            : `要上架：先請店員設定庫存，再用 update_shop_product（id=${row.id}）設 status=active。`,
+        next_step: `要上架：先請店員設定庫存，再用 update_shop_product（id=${row.id}）設 status=active。`,
       },
     };
   });
