@@ -138,7 +138,8 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 逐字沿用 0020；release_session_seat、expire_unpaid_orders、admin_delete_*、付款與
   // 訂單欄位一個都沒動。這一支的連線段建的測試場次都在 now() 之後，斷言原樣成立。
   // 0050（後台電話報名）已審：orders 只加有 default／nullable 的欄位（前台 insert 形狀不變）；enqueue_order_email／enqueue_registration_emails 只多 notify_customer 條件（預設 true，前台訂單行為不變）；expire_unpaid_orders 只多一行 source <> 'admin_phone'（前台訂單行為不變）。這支守的不變式原樣成立。
-  reviewedThrough: "0050_admin_phone_orders.sql",
+  // 0051（電話報名聯絡資料放寬）已審：event_registrations_contactable 由 CHECK 換成同名觸發器，web 訂單照舊擋、只有 source='admin_phone' 放行；orders 只多兩條限定 admin_phone 的 CHECK 與新表 order_contact_edit_log／RPC admin_update_phone_order_contacts。前台訂單、reserve_session_seat、enqueue_*、expire_unpaid_orders、金流／發票函式一個字沒動，這支守的不變式原樣成立。
+  reviewedThrough: "0051_phone_order_optional_contact.sql",
 });
 checkTrue("0044 有 begin; / commit;", /^begin;$/m.test(sql0044) && /^commit;$/m.test(sql0044));
 

@@ -865,6 +865,11 @@ export const MIGRATION_LEDGER = Object.freeze([
       "session_seats",
     ],
   },
+  {
+    file: "0051_phone_order_optional_contact.sql",
+    note: "後台電話報名聯絡資料放寬（只限 source='admin_phone'，前台不變）：event_registrations 的 CHECK event_registrations_contactable 換成同名 before insert/update of email,phone,order_id 觸發器（函式 event_registrations_check_contact()，security definer、search_path=''、revoke public/anon/authenticated）——有 email 或 phone 照舊通過，兩者皆空只有所屬 orders.source='admin_phone' 才放行，其餘以同名 check_violation 拒絕。orders 加兩條 CHECK：orders_admin_phone_contact（admin_phone 的 customer_email／customer_phone 至少一個非空白）、orders_admin_phone_notify_email（admin_phone 勾 notify_customer 必須有 customer_email）；customer_email／customer_phone 仍 NOT NULL（沒填存 ''）。新表 order_contact_edit_log（actor_id、order_id、changes jsonb 只記欄位名不存值；RLS on、anon/authenticated 全收、service_role 只 select）與 RPC admin_update_phone_order_contacts(order_id, actor_id, customer jsonb, participants jsonb) returns (updated, reason)：鎖訂單列、限 admin_phone、先驗全部輸入（姓名非空、聯絡至少一項、勾寄信要 email、參加者屬於這張單）再寫、有變動才記一列稽核；security definer、search_path=''、只 grant service_role。reserve_session_seat／enqueue_*／expire_unpaid_orders 一個字沒動",
+    touches: ["event_registrations", "orders_payments"],
+  },
 ]);
 
 /** 磁碟上的 migration 檔名，排序過。空目錄 = 丟例外（那不是「沒有違規」）。 */

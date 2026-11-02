@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminDetailNotFound, AdminDetailPage } from "@/components/admin/AdminDetailPage";
+import { PhoneOrderContactEditor } from "@/components/admin/PhoneOrderContactEditor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -512,6 +513,13 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
             </>
           ) : null}
         </dl>
+        {/* 0051：電話報名沒要到的資料，事後在這裡補（只限 admin_phone）。 */}
+        {detail.phone_order ? (
+          <PhoneOrderContactEditor
+            orderId={detail.id}
+            onSaved={() => router.invalidate({ sync: true })}
+          />
+        ) : null}
       </Section>
 
       <Section title="收件方式">

@@ -58,7 +58,8 @@ console.log("\n[1] 🔴 靜態：授權、建立者、標記已收款走既有 R
 {
   const fns = stripComments(readFile("src/lib/admin/fns/phone-orders.ts"));
   const serverFns = (fns.match(/createServerFn\(/g) ?? []).length;
-  check("fns/phone-orders.ts 有兩支 server fn", serverFns, 2);
+  // 0050 兩支（選項、建單）＋0051 兩支（讀／改聯絡資料）。
+  check("fns/phone-orders.ts 有四支 server fn", serverFns, 4);
   check(
     "🔴 每一支都 .middleware([adminFnMiddleware])",
     (fns.match(/\.middleware\(\[adminFnMiddleware\]\)/g) ?? []).length,
@@ -588,8 +589,12 @@ console.log("\n[10] 純函式：schema、試算、payload");
   checkTrue("合法輸入通過", s.safeParse(input()).success);
   checkTrue("訂購人手機格式錯 → 擋", !s.safeParse(input({ customerPhone: "123" })).success);
   checkTrue(
-    "參加者信箱與手機都沒填 → 擋",
-    !s.safeParse(input({ participants: [{ name: "A", phone: null, email: null }] })).success,
+    "0051：參加者信箱與手機都沒填 → 通過（電話報名放寬）",
+    s.safeParse(input({ participants: [{ name: "A", phone: null, email: null }] })).success,
+  );
+  checkTrue(
+    "0051：參加者手機有填但格式錯 → 仍然擋",
+    !s.safeParse(input({ participants: [{ name: "A", phone: "123", email: null }] })).success,
   );
   checkTrue(
     "統編檢核碼錯 → 擋（與前台同一份規則）",
@@ -660,6 +665,403 @@ console.log("\n[11] 店家通知信標明「後台電話報名」");
   checkTrue("內文有內部備註", withPhone.text.includes("老客人"));
   const web = tpl.renderAdminOrderNotificationEmail(base);
   checkTrue("前台訂單的信沒有這個標籤", !web.subject.includes("後台電話報名"));
+}
+
+// =============================================================================
+console.log("\n[12] 0051：只有姓名＋手機的訂購人、參加者全空也能建單");
+{
+  const s = phone.phoneOrderSchema;
+  const raw = input({
+    customerEmail: "",
+    customerPhone: "0912345678",
+    participants: [
+      { name: "", phone: null, email: null },
+      { name: null, phone: "", email: "" },
+    ],
+    notifyCustomer: false,
+  });
+  const parsed = s.safeParse(raw);
+  checkTrue("schema：訂購人只有姓名＋手機、兩位參加者全空 → 通過", parsed.success);
+  const data = parsed.data;
+  const payload = phone.buildPhoneOrderPayload(data);
+  check("payload：訂購人 Email 是空字串（orders 欄位 NOT NULL，存 ''）", payload.customerEmail, "");
+  check(
+    "payload：參加者姓名自動帶入（第 1 位＝訂購人，第 2 位＝同行者 1）",
+    payload.items[0].participants.map((p) => p.name),
+    ["王小明", "王小明 同行者 1"],
+  );
+  check(
+    "payload：參加者聯絡方式是 null（不是空字串）",
+    payload.items[0].participants.map((p) => [p.email, p.phone]),
+    [
+      [null, null],
+      [null, null],
+    ],
+  );
+
+  const res = await run(world(), data);
+  checkTrue(
+    "建單成功（createAdminPhoneOrder → createOrder，產線本人）",
+    res.ok && res.r.orderId === "o-new",
+  );
+  const row = orderInsert(res.log);
+  check("orders insert：customer_email ''", row?.customer_email, "");
+  check("orders insert：customer_phone 照填", row?.customer_phone, "0912345678");
+  check("orders insert：notify_customer false", row?.notify_customer, false);
+  const seat = rpcs(res.log, "reserve_session_seat")[0];
+  check(
+    "reserve_session_seat 收到的參加者：名字已帶入、聯絡方式 null",
+    seat?.args.p_participants.map((p) => [p.name, p.email, p.phone]),
+    [
+      ["王小明", null, null],
+      ["王小明 同行者 1", null, null],
+    ],
+  );
+
+  const emailOnly = s.safeParse(
+    input({ customerPhone: "", customerEmail: "ming@example.invalid" }),
+  );
+  checkTrue("訂購人只有 Email（沒手機）→ 通過", emailOnly.success);
+  checkTrue(
+    "訂購人手機與 Email 都沒有 → 擋",
+    !s.safeParse(input({ customerPhone: "", customerEmail: "" })).success,
+  );
+  checkTrue(
+    "訂購人 Email 有填但格式錯 → 擋",
+    !s.safeParse(input({ customerEmail: "abc" })).success,
+  );
+  checkTrue(
+    "訂購人 Email 判斷與前台同一個（zod .email()：a..b@x.yz 擋）",
+    !s.safeParse(input({ customerEmail: "a..b@x.yz" })).success,
+  );
+  checkTrue("訂購人姓名空白 → 擋", !s.safeParse(input({ customerName: "  " })).success);
+
+  const noContact = await run(world(), { ...data, customerPhone: "" });
+  check(
+    "repo 邊界：訂購人沒有任何聯絡方式 → AdminPhoneOrderInputError，一筆都沒寫",
+    [noContact.ok, noContact.code, wrote(noContact.log).length],
+    [false, "customer_contact_required", 0],
+  );
+}
+
+console.log("\n[13] 0051：沒有 Email 卻要寄信 → 擋（表單、server fn、repo、DB 四層）");
+{
+  check(
+    "phoneOrderNotifyError：有勾、沒 Email → 錯誤訊息含「訂購人沒有 Email，無法寄信」",
+    String(phone.phoneOrderNotifyError({ notifyCustomer: true, customerEmail: "" })).includes(
+      "訂購人沒有 Email，無法寄信",
+    ),
+    true,
+  );
+  check(
+    "phoneOrderNotifyError：有 Email → null",
+    phone.phoneOrderNotifyError({ notifyCustomer: true, customerEmail: "a@example.invalid" }),
+    null,
+  );
+  check(
+    "phoneOrderNotifyError：沒勾 → null",
+    phone.phoneOrderNotifyError({ notifyCustomer: false, customerEmail: "" }),
+    null,
+  );
+  const data = phone.phoneOrderSchema.parse(
+    input({ customerEmail: "", customerPhone: "0912345678", notifyCustomer: true }),
+  );
+  const res = await run(world(), data);
+  check(
+    "repo 邊界：notifyCustomer 但沒 Email → email_required_for_notify，一筆都沒寫",
+    [res.ok, res.code, wrote(res.log).length],
+    [false, "email_required_for_notify", 0],
+  );
+
+  const fns = stripComments(readFile("src/lib/admin/fns/phone-orders.ts"));
+  const guardIdx = fns.indexOf("phoneOrderNotifyError(data)");
+  const createIdx = fns.indexOf("createAdminPhoneOrder(buildPhoneOrderPayload(data)");
+  checkTrue(
+    "server fn：建單之前先 phoneOrderNotifyError(data)，回 { ok:false, message }",
+    guardIdx > 0 &&
+      createIdx > guardIdx &&
+      /if \(notifyError\) return \{ ok: false, message: notifyError \}/.test(fns),
+  );
+  checkTrue(
+    "server fn：AdminPhoneOrderInputError 轉成店員看得懂的話",
+    /err instanceof AdminPhoneOrderInputError/.test(fns),
+  );
+
+  const form = stripComments(readFile("src/components/admin/PhoneOrderForm.tsx"));
+  checkTrue("表單：沒有 Email 時勾選框 disabled", /disabled=\{!buyerHasEmail\}/.test(form));
+  checkTrue(
+    "表單：送出用 effectiveNotify（清掉 Email 不殘留勾選）",
+    /notifyCustomer: effectiveNotify/.test(form),
+  );
+  checkTrue("表單：說明文字用 NOTIFY_NEEDS_EMAIL_TEXT", /NOTIFY_NEEDS_EMAIL_TEXT/.test(form));
+  check("NOTIFY_NEEDS_EMAIL_TEXT", phone.NOTIFY_NEEDS_EMAIL_TEXT, "訂購人沒有 Email，無法寄信");
+  checkTrue(
+    "表單：參加者姓名 placeholder 顯示預設值",
+    /placeholder=\{\s*defaultParticipantName\(buyer\.name, i\)/.test(form),
+  );
+
+  const sql = stripSqlComments(
+    readFile("supabase/migrations/0051_phone_order_optional_contact.sql"),
+  );
+  checkTrue(
+    "DB：orders_admin_phone_notify_email（admin_phone 勾寄信一定要有 Email）",
+    /orders_admin_phone_notify_email check \(\s*source <> 'admin_phone'\s*or not notify_customer\s*or nullif\(btrim\(customer_email\), ''\) is not null/.test(
+      sql,
+    ),
+  );
+}
+
+console.log("\n[14] 0051：沒有 Email 時的發票——照開、不帶 BuyerEmailAddress");
+{
+  const amego = await import(pathToFileURL(join(ROOT, "src/server/amego.ts")).href);
+  const lines = [{ description: "海的聲音", quantity: 2, unitPrice: 300, amount: 600 }];
+  const b2c = amego.buildIssuePayload({ orderId: "IB-T", lines, buyerEmail: "" });
+  check(
+    "buildIssuePayload：空字串 Email → 不帶 BuyerEmailAddress",
+    "BuyerEmailAddress" in b2c,
+    false,
+  );
+  check(
+    "buildIssuePayload：買方仍是 0000000000／消費者（B2C 照開）",
+    [b2c.BuyerIdentifier, b2c.BuyerName],
+    ["0000000000", "消費者"],
+  );
+  check("buildIssuePayload：金額照算", b2c.TotalAmount, "600");
+  const donate = amego.buildIssuePayload({
+    orderId: "IB-T",
+    lines,
+    buyerEmail: null,
+    loveCode: "168001",
+  });
+  check("沒有 Email＋捐贈 → NPOBAN 照帶", donate.NPOBAN, "168001");
+
+  const inv = stripComments(readFile("src/server/repos/invoices.ts"));
+  checkTrue(
+    "getOrderForInvoice：notify_customer=false（沒有 Email 的電話報名一定是 false）→ customerEmail 給空字串",
+    /customerEmail: o\.notify_customer === false \? "" : String\(o\.customer_email \?\? ""\)/.test(
+      inv,
+    ),
+  );
+  const issuer = stripComments(readFile("src/server/invoice-issuer.ts"));
+  check(
+    "invoice-issuer：兩次開立都是 buyerEmail: order.customerEmail || null（空 → null，不擋開立）",
+    (issuer.match(/buyerEmail: order\.customerEmail \|\| null/g) ?? []).length,
+    2,
+  );
+  checkTrue(
+    "invoice-issuer：沒有任何「沒有 Email 就不開」的分支",
+    !/customerEmail[^\n]{0,40}(throw|return \{ ok: false)/.test(issuer),
+  );
+}
+
+console.log("\n[15] 0051：前台結帳規則不變");
+{
+  const co = await import(pathToFileURL(join(ROOT, "src/lib/checkout.ts")).href);
+  const front = co.checkoutFormSchema({ t: (m) => m.zh, requireAddress: false });
+  const base = {
+    customerName: "王小明",
+    customerEmail: "ming@example.invalid",
+    customerPhone: "0912345678",
+    shippingMethod: "none",
+    address: null,
+    note: null,
+    participants: [
+      { lineKey: "k", name: "王小明", email: "ming@example.invalid", phone: null, noticeAck: true },
+    ],
+  };
+  checkTrue("前台：完整資料 → 通過", front.safeParse(base).success);
+  checkTrue("前台：沒有 Email → 擋", !front.safeParse({ ...base, customerEmail: "" }).success);
+  checkTrue("前台：沒有手機 → 擋", !front.safeParse({ ...base, customerPhone: "" }).success);
+  checkTrue(
+    "前台：參加者信箱與手機都沒填 → 擋",
+    !front.safeParse({
+      ...base,
+      participants: [{ lineKey: "k", name: "A", email: null, phone: null, noticeAck: true }],
+    }).success,
+  );
+  checkTrue(
+    "前台：參加者沒姓名 → 擋",
+    !front.safeParse({
+      ...base,
+      participants: [
+        { lineKey: "k", name: "", email: "a@example.invalid", phone: null, noticeAck: true },
+      ],
+    }).success,
+  );
+  checkTrue(
+    "前台 payload schema：customerEmail 空字串 → 擋",
+    !co.checkoutPayloadSchema.safeParse({
+      ...base,
+      customerEmail: "",
+      items: [{ productId: "p", quantity: 1 }],
+      locale: "zh",
+      idempotencyKey: crypto.randomUUID(),
+    }).success,
+  );
+
+  // createOrder()（前台，沒有 admin）：參加者沒有聯絡方式 → order_failed，連 orders 都沒寫。
+  const db = makeDb(world());
+  globalThis.__fakeDb = db;
+  globalThis.__notified = [];
+  const p = phone.buildPhoneOrderPayload(
+    phone.phoneOrderSchema.parse(input({ participants: [{ name: "A" }, { name: "B" }] })),
+  );
+  let code = "no error";
+  try {
+    await createOrder(p);
+  } catch (err) {
+    code = err?.code ?? String(err);
+  }
+  check("前台 createOrder：參加者沒聯絡方式 → order_failed", code, "order_failed");
+  check("前台 createOrder：被擋時沒有寫任何東西", wrote(db.log).length, 0);
+
+  const orders = stripComments(readFile("src/server/repos/orders.ts"));
+  checkTrue(
+    "orders.ts：放寬只在 admin 分支（allowParticipantWithoutContact: admin !== null）",
+    /allowParticipantWithoutContact: admin !== null/.test(orders),
+  );
+  checkTrue(
+    "orders.ts：priceLines 預設 allowParticipantWithoutContact=false",
+    /= \{ allowParticipantWithoutContact: false \}/.test(orders),
+  );
+
+  const sql = stripSqlComments(
+    readFile("supabase/migrations/0051_phone_order_optional_contact.sql"),
+  );
+  checkTrue(
+    "DB 觸發器：兩者皆空只有 o.source = 'admin_phone' 放行，否則同名 check_violation",
+    /o\.source = 'admin_phone'/.test(sql) &&
+      /errcode = 'check_violation'/.test(sql) &&
+      /constraint = 'event_registrations_contactable'/.test(sql),
+  );
+  checkTrue(
+    "DB：orders_admin_phone_contact 只約束 admin_phone",
+    /orders_admin_phone_contact check \(\s*source <> 'admin_phone'/.test(sql),
+  );
+  checkTrue("DB：沒有放寬 customer_email／customer_phone 的 NOT NULL", !/drop not null/i.test(sql));
+  checkTrue("DB：沒有改 reserve_session_seat", !/reserve_session_seat/.test(sql));
+}
+
+console.log("\n[16] 0051：事後補資料（訂單內頁編輯聯絡資料）");
+{
+  const fns = stripComments(readFile("src/lib/admin/fns/phone-orders.ts"));
+  checkTrue(
+    "updatePhoneOrderContactsAdmin：adminFnMiddleware＋inputValidator(phoneOrderContactEditSchema)",
+    /updatePhoneOrderContactsAdmin = createServerFn\(\{ method: "POST" \}\)\s*\.middleware\(\[adminFnMiddleware\]\)\s*\.inputValidator\(phoneOrderContactEditSchema\)/.test(
+      fns,
+    ),
+  );
+  checkTrue(
+    "稽核的操作者只認 context.admin.userId",
+    /updatePhoneOrderContacts\(\{\s*orderId: data\.orderId,\s*actorId: context\.admin\.userId/.test(
+      fns,
+    ),
+  );
+  checkTrue(
+    "getPhoneOrderContacts：GET＋adminFnMiddleware",
+    /getPhoneOrderContacts = createServerFn\(\{ method: "GET" \}\)\s*\.middleware\(\[adminFnMiddleware\]\)/.test(
+      fns,
+    ),
+  );
+  const repo = stripComments(readFile("src/server/repos/phone-orders.ts"));
+  checkTrue(
+    "讀取只回 admin_phone 的訂單",
+    /order\.source !== "admin_phone"\) return null/.test(repo),
+  );
+  checkTrue(
+    "寫入走 admin_update_phone_order_contacts RPC",
+    /rpc\("admin_update_phone_order_contacts"/.test(repo),
+  );
+  const page = stripComments(readFile("src/routes/admin/_shell.orders_.$id.tsx"));
+  checkTrue(
+    "訂單內頁：編輯器只掛在電話報名（detail.phone_order）",
+    /\{detail\.phone_order \? \(\s*<PhoneOrderContactEditor/.test(page),
+  );
+
+  const e = phone.phoneOrderContactEditSchema;
+  const id = "00000000-0000-4000-8000-0000000000aa";
+  const ok = {
+    orderId: id,
+    customer: { name: "王小明", email: "", phone: "0912345678" },
+    participants: [{ id, name: "林小美", email: "", phone: "" }],
+  };
+  checkTrue("編輯：訂購人只有手機、參加者沒聯絡方式 → 通過", e.safeParse(ok).success);
+  checkTrue(
+    "編輯：訂購人手機與 Email 都清空 → 擋",
+    !e.safeParse({ ...ok, customer: { name: "王", email: "", phone: "" } }).success,
+  );
+  checkTrue(
+    "編輯：手機格式錯 → 擋",
+    !e.safeParse({ ...ok, participants: [{ id, name: "A", email: "", phone: "12" }] }).success,
+  );
+  checkTrue(
+    "編輯：參加者姓名清空 → 擋",
+    !e.safeParse({ ...ok, participants: [{ id, name: " ", email: "", phone: "" }] }).success,
+  );
+  const stripped = e.parse({ ...ok, customer: { ...ok.customer, total: 1 }, extra: "x" });
+  checkTrue(
+    "編輯：多餘欄位被丟掉（只有姓名／手機／Email）",
+    !("extra" in stripped) && !("total" in stripped.customer),
+  );
+
+  const sql = stripSqlComments(
+    readFile("supabase/migrations/0051_phone_order_optional_contact.sql"),
+  );
+  checkTrue("RPC：限 admin_phone", /'not_phone_order'/.test(sql));
+  checkTrue(
+    "RPC：驗證參加者時就 for update 鎖列（不會與單筆移除競爭出不實稽核）",
+    /and r\.order_id = p_order_id\s*for update;\s*if not found then\s*return query select false, 'registration_not_in_order'/.test(
+      sql,
+    ),
+  );
+  checkTrue(
+    "RPC：參加者必須屬於這張單",
+    /r\.order_id = p_order_id/.test(sql) && /'registration_not_in_order'/.test(sql),
+  );
+  checkTrue(
+    "RPC：有變動才寫稽核",
+    /insert into public\.order_contact_edit_log \(actor_id, order_id, changes\)/.test(sql),
+  );
+  checkTrue(
+    "RPC：只 grant service_role",
+    /revoke all on function public\.admin_update_phone_order_contacts\(uuid, uuid, jsonb, jsonb\)\s*from public, anon, authenticated/.test(
+      sql,
+    ) &&
+      /grant execute on function public\.admin_update_phone_order_contacts\(uuid, uuid, jsonb, jsonb\)\s*to service_role/.test(
+        sql,
+      ),
+  );
+  checkTrue(
+    "稽核表：RLS on、anon/authenticated 全收",
+    /order_contact_edit_log enable row level security/.test(sql) &&
+      /revoke all on table public\.order_contact_edit_log from anon, authenticated/.test(sql),
+  );
+}
+
+console.log("\n[17] 0051：預設姓名");
+{
+  check("第 1 位＝訂購人姓名", phone.defaultParticipantName("王小明", 0), "王小明");
+  check("第 3 位＝同行者 2", phone.defaultParticipantName("王小明", 2), "王小明 同行者 2");
+  check(
+    "訂購人還沒填 → 空字串（placeholder 改顯示說明）",
+    phone.defaultParticipantName(" ", 1),
+    "",
+  );
+  const long = "名".repeat(60);
+  const d = phone.defaultParticipantName(long, 12);
+  check(
+    "超過 60 字時截訂購人姓名、保留後綴",
+    [d.length <= 60, d.endsWith(" 同行者 12")],
+    [true, true],
+  );
+  const p = phone.buildPhoneOrderPayload(
+    phone.phoneOrderSchema.parse(input({ participants: [{ name: "自己填" }, { name: "  " }] })),
+  );
+  check(
+    "有填的姓名照用，空白才帶預設",
+    p.items[0].participants.map((x) => x.name),
+    ["自己填", "王小明 同行者 1"],
+  );
 }
 
 console.log("\n" + "─".repeat(52));

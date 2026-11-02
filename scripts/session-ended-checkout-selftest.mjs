@@ -480,7 +480,8 @@ for (const rel of PAYMENT_PATHS) {
     1,
   );
   const replayIdx = orders.indexOf("const replay = await findByIdempotencyKey(");
-  const priceIdx = orders.indexOf("const lines = await priceLines(payload.items);");
+  // 0051 起第二個參數是 { allowParticipantWithoutContact: admin !== null }（只放寬電話報名）。
+  const priceIdx = orders.indexOf("const lines = await priceLines(payload.items,");
   checkTrue(
     "replay 短路在 priceLines 之前（已成立的單重送不會被新規則擋）",
     replayIdx > 0 && replayIdx < priceIdx,

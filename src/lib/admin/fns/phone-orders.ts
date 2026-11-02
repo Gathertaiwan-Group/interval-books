@@ -13,8 +13,13 @@
  * 回 already_paid、不再觸發通知。
  */
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { adminFnMiddleware } from "@/lib/admin/middleware";
-import { phoneOrderSchema } from "@/lib/admin/phone-order";
+import {
+  phoneOrderContactEditSchema,
+  phoneOrderNotifyError,
+  phoneOrderSchema,
+} from "@/lib/admin/phone-order";
 
 export const getPhoneOrderFormOptions = createServerFn({ method: "GET" })
   .middleware([adminFnMiddleware])
@@ -50,9 +55,13 @@ export const createPhoneOrderAdmin = createServerFn({ method: "POST" })
   .inputValidator(phoneOrderSchema)
   .handler(async ({ data, context }): Promise<CreatePhoneOrderResult> => {
     const { buildPhoneOrderPayload, phoneOrderPaidNote } = await import("@/lib/admin/phone-order");
-    const { createAdminPhoneOrder, AdminPhoneOrderUncertainError } =
+    const { createAdminPhoneOrder, AdminPhoneOrderInputError, AdminPhoneOrderUncertainError } =
       await import("@/server/repos/orders");
     const { CheckoutError, CHECKOUT_ERROR_COPY } = await import("@/lib/checkout");
+
+    // 0051：沒有訂購人 Email 卻要求寄信 → 不建單，回一句店員看得懂的話。
+    const notifyError = phoneOrderNotifyError(data);
+    if (notifyError) return { ok: false, message: notifyError };
 
     let placed;
     try {
@@ -68,6 +77,15 @@ export const createPhoneOrderAdmin = createServerFn({ method: "POST" })
           data.payment.status === "paid" && data.payment.last5 ? data.payment.last5 : null,
       });
     } catch (err) {
+      if (err instanceof AdminPhoneOrderInputError) {
+        return {
+          ok: false,
+          message:
+            err.code === "email_required_for_notify"
+              ? (phoneOrderNotifyError({ notifyCustomer: true, customerEmail: "" }) ?? "")
+              : "訂購人的手機或 Email 至少要填一項，訂單沒有成立。",
+        };
+      }
       if (err instanceof AdminPhoneOrderUncertainError) {
         // 訂單可能已經成立（或同一筆送出還在處理中）——不標記已收款、也不說「沒有成立」。
         console.error(`[admin/phone-orders] 建單結果不確定：${err.message}`);
@@ -118,4 +136,54 @@ export const createPhoneOrderAdmin = createServerFn({ method: "POST" })
     }
 
     return { ok: true, orderId: placed.orderId, orderNo: placed.orderNo, warning };
+  });
+
+// ---------------------------------------------------------------------------
+// 0051：事後補資料（訂單內頁「編輯訂購人／參加者聯絡資料」）
+// ---------------------------------------------------------------------------
+
+/**
+ * 讀這張電話報名訂單目前的訂購人與參加者聯絡資料（明文，給編輯表單預填）。
+ * 只限 source = 'admin_phone'；其他訂單回 null。同訂單內頁一樣只有 admin 看得到。
+ */
+export const getPhoneOrderContacts = createServerFn({ method: "GET" })
+  .middleware([adminFnMiddleware])
+  .inputValidator(z.object({ orderId: z.string().trim().uuid() }))
+  .handler(async ({ data }) => {
+    const { loadPhoneOrderContacts } = await import("@/server/repos/phone-orders");
+    return await loadPhoneOrderContacts(data.orderId);
+  });
+
+export type UpdatePhoneOrderContactsResult =
+  | { ok: true; changed: boolean }
+  | { ok: false; message: string };
+
+const CONTACT_EDIT_ERROR_TEXT: Record<string, string> = {
+  not_found: "找不到這張訂單，可能已被刪除。",
+  not_phone_order: "只有後台電話報名的訂單可以在這裡改聯絡資料。",
+  customer_name_required: "訂購人姓名必填。",
+  customer_contact_required: "訂購人的手機或 Email 至少要填一項。",
+  email_required_for_notify: "這張單有勾「寄信給客人」，訂購人 Email 不能清空。",
+  registration_not_in_order: "參加者資料已經變動（可能被移除），請重新整理後再試。",
+  participant_name_required: "每一位參加者都要有姓名。",
+};
+
+/**
+ * 改電話報名訂單的訂購人／參加者姓名、手機、Email。寫入與稽核在同一支 RPC
+ * （admin_update_phone_order_contacts，0051 §3）：誰（context.admin.userId，呼叫端
+ * 不能宣稱）、什麼時候、改了哪幾個欄位。CSRF 由全域 createCsrfMiddleware 擋。
+ */
+export const updatePhoneOrderContactsAdmin = createServerFn({ method: "POST" })
+  .middleware([adminFnMiddleware])
+  .inputValidator(phoneOrderContactEditSchema)
+  .handler(async ({ data, context }): Promise<UpdatePhoneOrderContactsResult> => {
+    const { updatePhoneOrderContacts } = await import("@/server/repos/phone-orders");
+    const res = await updatePhoneOrderContacts({
+      orderId: data.orderId,
+      actorId: context.admin.userId,
+      customer: data.customer,
+      participants: data.participants,
+    });
+    if (res.updated) return { ok: true, changed: res.reason === "updated" };
+    return { ok: false, message: CONTACT_EDIT_ERROR_TEXT[res.reason] ?? "儲存失敗，請再試一次。" };
   });

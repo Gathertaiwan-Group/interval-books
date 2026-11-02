@@ -12,6 +12,8 @@ import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
 import type { Localized } from "@/i18n/types";
 import type {
+  PhoneOrderContactEditInput,
+  PhoneOrderContacts,
   PhoneOrderPlanOption,
   PhoneOrderProductOption,
   PhoneOrderSessionOption,
@@ -175,4 +177,105 @@ export async function countOrderRegistrations(orderId: string): Promise<number> 
     return -1;
   }
   return (data ?? []).length;
+}
+
+// ---------------------------------------------------------------------------
+// 0051：事後補資料
+// ---------------------------------------------------------------------------
+
+/**
+ * 電話報名訂單目前的訂購人與參加者聯絡資料（明文）。不是 admin_phone 或找不到 → null。
+ * 只有 fns/phone-orders.ts 的 getPhoneOrderContacts（adminFnMiddleware）呼叫。
+ */
+export async function loadPhoneOrderContacts(orderId: string): Promise<PhoneOrderContacts | null> {
+  const db = supabaseAdmin();
+  const { data: o, error } = await db
+    .from("orders")
+    .select("id, source, notify_customer, customer_name, customer_email, customer_phone")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (error) {
+    console.error(`[repo/phone-orders] 讀訂單聯絡資料失敗：${error.code} ${error.message}`);
+    throw new Error(`[repo/phone-orders] 訂單讀取失敗：${error.code}`);
+  }
+  const order = o as {
+    source?: string;
+    notify_customer?: boolean;
+    customer_name?: string | null;
+    customer_email?: string | null;
+    customer_phone?: string | null;
+  } | null;
+  if (!order || order.source !== "admin_phone") return null;
+
+  const { data: regs, error: regError } = await db
+    .from("event_registrations")
+    .select("id, seat_no, name, email, phone, created_at")
+    .eq("order_id", orderId)
+    .order("created_at", { ascending: true })
+    .order("seat_no", { ascending: true });
+  if (regError) {
+    console.error(`[repo/phone-orders] 讀參加者失敗：${regError.code} ${regError.message}`);
+    throw new Error(`[repo/phone-orders] 參加者讀取失敗：${regError.code}`);
+  }
+  const blank = (v: string | null | undefined) => (v ?? "").trim();
+  return {
+    customer: {
+      name: blank(order.customer_name),
+      email: blank(order.customer_email),
+      phone: blank(order.customer_phone),
+    },
+    notifyCustomer: order.notify_customer === true,
+    participants: (
+      (regs ?? []) as unknown as {
+        id: string;
+        seat_no: number;
+        name: string;
+        email: string | null;
+        phone: string | null;
+      }[]
+    ).map((r) => ({
+      id: r.id,
+      seatNo: r.seat_no,
+      name: r.name,
+      email: blank(r.email) || null,
+      phone: blank(r.phone) || null,
+    })),
+  };
+}
+
+/**
+ * 寫入＋稽核是同一支 RPC（admin_update_phone_order_contacts，0051 §3）：鎖訂單 → 驗全部
+ * 輸入 → 才寫 → 有變動才記一列 order_contact_edit_log（誰、何時、哪幾個欄位，不存值）。
+ * 回 { updated, reason }：updated=false 時 reason 是給呼叫端對照文案的碼。
+ */
+export async function updatePhoneOrderContacts(args: {
+  orderId: string;
+  actorId: string;
+  customer: PhoneOrderContactEditInput["customer"];
+  participants: PhoneOrderContactEditInput["participants"];
+}): Promise<{ updated: boolean; reason: string }> {
+  const { data, error } = await supabaseAdmin().rpc("admin_update_phone_order_contacts", {
+    p_order_id: args.orderId,
+    p_actor_id: args.actorId,
+    p_customer: {
+      name: args.customer.name,
+      email: args.customer.email,
+      phone: args.customer.phone,
+    },
+    p_participants: args.participants.map((p) => ({
+      id: p.id,
+      name: p.name,
+      email: p.email || null,
+      phone: p.phone || null,
+    })),
+  });
+  if (error) {
+    console.error(`[repo/phone-orders] 更新聯絡資料失敗：${error.code} ${error.message}`);
+    throw new Error(`[repo/phone-orders] 更新聯絡資料失敗：${error.code}`);
+  }
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | { updated?: boolean; reason?: string }
+    | null
+    | undefined;
+  return { updated: row?.updated === true, reason: String(row?.reason ?? "unknown") };
 }

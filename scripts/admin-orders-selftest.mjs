@@ -586,9 +586,13 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
     // enqueue_registration_emails 加 notify_customer 條件、expire_unpaid_orders 跳過
     // source='admin_phone'；admin_delete_order()、admin_archive_order()、admin_mark_order_paid()
     // 一個字沒動（電話報名「已收到匯款」就是呼叫 admin_mark_order_paid()）。
-    "supabase/migrations 剛好 50 個 .sql 檔（0001–0049 原封不動 + 0050 後台電話報名）",
+    // 0051（電話報名聯絡資料放寬）：event_registrations_contactable CHECK → 同名觸發器（只放行
+    // admin_phone）、orders 兩條限 admin_phone 的 CHECK、order_contact_edit_log＋
+    // admin_update_phone_order_contacts()。admin_delete_order／admin_archive_order／
+    // admin_mark_order_paid 一個字沒動。
+    "supabase/migrations 剛好 51 個 .sql 檔（0001–0050 原封不動 + 0051 電話報名聯絡資料放寬）",
     migFiles.length,
-    50,
+    51,
   );
 }
 

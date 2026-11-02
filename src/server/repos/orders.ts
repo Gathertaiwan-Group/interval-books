@@ -301,7 +301,15 @@ const isBooking = (t: ProductTypeForOrder) => t === "event" || t === "journey";
  * quantity, and atomic_deduct_stock() would otherwise deduct them as two
  * independent lines against the same row.
  */
-async function priceLines(items: CheckoutPayload["items"]): Promise<PricedLine[]> {
+async function priceLines(
+  items: CheckoutPayload["items"],
+  /**
+   * 0051：只有後台電話報名（createOrder 的 admin 分支）是 true —— 參加者可以沒有任何
+   * 聯絡方式（資料庫的 event_registrations_contactable 觸發器也只對 admin_phone 放行）。
+   * 前台結帳永遠是 false，規則與 0051 之前逐字相同。
+   */
+  opts: { allowParticipantWithoutContact: boolean } = { allowParticipantWithoutContact: false },
+): Promise<PricedLine[]> {
   // ⚠️ Merged on (product, sitting, plan), not on product alone. Before 0020 the
   // key was the product id, because two lines for the same product really were
   // indistinguishable. They are not any more: one activity with a morning and
@@ -466,7 +474,10 @@ async function priceLines(items: CheckoutPayload["items"]): Promise<PricedLine[]
         const hasName = person.name.trim().length > 0;
         const hasContact =
           (person.email ?? "").trim().length > 0 || (person.phone ?? "").trim().length > 0;
-        if (!hasName || !hasContact) throw new CheckoutError("order_failed");
+        if (!hasName) throw new CheckoutError("order_failed");
+        if (!hasContact && !opts.allowParticipantWithoutContact) {
+          throw new CheckoutError("order_failed");
+        }
       }
     } else if (w.sessionId !== null || w.planId !== null || w.participants.length > 0) {
       // A book with a sitting (or a plan) attached is a payload that has been
@@ -1017,7 +1028,9 @@ export async function createOrder(
   const replay = await findByIdempotencyKey(payload.idempotencyKey);
   if (replay) return replay;
 
-  const lines = await priceLines(payload.items);
+  const lines = await priceLines(payload.items, {
+    allowParticipantWithoutContact: admin !== null,
+  });
 
   // Shipping is decided by the products, not by the form. A cart of nothing but
   // bookings collects no address and pays no freight; see computeShippingFee().
@@ -1584,6 +1597,16 @@ export class AdminPhoneOrderUncertainError extends Error {
   }
 }
 
+/** 電話報名的輸入在 repo 這一層被擋（0051）。訂單沒有建立。 */
+export class AdminPhoneOrderInputError extends Error {
+  readonly code: "customer_contact_required" | "email_required_for_notify";
+  constructor(code: "customer_contact_required" | "email_required_for_notify") {
+    super(code);
+    this.name = "AdminPhoneOrderInputError";
+    this.code = code;
+  }
+}
+
 export type PlacedAdminPhoneOrder = {
   orderId: string;
   orderNo: string;
@@ -1604,6 +1627,15 @@ export async function createAdminPhoneOrder(
   payload: CheckoutPayload,
   admin: AdminPhoneOrderOptions,
 ): Promise<PlacedAdminPhoneOrder> {
+  // 0051：訂購人手機與 Email 至少一項；勾寄信一定要有 Email。server fn 已經先擋過
+  // （回店員看得懂的話），這裡是 repo 自己的邊界，資料庫 CHECK 是最後一道。
+  const email = (payload.customerEmail ?? "").trim();
+  const phone = (payload.customerPhone ?? "").trim();
+  if (email === "" && phone === "")
+    throw new AdminPhoneOrderInputError("customer_contact_required");
+  if (admin.notifyCustomer && email === "") {
+    throw new AdminPhoneOrderInputError("email_required_for_notify");
+  }
   await createOrder(payload, { admin });
   const { data, error } = await supabaseAdmin()
     .from("orders")

@@ -4,6 +4,10 @@
  * 後台慣例：AdminDetailPage（「← 回到列表」＋手機版底部固定按鈕）、UnsavedChangesGuard
  * （填到一半離開會先問）、useState 管欄位（同 ReferrerForm）。
  *
+ * 聯絡資料（0051，比前台寬）：訂購人姓名必填、手機或 Email 至少一項；參加者三欄都可以
+ * 留空，姓名留空會自動帶「訂購人姓名」／「訂購人姓名 同行者 N」（placeholder 先顯示）。
+ * 訂購人沒有 Email 時「寄報名成功信給客人」停用。
+ *
  * 驗證：送出前用 phoneOrderSchema（與 server fn 的 inputValidator **同一份**）先擋一次，
  * 錯誤列在按鈕上方；真正的邊界在伺服器（createOrder() 重算價格、reserve_session_seat()
  * 擋名額不足與已開始的場次）。
@@ -26,6 +30,9 @@ import { money } from "@/lib/admin/order-labels";
 import { formatTaipeiDateTime } from "@/lib/taipei-time";
 import { CARRIER_MOBILE, CARRIER_NPC, type InvoiceType } from "@/lib/invoice-format";
 import {
+  defaultParticipantName,
+  NOTIFY_NEEDS_EMAIL_TEXT,
+  phoneOrderNotifyError,
   phoneOrderSchema,
   priceOverrideError,
   quotePhoneOrder,
@@ -158,6 +165,9 @@ export function PhoneOrderForm({ products, today, initialSessionId, back, onCrea
   const overrideNumber = /^\d+$/.test(overrideAmount.trim()) ? Number(overrideAmount.trim()) : NaN;
   const finalTotal = overrideOn && Number.isFinite(overrideNumber) ? overrideNumber : quote.total;
   const isFree = finalTotal === 0 && session !== null && (!needsPlan || plan !== null);
+  const buyerHasEmail = buyer.email.trim() !== "";
+  // 沒有 Email 就不能寄：勾選框停用，送出時也一律當作沒勾（清掉 Email 不會殘留勾選）。
+  const effectiveNotify = notifyCustomer && buyerHasEmail;
 
   function buildInput(): PhoneOrderInput | null {
     const msgs: string[] = [];
@@ -190,7 +200,7 @@ export function PhoneOrderForm({ products, today, initialSessionId, back, onCrea
       planId: plan ? plan.id : null,
       quantity: qty,
       participants: shownPeople.map((p) => ({
-        name: p.name,
+        name: p.name.trim() || null,
         phone: p.phone.trim() || null,
         email: p.email.trim() || null,
       })),
@@ -212,7 +222,7 @@ export function PhoneOrderForm({ products, today, initialSessionId, back, onCrea
         paymentStatus === "paid" && !isFree
           ? { status: "paid" as const, paidOn, last5: last5.trim() || null }
           : { status: "unpaid" as const },
-      notifyCustomer,
+      notifyCustomer: effectiveNotify,
     };
     const parsed = phoneOrderSchema.safeParse(raw);
     if (!parsed.success) {
@@ -231,6 +241,11 @@ export function PhoneOrderForm({ products, today, initialSessionId, back, onCrea
           return `${where}${i.message}`;
         }),
       );
+      return null;
+    }
+    const notifyError = phoneOrderNotifyError(parsed.data);
+    if (notifyError) {
+      setErrors([notifyError]);
       return null;
     }
     setErrors([]);
@@ -384,6 +399,9 @@ export function PhoneOrderForm({ products, today, initialSessionId, back, onCrea
         </Block>
 
         <Block title="2. 訂購人">
+          <p className="text-xs text-muted-foreground">
+            姓名必填；手機或 Email 至少填一項（都有更好）。沒要到的之後可以在訂單頁補。
+          </p>
           <div className="grid gap-3 sm:grid-cols-3">
             <Field label="姓名" htmlFor="po-buyer-name">
               <Input
@@ -397,6 +415,7 @@ export function PhoneOrderForm({ products, today, initialSessionId, back, onCrea
               <Input
                 id="po-buyer-phone"
                 inputMode="tel"
+                placeholder="手機或 Email 至少一項"
                 value={buyer.phone}
                 maxLength={10}
                 onChange={(e) => setBuyer({ ...buyer, phone: e.target.value.trim() })}
@@ -406,6 +425,7 @@ export function PhoneOrderForm({ products, today, initialSessionId, back, onCrea
               <Input
                 id="po-buyer-email"
                 type="email"
+                placeholder="沒有可留空（就不能寄信）"
                 value={buyer.email}
                 maxLength={120}
                 onChange={(e) => setBuyer({ ...buyer, email: e.target.value.trim() })}
@@ -420,7 +440,8 @@ export function PhoneOrderForm({ products, today, initialSessionId, back, onCrea
           ) : (
             <div className="space-y-3">
               <p className="text-xs text-muted-foreground">
-                每一位都要有姓名，信箱與手機至少填一項（與網站結帳相同）。
+                沒要到的欄位都可以留空。姓名留空會自動帶入框內的灰字（第 1
+                位是訂購人姓名，其餘是「訂購人姓名 同行者 N」）；手機、Email 之後可以在訂單頁補。
               </p>
               {shownPeople.map((p, i) => (
                 <div key={i} className="grid gap-3 rounded-md bg-muted/40 p-3 sm:grid-cols-3">
@@ -440,6 +461,10 @@ export function PhoneOrderForm({ products, today, initialSessionId, back, onCrea
                   <Field label="姓名" htmlFor={`po-p${i}-name`}>
                     <Input
                       id={`po-p${i}-name`}
+                      placeholder={
+                        defaultParticipantName(buyer.name, i) ||
+                        (i === 0 ? "留空＝訂購人姓名" : `留空＝訂購人姓名 同行者 ${i}`)
+                      }
                       value={p.name}
                       maxLength={60}
                       onChange={(e) => setPerson(i, { name: e.target.value })}
@@ -449,6 +474,7 @@ export function PhoneOrderForm({ products, today, initialSessionId, back, onCrea
                     <Input
                       id={`po-p${i}-phone`}
                       inputMode="tel"
+                      placeholder="可留空"
                       value={p.phone}
                       maxLength={10}
                       onChange={(e) => setPerson(i, { phone: e.target.value.trim() })}
@@ -458,6 +484,7 @@ export function PhoneOrderForm({ products, today, initialSessionId, back, onCrea
                     <Input
                       id={`po-p${i}-email`}
                       type="email"
+                      placeholder="可留空"
                       value={p.email}
                       maxLength={120}
                       onChange={(e) => setPerson(i, { email: e.target.value.trim() })}
@@ -470,6 +497,12 @@ export function PhoneOrderForm({ products, today, initialSessionId, back, onCrea
         </Block>
 
         <Block title="4. 電子發票">
+          {!effectiveNotify ? (
+            <p className="text-xs text-muted-foreground">
+              {buyerHasEmail ? "不寄信給客人" : "訂購人沒有 Email"}
+              ：發票照常開立，但不會寄開立通知給客人（號碼在訂單頁看得到）。客人想留存的話，可改選手機條碼載具或捐贈。
+            </p>
+          ) : null}
           <div className="flex flex-wrap gap-4 text-sm" role="radiogroup" aria-label="發票類型">
             {(
               [
@@ -666,12 +699,19 @@ export function PhoneOrderForm({ products, today, initialSessionId, back, onCrea
           <label className="flex items-start gap-2 text-sm">
             <Checkbox
               className="mt-0.5"
-              checked={notifyCustomer}
+              checked={effectiveNotify}
+              disabled={!buyerHasEmail}
+              aria-describedby="po-notify-help"
               onCheckedChange={(v) => setNotifyCustomer(v === true)}
             />
-            <span>
+            <span className={buyerHasEmail ? undefined : "text-muted-foreground"}>
               寄報名成功信給客人
-              <span className="block text-xs text-muted-foreground">
+              {!buyerHasEmail ? (
+                <span className="block text-xs font-medium text-amber-700 dark:text-amber-400">
+                  {NOTIFY_NEEDS_EMAIL_TEXT}（先填訂購人 Email 才能勾）。
+                </span>
+              ) : null}
+              <span id="po-notify-help" className="block text-xs text-muted-foreground">
                 不勾＝這張單完全不寄信給客人（含付款成功、報名成功、活動前提醒）。店家通知信照常寄，並標明「後台電話報名」。
               </span>
             </span>
