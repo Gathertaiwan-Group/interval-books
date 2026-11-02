@@ -98,7 +98,8 @@ export const REDIRECT_URI_ALLOWLIST: readonly string[] = [
  * ChatGPT 另一種 callback 形狀：`https://chatgpt.com/connector/oauth/<連接器 id>`。
  * 只放行這個固定前綴＋一段安全字元的 id，不放行任意 chatgpt.com 路徑。
  */
-const CHATGPT_CONNECTOR_CALLBACK = /^https:\/\/chatgpt\.com\/connector\/oauth\/[A-Za-z0-9_-]{1,128}$/;
+const CHATGPT_CONNECTOR_CALLBACK =
+  /^https:\/\/chatgpt\.com\/connector\/oauth\/[A-Za-z0-9_-]{1,128}$/;
 /** loopback：http、主機只能是 localhost／127.0.0.1，port 任意。 */
 export const LOOPBACK_HOSTS: readonly string[] = ["localhost", "127.0.0.1"];
 

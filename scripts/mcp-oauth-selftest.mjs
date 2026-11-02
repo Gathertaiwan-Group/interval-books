@@ -213,7 +213,9 @@ let localClient;
   ]) {
     checkTrue(
       `ChatGPT callback 可以註冊 ${good}`,
-      Boolean(oc.registerClient({ client_name: "ChatGPT", redirect_uris: [good] }, SECRET).client_id),
+      Boolean(
+        oc.registerClient({ client_name: "ChatGPT", redirect_uris: [good] }, SECRET).client_id,
+      ),
     );
   }
 
