@@ -125,7 +125,10 @@ export function publicationTitle(entry: PublicationSeoInput): Localized {
       BRAND[lang],
     );
     if (charLength(full) <= TITLE_LIMIT[lang]) return full;
-    return joinTitle(name, where, label, BRAND[lang]);
+    const short = joinTitle(name, where, label, BRAND[lang]);
+    if (charLength(short) <= TITLE_LIMIT[lang]) return short;
+    // 刊名本身就很長（英文常見）：再拿掉「地方刊物」那一段，只留 刊名｜地區｜店名。
+    return joinTitle(name, where, BRAND[lang]);
   };
   return { zh: build("zh"), en: build("en"), ja: build("ja") };
 }
@@ -217,7 +220,8 @@ export function publicationLd(opts: {
             availability: offer.inStock
               ? "https://schema.org/InStock"
               : "https://schema.org/OutOfStock",
-            url: canonicalUrl(`/shop/${offer.slug}`, undefined, lang),
+            // 指向刊物頁本身（canonical）：商品頁的 canonical 也指回這裡，不給 Google 兩個網址。
+            url,
             seller: { "@type": "Organization", "@id": ORG_ID, name: STORE_NAME },
           },
         }

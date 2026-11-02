@@ -152,7 +152,9 @@ export const Route = createFileRoute("/shop/$slug")({
           description: seo.description,
           image: seo.image,
           type: "product",
-          jsonLd: seo.jsonLd,
+          // 有對應刊物：Product／Book（含 offers）與麵包屑由 canonical 的刊物頁輸出，
+          // 這裡不再給第二份（同一件商品不出現兩個 Product 實體）。
+          jsonLd: publication ? [] : seo.jsonLd,
         },
       ),
     };

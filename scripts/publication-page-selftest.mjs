@@ -104,6 +104,15 @@ const t1 = pub.publicationTitle(TW001);
 check("tw-001 中文 title", t1.zh, "東北風｜基隆・八斗子漁村文物館｜地方刊物｜小時光風土誌書店");
 checkTrue("中文 title ≤ 40 字", core.charLength(t1.zh) <= 40);
 checkTrue("英文 title ≤ 70 字元", t1.en.length <= 70);
+const longEn = {
+  ...TW001,
+  title: L("東北風", "The Very Long English Title Of A Local Magazine From Keelung", "東北風"),
+};
+check(
+  "英文刊名很長 → 再拿掉 Local Publications（刊名｜地區｜店名）",
+  pub.publicationTitle(longEn).en,
+  "The Very Long English Title Of A Local Magazine From Keelung｜Keelung｜Interval Books",
+);
 checkTrue(
   "英文 title 以刊名開頭、以 Interval Books 結尾",
   /^Dongbeifeng｜.*Interval Books$/.test(t1.en),
@@ -210,7 +219,11 @@ check(
   [150, "TWD"],
 );
 check("offers.availability InStock", ldOffer[0].offers.availability, "https://schema.org/InStock");
-check("offers.url 指向（同語言的）商品頁", ldOffer[0].offers.url, `${O}/en/shop/pub-tw-001`);
+check(
+  "offers.url 指向（同語言的）刊物頁本身（canonical，不指向 canonical 指回來的商品頁）",
+  ldOffer[0].offers.url,
+  `${O}/en/publications/tw-001`,
+);
 check("英文版 url 帶 /en", ldOffer[0].url, `${O}/en/publications/tw-001`);
 checkFalse("沒封面就不輸出 image", "image" in ldOffer[0]);
 check(
@@ -405,6 +418,10 @@ checkTrue(
   /canonicalPath: publication \? publicationPath\(publication\.slug\) : undefined/.test(
     shopSlugSrc,
   ),
+);
+checkTrue(
+  "shop.$slug.tsx：有對應刊物時不輸出第二份 Product JSON-LD",
+  /jsonLd: publication \? \[\] : seo\.jsonLd/.test(shopSlugSrc),
 );
 checkTrue("shop.$slug.tsx：頁面連到刊物頁", /to="\/publications\/\$slug"/.test(shopSlugSrc));
 const shopIndexSrc = readFile("src/routes/shop.index.tsx");

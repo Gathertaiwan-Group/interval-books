@@ -242,6 +242,9 @@ export async function fetchPublicationForProduct(
       .select("slug, title, intro")
       .eq("product_id", productId)
       .eq("is_published", true)
+      // 與總覽頁同一個排序（seq 是台灣、日本各自編號，單看 seq 會挑錯國家）。
+      .order("sheet", { ascending: false })
+      .order("sort_order", { ascending: true })
       .order("seq", { ascending: true })
       .limit(1);
     if (error || !Array.isArray(data) || data.length === 0) return null;
