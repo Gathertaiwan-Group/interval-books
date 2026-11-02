@@ -71,7 +71,7 @@ export const Route = createFileRoute("/admin/_shell/inventory-products")({
     // 進不來，而且擋人的是 middleware 重讀 profiles 那一下，不是側欄。
     return await getInventoryProductsPageData({ data: { filter: DEFAULT_FILTER } });
   },
-  head: () => ({ meta: [{ title: "商品管理｜小時光書店後台" }] }),
+  head: () => ({ meta: [{ title: "商品管理｜小時光風土誌書店後台" }] }),
   component: InventoryProductsPage,
 });
 

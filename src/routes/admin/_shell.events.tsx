@@ -65,7 +65,7 @@ export const Route = createFileRoute("/admin/_shell/events")({
     return { ...(await getAdminEventsPageData()), now: Date.now() };
   },
   head: () => ({
-    meta: [{ title: "活動｜小時光書店後台" }],
+    meta: [{ title: "活動｜小時光風土誌書店後台" }],
   }),
   component: AdminEventsPage,
 });

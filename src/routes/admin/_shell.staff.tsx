@@ -80,7 +80,7 @@ export const Route = createFileRoute("/admin/_shell/staff")({
     const accounts = await listStaffAccounts();
     return { accounts };
   },
-  head: () => ({ meta: [{ title: "後台人員｜小時光書店後台" }] }),
+  head: () => ({ meta: [{ title: "後台人員｜小時光風土誌書店後台" }] }),
   component: AdminStaffPage,
 });
 

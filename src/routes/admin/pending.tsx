@@ -24,7 +24,7 @@ export const Route = createFileRoute("/admin/pending")({
     return { user };
   },
   head: () => ({
-    meta: [{ title: "帳號待開通｜小時光書店後台" }],
+    meta: [{ title: "帳號待開通｜小時光風土誌書店後台" }],
     styles: backOfficeTypeScaleStyles(),
   }),
   component: PendingApprovalPage,

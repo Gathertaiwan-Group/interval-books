@@ -61,7 +61,7 @@ export const Route = createFileRoute("/admin/_shell/inventory-purchases")({
     // 不是側欄。整份商品清單不在這裡：匯入／拍照辨識打開時才抓（usePickerProducts）。
     return await getInventoryPurchasesPageData({ data: { filter: DEFAULT_FILTER } });
   },
-  head: () => ({ meta: [{ title: "進貨｜小時光書店後台" }] }),
+  head: () => ({ meta: [{ title: "進貨｜小時光風土誌書店後台" }] }),
   component: InventoryPurchasesPage,
 });
 

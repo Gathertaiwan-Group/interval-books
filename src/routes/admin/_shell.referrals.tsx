@@ -54,7 +54,7 @@ export const Route = createFileRoute("/admin/_shell/referrals")({
     ]);
     return { ...list, report, period };
   },
-  head: () => ({ meta: [{ title: "推廣與分潤｜小時光書店後台" }] }),
+  head: () => ({ meta: [{ title: "推廣與分潤｜小時光風土誌書店後台" }] }),
   component: ReferralsPage,
 });
 

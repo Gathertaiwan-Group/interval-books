@@ -28,9 +28,9 @@ import eventImg from "@/assets/event-reading.jpg";
 /** Fallback copy — used only when the Supabase read fails. */
 const PAGE = {
   metaTitle: {
-    zh: "活動 Events｜小時光書店 Interval Books",
+    zh: "活動 Events｜小時光風土誌書店",
     en: "Events｜Interval Books",
-    ja: "イベント｜小時光書店 Interval Books",
+    ja: "イベント｜小時光 風土誌書店",
   },
   metaDescription: {
     zh: "讀書會、療癒生活節、策旅說明會、陶藝家展售、身心靈工作坊與好書交流——本頁為策展式彙整，每場活動皆有獨立網站。",

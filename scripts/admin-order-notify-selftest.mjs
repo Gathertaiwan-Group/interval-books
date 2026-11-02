@@ -841,7 +841,7 @@ if (tpl) {
   check(
     "🔴 主旨：新訂單 <編號>｜<訂購人>｜<金額>",
     homeMail.subject,
-    "【小時光書店】新訂單 IB-SELFTEST-0032｜王小明｜NT$1,280",
+    "【小時光風土誌書店】新訂單 IB-SELFTEST-0032｜王小明｜NT$1,280",
   );
   {
     const t = homeMail.text;
@@ -943,7 +943,7 @@ if (tpl) {
   check(
     "讀不到訂購人時主旨＝編號＋金額",
     nullMail.subject,
-    "【小時光書店】新訂單 IB-SELFTEST-0032｜NT$1,280",
+    "【小時光風土誌書店】新訂單 IB-SELFTEST-0032｜NT$1,280",
   );
   checkTrue("讀不到訂購人時註明請到後台查看", nullMail.text.includes("訂購人資料讀取失敗"));
   checkTrue("讀不到訂購人時摘要仍有收件方式", nullMail.text.includes("收件方式：宅配到府"));
@@ -958,7 +958,7 @@ if (tpl) {
   check(
     "🔴 待收款主旨：待收款訂單 <編號>｜<訂購人>｜<金額>",
     placedMail.subject,
-    "【小時光書店】待收款訂單 IB-SELFTEST-0032｜王小明｜NT$1,280",
+    "【小時光風土誌書店】待收款訂單 IB-SELFTEST-0032｜王小明｜NT$1,280",
   );
 
   // 主旨：換行／控制字元壓平、過長截斷

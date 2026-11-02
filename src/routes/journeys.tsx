@@ -18,9 +18,9 @@ import journeyImg from "@/assets/journey-mist.jpg";
 /** Fallback copy — used only when the Supabase read fails. */
 const PAGE = {
   metaTitle: {
-    zh: "策旅 Journeys｜小時光書店 Interval Books",
+    zh: "策旅 Journeys｜小時光風土誌書店",
     en: "Journeys｜Interval Books",
-    ja: "旅｜小時光書店 Interval Books",
+    ja: "旅｜小時光 風土誌書店",
   },
   metaDescription: {
     zh: "由書與土地共同寫成的深度旅程。每一趟策旅皆有獨立網站，本頁為彙整導流。",

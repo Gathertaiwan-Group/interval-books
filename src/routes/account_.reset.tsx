@@ -50,14 +50,14 @@ type ResetValues = z.infer<typeof resetSchema>;
 
 const META = {
   title: {
-    zh: "設定新密碼｜小時光書店",
+    zh: "設定新密碼｜小時光風土誌書店",
     en: "Set New Password｜Interval Books",
-    ja: "新しいパスワードの設定｜小時光書店",
+    ja: "新しいパスワードの設定｜小時光 風土誌書店",
   },
   description: {
-    zh: "為你的小時光書店會員帳號設定一組新密碼。",
+    zh: "為你的小時光風土誌書店會員帳號設定一組新密碼。",
     en: "Set a new password for your Interval Books account.",
-    ja: "小時光書店の会員アカウントに新しいパスワードを設定します。",
+    ja: "小時光 風土誌書店の会員アカウントに新しいパスワードを設定します。",
   },
 };
 
@@ -110,7 +110,7 @@ function AccountResetPage() {
           <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-muted">
             <ShieldCheck className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
           </div>
-          <p className="text-sm text-muted-foreground">小時光書店 Interval Books</p>
+          <p className="text-sm text-muted-foreground">小時光風土誌書店 Interval Books</p>
           <h1 className="text-xl font-medium">設定新密碼</h1>
         </div>
 

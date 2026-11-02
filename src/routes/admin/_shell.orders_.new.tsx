@@ -27,7 +27,7 @@ export const Route = createFileRoute("/admin/_shell/orders_/new")({
     // 「今天」在伺服器算一次（台北時間），免得 SSR 與瀏覽器的預設匯款日期不同而 hydration mismatch。
     return { products: await getPhoneOrderFormOptions(), today: taipeiToday() };
   },
-  head: () => ({ meta: [{ title: "新增電話報名｜訂單｜小時光書店後台" }] }),
+  head: () => ({ meta: [{ title: "新增電話報名｜訂單｜小時光風土誌書店後台" }] }),
   component: PhoneOrderNewPage,
 });
 

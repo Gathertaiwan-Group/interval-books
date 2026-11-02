@@ -265,10 +265,18 @@ export function robotsTxt(): string {
 // 文字
 // =============================================================================
 
+/**
+ * 結構化資料（JSON-LD）用的店名。2026-11 起品牌統一為「小時光風土誌書店」；舊名「小時光書店」
+ * 是 Google 商家檔案上的名稱，放在 alternateName 讓搜尋引擎對得起來。不讀 site_settings 的
+ * meta_site_name（那是 og:site_name 用的顯示字串，後台可改）。
+ */
+export const STORE_NAME = "小時光風土誌書店";
+export const STORE_ALTERNATE_NAMES = ["小時光書店", "Interval Books"];
+
 export const BRAND = {
-  zh: "小時光書店",
+  zh: "小時光風土誌書店",
   en: "Interval Books",
-  ja: "小時光書店",
+  ja: "小時光 風土誌書店",
 } as const satisfies Localized;
 
 /**
@@ -277,9 +285,9 @@ export const BRAND = {
  * （首頁入口與 /journeys）。
  */
 export const SITE_BLURB: Localized = {
-  zh: "小時光書店位於台北華山文創園區紅磚六合院西7-3館，以風土誌為主題選書，展售地方刊物與選物，也舉辦讀書會、講座、工作坊與策旅。",
+  zh: "小時光風土誌書店位於台北華山文創園區紅磚六合院西7-3館，以風土誌為主題選書，展售地方刊物與選物，也舉辦讀書會、講座、工作坊與策旅。",
   en: "Interval Books is a terroir-minded bookstore in the Red Brick Courtyard (West 7-3) of Huashan 1914 Creative Park, Taipei — books, local publications, curated objects, reading circles, talks, workshops and journeys.",
-  ja: "小時光書店は台北・華山1914文化創意産業園区 紅煉瓦六合院 西7-3館にある、風土誌をテーマにした書店。選書、地域の刊行物、セレクト品のほか、読書会・トーク・ワークショップ・旅も企画しています。",
+  ja: "小時光 風土誌書店は台北・華山1914文化創意産業園区 紅煉瓦六合院 西7-3館にある、風土誌をテーマにした書店。選書、地域の刊行物、セレクト品のほか、読書会・トーク・ワークショップ・旅も企画しています。",
 };
 
 /** 「＿＿＿」「___」這類還沒填的佔位符。 */
@@ -357,7 +365,7 @@ export function joinTitle(...parts: Array<string | null | undefined>): string {
 }
 
 /**
- * 三語 title 模板：「{名稱}｜{其他段落}｜小時光書店」（英文版品牌是 Interval Books）。
+ * 三語 title 模板：「{名稱}｜{其他段落}｜小時光風土誌書店」（英文版品牌是 Interval Books）。
  * 名稱先去掉外來品牌後綴（見 stripForeignBrandSuffix）。
  */
 export function seoTitle(name: Localized, ...middle: Array<Localized | string | null>): Localized {
@@ -409,8 +417,8 @@ export function organizationLd(facts: StoreFacts, logoUrl: string): JsonLd {
   return {
     "@type": "Organization",
     "@id": ORG_ID,
-    name: facts.meta.siteName,
-    alternateName: ["小時光書店", "Interval Books"],
+    name: STORE_NAME,
+    alternateName: STORE_ALTERNATE_NAMES,
     url: `${SITE_ORIGIN}/`,
     logo: absoluteUrl(logoUrl),
     ...(facts.contactEmail ? { email: facts.contactEmail } : {}),
@@ -423,7 +431,8 @@ export function websiteLd(facts: StoreFacts): JsonLd {
   return {
     "@type": "WebSite",
     "@id": WEBSITE_ID,
-    name: facts.meta.siteName,
+    name: STORE_NAME,
+    alternateName: STORE_ALTERNATE_NAMES,
     url: `${SITE_ORIGIN}/`,
     // 2026-11 起有 /en、/ja 版本（src/lib/seo/i18n.ts）。
     inLanguage: ["zh-Hant-TW", "en", "ja"],
@@ -500,7 +509,8 @@ export function bookStoreLd(facts: StoreFacts, imageUrl: string, logoUrl: string
   return {
     "@type": "BookStore",
     "@id": STORE_ID,
-    name: facts.meta.siteName,
+    name: STORE_NAME,
+    alternateName: STORE_ALTERNATE_NAMES,
     url: `${SITE_ORIGIN}/`,
     image: absoluteUrl(imageUrl),
     logo: absoluteUrl(logoUrl),
@@ -765,7 +775,7 @@ export function eventLd(input: EventLdInput): JsonLd[] {
       organizer: {
         "@type": "Organization",
         "@id": ORG_ID,
-        name: "小時光書店 Interval Books",
+        name: STORE_NAME,
         url: `${SITE_ORIGIN}/`,
       },
       ...(input.performer ? { performer: { "@type": "Person", name: input.performer } } : {}),
@@ -804,7 +814,7 @@ export function productLd(input: ProductLdInput): JsonLd {
       priceCurrency: "TWD",
       availability: input.inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
       url: input.url,
-      seller: { "@type": "Organization", "@id": ORG_ID, name: "小時光書店 Interval Books" },
+      seller: { "@type": "Organization", "@id": ORG_ID, name: STORE_NAME },
     },
   };
 }

@@ -52,9 +52,9 @@ import { fetchActiveProductForEventSlug, type ShopProduct } from "@/lib/shop";
 /** 三語 meta。⚠️ 必須是頂層靜態常數、每一句都是字面值——check-meta.mjs 靜態解析這個物件。 */
 const PAGE = {
   metaTitle: {
-    zh: "城市思享沙龍 #01｜台東，不只是遠方｜小時光書店",
+    zh: "城市思享沙龍 #01｜台東，不只是遠方｜小時光風土誌書店",
     en: "City Think Salon #01｜Taitung Is Not Just a Distant Place｜Interval Books",
-    ja: "都市サロン #01｜台東は、遠い場所であるだけではない｜小時光書店",
+    ja: "都市サロン #01｜台東は、遠い場所であるだけではない｜小時光 風土誌書店",
   },
   metaDescription: {
     zh: "2026.9.22 於小時光風土誌書店。藝術、地方創生與一種新的商業生活方式——15 席限定的定向邀請沙龍。",
@@ -70,7 +70,7 @@ const PAGE = {
  * 弄壞的事——講者確定了、議程調整了，只要動這個物件。
  */
 const SALON = {
-  cohosts: "小時光書店 Interval Books ✕ 中華民國購物中心暨商業地產協會",
+  cohosts: "小時光風土誌書店 Interval Books ✕ 中華民國購物中心暨商業地產協會",
   badge: "城市思享沙龍 CITY THINK SALON #01｜10月台東參訪前導沙龍",
   headline: "台東，不只是遠方",
   subheadline: "藝術、地方創生與一種新的商業生活方式",

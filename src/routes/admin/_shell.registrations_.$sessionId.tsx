@@ -28,8 +28,8 @@ export const Route = createFileRoute("/admin/_shell/registrations_/$sessionId")(
     meta: [
       {
         title: loaderData?.data?.session
-          ? `${loaderData.data.session.title.zh}｜活動報名｜小時光書店後台`
-          : "活動報名｜小時光書店後台",
+          ? `${loaderData.data.session.title.zh}｜活動報名｜小時光風土誌書店後台`
+          : "活動報名｜小時光風土誌書店後台",
       },
     ],
   }),

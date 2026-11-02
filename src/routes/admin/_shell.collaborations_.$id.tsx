@@ -26,8 +26,8 @@ export const Route = createFileRoute("/admin/_shell/collaborations_/$id")({
     meta: [
       {
         title: loaderData?.collaboration
-          ? `編輯合作：${loaderData.collaboration.title.zh}｜小時光書店後台`
-          : "合作｜小時光書店後台",
+          ? `編輯合作：${loaderData.collaboration.title.zh}｜小時光風土誌書店後台`
+          : "合作｜小時光風土誌書店後台",
       },
     ],
   }),

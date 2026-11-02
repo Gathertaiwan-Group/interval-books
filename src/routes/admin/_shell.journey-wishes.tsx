@@ -42,7 +42,7 @@ export const Route = createFileRoute("/admin/_shell/journey-wishes")({
     const res = await listJourneyWishes({ data: { status: deps.status } });
     return { ...res, status: deps.status };
   },
-  head: () => ({ meta: [{ title: "旅程願望｜小時光書店後台" }] }),
+  head: () => ({ meta: [{ title: "旅程願望｜小時光風土誌書店後台" }] }),
   component: AdminJourneyWishesPage,
 });
 

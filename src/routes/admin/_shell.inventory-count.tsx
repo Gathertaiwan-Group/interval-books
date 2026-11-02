@@ -64,7 +64,7 @@ export const Route = createFileRoute("/admin/_shell/inventory-count")({
       },
     });
   },
-  head: () => ({ meta: [{ title: "庫存盤點｜小時光書店後台" }] }),
+  head: () => ({ meta: [{ title: "庫存盤點｜小時光風土誌書店後台" }] }),
   component: InventoryCountPage,
 });
 

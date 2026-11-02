@@ -30,22 +30,21 @@ import { linkedEventFor, newestEndedFirst, splitJourneys } from "@/lib/past-shel
 /** Fallback copy — used only when the Supabase read fails. */
 const PAGE_META = {
   title: {
-    zh: "小時光書店 Interval Books｜風土誌策展的閱讀與生活場域",
-    en: "Interval Books｜A curated home for reading, terroir, and quiet life",
-    ja: "小時光書店 Interval Books｜風土誌をキュレーションする読書と暮らしの場",
+    zh: "小時光風土誌書店 Interval Books｜華山的地方刊物與風土選書",
+    en: "Interval Books｜A bookstore of place in Huashan, Taipei",
+    ja: "小時光 風土誌書店 Interval Books｜華山で地域誌と出会う書店",
   },
   /**
    * 首頁的搜尋結果描述（2026-11 SEO 健檢 M2）。
    *
-   * pages/'index' 的 meta_description 目前是「留一段屬於自己的＿＿＿小時光。」——那是英雄區
-   * 刻意留白的文案，拿來當描述只有 15 字還帶著佔位底線。fitDescription() 看到佔位符就改用
-   * 這一段。內容全部是站上已經寫著的事實（地址、風土誌、地方刊物、活動、策旅）。後台把
-   * meta_description 改成一段正常的文字之後，那一段就會優先。
+   * 2026-11 首頁改版上線時，pages/'index' 的 meta_description 已從佔位句「留一段屬於自己的
+   * ＿＿＿小時光。」改成與這裡相同的定位描述；這一段只在 DB 讀不到（或又被改回佔位符，
+   * fitDescription() 會偵測）時才用。
    */
   description: {
-    zh: "小時光書店 Interval Books 位於台北華山文創園區紅磚六合院西7-3館，是一間以風土誌為主題的書店：選書、地方刊物與選物，也舉辦讀書會、講座、工作坊與台東策旅。留一段屬於自己的小時光。",
-    en: "Interval Books is a terroir-minded bookstore in the Red Brick Courtyard (West 7-3) of Huashan 1914 Creative Park, Taipei: books, local publications and curated objects, plus reading circles, talks, workshops and journeys to Taitung.",
-    ja: "小時光書店は台北・華山1914文化創意産業園区 紅煉瓦六合院 西7-3館にある、風土誌をテーマにした書店。選書、地域の刊行物、セレクト品のほか、読書会・トーク・ワークショップ・台東への旅も企画しています。",
+    zh: "小時光風土誌書店（Interval Books）在台北華山文創園區紅磚六合院西7-3館。以土地為線索選書，典藏台灣與日本的地方刊物，也舉辦讀書會、講座與工作坊，並帶你走進台東的文化策旅。",
+    en: "Interval Books is a bookstore of place in Taipei's Huashan 1914 park: books chosen by the land, local publications from Taiwan and Japan, talks, Taitung trips.",
+    ja: "小時光 風土誌書店（Interval Books）は台北・華山1914文化創意産業園区 紅煉瓦六合院 西7-3館の書店。土地を手がかりに本を選び、台湾と日本の地域誌を所蔵。読書会やトーク、ワークショップ、台東への旅も企画しています。",
   },
 };
 
@@ -55,7 +54,7 @@ const HERO = {
     en: "Interval Books  ／  Est.",
     ja: "Interval Books  ／  Est.",
   },
-  titleMain: { zh: "小時光書店", en: "Interval Books", ja: "小時光書店" },
+  titleMain: { zh: "小時光風土誌書店", en: "Interval Books", ja: "小時光 風土誌書店" },
   titleSub: {
     zh: "留一點時間給真正重要的事",
     en: "Save a little time for what truly matters.",
@@ -173,9 +172,9 @@ const HOME = {
   },
   goCta: { zh: "看策旅", en: "See journeys", ja: "旅を見る" },
   imgReadAlt: {
-    zh: "小時光書店店內，紅磚牆下的書架與平台",
+    zh: "小時光風土誌書店店內，紅磚牆下的書架與平台",
     en: "Inside Interval Books: shelves and tables under red brick walls",
-    ja: "小時光書店の店内。紅煉瓦の壁の下の書棚と平台",
+    ja: "小時光 風土誌書店の店内。紅煉瓦の壁の下の書棚と平台",
   },
   imgGatherAlt: {
     zh: "兩位讀者在書店裡一起翻讀一本書",

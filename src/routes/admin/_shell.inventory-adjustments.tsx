@@ -54,7 +54,7 @@ export const Route = createFileRoute("/admin/_shell/inventory-adjustments")({
       data: { filter: DEFAULT_FILTER, summary: { dateFrom: null, dateTo: null } },
     });
   },
-  head: () => ({ meta: [{ title: "在庫異動｜小時光書店後台" }] }),
+  head: () => ({ meta: [{ title: "在庫異動｜小時光風土誌書店後台" }] }),
   component: InventoryAdjustmentsPage,
 });
 

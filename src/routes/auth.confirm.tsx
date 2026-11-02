@@ -32,14 +32,14 @@ type LinkType = "signup" | "recovery" | "";
 
 const META = {
   title: {
-    zh: "帳號驗證｜小時光書店",
+    zh: "帳號驗證｜小時光風土誌書店",
     en: "Verifying｜Interval Books",
-    ja: "認証確認｜小時光書店",
+    ja: "認証確認｜小時光 風土誌書店",
   },
   description: {
-    zh: "正在確認你的小時光書店帳號驗證連結。",
+    zh: "正在確認你的小時光風土誌書店帳號驗證連結。",
     en: "Confirming your Interval Books account verification link.",
-    ja: "小時光書店のアカウント確認リンクを確認しています。",
+    ja: "小時光 風土誌書店のアカウント確認リンクを確認しています。",
   },
 };
 

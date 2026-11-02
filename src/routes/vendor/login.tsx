@@ -51,7 +51,7 @@ type LoginValues = z.infer<typeof loginSchema>;
 
 export const Route = createFileRoute("/vendor/login")({
   head: () => ({
-    meta: [{ title: "廠商登入｜小時光書店" }],
+    meta: [{ title: "廠商登入｜小時光風土誌書店" }],
     styles: backOfficeTypeScaleStyles(),
   }),
   component: VendorLoginPage,
@@ -87,7 +87,7 @@ function VendorLoginPage() {
           <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-muted">
             <Store className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
           </div>
-          <p className="text-sm text-muted-foreground">小時光書店 Interval Books</p>
+          <p className="text-sm text-muted-foreground">小時光風土誌書店 Interval Books</p>
           <h1 className="text-xl font-medium">廠商入口登入</h1>
         </div>
 
@@ -126,7 +126,7 @@ function VendorLoginPage() {
         </Form>
 
         <p className="text-center text-xs leading-relaxed text-muted-foreground">
-          帳號由小時光書店配發。忘記密碼或還沒拿到帳號，請直接聯絡書店。
+          帳號由小時光風土誌書店配發。忘記密碼或還沒拿到帳號，請直接聯絡書店。
         </p>
       </div>
     </div>

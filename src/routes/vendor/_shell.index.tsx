@@ -47,7 +47,7 @@ export const Route = createFileRoute("/vendor/_shell/")({
     const [profile, products] = await Promise.all([myVendorProfile(), myProducts()]);
     return { profile, products };
   },
-  head: () => ({ meta: [{ title: "我的資料｜小時光書店廠商入口" }] }),
+  head: () => ({ meta: [{ title: "我的資料｜小時光風土誌書店廠商入口" }] }),
   component: VendorHomePage,
 });
 
@@ -88,13 +88,13 @@ function VendorHomePage() {
       <div>
         <h1 className="text-lg font-medium">我的資料</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          以下是小時光書店目前登記的資料。需要更正請直接聯絡書店 —— 這一頁不能編輯。
+          以下是小時光風土誌書店目前登記的資料。需要更正請直接聯絡書店 —— 這一頁不能編輯。
         </p>
       </div>
 
       {vendor === null ? (
         <div className="rounded-md border border-dashed border-border p-6 text-sm text-muted-foreground">
-          目前查不到你的廠商基本資料，請聯絡小時光書店確認。
+          目前查不到你的廠商基本資料，請聯絡小時光風土誌書店確認。
         </div>
       ) : (
         <Card>
@@ -127,7 +127,7 @@ function VendorHomePage() {
         <CardContent className="space-y-4">
           {bankAccounts.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              目前沒有登記匯款帳戶，請聯絡小時光書店補登。
+              目前沒有登記匯款帳戶，請聯絡小時光風土誌書店補登。
             </p>
           ) : (
             <>

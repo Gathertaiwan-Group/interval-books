@@ -29,8 +29,8 @@ export const Route = createFileRoute("/admin/_shell/inventory-purchases_/$id")({
     meta: [
       {
         title: loaderData?.purchase
-          ? `編輯進貨：${loaderData.purchase.item_name || loaderData.purchase.product_name || "（找不到商品）"}｜小時光書店後台`
-          : "進貨｜小時光書店後台",
+          ? `編輯進貨：${loaderData.purchase.item_name || loaderData.purchase.product_name || "（找不到商品）"}｜小時光風土誌書店後台`
+          : "進貨｜小時光風土誌書店後台",
       },
     ],
   }),

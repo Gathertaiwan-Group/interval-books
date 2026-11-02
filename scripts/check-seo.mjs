@@ -241,7 +241,9 @@ async function checkPage({ path, canonical, ld }) {
   ok("沒有 noindex", !h.meta("robots").some((v) => /noindex/.test(v)));
   ok(
     `title 長度合理（${len(h.title)} 字）且有品牌`,
-    len(h.title) >= 8 && len(h.title) <= 70 && /小時光書店|Interval Books/.test(h.title),
+    len(h.title) >= 8 &&
+      len(h.title) <= 70 &&
+      /小時光風土誌書店|小時光 風土誌書店|Interval Books/.test(h.title),
     h.title,
   );
   const desc = h.meta("description")[0] ?? "";

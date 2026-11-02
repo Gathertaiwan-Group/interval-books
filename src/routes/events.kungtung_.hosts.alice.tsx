@@ -24,9 +24,9 @@ import kungtungCss from "@/components/kungtung/kungtung.css?url";
 /** 三語 meta。⚠️ 必須是頂層靜態常數、每一句都是字面值——check-meta.mjs 靜態解析這個物件。 */
 const PAGE = {
   metaTitle: {
-    zh: "Alice 劉柳樺｜文化策旅人｜公東教堂文化之旅｜小時光書店",
+    zh: "Alice 劉柳樺｜文化策旅人｜公東教堂文化之旅｜小時光風土誌書店",
     en: "Alice Liu — Journey Curator｜Kung Tung Chapel Journey｜Interval Books",
-    ja: "Alice 劉柳樺｜文化の旅のキュレーター｜公東教会文化の旅｜小時光書店",
+    ja: "Alice 劉柳樺｜文化の旅のキュレーター｜公東教会文化の旅｜小時光 風土誌書店",
   },
   metaDescription: {
     zh: "小時光風土誌書店主理人 × 馥自然人文空間策旅主理人 Alice 劉柳樺的經歷與策展。",

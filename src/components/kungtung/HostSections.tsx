@@ -582,7 +582,7 @@ export function AliceSection3() {
       <ul className="kt-host-media-list">
         <li>
           <a href="https://www.intervalbooks.tw/about" target="_blank" rel="noopener noreferrer">
-            <span className="kt-host-media-source">小時光書店 Interval Books</span>
+            <span className="kt-host-media-source">小時光風土誌書店 Interval Books</span>
             <span className="kt-host-media-title">關於小時光</span>
             <svg
               xmlns="http://www.w3.org/2000/svg"

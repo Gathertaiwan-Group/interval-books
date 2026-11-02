@@ -91,7 +91,7 @@ export const Route = createFileRoute("/admin/_shell/products_/curated-themes")({
     return { themes };
   },
   head: () => ({
-    meta: [{ title: "選品主題｜小時光書店後台" }],
+    meta: [{ title: "選品主題｜小時光風土誌書店後台" }],
   }),
   component: AdminCuratedPage,
 });

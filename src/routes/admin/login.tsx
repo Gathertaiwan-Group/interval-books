@@ -31,7 +31,7 @@ export const Route = createFileRoute("/admin/login")({
     return redirect ? { redirect } : {};
   },
   head: () => ({
-    meta: [{ title: "管理員登入｜小時光書店後台" }],
+    meta: [{ title: "管理員登入｜小時光風土誌書店後台" }],
     styles: backOfficeTypeScaleStyles(),
   }),
   component: AdminLoginPage,
@@ -84,7 +84,7 @@ function AdminLoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
       <div className="w-full max-w-sm space-y-6 rounded-lg border border-border bg-background p-8 shadow-sm">
         <div className="space-y-1 text-center">
-          <p className="text-sm text-muted-foreground">小時光書店 Interval Books</p>
+          <p className="text-sm text-muted-foreground">小時光風土誌書店 Interval Books</p>
           <h1 className="text-xl font-medium">管理後台登入</h1>
         </div>
 

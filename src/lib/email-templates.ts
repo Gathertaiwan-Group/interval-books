@@ -976,8 +976,8 @@ export function renderAdminOrderNotificationEmail(
   const phoneOrder = input.phoneOrder ?? null;
   const subject =
     (placed
-      ? `【小時光書店】待收款訂單 ${input.orderNo}`
-      : `【小時光書店】新訂單 ${input.orderNo}`) +
+      ? `【小時光風土誌書店】待收款訂單 ${input.orderNo}`
+      : `【小時光風土誌書店】新訂單 ${input.orderNo}`) +
     (phoneOrder ? `｜${ADMIN_PHONE_ORDER_LABEL}` : "") +
     (needsContact ? "｜需聯繫" : "") +
     (buyerName ? `｜${buyerName}` : "") +
@@ -1066,7 +1066,7 @@ export function renderAdminOrderNotificationEmail(
       : input.adminUrl
         ? ""
         : "完整資料請登入後台「訂單」查看。",
-    signature: "小時光書店後台系統",
+    signature: "小時光風土誌書店後台系統",
     footerNote: "本信件由系統自動發送，收件人於後台「全站設定」設定。",
   });
 
@@ -1193,9 +1193,9 @@ export type OrderShippedInput = {
  */
 export const ORDER_SHIPPED_TEXT = {
   subject: {
-    zh: "【小時光書店】訂單 {orderNo} 已出貨",
+    zh: "【小時光風土誌書店】訂單 {orderNo} 已出貨",
     en: "Interval Books: your order {orderNo} has shipped",
-    ja: "【小時光書店】ご注文 {orderNo} を発送しました",
+    ja: "【小時光 風土誌書店】ご注文 {orderNo} を発送しました",
   },
   heading: {
     zh: "你的訂單已經出貨了",
@@ -1203,14 +1203,14 @@ export const ORDER_SHIPPED_TEXT = {
     ja: "ご注文の商品を発送しました",
   },
   introHome: {
-    zh: "{customerName} 你好，你在小時光書店訂購的商品已經交給宅配寄出，將送到下方地址，請留意收件。",
+    zh: "{customerName} 你好，你在小時光風土誌書店訂購的商品已經交給宅配寄出，將送到下方地址，請留意收件。",
     en: "Hi {customerName}, your Interval Books order has been handed to the courier and is on its way to the address below.",
-    ja: "{customerName} 様、小時光書店でご注文の商品を宅配便で発送しました。下記のご住所へお届けしますので、お受け取りをお願いいたします。",
+    ja: "{customerName} 様、小時光 風土誌書店でご注文の商品を宅配便で発送しました。下記のご住所へお届けしますので、お受け取りをお願いいたします。",
   },
   introCvs: {
-    zh: "{customerName} 你好，你在小時光書店訂購的商品已經寄往下方的超商門市。包裹到店後會再通知你取貨，請於期限內前往取件。",
+    zh: "{customerName} 你好，你在小時光風土誌書店訂購的商品已經寄往下方的超商門市。包裹到店後會再通知你取貨，請於期限內前往取件。",
     en: "Hi {customerName}, your Interval Books order has been sent to the convenience store below. You will be notified when it arrives — please pick it up before the deadline.",
-    ja: "{customerName} 様、小時光書店でご注文の商品を下記のコンビニ店舗へ発送しました。到着後にお知らせが届きますので、期限内にお受け取りください。",
+    ja: "{customerName} 様、小時光 風土誌書店でご注文の商品を下記のコンビニ店舗へ発送しました。到着後にお知らせが届きますので、期限内にお受け取りください。",
   },
   outro: {
     zh: "收到商品後若有任何問題，歡迎與我們聯繫。",
@@ -1378,8 +1378,8 @@ export function renderInvoiceFailedAdminEmail(input: InvoiceAlertInput): Rendere
   const first = input.orders[0]?.orderNo ?? "";
   const single = n === 1;
   const subject = single
-    ? `【小時光書店】發票開立失敗：${first}`
-    : `【小時光書店】發票開立失敗：${first} 等 ${n} 張`;
+    ? `【小時光風土誌書店】發票開立失敗：${first}`
+    : `【小時光風土誌書店】發票開立失敗：${first} 等 ${n} 張`;
   const heading = single
     ? `訂單 ${first} 的電子發票開不出來`
     : `${n} 張已付款訂單的電子發票開不出來`;
@@ -1411,7 +1411,7 @@ export function renderInvoiceFailedAdminEmail(input: InvoiceAlertInput): Rendere
         ? { label: "到後台查看發票尚未開立的訂單", url: input.listUrl }
         : undefined,
     outro: "",
-    signature: "小時光書店後台系統",
+    signature: "小時光風土誌書店後台系統",
     footerNote:
       "本信件由系統自動發送給後台「全站設定」的通知收件人，不會寄給客人。同一次失敗只會通知一次；每天早上 9 點另有一封尚未處理清單的提醒。",
   });
@@ -1421,7 +1421,7 @@ export function renderInvoiceFailedAdminEmail(input: InvoiceAlertInput): Rendere
 /** 每日彙整——台北 09:00–09:59 的排程，一天最多一封。 */
 export function renderInvoiceDigestAdminEmail(input: InvoiceAlertInput): RenderedEmail {
   const n = input.orders.length;
-  const subject = `【小時光書店】每日提醒：${n} 張已付款訂單的發票尚未開立`;
+  const subject = `【小時光風土誌書店】每日提醒：${n} 張已付款訂單的發票尚未開立`;
   const { text, html } = layout({
     heading: `${n} 張已付款訂單的發票尚未開立`,
     intro:
@@ -1436,7 +1436,7 @@ export function renderInvoiceDigestAdminEmail(input: InvoiceAlertInput): Rendere
     ],
     link: input.listUrl ? { label: "到後台查看發票尚未開立的訂單", url: input.listUrl } : undefined,
     outro: "",
-    signature: "小時光書店後台系統",
+    signature: "小時光風土誌書店後台系統",
     footerNote: "本信件由系統自動發送給後台「全站設定」的通知收件人，不會寄給客人。",
   });
   return { subject, text, html };

@@ -407,7 +407,7 @@ const one = E.renderInvoiceFailedAdminEmail({
   maxRetries: MAX,
   listUrl: "https://interval-books.vercel.app/admin/orders?scope=invoice_problem",
 });
-check("單張主旨", one.subject, "【小時光書店】發票開立失敗：IB-202600001192");
+check("單張主旨", one.subject, "【小時光風土誌書店】發票開立失敗：IB-202600001192");
 for (const [label, needle] of [
   ["訂單編號", "IB-202600001192"],
   ["付款時間（台北）", "2026/09/02 15:21"],
@@ -426,7 +426,7 @@ const five = E.renderInvoiceFailedAdminEmail({
   remaining: 0,
   listUrl: "https://interval-books.vercel.app/admin/orders?scope=invoice_problem",
 });
-check("多張主旨", five.subject, "【小時光書店】發票開立失敗：IB-202600001191 等 5 張");
+check("多張主旨", five.subject, "【小時光風土誌書店】發票開立失敗：IB-202600001191 等 5 張");
 check(
   "多張：每張都有自己的後台連結",
   SEPT.every((r) => five.text.includes(`/admin/orders/${r.orderId}`)),
@@ -463,7 +463,7 @@ const dg = E.renderInvoiceDigestAdminEmail({
   maxRetries: MAX,
   listUrl: "https://interval-books.vercel.app/admin/orders?scope=invoice_problem",
 });
-check("彙整主旨", dg.subject, "【小時光書店】每日提醒：5 張已付款訂單的發票尚未開立");
+check("彙整主旨", dg.subject, "【小時光風土誌書店】每日提醒：5 張已付款訂單的發票尚未開立");
 check(
   "彙整列出 5 張",
   SEPT.every((r) => dg.text.includes(r.orderNo)),

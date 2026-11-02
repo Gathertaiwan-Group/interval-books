@@ -45,7 +45,7 @@ export const Route = createFileRoute("/admin/_shell/news")({
     return { news };
   },
   head: () => ({
-    meta: [{ title: "最新消息｜小時光書店後台" }],
+    meta: [{ title: "最新消息｜小時光風土誌書店後台" }],
   }),
   component: AdminNewsPage,
 });

@@ -45,7 +45,7 @@ export const Route = createFileRoute("/admin/_shell/stock-alerts")({
     const { listStockAlerts } = await import("@/lib/admin/fns/pos");
     return { alerts: await listStockAlerts({ data: { status: "open" } }) };
   },
-  head: () => ({ meta: [{ title: "賣超告警｜小時光書店後台" }] }),
+  head: () => ({ meta: [{ title: "賣超告警｜小時光風土誌書店後台" }] }),
   component: StockAlertsPage,
 });
 

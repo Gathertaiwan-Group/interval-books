@@ -35,7 +35,7 @@ export const Route = createFileRoute("/admin/_shell/settings")({
     return { settings };
   },
   head: () => ({
-    meta: [{ title: "全站設定｜小時光書店後台" }],
+    meta: [{ title: "全站設定｜小時光風土誌書店後台" }],
   }),
   component: AdminSettingsPage,
 });

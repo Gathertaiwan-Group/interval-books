@@ -35,8 +35,8 @@ export const Route = createFileRoute("/admin/_shell/journeys_/$id")({
     meta: [
       {
         title: loaderData?.journey
-          ? `編輯策旅：${loaderData.journey.title.zh}｜小時光書店後台`
-          : "策旅｜小時光書店後台",
+          ? `編輯策旅：${loaderData.journey.title.zh}｜小時光風土誌書店後台`
+          : "策旅｜小時光風土誌書店後台",
       },
     ],
   }),

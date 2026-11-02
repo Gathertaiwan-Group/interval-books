@@ -24,8 +24,8 @@ export const Route = createFileRoute("/admin/_shell/inventory-products_/$id")({
     meta: [
       {
         title: loaderData?.data?.product
-          ? `${loaderData.data.product.name}｜商品管理｜小時光書店後台`
-          : "商品管理｜小時光書店後台",
+          ? `${loaderData.data.product.name}｜商品管理｜小時光風土誌書店後台`
+          : "商品管理｜小時光風土誌書店後台",
       },
     ],
   }),

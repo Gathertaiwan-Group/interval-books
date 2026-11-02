@@ -26,14 +26,14 @@ import { formatTaipeiDate, formatTaipeiDateTime } from "@/lib/taipei-time";
 
 const META = {
   title: {
-    zh: "我的帳號｜小時光書店",
+    zh: "我的帳號｜小時光風土誌書店",
     en: "My Account｜Interval Books",
-    ja: "マイページ｜小時光書店",
+    ja: "マイページ｜小時光 風土誌書店",
   },
   description: {
-    zh: "查看你在小時光書店的訂單與活動報名紀錄。",
+    zh: "查看你在小時光風土誌書店的訂單與活動報名紀錄。",
     en: "View your orders and event registrations at Interval Books.",
-    ja: "小時光書店でのご注文とイベント申込みの履歴をご確認いただけます。",
+    ja: "小時光 風土誌書店でのご注文とイベント申込みの履歴をご確認いただけます。",
   },
 };
 

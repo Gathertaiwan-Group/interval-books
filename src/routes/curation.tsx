@@ -12,9 +12,9 @@ import { useSiteContent } from "@/lib/site-content";
 /** Fallback copy — used only when the Supabase read fails. */
 const PAGE = {
   metaTitle: {
-    zh: "策展與合作 Curation｜小時光書店 Interval Books",
+    zh: "策展與合作 Curation｜小時光風土誌書店",
     en: "Curation & Collaboration｜Interval Books",
-    ja: "キュレーションと協働｜小時光書店 Interval Books",
+    ja: "キュレーションと協働｜小時光 風土誌書店",
   },
   metaDescription: {
     zh: "療癒藝術節、空間策展、書店展售與品牌共創——以低調而精緻的方式，與夥伴共創。",

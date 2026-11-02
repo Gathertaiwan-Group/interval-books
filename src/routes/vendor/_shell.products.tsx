@@ -50,7 +50,7 @@ export const Route = createFileRoute("/vendor/_shell/products")({
     // ⚠️ 無參數。過濾條件在資料庫函式裡，用 cookie 推導出來的 vendor_id。
     return { products: await myProducts() };
   },
-  head: () => ({ meta: [{ title: "我的商品｜小時光書店廠商入口" }] }),
+  head: () => ({ meta: [{ title: "我的商品｜小時光風土誌書店廠商入口" }] }),
   component: VendorProductsPage,
 });
 

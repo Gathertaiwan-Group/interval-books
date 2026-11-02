@@ -43,7 +43,7 @@ export const Route = createFileRoute("/admin/_shell/partnerships")({
     const res = await listPartnershipInquiries({ data: { status: deps.status } });
     return { ...res, status: deps.status };
   },
-  head: () => ({ meta: [{ title: "異業合作｜小時光書店後台" }] }),
+  head: () => ({ meta: [{ title: "異業合作｜小時光風土誌書店後台" }] }),
   component: AdminPartnershipsPage,
 });
 

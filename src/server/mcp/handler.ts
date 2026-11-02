@@ -11,7 +11,7 @@ import "@tanstack/react-start/server-only";
 import { createMcpHandler } from "mcp-handler";
 import { registerContentTools } from "./tools";
 
-export const MCP_INSTRUCTIONS = `小時光書店（www.intervalbooks.tw）網站內容管理 MCP。
+export const MCP_INSTRUCTIONS = `小時光風土誌書店（www.intervalbooks.tw）網站內容管理 MCP。
 
 【能做什麼】
 讀：最新消息、活動（含票券／場次／票種的唯讀摘要）、策旅、選物與書籍商品、地方刊物、選品、講者、合作、頁面文案、店家基本資訊、活動分類。

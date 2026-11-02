@@ -62,7 +62,7 @@ export const Route = createFileRoute("/admin/_shell/strings")({
     return { uiStrings };
   },
   head: () => ({
-    meta: [{ title: "介面文字｜小時光書店後台" }],
+    meta: [{ title: "介面文字｜小時光風土誌書店後台" }],
   }),
   component: AdminStringsPage,
 });

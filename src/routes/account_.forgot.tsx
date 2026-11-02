@@ -34,14 +34,14 @@ type ForgotValues = z.infer<typeof forgotSchema>;
 
 const META = {
   title: {
-    zh: "忘記密碼｜小時光書店",
+    zh: "忘記密碼｜小時光風土誌書店",
     en: "Forgot Password｜Interval Books",
-    ja: "パスワードをお忘れの方｜小時光書店",
+    ja: "パスワードをお忘れの方｜小時光 風土誌書店",
   },
   description: {
-    zh: "重設小時光書店會員帳號的密碼。",
+    zh: "重設小時光風土誌書店會員帳號的密碼。",
     en: "Reset the password for your Interval Books account.",
-    ja: "小時光書店の会員アカウントのパスワードを再設定します。",
+    ja: "小時光 風土誌書店の会員アカウントのパスワードを再設定します。",
   },
 };
 
@@ -110,7 +110,7 @@ function AccountForgotPage() {
           <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-muted">
             <KeyRound className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
           </div>
-          <p className="text-sm text-muted-foreground">小時光書店 Interval Books</p>
+          <p className="text-sm text-muted-foreground">小時光風土誌書店 Interval Books</p>
           <h1 className="text-xl font-medium">忘記密碼</h1>
           <p className="text-sm leading-relaxed text-muted-foreground">
             輸入註冊時使用的電子郵件，我們會寄送重設密碼的連結給你。

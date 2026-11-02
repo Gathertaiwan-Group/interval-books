@@ -34,9 +34,9 @@ import curatedImg from "@/assets/curated-objects.jpg";
 /** Fallback copy — used only when the Supabase read fails. */
 const PAGE = {
   metaTitle: {
-    zh: "選物 Shop｜小時光書店 Interval Books",
+    zh: "選物 Shop｜小時光風土誌書店",
     en: "Selection｜Interval Books",
-    ja: "セレクト｜小時光書店 Interval Books",
+    ja: "セレクト｜小時光 風土誌書店",
   },
   metaDescription: {
     zh: "書籍、選物、活動與策旅名額，都可以在這裡直接選購；地方刊物展與主理人的選品也在同一頁。",
@@ -65,19 +65,19 @@ const PAGE = {
    * （'publications'／'curated'）以後台的為準，這裡是退路。
    */
   publicationsMetaTitle: {
-    zh: "地方刊物 Local Publications｜小時光書店 Interval Books",
+    zh: "地方刊物 Local Publications｜小時光風土誌書店",
     en: "Local Publications｜Interval Books",
-    ja: "地域の刊行物｜小時光書店 Interval Books",
+    ja: "地域の刊行物｜小時光 風土誌書店",
   },
   publicationsMetaDescription: {
-    zh: "小時光書店的地方刊物展：從基隆的漁村到日本的山間小鎮，一個地方怎麼被自己的人寫下來。台灣與日本的地方刊物依地區整理，部分可線上選購，其餘在店內展閱。",
+    zh: "小時光風土誌書店的地方刊物展：從基隆的漁村到日本的山間小鎮，一個地方怎麼被自己的人寫下來。台灣與日本的地方刊物依地區整理，部分可線上選購，其餘在店內展閱。",
     en: "The local-publications show at Interval Books: from a fishing village in Keelung to small mountain towns in Japan — how a place gets written down by its own people. Some titles can be ordered online; the rest are on display in the store.",
-    ja: "小時光書店の地域の刊行物展。基隆の漁村から日本の山あいの町まで、土地がその土地の人によって書き残される姿を集めました。一部はオンラインで購入でき、その他は店頭でご覧いただけます。",
+    ja: "小時光 風土誌書店の地域の刊行物展。基隆の漁村から日本の山あいの町まで、土地がその土地の人によって書き残される姿を集めました。一部はオンラインで購入でき、その他は店頭でご覧いただけます。",
   },
   curatedMetaTitle: {
-    zh: "主理人的選品 Curated｜小時光書店 Interval Books",
+    zh: "主理人的選品 Curated｜小時光風土誌書店",
     en: "The Owner's Curated Window｜Interval Books",
-    ja: "店主の選品｜小時光書店 Interval Books",
+    ja: "店主の選品｜小時光 風土誌書店",
   },
   curatedMetaDescription: {
     zh: "三個主題櫥窗：地方風土、器物與陶、茶與日常。展示型呈現，請至店或來信詢問。",

@@ -39,8 +39,8 @@ export const Route = createFileRoute("/admin/_shell/products_/curated/$id")({
     meta: [
       {
         title: loaderData?.item
-          ? `編輯選品「${loaderData.item.name.zh}」｜小時光書店後台`
-          : "編輯選品｜小時光書店後台",
+          ? `編輯選品「${loaderData.item.name.zh}」｜小時光風土誌書店後台`
+          : "編輯選品｜小時光風土誌書店後台",
       },
     ],
   }),

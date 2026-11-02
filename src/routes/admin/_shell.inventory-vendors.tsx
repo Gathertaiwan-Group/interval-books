@@ -74,7 +74,7 @@ export const Route = createFileRoute("/admin/_shell/inventory-vendors")({
       data: { filter: DEFAULT_VENDOR_FILTER, approvalStatus: "pending" },
     });
   },
-  head: () => ({ meta: [{ title: "廠商｜小時光書店後台" }] }),
+  head: () => ({ meta: [{ title: "廠商｜小時光風土誌書店後台" }] }),
   component: InventoryVendorsPage,
 });
 

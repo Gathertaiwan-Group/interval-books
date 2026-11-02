@@ -40,14 +40,14 @@ import curatedImg from "@/assets/curated-objects.jpg";
  */
 const PAGE = {
   metaTitle: {
-    zh: "商品｜小時光書店 Interval Books",
+    zh: "商品｜小時光風土誌書店",
     en: "Item｜Interval Books",
-    ja: "商品｜小時光書店 Interval Books",
+    ja: "商品｜小時光 風土誌書店",
   },
   metaDescription: {
-    zh: "小時光書店的選物與書籍，一件一件挑過才留下來。",
+    zh: "小時光風土誌書店的選物與書籍，一件一件挑過才留下來。",
     en: "Books and objects from Interval Books — each one chosen by hand before it earned its place.",
-    ja: "小時光書店が一点ずつ選んだ書籍とセレクト品をご紹介します。",
+    ja: "小時光 風土誌書店が一点ずつ選んだ書籍とセレクト品をご紹介します。",
   },
   back: { zh: "回到選購", en: "Back to shop", ja: "ショップへ戻る" },
   quantity: { zh: "數量", en: "Quantity", ja: "数量" },
@@ -118,7 +118,7 @@ export const Route = createFileRoute("/shop/$slug")({
     // now：「場次開始了沒」的判斷時間點，SSR 與第一次 hydrate 共用（見 useBookingNow）。
     return { product, unavailable, now: Date.now() };
   },
-  // SEO（2026-11 健檢）：title「{品名}｜{類別}｜小時光書店」、描述取摘要＋介紹文、
+  // SEO（2026-11 健檢）：title「{品名}｜{類別}｜小時光風土誌書店」、描述取摘要＋介紹文、
   // JSON-LD 輸出 Product（刊物另標 Book）與麵包屑。組裝在 src/lib/seo/pages.ts#productSeo。
   head: ({ loaderData, matches, match }) => {
     const product = loaderData?.product ?? null;

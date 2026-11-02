@@ -53,14 +53,14 @@ import exhibitionImg from "@/assets/exhibition-corner.jpg";
 /** Fallback copy — used when pages/'partnership' has no row (currently: always). */
 const PAGE = {
   metaTitle: {
-    zh: "異業合作 Partnership｜小時光書店 Interval Books",
+    zh: "異業合作 Partnership｜小時光風土誌書店",
     en: "Partnership｜Interval Books",
-    ja: "協働・コラボレーションのご相談｜小時光書店 Interval Books",
+    ja: "協働・コラボレーションのご相談｜小時光 風土誌書店",
   },
   metaDescription: {
-    zh: "小時光書店位於華山文創園區，歡迎品牌、企業、創作者與我們合作：活動、展覽、選物寄賣、品牌聯名、企業包場、講座與工作坊。填寫表單，我們會在 3 個工作天內回覆。",
+    zh: "小時光風土誌書店位於華山文創園區，歡迎品牌、企業、創作者與我們合作：活動、展覽、選物寄賣、品牌聯名、企業包場、講座與工作坊。填寫表單，我們會在 3 個工作天內回覆。",
     en: "Interval Books at Huashan welcomes brands, companies and creators: events, exhibitions, consignment, brand collaborations, private bookings, talks and workshops. Send us a note — we reply within 3 business days.",
-    ja: "華山の小時光書店では、ブランド・企業・作り手との協働を歓迎しています。イベント、展示、委託販売、ブランドコラボ、貸切、講座・ワークショップ。フォームからご相談ください。3営業日以内にお返事します。",
+    ja: "華山の小時光 風土誌書店では、ブランド・企業・作り手との協働を歓迎しています。イベント、展示、委託販売、ブランドコラボ、貸切、講座・ワークショップ。フォームからご相談ください。3営業日以内にお返事します。",
   },
   eyebrowSuffix: { zh: "異業合作", en: "異業合作", ja: "異業合作" },
   title: {
@@ -280,7 +280,7 @@ const LABEL: Record<string, Localized> = {
   consentA: { zh: "我已閱讀並同意", en: "I have read and agree to the", ja: "" },
   consentLink: { zh: "隱私權政策", en: "privacy policy", ja: "プライバシーポリシー" },
   consentB: {
-    zh: "，同意小時光書店使用以上資料與我聯繫合作事宜。",
+    zh: "，同意小時光風土誌書店使用以上資料與我聯繫合作事宜。",
     en: ", and agree that Interval Books may use these details to contact me about this inquiry.",
     ja: "に同意し、本件のご連絡に上記情報を利用することを承諾します。",
   },

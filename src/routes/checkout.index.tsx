@@ -75,14 +75,14 @@ import type { Localized } from "@/i18n/types";
 
 const PAGE = {
   metaTitle: {
-    zh: "結帳 Checkout｜小時光書店 Interval Books",
+    zh: "結帳 Checkout｜小時光風土誌書店",
     en: "Checkout｜Interval Books",
-    ja: "ご購入手続き｜小時光書店 Interval Books",
+    ja: "ご購入手続き｜小時光 風土誌書店",
   },
   metaDescription: {
-    zh: "填寫收件資料並選擇付款方式，完成小時光書店的訂單。可用信用卡線上付款或銀行匯款。",
+    zh: "填寫收件資料並選擇付款方式，完成小時光風土誌書店的訂單。可用信用卡線上付款或銀行匯款。",
     en: "Enter your delivery details and choose how to pay to complete your Interval Books order — by card online or by bank transfer.",
-    ja: "お届け先とお支払い方法をご入力いただき、小時光書店のご注文を確定します。クレジットカード決済または銀行振込をご利用いただけます。",
+    ja: "お届け先とお支払い方法をご入力いただき、小時光 風土誌書店のご注文を確定します。クレジットカード決済または銀行振込をご利用いただけます。",
   },
   eyebrowSuffix: { zh: "結帳", en: "Checkout", ja: "ご購入手続き" },
   title: { zh: "留下收件資料", en: "Where should this go", ja: "お届け先のご入力" },

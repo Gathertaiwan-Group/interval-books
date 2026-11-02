@@ -2,7 +2,7 @@
 import type { Localized } from "./types";
 
 export const UI = {
-  brand: { zh: "小時光書店", en: "Interval Books", ja: "小時光書店" },
+  brand: { zh: "小時光風土誌書店", en: "Interval Books", ja: "小時光 風土誌書店" },
   brandSub: { zh: "Interval Books", en: "Hourlight Bookstore", ja: "Interval Books" },
 
   nav: {
@@ -51,12 +51,12 @@ export const UI = {
     follow: { zh: "追蹤", en: "Follow", ja: "フォロー" },
     account: { zh: "我的帳號", en: "My Account", ja: "マイページ" },
     aboutBlurb: {
-      zh: "我們是在華山的小時光書店，聽得到鳥鳴，聞得到茶香與書香，感受得到人情的溫度與連結。",
+      zh: "我們是在華山的小時光風土誌書店，聽得到鳥鳴，聞得到茶香與書香，感受得到人情的溫度與連結。",
       en: "Tucked inside Huashan Cultural Park, Interval Books is a quiet pause — birdsong outside, the scent of tea and paper within, and the warmth of small encounters.",
-      ja: "華山文化園にひっそりと佇む小時光書店。鳥のさえずり、茶と本の香り、ひとと人のあたたかな繋がりが息づく場所です。",
+      ja: "華山文化園にひっそりと佇む小時光 風土誌書店。鳥のさえずり、茶と本の香り、ひとと人のあたたかな繋がりが息づく場所です。",
     },
     rights: {
-      zh: "小時光書店．保留所有權利",
+      zh: "小時光風土誌書店．保留所有權利",
       en: "Interval Books. All rights reserved.",
       ja: "Interval Books. All rights reserved.",
     },
@@ -92,9 +92,9 @@ export const UI = {
 
 export const SITE_INFO = {
   shortDesc: {
-    zh: "我們是在華山的小時光書店，聽得到鳥鳴，聞得到茶香與書香，感受得到人情的溫度與連結。",
+    zh: "我們是在華山的小時光風土誌書店，聽得到鳥鳴，聞得到茶香與書香，感受得到人情的溫度與連結。",
     en: "Tucked inside Huashan Cultural Park, Interval Books is a quiet pause — birdsong outside, the scent of tea and paper within, and the warmth of small encounters.",
-    ja: "華山文化園にひっそりと佇む小時光書店。鳥のさえずり、茶と本の香り、ひとと人のあたたかな繋がりが息づく場所です。",
+    ja: "華山文化園にひっそりと佇む小時光 風土誌書店。鳥のさえずり、茶と本の香り、ひとと人のあたたかな繋がりが息づく場所です。",
   } as Localized,
   address: {
     zh: "華山文創園區．紅磚六合院 西7-3館",

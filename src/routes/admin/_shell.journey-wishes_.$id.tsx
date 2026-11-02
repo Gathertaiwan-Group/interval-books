@@ -47,8 +47,8 @@ export const Route = createFileRoute("/admin/_shell/journey-wishes_/$id")({
     meta: [
       {
         title: loaderData?.wish
-          ? `旅程願望：${loaderData.wish.name || "未留稱呼"}｜小時光書店後台`
-          : "旅程願望｜小時光書店後台",
+          ? `旅程願望：${loaderData.wish.name || "未留稱呼"}｜小時光風土誌書店後台`
+          : "旅程願望｜小時光風土誌書店後台",
       },
     ],
   }),

@@ -24,9 +24,9 @@ import kungtungCss from "@/components/kungtung/kungtung.css?url";
 /** 三語 meta。⚠️ 必須是頂層靜態常數、每一句都是字面值——check-meta.mjs 靜態解析這個物件。 */
 const PAGE = {
   metaTitle: {
-    zh: "范毅舜｜文化領路人｜公東教堂文化之旅｜小時光書店",
+    zh: "范毅舜｜文化領路人｜公東教堂文化之旅｜小時光風土誌書店",
     en: "Nicholas Fan — Cultural Guide｜Kung Tung Chapel Journey｜Interval Books",
-    ja: "范毅舜｜文化の案内人｜公東教会文化の旅｜小時光書店",
+    ja: "范毅舜｜文化の案内人｜公東教会文化の旅｜小時光 風土誌書店",
   },
   metaDescription: {
     zh: "攝影作家范毅舜的經歷、代表著作與媒體報導。《公東的教堂》作者，親自帶領旅人走進公東教堂。",

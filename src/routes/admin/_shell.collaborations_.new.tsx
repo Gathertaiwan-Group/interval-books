@@ -14,7 +14,7 @@ export const Route = createFileRoute("/admin/_shell/collaborations_/new")({
     const { listCollaborations } = await import("@/lib/admin/fns/collaborations");
     return { nextSortOrder: newFirstSortOrder(await listCollaborations()) };
   },
-  head: () => ({ meta: [{ title: "新增合作｜小時光書店後台" }] }),
+  head: () => ({ meta: [{ title: "新增合作｜小時光風土誌書店後台" }] }),
   component: CollaborationNewPage,
 });
 

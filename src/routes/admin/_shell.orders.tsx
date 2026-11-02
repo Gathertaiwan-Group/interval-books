@@ -104,7 +104,7 @@ export const Route = createFileRoute("/admin/_shell/orders")({
       invoiceProblems: invoiceSummary.count,
     };
   },
-  head: () => ({ meta: [{ title: "訂單｜小時光書店後台" }] }),
+  head: () => ({ meta: [{ title: "訂單｜小時光風土誌書店後台" }] }),
   component: AdminOrdersPage,
 });
 

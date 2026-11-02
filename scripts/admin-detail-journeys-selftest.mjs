@@ -112,7 +112,7 @@ console.log("\n[1] 編輯內頁：loader 一支 fn、授權不放寬、pending")
     /readAdminPeek<JourneyRow>\("journey", id\)/.test(edit),
   );
   checkTrue("找不到 → AdminDetailNotFound", /AdminDetailNotFound/.test(edit));
-  checkTrue("head 標題「…｜小時光書店後台」", /｜小時光書店後台/.test(read(EDIT)));
+  checkTrue("head 標題「…｜小時光風土誌書店後台」", /｜小時光風土誌書店後台/.test(read(EDIT)));
   checkTrue("key={journey.id}（換一筆重新掛載）", /key=\{journey\.id\}/.test(edit));
   checkTrue(
     "存檔 → invalidate → 回上一頁（列表），否則 replace 到列表",

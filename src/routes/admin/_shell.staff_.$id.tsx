@@ -26,7 +26,7 @@ export const Route = createFileRoute("/admin/_shell/staff_/$id")({
     const accounts = await listStaffAccounts();
     return { account: accounts.find((a) => a.id === params.id) ?? null };
   },
-  head: () => ({ meta: [{ title: "編輯後台身分｜小時光書店後台" }] }),
+  head: () => ({ meta: [{ title: "編輯後台身分｜小時光風土誌書店後台" }] }),
   ...ADMIN_DETAIL_PENDING,
   pendingComponent: StaffPending,
   component: StaffEditPage,

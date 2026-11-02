@@ -114,8 +114,8 @@ export const Route = createFileRoute("/admin/_shell/orders_/$id")({
     meta: [
       {
         title: loaderData?.detail
-          ? `訂單 ${loaderData.detail.order_no}｜小時光書店後台`
-          : "訂單｜小時光書店後台",
+          ? `訂單 ${loaderData.detail.order_no}｜小時光風土誌書店後台`
+          : "訂單｜小時光風土誌書店後台",
       },
     ],
   }),

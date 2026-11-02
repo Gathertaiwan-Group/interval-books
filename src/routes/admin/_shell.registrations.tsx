@@ -91,7 +91,7 @@ export const Route = createFileRoute("/admin/_shell/registrations")({
     return await getAdminRegistrationsPageData();
   },
   head: () => ({
-    meta: [{ title: "活動報名｜小時光書店後台" }],
+    meta: [{ title: "活動報名｜小時光風土誌書店後台" }],
   }),
   component: AdminRegistrationsPage,
 });

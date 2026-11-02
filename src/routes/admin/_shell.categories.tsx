@@ -70,7 +70,7 @@ export const Route = createFileRoute("/admin/_shell/categories")({
     return { categories, counts };
   },
   head: () => ({
-    meta: [{ title: "活動分類｜小時光書店後台" }],
+    meta: [{ title: "活動分類｜小時光風土誌書店後台" }],
   }),
   component: AdminEventCategoriesPage,
 });

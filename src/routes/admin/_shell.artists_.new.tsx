@@ -14,7 +14,7 @@ export const Route = createFileRoute("/admin/_shell/artists_/new")({
     const artists = await listArtists();
     return { nextSortOrder: artists.reduce((max, a) => Math.max(max, a.sort_order), 0) + 1 };
   },
-  head: () => ({ meta: [{ title: "新增講者｜小時光書店後台" }] }),
+  head: () => ({ meta: [{ title: "新增講者｜小時光風土誌書店後台" }] }),
   component: ArtistNewPage,
 });
 

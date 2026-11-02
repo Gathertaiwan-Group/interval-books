@@ -25,7 +25,7 @@ export const Route = createFileRoute("/admin/_shell/")({
     return await getAdminTodo();
   },
   head: () => ({
-    meta: [{ title: "今日待辦｜小時光書店後台" }],
+    meta: [{ title: "今日待辦｜小時光風土誌書店後台" }],
   }),
   component: AdminDashboard,
 });

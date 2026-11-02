@@ -51,8 +51,8 @@ export const Route = createFileRoute("/admin/_shell/partnerships_/$id")({
     meta: [
       {
         title: loaderData?.inquiry
-          ? `合作邀約：${loaderData.inquiry.company}｜小時光書店後台`
-          : "異業合作｜小時光書店後台",
+          ? `合作邀約：${loaderData.inquiry.company}｜小時光風土誌書店後台`
+          : "異業合作｜小時光風土誌書店後台",
       },
     ],
   }),

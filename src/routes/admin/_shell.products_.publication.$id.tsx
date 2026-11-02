@@ -30,8 +30,8 @@ export const Route = createFileRoute("/admin/_shell/products_/publication/$id")(
     meta: [
       {
         title: loaderData?.publication
-          ? `編輯「${loaderData.publication.title.zh}」｜地方刊物｜小時光書店後台`
-          : "編輯地方刊物｜小時光書店後台",
+          ? `編輯「${loaderData.publication.title.zh}」｜地方刊物｜小時光風土誌書店後台`
+          : "編輯地方刊物｜小時光風土誌書店後台",
       },
     ],
   }),

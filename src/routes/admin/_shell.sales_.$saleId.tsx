@@ -28,8 +28,8 @@ export const Route = createFileRoute("/admin/_shell/sales_/$saleId")({
     meta: [
       {
         title: loaderData?.sale
-          ? `銷售明細：${loaderData.sale.product_name ?? "（無品名）"}｜小時光書店後台`
-          : "銷售紀錄｜小時光書店後台",
+          ? `銷售明細：${loaderData.sale.product_name ?? "（無品名）"}｜小時光風土誌書店後台`
+          : "銷售紀錄｜小時光風土誌書店後台",
       },
     ],
   }),
