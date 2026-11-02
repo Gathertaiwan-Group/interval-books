@@ -843,6 +843,28 @@ export const MIGRATION_LEDGER = Object.freeze([
     // 的唯讀查詢，逐字沿用；expire_unpaid_orders 沒有碰）。
     touches: ["event_registrations", "order_expiry", "session_seats"],
   },
+  {
+    file: "0050_admin_phone_orders.sql",
+    note: "後台「新增電話報名」：orders 加 source text not null default 'web'（CHECK web/admin_phone）、created_by uuid（auth.users，on delete set null）、admin_note（≤1000 字）、price_override_reason（btrim 後 1–200 字）、notify_customer boolean not null default true（CHECK notify_customer or source='admin_phone'，前台訂單一定寄信）、remittance_paid_on date，以及部分索引 orders_admin_phone_idx（created_at desc where source='admin_phone'），附 comment on column。enqueue_order_email() 多一個 o.notify_customer 條件、enqueue_registration_emails() 多 join public.orders 與 o.notify_customer 條件（客人信的兩個入口，backlog／提醒信排程繞不過去）；expire_unpaid_orders() 候選條件多一行 o.source <> 'admin_phone'（電話報名未付款單不自動取消）。三支函式本體取自正式庫 pg_get_functiondef，只加上述條件，簽章與回傳形狀不變（create or replace），security definer／search_path 不變，重申只 grant service_role。admin_mark_order_paid／settle_free_order／reserve_session_seat／admin_delete_order 一個字沒動",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：orders_payments（public.orders 的
+    // alter table／index、expire 本體的 public.payments）、email_outbox（email_outbox insert、
+    // enqueue_registration_emails）、roster_pii（enqueue_registration_emails 逐字沿用的
+    // admin_event_roster／on_roster）、event_registrations（同上 join）、order_expiry
+    // （expire_unpaid_orders、order_items），以及 expire 本體逐字沿用的 products_availability
+    // （public.products）、inventory（inv.products）、session_seats（event_sessions、seats_taken）、
+    // session_plans（event_session_plans、units_taken）。
+    touches: [
+      "email_outbox",
+      "event_registrations",
+      "inventory",
+      "order_expiry",
+      "orders_payments",
+      "products_availability",
+      "roster_pii",
+      "session_plans",
+      "session_seats",
+    ],
+  },
 ]);
 
 /** 磁碟上的 migration 檔名，排序過。空目錄 = 丟例外（那不是「沒有違規」）。 */

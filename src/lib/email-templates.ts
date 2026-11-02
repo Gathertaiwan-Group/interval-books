@@ -211,6 +211,15 @@ export type AdminOrderNotificationInput = {
    * 「需聯繫」、付款方式那一列與開頭說明都寫出來。不傳＝false。
    */
   needsContact?: boolean;
+  /**
+   * 0050：後台電話報名。不傳／null＝前台訂單。傳了就在主旨與內文標「後台電話報名」，
+   * 並印建立者、內部備註、有沒有寄信給客人。
+   */
+  phoneOrder?: {
+    notifyCustomer: boolean;
+    adminNote: string | null;
+    createdByEmail: string | null;
+  } | null;
   items: { name: Localized; quantity: number; subtotal: number }[];
   /**
    * 這張訂單買到的場次，附這個場次總共幾位參加者，以及（讀得到時）逐位參加者。
@@ -964,10 +973,12 @@ export function renderAdminOrderNotificationEmail(
       : "有新的訂單";
   const buyerName = subjectSafe(contact?.customerName ?? "");
   const needsContact = input.needsContact === true;
+  const phoneOrder = input.phoneOrder ?? null;
   const subject =
     (placed
       ? `【小時光書店】待收款訂單 ${input.orderNo}`
       : `【小時光書店】新訂單 ${input.orderNo}`) +
+    (phoneOrder ? `｜${ADMIN_PHONE_ORDER_LABEL}` : "") +
     (needsContact ? "｜需聯繫" : "") +
     (buyerName ? `｜${buyerName}` : "") +
     `｜${formatMoney(input.total)}`;
@@ -994,6 +1005,20 @@ export function renderAdminOrderNotificationEmail(
   // 讓店家一眼看到要主動打電話／寫信，不是等客人自己匯款。
   if (needsContact) {
     rows.push({ label: "需聯繫", value: ADMIN_NEEDS_CONTACT_NOTE });
+  }
+  // 0050：後台電話報名——這張單不是客人自己在網站上下的，店家要一眼看得出來。
+  if (phoneOrder) {
+    rows.push({
+      label: "來源",
+      value:
+        ADMIN_PHONE_ORDER_LABEL +
+        (phoneOrder.createdByEmail ? `（建立者 ${phoneOrder.createdByEmail}）` : ""),
+    });
+    rows.push({
+      label: "客人通知信",
+      value: phoneOrder.notifyCustomer ? "會寄給客人" : "不寄給客人（建單時未勾選）",
+    });
+    if (phoneOrder.adminNote) rows.push({ label: "內部備註", value: phoneOrder.adminNote });
   }
   // 收件方式在訂購人區塊裡已經印了（跟地址放在一起才看得懂）；讀不到訂購人時才放這裡。
   if (!contact) {
@@ -1047,6 +1072,9 @@ export function renderAdminOrderNotificationEmail(
 
   return { subject, text, html };
 }
+
+/** 0050：後台電話報名的標籤。主旨、店家信內文、後台列表共用這幾個字。 */
+export const ADMIN_PHONE_ORDER_LABEL = "後台電話報名";
 
 /** 店家通知信：需專人聯繫的那一句（0048）。 */
 export const ADMIN_NEEDS_CONTACT_NOTE =

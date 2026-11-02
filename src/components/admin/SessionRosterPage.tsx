@@ -14,7 +14,7 @@
 import { useState } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Download, Pencil } from "lucide-react";
+import { Download, Pencil, PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AdminDetailPage } from "@/components/admin/AdminDetailPage";
@@ -30,9 +30,21 @@ type Props = {
   rosterError: string | null;
   /** ⚠️ 只控制畫面。擋住直接呼叫的是 server fn 的 requireRosterRead()。 */
   canReadRoster: boolean;
+  /**
+   * 0050：顯示「新增電話報名」（只有 admin 看得到）。⚠️ 只控制畫面——建單的 server fn
+   * 自己掛 adminFnMiddleware。
+   */
+  canCreatePhoneOrder?: boolean;
 };
 
-export function SessionRosterPage({ session, product, roster, rosterError, canReadRoster }: Props) {
+export function SessionRosterPage({
+  session,
+  product,
+  roster,
+  rosterError,
+  canReadRoster,
+  canCreatePhoneOrder = false,
+}: Props) {
   const router = useRouter();
   const [exporting, setExporting] = useState(false);
 
@@ -77,6 +89,18 @@ export function SessionRosterPage({ session, product, roster, rosterError, canRe
 
   const actions = (
     <>
+      {canCreatePhoneOrder ? (
+        <Button asChild size="sm" className="gap-1.5">
+          <Link
+            to="/admin/orders/new"
+            search={{ sessionId: session.id, from: "roster" }}
+            preload="intent"
+          >
+            <PhoneCall className="h-4 w-4" aria-hidden="true" />
+            新增電話報名
+          </Link>
+        </Button>
+      ) : null}
       <Button asChild variant="outline" size="sm" className="gap-1.5">
         <Link
           to="/admin/registrations/$sessionId/edit"

@@ -25,8 +25,9 @@
  * 檔頭）。列表只列姓名；電話／信箱／地址在內頁。
  */
 import { createFileRoute, Link, redirect, useRouter, useRouterState } from "@tanstack/react-router";
-import { Landmark, Loader2 } from "lucide-react";
+import { Landmark, Loader2, PhoneCall } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { InvoiceProblemBanner } from "@/components/admin/InvoiceProblemBanner";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -42,11 +43,13 @@ import {
 // ICU 印出來的字也不一樣（空白字元），SSR 會 React #418。見該檔檔頭。
 import { formatTaipeiDateTime } from "@/lib/taipei-time";
 import {
+  isPhoneOrder,
   isUuid,
   money,
   NEEDS_CONTACT_LABEL,
   parseOrderListSearch,
   PAYMENT_STATUS_LABEL,
+  PHONE_ORDER_LABEL,
   paymentMethodLabel,
   paymentStatusBadgeVariant,
   scopeOf,
@@ -136,15 +139,24 @@ function AdminOrdersPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="flex items-center gap-2 text-lg font-medium">
-          <Landmark className="h-5 w-5" aria-hidden="true" />
-          訂單
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          客人匯款後要有人核對入帳、手動標成已收款——逾期未標記的匯款訂單會在 3
-          天後被自動取消。點一列進入訂單內頁，看完整的聯絡方式、收件地址與發票資料。
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-lg font-medium">
+            <Landmark className="h-5 w-5" aria-hidden="true" />
+            訂單
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            客人匯款後要有人核對入帳、手動標成已收款——逾期未標記的匯款訂單會在 3
+            天後被自動取消（後台電話報名的單不會自動取消）。點一列進入訂單內頁，看完整的聯絡方式、收件地址與發票資料。
+          </p>
+        </div>
+        {/* 0050：客人打電話來報名 → 在後台補一張正式訂單。 */}
+        <Button asChild className="gap-1.5">
+          <Link to="/admin/orders/new" preload="intent">
+            <PhoneCall className="h-4 w-4" aria-hidden="true" />
+            新增電話報名
+          </Link>
+        </Button>
       </div>
 
       {/* 已經在「發票尚未開立」分頁上就不再重複一條指向自己的橫幅。 */}
@@ -163,6 +175,7 @@ function AdminOrdersPage() {
             <TabsTrigger value="needs_contact">{NEEDS_CONTACT_LABEL}</TabsTrigger>
             <TabsTrigger value="to_ship">待出貨</TabsTrigger>
             <TabsTrigger value="all">全部訂單</TabsTrigger>
+            <TabsTrigger value="phone">{PHONE_ORDER_LABEL}</TabsTrigger>
             <TabsTrigger value="invoice_problem">
               發票尚未開立{invoiceProblems ? `（${invoiceProblems}）` : ""}
             </TabsTrigger>
@@ -218,7 +231,9 @@ function AdminOrdersPage() {
                         ? "目前沒有待出貨的訂單"
                         : scope === "invoice_problem"
                           ? "目前沒有發票尚未開立的已付款訂單"
-                          : "目前沒有訂單"}
+                          : scope === "phone"
+                            ? "目前沒有後台電話報名的訂單"
+                            : "目前沒有訂單"}
                 </TableCell>
               </TableRow>
             ) : (
@@ -249,6 +264,11 @@ function AdminOrdersPage() {
                     >
                       {o.order_no}
                     </Link>
+                    {isPhoneOrder(o) ? (
+                      <Badge variant="secondary" className="ml-2 font-normal">
+                        {PHONE_ORDER_LABEL}
+                      </Badge>
+                    ) : null}
                     {o.archived_at ? (
                       <Badge variant="outline" className="ml-2 font-normal">
                         已封存

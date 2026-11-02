@@ -15,11 +15,21 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { adminFnMiddleware } from "@/lib/admin/middleware";
 
+/** 0050 加了 phone（後台電話報名）。 */
+const ORDER_LIST_SCOPES = [
+  "transfer_pending",
+  "needs_contact",
+  "to_ship",
+  "all",
+  "invoice_problem",
+  "phone",
+] as const;
+
 export const listAdminOrders = createServerFn({ method: "GET" })
   .middleware([adminFnMiddleware])
   .inputValidator(
     z.object({
-      scope: z.enum(["transfer_pending", "needs_contact", "to_ship", "all", "invoice_problem"]),
+      scope: z.enum(ORDER_LIST_SCOPES),
       includeArchived: z.boolean().optional(),
     }),
   )

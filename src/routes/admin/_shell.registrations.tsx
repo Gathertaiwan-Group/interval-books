@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { PhoneCall, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -98,6 +98,9 @@ export const Route = createFileRoute("/admin/_shell/registrations")({
 
 function AdminRegistrationsPage() {
   const { sessions, products, counts, schemaMissing, rosterReady } = Route.useLoaderData();
+  // 0050：「新增電話報名」只給 admin 看（⚠️ 只是畫面；建單的 server fn 掛 adminFnMiddleware）。
+  const { user } = Route.useRouteContext();
+  const isAdmin = user.role === "admin";
   const router = useRouter();
 
   const [deleteTarget, setDeleteTarget] = useState<SessionRow | null>(null);
@@ -139,19 +142,29 @@ function AdminRegistrationsPage() {
             共 {sessions.length} 個場次。名額在這裡維護——商品頁不再有名額欄位。
           </p>
         </div>
-        {products.length === 0 ? (
-          <Button className="gap-1.5" disabled>
-            <Plus className="h-4 w-4" />
-            新增場次
-          </Button>
-        ) : (
-          <Button asChild className="gap-1.5">
-            <Link to="/admin/registrations/new" preload="intent">
+        <div className="flex flex-wrap items-center gap-2">
+          {isAdmin ? (
+            <Button asChild variant="outline" className="gap-1.5">
+              <Link to="/admin/orders/new" search={{ from: "registrations" }} preload="intent">
+                <PhoneCall className="h-4 w-4" aria-hidden="true" />
+                新增電話報名
+              </Link>
+            </Button>
+          ) : null}
+          {products.length === 0 ? (
+            <Button className="gap-1.5" disabled>
               <Plus className="h-4 w-4" />
               新增場次
-            </Link>
-          </Button>
-        )}
+            </Button>
+          ) : (
+            <Button asChild className="gap-1.5">
+              <Link to="/admin/registrations/new" preload="intent">
+                <Plus className="h-4 w-4" />
+                新增場次
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* 0020／0021 早已套用到正式庫，「migration 尚未套用」的兩段工程說明已拿掉。

@@ -582,9 +582,13 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
     // 只被唯讀 select；admin_delete_order()、admin_archive_order() 與訂單／付款處理沒動。
     // 0049（場次開始後不收新訂單）只 create or replace reserve_session_seat() 加一步時間檢查，
     // 呼叫端只有 createOrder()；admin_delete_order()、admin_archive_order() 與訂單／付款處理沒動。
-    "supabase/migrations 剛好 49 個 .sql 檔（0001–0048 原封不動 + 0049 場次開始後不收新訂單）",
+    // 0050（後台電話報名）對 orders 加六個有 default／nullable 的欄位，enqueue_order_email／
+    // enqueue_registration_emails 加 notify_customer 條件、expire_unpaid_orders 跳過
+    // source='admin_phone'；admin_delete_order()、admin_archive_order()、admin_mark_order_paid()
+    // 一個字沒動（電話報名「已收到匯款」就是呼叫 admin_mark_order_paid()）。
+    "supabase/migrations 剛好 50 個 .sql 檔（0001–0049 原封不動 + 0050 後台電話報名）",
     migFiles.length,
-    49,
+    50,
   );
 }
 

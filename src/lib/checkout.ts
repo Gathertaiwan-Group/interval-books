@@ -282,7 +282,9 @@ export type CheckoutErrorCode =
   | "order_failed"
   | "payment_unavailable"
   | "payment_already_settled"
-  | "referral_invalid";
+  | "referral_invalid"
+  /** 0050：後台電話報名的手動改價不合法（高於原價、負數、或沒填原因）。前台不會出現。 */
+  | "price_override_invalid";
 
 export class CheckoutError extends Error {
   readonly code: CheckoutErrorCode;
@@ -347,6 +349,11 @@ export const CHECKOUT_ERROR_COPY: Record<CheckoutErrorCode, Localized> = {
     zh: "推薦碼無效或已停用，訂單沒有成立。請修改或清空推薦碼後再送出。",
     en: "That referral code is not valid, so no order was created. Please correct or clear it and try again.",
     ja: "紹介コードが無効のため、ご注文は成立していません。修正するか空欄にしてから再度お進みください。",
+  },
+  price_override_invalid: {
+    zh: "手動改價只能改成 0 到原價之間的金額，而且要填改價原因。",
+    en: "A manual price must be between 0 and the original price, with a reason.",
+    ja: "手動価格は 0 から元の価格までの金額で、理由の入力が必要です。",
   },
 };
 
@@ -543,6 +550,38 @@ function invoiceSchema(t: Translate) {
  * 由 reserve_session_seat() 在寫入的當下取 now()。一個永遠沒人勾的同意欄位就是
  * 一個死欄位 —— 那正是 events.registration_type 的下場，所以這裡讓它是必填。
  */
+/**
+ * 參加者聯絡方式的共用規則（姓名必填；信箱與手機至少一項；格式）。前台結帳的
+ * participantSchema() 與後台電話報名（0050，src/lib/admin/phone-order.ts）共用這一份，
+ * 免得兩邊各寫一次而分岔。
+ */
+function refineParticipantContact(
+  value: { email?: string | null; phone?: string | null },
+  ctx: z.RefinementCtx,
+  t: Translate,
+): void {
+  const hasEmail = (value.email ?? "").trim().length > 0;
+  const hasPhone = (value.phone ?? "").trim().length > 0;
+  if (!hasEmail && !hasPhone) {
+    // 掛在 email 上而不是整個物件上：react-hook-form 才印得到輸入框旁邊。
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["email"],
+      message: t(MSG.participantContact),
+    });
+  }
+  if (hasEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((value.email ?? "").trim())) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["email"],
+      message: t(MSG.emailFormat),
+    });
+  }
+  if (hasPhone && !TW_MOBILE.test((value.phone ?? "").trim())) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["phone"], message: t(MSG.phone) });
+  }
+}
+
 function participantSchema(t: Translate) {
   return z
     .object({
@@ -554,26 +593,7 @@ function participantSchema(t: Translate) {
       noticeAck: z.boolean(),
     })
     .superRefine((value, ctx) => {
-      const hasEmail = (value.email ?? "").trim().length > 0;
-      const hasPhone = (value.phone ?? "").trim().length > 0;
-      if (!hasEmail && !hasPhone) {
-        // 掛在 email 上而不是整個物件上：react-hook-form 才印得到輸入框旁邊。
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["email"],
-          message: t(MSG.participantContact),
-        });
-      }
-      if (hasEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((value.email ?? "").trim())) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["email"],
-          message: t(MSG.emailFormat),
-        });
-      }
-      if (hasPhone && !TW_MOBILE.test((value.phone ?? "").trim())) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["phone"], message: t(MSG.phone) });
-      }
+      refineParticipantContact(value, ctx, t);
       if (!value.noticeAck) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -582,6 +602,26 @@ function participantSchema(t: Translate) {
         });
       }
     });
+}
+
+/**
+ * 後台電話報名（0050）的一位參加者：與前台同樣的姓名／信箱／手機規則，但**沒有**
+ * lineKey（後台一張單只有一個場次）與 noticeAck（那是客人本人在網頁上勾的同意，
+ * 店員不能代勾——資料庫的 notice_ack_at 會留空）。
+ */
+export function participantContactSchema(t: Translate) {
+  return z
+    .object({
+      name: z.string().trim().min(1, t(MSG.participantName)).max(60, t(MSG.nameLong)),
+      email: z.string().trim().max(120, t(MSG.tooLong)).optional().nullable(),
+      phone: z.string().trim().max(30, t(MSG.tooLong)).optional().nullable(),
+    })
+    .superRefine((value, ctx) => refineParticipantContact(value, ctx, t));
+}
+
+/** 後台電話報名（0050）用的發票 schema：與前台結帳同一份規則。 */
+export function invoiceChoiceSchema(t: Translate) {
+  return invoiceSchema(t);
 }
 
 /**

@@ -62,6 +62,7 @@ import { INVOICE_MAX_RETRIES } from "@/server/repos/invoices";
 // ---------------------------------------------------------------------------
 
 export type AdminOrderListScope =
+  | "phone"
   | "transfer_pending"
   | "needs_contact"
   | "to_ship"
@@ -85,7 +86,7 @@ export type AdminOrderListFilter = {
  * 都多帶一包資料回來。
  */
 const LIST_COLUMNS =
-  "id, order_no, created_at, total, payment_method, payment_status, status, shipping_method, remittance_last5, customer_name, archived_at, needs_contact";
+  "id, order_no, created_at, total, payment_method, payment_status, status, shipping_method, remittance_last5, source, customer_name, archived_at, needs_contact";
 
 export type AdminOrderListRow = {
   id: string;
@@ -103,6 +104,8 @@ export type AdminOrderListRow = {
   archived_at: string | null;
   /** 0048：客人選匯款時勾了「我需要專人聯繫協助付款」。 */
   needs_contact: boolean;
+  /** 0050：'web'（前台結帳）／'admin_phone'（後台電話報名）。 */
+  source: string;
 };
 
 /**
@@ -154,6 +157,9 @@ export async function listAdminOrders(filter: AdminOrderListFilter): Promise<Adm
 
   if (filter.scope === "transfer_pending") {
     query = query.eq("payment_method", "transfer").neq("payment_status", "paid");
+  } else if (filter.scope === "phone") {
+    // 0050：後台電話報名（吃 orders_admin_phone_idx）。已付款、未付款、免費都列。
+    query = query.eq("source", "admin_phone");
   } else if (filter.scope === "needs_contact") {
     // 0048：還沒收到錢、也還沒被取消、而且客人要求專人聯繫的訂單——與列表／內頁
     // 「需聯繫」標示亮起的條件相同（src/lib/admin/order-labels.ts showNeedsContact）。
@@ -194,7 +200,9 @@ const ORDER_COLUMNS =
   "subtotal, shipping_fee, discount, total, shipping_method, note, " +
   "remittance_last5, remittance_reported_at, customer_name, customer_email, customer_phone, archived_at, needs_contact, " +
   // 0040：推薦碼與當時的折扣%。
-  "referral_code, referral_discount_percent";
+  "referral_code, referral_discount_percent, " +
+  // 0050：後台電話報名。
+  "source, created_by, admin_note, price_override_reason, notify_customer, remittance_paid_on";
 
 /** 一次查完：訂單本身＋品項（含場次）＋收件資料＋發票資料。見檔頭「速度」。 */
 const DETAIL_SELECT =
@@ -306,6 +314,14 @@ export type AdminOrderDetail = {
   /** 推薦碼（0040）。null＝沒有推薦人。 */
   referral_code: string | null;
   referral_discount_percent: number | null;
+  /** 0050：後台電話報名的資訊；前台訂單是 null。 */
+  phone_order: {
+    created_by_email: string | null;
+    admin_note: string | null;
+    price_override_reason: string | null;
+    notify_customer: boolean;
+    remittance_paid_on: string | null;
+  } | null;
 };
 
 /** PostgREST 對 to-one embed 可能回物件或單元素陣列，兩種都吃（同 customer-orders.ts）。 */
@@ -391,6 +407,12 @@ type OrderDetailRawRow = {
   archived_at: string | null;
   referral_code: string | null;
   referral_discount_percent: number | string | null;
+  source: string | null;
+  created_by: string | null;
+  admin_note: string | null;
+  price_override_reason: string | null;
+  notify_customer: boolean | null;
+  remittance_paid_on: string | null;
   order_items: ItemRawRow[] | null;
   order_addresses: AddrRawRow[] | null;
   invoices: InvoiceRawRow | InvoiceRawRow[] | null;
@@ -449,6 +471,21 @@ export async function getAdminOrderDetail(orderId: string): Promise<AdminOrderDe
     cvs_address: r.cvs_address,
     cvs_sub_type: r.cvs_sub_type,
   }));
+
+  // 0050：電話報名的建立者。profiles 讀失敗只是少一個 email，不讓整頁掛掉。
+  let phoneOrder: AdminOrderDetail["phone_order"] = null;
+  if (o.source === "admin_phone") {
+    // 只有電話報名才多這一趟（profiles 與 orders 之間沒有外鍵，無法巢狀 select）；
+    // 一般訂單仍然是「詳情一次查詢」。
+    const { loadAdminEmail } = await import("@/server/repos/phone-orders");
+    phoneOrder = {
+      created_by_email: o.created_by ? await loadAdminEmail(o.created_by) : null,
+      admin_note: blankToNull(o.admin_note),
+      price_override_reason: blankToNull(o.price_override_reason),
+      notify_customer: o.notify_customer !== false,
+      remittance_paid_on: o.remittance_paid_on ?? null,
+    };
+  }
 
   const inv = firstOf(o.invoices);
   const invoice: AdminOrderInvoice | null = inv
@@ -511,6 +548,7 @@ export async function getAdminOrderDetail(orderId: string): Promise<AdminOrderDe
       o.referral_discount_percent === null || o.referral_discount_percent === undefined
         ? null
         : Number(o.referral_discount_percent),
+    phone_order: phoneOrder,
   };
 }
 

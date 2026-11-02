@@ -137,7 +137,8 @@ assertMigrationDependencies(check, MIG_DIR, {
   // SESSION_STARTED，位置在 ⑤ 超額／⑥ 佔位／⑦ 寫參加者之前，raise 時什麼都沒寫。①–④、⑤–⑦
   // 逐字沿用 0020；release_session_seat、expire_unpaid_orders、admin_delete_*、付款與
   // 訂單欄位一個都沒動。這一支的連線段建的測試場次都在 now() 之後，斷言原樣成立。
-  reviewedThrough: "0049_reserve_session_seat_reject_started.sql",
+  // 0050（後台電話報名）已審：orders 只加有 default／nullable 的欄位（前台 insert 形狀不變）；enqueue_order_email／enqueue_registration_emails 只多 notify_customer 條件（預設 true，前台訂單行為不變）；expire_unpaid_orders 只多一行 source <> 'admin_phone'（前台訂單行為不變）。這支守的不變式原樣成立。
+  reviewedThrough: "0050_admin_phone_orders.sql",
 });
 checkTrue("0044 有 begin; / commit;", /^begin;$/m.test(sql0044) && /^commit;$/m.test(sql0044));
 

@@ -79,6 +79,7 @@ import {
   isUuid,
   money,
   NEEDS_CONTACT_LABEL,
+  PHONE_ORDER_LABEL,
   parseOrderListSearch,
   PAYMENT_STATUS_LABEL,
   paymentMethodLabel,
@@ -403,11 +404,18 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
       icon={<Landmark className="h-5 w-5" aria-hidden="true" />}
       title={<span className="font-mono">{detail.order_no}</span>}
       titleExtra={
-        detail.archived_at ? (
-          <Badge variant="outline" className="font-normal">
-            已封存
-          </Badge>
-        ) : null
+        <>
+          {detail.phone_order ? (
+            <Badge variant="secondary" className="font-normal">
+              {PHONE_ORDER_LABEL}
+            </Badge>
+          ) : null}
+          {detail.archived_at ? (
+            <Badge variant="outline" className="font-normal">
+              已封存
+            </Badge>
+          ) : null}
+        </>
       }
       meta={
         <div className="flex flex-wrap items-center gap-2">
@@ -430,6 +438,43 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
         </div>
       }
     >
+      {/* 0050：後台電話報名——誰建的、內部備註、改價原因、有沒有寄信給客人。 */}
+      {detail.phone_order ? (
+        <Section title={PHONE_ORDER_LABEL}>
+          <dl className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-1 text-sm">
+            <dt className="text-muted-foreground">建立者</dt>
+            <dd className="break-all">{detail.phone_order.created_by_email ?? "（讀不到）"}</dd>
+            <dt className="text-muted-foreground">客人通知信</dt>
+            <dd>
+              {detail.phone_order.notify_customer ? "會寄給客人" : "不寄給客人（建單時未勾選）"}
+            </dd>
+            {detail.phone_order.remittance_paid_on ? (
+              <>
+                <dt className="text-muted-foreground">匯款日期</dt>
+                <dd>{detail.phone_order.remittance_paid_on}</dd>
+              </>
+            ) : null}
+            {detail.phone_order.price_override_reason ? (
+              <>
+                <dt className="text-muted-foreground">改價原因</dt>
+                <dd className="whitespace-pre-wrap">{detail.phone_order.price_override_reason}</dd>
+              </>
+            ) : null}
+            {detail.phone_order.admin_note ? (
+              <>
+                <dt className="text-muted-foreground">內部備註</dt>
+                <dd className="whitespace-pre-wrap">{detail.phone_order.admin_note}</dd>
+              </>
+            ) : null}
+          </dl>
+          {detail.payment_status !== "paid" && detail.status === "pending" ? (
+            <p className="text-xs text-muted-foreground">
+              電話報名的未付款單不會被 3 天逾期自動取消，名額會一直保留到標記已收款或刪除訂單為止。
+            </p>
+          ) : null}
+        </Section>
+      ) : null}
+
       <Section title="訂購人">
         <dl className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-1 text-sm">
           <dt className="text-muted-foreground">姓名</dt>
@@ -602,7 +647,9 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
             <dd className="text-right">{money(detail.subtotal)}</dd>
             <dt className="text-muted-foreground">運費</dt>
             <dd className="text-right">{money(detail.shipping_fee)}</dd>
-            <dt className="text-muted-foreground">折扣</dt>
+            <dt className="text-muted-foreground">
+              {detail.phone_order?.price_override_reason ? "折扣（手動改價）" : "折扣"}
+            </dt>
             <dd className="text-right">−{money(detail.discount)}</dd>
             <dt className="text-muted-foreground">推薦碼</dt>
             <dd className="text-right">

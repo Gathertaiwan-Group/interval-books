@@ -1421,7 +1421,8 @@ for (const [label, src] of [
     // ── 0048_order_needs_contact.sql 的重讀結論 ── 只對 public.orders 加 needs_contact boolean
     // not null default false（＋comment on column）。沒有改任何函式、CHECK、trigger、排程或 grant，
     // 既有欄位與 expire_unpaid_orders() 不變；這一支的斷言原樣成立。
-    reviewedThrough: "0048_order_needs_contact.sql",
+    // 0050（後台電話報名）已審：orders 只加有 default／nullable 的欄位（前台 insert 形狀不變）；enqueue_order_email／enqueue_registration_emails 只多 notify_customer 條件（預設 true，前台訂單行為不變）；expire_unpaid_orders 只多一行 source <> 'admin_phone'（前台訂單行為不變）。這支守的不變式原樣成立。
+    reviewedThrough: "0050_admin_phone_orders.sql",
   });
 }
 

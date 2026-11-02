@@ -97,6 +97,7 @@ import { Route as AdminShellJourneysNewRouteImport } from './routes/admin/_shell
 import { Route as AdminShellNewsIdRouteImport } from './routes/admin/_shell.news_.$id'
 import { Route as AdminShellNewsNewRouteImport } from './routes/admin/_shell.news_.new'
 import { Route as AdminShellOrdersIdRouteImport } from './routes/admin/_shell.orders_.$id'
+import { Route as AdminShellOrdersNewRouteImport } from './routes/admin/_shell.orders_.new'
 import { Route as AdminShellPagesSplatRouteImport } from './routes/admin/_shell.pages.$'
 import { Route as AdminShellPartnershipsIdRouteImport } from './routes/admin/_shell.partnerships_.$id'
 import { Route as AdminShellProductsCuratedThemesRouteImport } from './routes/admin/_shell.products_.curated-themes'
@@ -583,6 +584,11 @@ const AdminShellOrdersIdRoute = AdminShellOrdersIdRouteImport.update({
   path: '/orders/$id',
   getParentRoute: () => AdminShellRoute,
 } as any)
+const AdminShellOrdersNewRoute = AdminShellOrdersNewRouteImport.update({
+  id: '/orders_/new',
+  path: '/orders/new',
+  getParentRoute: () => AdminShellRoute,
+} as any)
 const AdminShellPagesSplatRoute = AdminShellPagesSplatRouteImport.update({
   id: '/$',
   path: '/$',
@@ -812,6 +818,7 @@ export interface FileRoutesByFullPath {
   '/admin/news/$id': typeof AdminShellNewsIdRoute
   '/admin/news/new': typeof AdminShellNewsNewRoute
   '/admin/orders/$id': typeof AdminShellOrdersIdRoute
+  '/admin/orders/new': typeof AdminShellOrdersNewRoute
   '/admin/pages/$': typeof AdminShellPagesSplatRoute
   '/admin/partnerships/$id': typeof AdminShellPartnershipsIdRoute
   '/admin/products/curated-themes': typeof AdminShellProductsCuratedThemesRoute
@@ -921,6 +928,7 @@ export interface FileRoutesByTo {
   '/admin/news/$id': typeof AdminShellNewsIdRoute
   '/admin/news/new': typeof AdminShellNewsNewRoute
   '/admin/orders/$id': typeof AdminShellOrdersIdRoute
+  '/admin/orders/new': typeof AdminShellOrdersNewRoute
   '/admin/pages/$': typeof AdminShellPagesSplatRoute
   '/admin/partnerships/$id': typeof AdminShellPartnershipsIdRoute
   '/admin/products/curated-themes': typeof AdminShellProductsCuratedThemesRoute
@@ -1035,6 +1043,7 @@ export interface FileRoutesById {
   '/admin/_shell/news_/$id': typeof AdminShellNewsIdRoute
   '/admin/_shell/news_/new': typeof AdminShellNewsNewRoute
   '/admin/_shell/orders_/$id': typeof AdminShellOrdersIdRoute
+  '/admin/_shell/orders_/new': typeof AdminShellOrdersNewRoute
   '/admin/_shell/pages/$': typeof AdminShellPagesSplatRoute
   '/admin/_shell/partnerships_/$id': typeof AdminShellPartnershipsIdRoute
   '/admin/_shell/products_/curated-themes': typeof AdminShellProductsCuratedThemesRoute
@@ -1151,6 +1160,7 @@ export interface FileRouteTypes {
     | '/admin/news/$id'
     | '/admin/news/new'
     | '/admin/orders/$id'
+    | '/admin/orders/new'
     | '/admin/pages/$'
     | '/admin/partnerships/$id'
     | '/admin/products/curated-themes'
@@ -1260,6 +1270,7 @@ export interface FileRouteTypes {
     | '/admin/news/$id'
     | '/admin/news/new'
     | '/admin/orders/$id'
+    | '/admin/orders/new'
     | '/admin/pages/$'
     | '/admin/partnerships/$id'
     | '/admin/products/curated-themes'
@@ -1373,6 +1384,7 @@ export interface FileRouteTypes {
     | '/admin/_shell/news_/$id'
     | '/admin/_shell/news_/new'
     | '/admin/_shell/orders_/$id'
+    | '/admin/_shell/orders_/new'
     | '/admin/_shell/pages/$'
     | '/admin/_shell/partnerships_/$id'
     | '/admin/_shell/products_/curated-themes'
@@ -2056,6 +2068,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminShellOrdersIdRouteImport
       parentRoute: typeof AdminShellRoute
     }
+    '/admin/_shell/orders_/new': {
+      id: '/admin/_shell/orders_/new'
+      path: '/orders/new'
+      fullPath: '/admin/orders/new'
+      preLoaderRoute: typeof AdminShellOrdersNewRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
     '/admin/_shell/pages/$': {
       id: '/admin/_shell/pages/$'
       path: '/$'
@@ -2382,6 +2401,7 @@ interface AdminShellRouteChildren {
   AdminShellNewsIdRoute: typeof AdminShellNewsIdRoute
   AdminShellNewsNewRoute: typeof AdminShellNewsNewRoute
   AdminShellOrdersIdRoute: typeof AdminShellOrdersIdRoute
+  AdminShellOrdersNewRoute: typeof AdminShellOrdersNewRoute
   AdminShellPartnershipsIdRoute: typeof AdminShellPartnershipsIdRoute
   AdminShellProductsCuratedThemesRoute: typeof AdminShellProductsCuratedThemesRoute
   AdminShellReferralsIdRoute: typeof AdminShellReferralsIdRoute
@@ -2451,6 +2471,7 @@ const AdminShellRouteChildren: AdminShellRouteChildren = {
   AdminShellNewsIdRoute: AdminShellNewsIdRoute,
   AdminShellNewsNewRoute: AdminShellNewsNewRoute,
   AdminShellOrdersIdRoute: AdminShellOrdersIdRoute,
+  AdminShellOrdersNewRoute: AdminShellOrdersNewRoute,
   AdminShellPartnershipsIdRoute: AdminShellPartnershipsIdRoute,
   AdminShellProductsCuratedThemesRoute: AdminShellProductsCuratedThemesRoute,
   AdminShellReferralsIdRoute: AdminShellReferralsIdRoute,

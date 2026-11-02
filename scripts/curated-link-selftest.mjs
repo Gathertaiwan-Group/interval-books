@@ -569,7 +569,8 @@ console.log("\n[4] migration 0041 與帳本");
     // 被單筆移除過時兩者相等）；expire 的 4c／4d 合成一句，認領條件（含 0034 匯款 3 天）、商品
     // 庫存、products.seats_taken、inv 保留、取消訂單、付款嘗試、回傳值逐字沿用 0036。另 revoke
     // registration_removal_log 的 sequence 權限。這支自檢的斷言重讀過，原樣成立。
-    reviewedThrough: "0045_plan_units_release_by_registrations.sql",
+    // 0050（後台電話報名）已審：orders 只加有 default／nullable 的欄位（前台 insert 形狀不變）；enqueue_order_email／enqueue_registration_emails 只多 notify_customer 條件（預設 true，前台訂單行為不變）；expire_unpaid_orders 只多一行 source <> 'admin_phone'（前台訂單行為不變）。這支守的不變式原樣成立。
+    reviewedThrough: "0050_admin_phone_orders.sql",
   });
 }
 

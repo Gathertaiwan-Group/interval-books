@@ -15,14 +15,16 @@ export type OrderListScope =
   | "needs_contact"
   | "to_ship"
   | "all"
-  | "invoice_problem";
+  | "invoice_problem"
+  /** 0050：後台電話報名。 */
+  | "phone";
 
 /**
  * 列表頁的篩選條件，也是詳情頁「回訂單列表」要帶回去的網址參數。
  * transfer_pending 是預設分頁，網址上不寫；archived 只在打開時寫 `archived=1`。
  */
 export type OrderListSearch = {
-  scope?: "needs_contact" | "to_ship" | "all" | "invoice_problem";
+  scope?: "needs_contact" | "to_ship" | "all" | "invoice_problem" | "phone";
   archived?: 1;
 };
 
@@ -32,13 +34,20 @@ export function parseOrderListSearch(search: Record<string, unknown>): OrderList
     search.scope === "needs_contact" ||
     search.scope === "to_ship" ||
     search.scope === "all" ||
-    search.scope === "invoice_problem"
+    search.scope === "invoice_problem" ||
+    search.scope === "phone"
   ) {
     out.scope = search.scope;
   }
   const a = search.archived;
   if (a === 1 || a === "1" || a === true || a === "true") out.archived = 1;
   return out;
+}
+
+/** 0050：訂單來源的標籤。與 src/lib/email-templates.ts 的 ADMIN_PHONE_ORDER_LABEL 同字（見檔頭為什麼各自一份）。 */
+export const PHONE_ORDER_LABEL = "後台電話報名";
+export function isPhoneOrder(o: { source?: string | null }): boolean {
+  return o.source === "admin_phone";
 }
 
 export function scopeOf(search: OrderListSearch): OrderListScope {

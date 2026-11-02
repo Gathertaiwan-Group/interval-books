@@ -197,29 +197,36 @@ async function queueWithClaim(orderId: string): Promise<NotifyOutcome> {
   const sessions = await loadSessionBriefs(sessionIds);
 
   let queued = 0;
+  // 0050：後台電話報名沒勾「寄報名成功信給客人」→ 客人的付款成功信與每位參加者的報名
+  // 成功信都不排（店家信照排）。資料庫那一側 enqueue_order_email／
+  // enqueue_registration_emails 也會擋（orders.notify_customer），這裡先跳過只是為了
+  // 不白做排版、queued 的數字對得起來。
+  const notifyCustomer = order.phoneOrder ? order.phoneOrder.notifyCustomer : true;
 
   // ---- 1. 訂購人的付款成功信 -------------------------------------------------
   // 先排這一封：它不依賴名單，所以名單那一步就算失敗，客人至少會收到「錢收到了」。
   // 之後 backlog 重跑時這一封會撞 dedupe_key 變成 no-op，不會寄第二次。
-  const paidMail = renderOrderPaidEmail(
-    {
-      orderNo: order.orderNo,
-      customerName: order.customerName,
-      total: order.total,
-      items: items.map((i) => ({ name: i.name, quantity: i.quantity, subtotal: i.subtotal })),
-      sessions: sessionIds.map((id) => sessions.get(id)).filter((s): s is SessionBrief => !!s),
-    },
-    copy,
-    lang,
-  );
-  const addedOrderMail = await enqueueOrderEmail({
-    orderId,
-    dedupeKey: dedupeKeys.orderPaid(orderId),
-    subject: paidMail.subject,
-    text: paidMail.text,
-    html: paidMail.html,
-  });
-  if (addedOrderMail) queued += 1;
+  if (notifyCustomer) {
+    const paidMail = renderOrderPaidEmail(
+      {
+        orderNo: order.orderNo,
+        customerName: order.customerName,
+        total: order.total,
+        items: items.map((i) => ({ name: i.name, quantity: i.quantity, subtotal: i.subtotal })),
+        sessions: sessionIds.map((id) => sessions.get(id)).filter((s): s is SessionBrief => !!s),
+      },
+      copy,
+      lang,
+    );
+    const addedOrderMail = await enqueueOrderEmail({
+      orderId,
+      dedupeKey: dedupeKeys.orderPaid(orderId),
+      subject: paidMail.subject,
+      text: paidMail.text,
+      html: paidMail.html,
+    });
+    if (addedOrderMail) queued += 1;
+  }
 
   // ---- 1.5 店家的新訂單／新報名通知（0032）------------------------------------
   // ⚠️ 整段包在自己的 try/catch 裡，**絕對不能讓店家信的任何失敗拖累客人的信**：
@@ -249,6 +256,7 @@ async function queueWithClaim(orderId: string): Promise<NotifyOutcome> {
       // 0034：這條路永遠是「付款成功之後」——它跑在 claim_order_notify() 之內，
       // 而那道閘門的第一句就是「訂單必須已經結清」（0022 §8 閘門 1）。
       stage: "afterPayment",
+      phoneOrder: order.phoneOrder,
       orderNo: order.orderNo,
       total: order.total,
       contact: extras.contact,
@@ -286,7 +294,7 @@ async function queueWithClaim(orderId: string): Promise<NotifyOutcome> {
   //
   // ⚠️ 這裡拿到的是**遮罩過的**列，沒有明文地址 —— 排信只送 registration_id
   //    進去，地址由 0022 §7 的 SQL join。
-  if (sessionIds.length > 0) {
+  if (notifyCustomer && sessionIds.length > 0) {
     const roster = await loadPaidRosterByOrder(orderId);
     const mails: RegistrationMailItem[] = [];
     for (const row of roster) {
@@ -376,7 +384,9 @@ export async function queueOrderPlacedNotifications(orderId: string): Promise<No
     // ---- 1. 客人的匯款資訊信（只有匯款訂單有）-------------------------------
     // ⚠️ 自己一個 try/catch：它失敗不可以害得下面店家那封也排不進去（那是兩件
     //    獨立的事），更不可以往上丟讓訂單成立失敗。同 0032 在這個檔案裡的做法。
-    if (isTransfer) {
+    // 0050：電話報名沒勾寄信 → 客人這封也不寄（資料庫那一側同樣會擋）。
+    const notifyCustomer = order.phoneOrder ? order.phoneOrder.notifyCustomer : true;
+    if (isTransfer && notifyCustomer) {
       try {
         const account = await getRemittanceAccount();
         // 🔴 這封信裡有一條「回訂單頁填末五碼」的連結，而網址來自 SITE_URL。
@@ -413,7 +423,8 @@ export async function queueOrderPlacedNotifications(orderId: string): Promise<No
               bankCode: account.bankCode,
               bankAccount: account.bankAccount,
               accountName: account.accountName,
-              dueAt: remittanceDueAt(order.createdAt),
+              // 0050：電話報名的未付款單不會被 3 天逾期取消，信上不印期限。
+              dueAt: order.phoneOrder ? null : remittanceDueAt(order.createdAt),
               orderUrl,
               items: items.map((i) => ({
                 name: i.name,
@@ -465,6 +476,7 @@ export async function queueOrderPlacedNotifications(orderId: string): Promise<No
       const extras = await loadAdminMailExtras(orderId);
       const adminMail = renderAdminOrderNotificationEmail({
         stage: "atOrderTime",
+        phoneOrder: order.phoneOrder,
         orderNo: order.orderNo,
         total: order.total,
         contact: extras.contact,

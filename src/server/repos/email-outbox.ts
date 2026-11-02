@@ -484,6 +484,16 @@ export type NotifyOrder = {
    * 下單當下那兩封信（客人匯款資訊信、店家待收款通知信）要寫出來。
    */
   needsContact: boolean;
+  /**
+   * 0050：後台電話報名。null＝前台訂單（source='web'）。店家信要標「後台電話報名」、
+   * 客人信要看 notifyCustomer。
+   */
+  phoneOrder: {
+    notifyCustomer: boolean;
+    adminNote: string | null;
+    /** 建立者的 email（profiles.email）；讀不到就是 null。 */
+    createdByEmail: string | null;
+  } | null;
 };
 
 export type NotifyOrderItem = {
@@ -514,7 +524,7 @@ export async function getOrderForNotify(
     db
       .from("orders")
       .select(
-        "id, order_no, customer_name, total, locale, payment_method, shipping_method, created_at, needs_contact",
+        "id, order_no, customer_name, total, locale, payment_method, shipping_method, source, notify_customer, admin_note, created_by, created_at, needs_contact",
       )
       .eq("id", orderId)
       .maybeSingle(),
@@ -543,6 +553,18 @@ export async function getOrderForNotify(
   const rawLocale = String(o.locale ?? "zh");
   const locale: Lang = rawLocale === "en" || rawLocale === "ja" ? rawLocale : "zh";
 
+  // 0050：電話報名的建立者 email。讀失敗不讓整封信失敗（只是信裡少一個名字）。
+  let phoneOrder: NotifyOrder["phoneOrder"] = null;
+  if (o.source === "admin_phone") {
+    const { loadAdminEmail } = await import("@/server/repos/phone-orders");
+    const createdByEmail = o.created_by ? await loadAdminEmail(String(o.created_by)) : null;
+    phoneOrder = {
+      notifyCustomer: o.notify_customer !== false,
+      adminNote: typeof o.admin_note === "string" && o.admin_note.trim() ? o.admin_note : null,
+      createdByEmail,
+    };
+  }
+
   return {
     order: {
       id: String(o.id),
@@ -554,6 +576,7 @@ export async function getOrderForNotify(
       shippingMethod: String(o.shipping_method ?? "none"),
       createdAt: String(o.created_at ?? ""),
       needsContact: o.needs_contact === true,
+      phoneOrder,
     },
     items: ((itemsRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
       name: (r.name ?? {}) as Localized,

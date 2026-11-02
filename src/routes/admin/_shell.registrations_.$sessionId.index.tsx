@@ -60,6 +60,7 @@ function SessionRosterRoute() {
       // ⚠️ 只控制畫面。真正擋住直接呼叫 /_serverFn/… 的是 fns 那一層的
       //    requireRosterRead()，而它是從 staff_permissions 重讀出來的。
       canReadRoster={user.permissions.includes("event.roster.read")}
+      canCreatePhoneOrder={user.role === "admin"}
     />
   );
 }

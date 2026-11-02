@@ -967,8 +967,15 @@ export async function createOrder(
   opts: {
     /** ib_ref cookie 的值（0040）。只有 payload 沒帶 referralCode（舊前台）時才用。 */
     cookieReferralCode?: string | null;
+    /**
+     * 0050：後台「新增電話報名」。**只有** createAdminPhoneOrder()（下面）會帶，而它
+     * 只被 src/lib/admin/fns/phone-orders.ts（adminFnMiddleware）呼叫。前台結帳
+     * （placeOrder）永遠不帶這個欄位，所以下面每一個 `admin` 分支對前台都是死路。
+     */
+    admin?: AdminPhoneOrderOptions;
   } = {},
 ): Promise<PlacedOrder> {
+  const admin = opts.admin ?? null;
   const db = supabaseAdmin();
   /**
    * 0048：付款選擇 → orders.payment_method 與 orders.needs_contact。規則只有一份，
@@ -1040,10 +1047,13 @@ export async function createOrder(
   //
   // 客人自己打的碼無效 → 整筆拒絕（referral_invalid）：照原價成立會讓他付的比畫面上
   // 看到的多。cookie 帶來的碼無效 → 當作沒有。
-  const resolved = resolveReferralCode({
-    typed: payload.referralCode,
-    cookie: opts.cookieReferralCode ?? null,
-  });
+  // 0050：電話報名不套推薦碼（店員手動建單，沒有推薦連結這回事；要打折用手動改價）。
+  const resolved = admin
+    ? null
+    : resolveReferralCode({
+        typed: payload.referralCode,
+        cookie: opts.cookieReferralCode ?? null,
+      });
   let referral: { id: string; code: string; discountPercent: number } | null = null;
   if (resolved) {
     const found = await findReferrerForCheckout(resolved.code);
@@ -1056,7 +1066,27 @@ export async function createOrder(
         referral.discountPercent,
       )
     : 0;
-  const total = subtotal + shippingFee - discount;
+  const computedTotal = subtotal + shippingFee - discount;
+
+  // ---- 0050：後台手動改價 ----------------------------------------------------
+  // 只能**往下**改（0 ≤ 改後金額 ≤ 依票種算出的原價），差額記在 orders.discount ——
+  // 發票上就是一列「折扣」（buildInvoiceLines），明細加總仍等於 total。往上改需要一列
+  // 不是任何商品的明細，order_items 放不下（product 外鍵＋session 形狀 CHECK），所以不支援；
+  // 要收更多就選對的票種。改價一定要有原因（存在 price_override_reason）。
+  // 改後金額等於原價 → 視為沒有改價，原因不存。
+  let total = computedTotal;
+  let finalDiscount = discount;
+  let overrideReason: string | null = null;
+  if (admin && admin.totalOverride !== null && admin.totalOverride !== computedTotal) {
+    const target = admin.totalOverride;
+    const reason = (admin.priceOverrideReason ?? "").trim();
+    if (!Number.isInteger(target) || target < 0 || target > computedTotal || reason === "") {
+      throw new CheckoutError("price_override_invalid");
+    }
+    finalDiscount = discount + (computedTotal - target);
+    total = target;
+    overrideReason = reason;
+  }
 
   // ---- step 2: orders -------------------------------------------------------
   const { data: inserted, error: orderError } = await db
@@ -1067,7 +1097,7 @@ export async function createOrder(
       customer_phone: payload.customerPhone,
       subtotal,
       shipping_fee: shippingFee,
-      discount,
+      discount: finalDiscount,
       total,
       shipping_method: shippingMethod,
       // NULL for the offline path — orders.payment_method's CHECK has no
@@ -1093,6 +1123,26 @@ export async function createOrder(
             referrer_id: referral.id,
             referral_code: referral.code,
             referral_discount_percent: referral.discountPercent,
+          }
+        : {}),
+      // 0050：只有電話報名才帶這幾欄（前台訂單的 insert 形狀與 0050 之前逐字相同，
+      // 欄位全部靠 default：source='web'、notify_customer=true）。
+      ...(admin
+        ? {
+            source: "admin_phone",
+            created_by: admin.actorId,
+            admin_note: admin.adminNote,
+            price_override_reason: overrideReason,
+            notify_customer: admin.notifyCustomer,
+            // 0 元的單沒有款項，不記匯款資訊。
+            remittance_paid_on: total > 0 ? admin.remittancePaidOn : null,
+            // orders_remittance_pair_check：末五碼與回報時間要嘛都有、要嘛都沒有。
+            ...(admin.remittanceLast5 && total > 0
+              ? {
+                  remittance_last5: admin.remittanceLast5,
+                  remittance_reported_at: new Date().toISOString(),
+                }
+              : {}),
           }
         : {}),
     })
@@ -1487,7 +1537,9 @@ export async function createOrder(
   //    （total = 0）也不走 —— step 5b 已經把它變成 paid，該走的是付款成功那條路。
   //    這個判斷寫在 queueOrderPlacedNotifications() 裡（它自己重讀 payment_method），
   //    不在這裡用 wantsTransfer 判斷：那樣才是「以資料庫那一列為準」。
-  if (!wantsCard && total > 0) {
+  // 0050：電話報名「已收到匯款」的單不寄「待收款」這一批——呼叫端（fns/phone-orders.ts）
+  // 下一步就 admin_mark_order_paid()，然後走付款成功那條路寄店家信（與客人信，若有勾）。
+  if (!wantsCard && total > 0 && !admin?.paidUpfront) {
     const { triggerNotifyAfterOrderPlaced } = await import("@/server/notify");
     await triggerNotifyAfterOrderPlaced(order.id);
   }
@@ -1497,6 +1549,71 @@ export async function createOrder(
     publicToken: order.public_token,
     total: order.total,
     payment,
+  };
+}
+
+// -----------------------------------------------------------------------------
+// 0050：後台「新增電話報名」
+// -----------------------------------------------------------------------------
+
+export type AdminPhoneOrderOptions = {
+  /** 建立者。只能是 adminFnMiddleware 驗過的 context.admin.userId。 */
+  actorId: string;
+  /** 手動改價後的總金額；null＝照票種算。見 createOrder() 的「後台手動改價」。 */
+  totalOverride: number | null;
+  priceOverrideReason: string | null;
+  adminNote: string | null;
+  /** false＝這張單一封客人信都不寄（0050 在 enqueue_* 兩支函式裡擋）。 */
+  notifyCustomer: boolean;
+  /** 已收到匯款：建單後呼叫端會立刻 admin_mark_order_paid()，所以不寄「待收款」那批信。 */
+  paidUpfront: boolean;
+  /** YYYY-MM-DD。只有 paidUpfront 才有。 */
+  remittancePaidOn: string | null;
+  remittanceLast5: string | null;
+};
+
+export type PlacedAdminPhoneOrder = {
+  orderId: string;
+  orderNo: string;
+  total: number;
+  paymentStatus: string;
+};
+
+/**
+ * 後台電話報名建單。**整條路就是 createOrder()**：同一個 priceLines()（價格從票種／
+ * 商品重讀、場次開始就擋）、同一個 reserve_plan_units()／reserve_session_seat()
+ * （名額不足、場次已開始都在那裡擋）、同一個 settle_free_order()（0 元）、同一個
+ * idempotency_key 重送短路。差別只有 AdminPhoneOrderOptions 那幾項。
+ *
+ * 回傳 orderId（前台的 PlacedOrder 刻意不帶訂單 uuid）：用 idempotency_key 讀回來，
+ * 而且限定 source = 'admin_phone' —— 一個撞到前台訂單的 key 不會被當成這張單。
+ */
+export async function createAdminPhoneOrder(
+  payload: CheckoutPayload,
+  admin: AdminPhoneOrderOptions,
+): Promise<PlacedAdminPhoneOrder> {
+  await createOrder(payload, { admin });
+  const { data, error } = await supabaseAdmin()
+    .from("orders")
+    .select("id, order_no, total, payment_status")
+    .eq("idempotency_key", payload.idempotencyKey)
+    .eq("source", "admin_phone")
+    .maybeSingle();
+  if (error || !data) {
+    if (error) console.error(`[repo/orders] 電話報名讀回訂單失敗：${error.code} ${error.message}`);
+    throw new CheckoutError("order_failed");
+  }
+  const row = data as unknown as {
+    id: string;
+    order_no: string;
+    total: number;
+    payment_status: string;
+  };
+  return {
+    orderId: row.id,
+    orderNo: row.order_no,
+    total: row.total,
+    paymentStatus: row.payment_status,
   };
 }
 
@@ -1557,7 +1674,7 @@ export async function getOrderByToken(token: string): Promise<OrderSummary | nul
   const { data, error } = await db
     .from("orders")
     .select(
-      "id, order_no, status, payment_status, payment_method, subtotal, shipping_fee, discount, total, shipping_method, created_at, remittance_last5, remittance_reported_at, referral_code, needs_contact",
+      "id, order_no, status, payment_status, payment_method, subtotal, shipping_fee, discount, total, shipping_method, created_at, remittance_last5, remittance_reported_at, referral_code, needs_contact, source",
     )
     .eq("public_token", token)
     .maybeSingle();
@@ -1579,6 +1696,8 @@ export async function getOrderByToken(token: string): Promise<OrderSummary | nul
     remittance_reported_at: string | null;
     referral_code: string | null;
     needs_contact: boolean | null;
+    /** 0050：'admin_phone' 的單不會被 3 天逾期取消，所以完成頁不印匯款期限。 */
+    source: string | null;
   };
 
   /**
@@ -1598,7 +1717,7 @@ export async function getOrderByToken(token: string): Promise<OrderSummary | nul
     if (remittanceConfigured(account) && account) {
       remittance = {
         account,
-        dueAt: remittanceDueAt(o.created_at),
+        dueAt: o.source === "admin_phone" ? null : remittanceDueAt(o.created_at),
         last5: o.remittance_last5,
         reportedAt: o.remittance_reported_at,
         needsContact: o.needs_contact === true,

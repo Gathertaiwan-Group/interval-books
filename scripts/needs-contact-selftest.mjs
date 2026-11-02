@@ -333,7 +333,7 @@ checkTrue(
 );
 checkTrue(
   "server fn 的 scope 白名單收 needs_contact",
-  /"transfer_pending", "needs_contact"/.test(readFile("src/lib/admin/fns/orders.ts")),
+  /"transfer_pending",\s*"needs_contact"/.test(readFile("src/lib/admin/fns/orders.ts")),
 );
 
 // =============================================================================
