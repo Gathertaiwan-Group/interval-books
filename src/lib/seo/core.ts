@@ -285,9 +285,9 @@ export const BRAND = {
  * （首頁入口與 /journeys）。
  */
 export const SITE_BLURB: Localized = {
-  zh: "小時光風土誌書店位於台北華山文創園區紅磚六合院西7-3館，以風土誌為主題選書，展售地方刊物與選物，也舉辦讀書會、講座、工作坊與策旅。",
+  zh: "小時光風土誌書店位於台北華山文創園區紅磚六合院西7-3館，以土地為線索選書，展售地方刊物與選物，也舉辦讀書會、講座、工作坊與策旅。",
   en: "Interval Books is a terroir-minded bookstore in the Red Brick Courtyard (West 7-3) of Huashan 1914 Creative Park, Taipei — books, local publications, curated objects, reading circles, talks, workshops and journeys.",
-  ja: "小時光 風土誌書店は台北・華山1914文化創意産業園区 紅煉瓦六合院 西7-3館にある、風土誌をテーマにした書店。選書、地域の刊行物、セレクト品のほか、読書会・トーク・ワークショップ・旅も企画しています。",
+  ja: "小時光 風土誌書店は台北・華山1914文化創意産業園区 紅煉瓦六合院 西7-3館にある、土地を手がかりに本を選ぶ書店。選書、地域の刊行物、セレクト品のほか、読書会・トーク・ワークショップ・旅も企画しています。",
 };
 
 /** 「＿＿＿」「___」這類還沒填的佔位符。 */

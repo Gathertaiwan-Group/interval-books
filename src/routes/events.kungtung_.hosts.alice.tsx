@@ -31,7 +31,7 @@ const PAGE = {
   metaDescription: {
     zh: "小時光風土誌書店主理人 × 馥自然人文空間策旅主理人 Alice 劉柳樺的經歷與策展。",
     en: "Alice Liu, founder of Interval Books and journey curator at INNTERVAL Fu Nature & Humanities Space: her work and curation.",
-    ja: "小時光風土誌書店の店主であり、馥自然人文空間の旅のキュレーター、Alice 劉柳樺の経歴と企画。",
+    ja: "小時光 風土誌書店の店主であり、馥自然人文空間の旅のキュレーター、Alice 劉柳樺の経歴と企画。",
   },
 };
 
