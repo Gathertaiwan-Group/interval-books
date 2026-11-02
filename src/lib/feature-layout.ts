@@ -11,8 +11,14 @@
  *
  * 🔴 不要再用 `grid gap-px bg-border` 那種 1px 細線磚牆：只有一筆時，容器的底色會露出一大塊灰色。
  */
-export const CARD = "group flex flex-col border border-border bg-background/40 transition-colors";
-export const CARD_HOVER = "hover:border-foreground/40";
+//
+// 2026-11 改版：底色由半透明背景改成 card 色（紙張略亮一階，與米色底分得開）；可點的卡片
+// hover 時框線加深＋一層很淡的落影，取代單純換框色。transition 只動框色與陰影，
+// prefers-reduced-motion 由 styles.css 統一關掉。
+export const CARD =
+  "group flex flex-col border border-border bg-card/70 transition-[border-color,box-shadow] duration-300";
+export const CARD_HOVER =
+  "hover:border-foreground/30 hover:shadow-[0_22px_44px_-30px_oklch(0.245_0.018_60/0.5)]";
 
 export function featureLayout(count: number) {
   if (count === 1) {

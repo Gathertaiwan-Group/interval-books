@@ -1,24 +1,31 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { PageShell } from "@/components/PageShell";
 import { CoverImage } from "@/components/CoverImage";
+import { PastShelf } from "@/components/PastShelf";
+import { RestMark } from "@/components/RestMark";
 import { HomeProductShelf } from "@/components/shop/HomeProductShelf";
 import { useLocalizeHref, useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fetchEvents, fetchJourneyEventDates, fetchJourneys, fetchPage, pageText } from "@/lib/cms";
 import { useSiteContent } from "@/lib/site-content";
 import { isEventPast } from "@/lib/event-status";
-import { featureLayout } from "@/lib/feature-layout";
+import { CARD, CARD_HOVER, featureLayout } from "@/lib/feature-layout";
 import { imageFor, srcSetFor } from "@/lib/images";
 import { fetchHomeShelfProducts } from "@/lib/shop";
+import { fetchPublicationsTeaser } from "@/lib/publications";
 import heroImg from "@/assets/hero-mountain.jpg";
 import storefrontImg from "@/assets/storefront.jpg";
 import curatedImg from "@/assets/curated-objects.jpg";
 import journeyImg from "@/assets/journey-mist.jpg";
+import bookstoreImg from "@/assets/bookstore-interior.jpg";
+import eventReadingImg from "@/assets/event-reading.jpg";
+import exhibitionImg from "@/assets/exhibition-corner.jpg";
 import { journeyLinkProps } from "@/lib/journey-link";
 import { fitDescription } from "@/lib/seo/core";
 import { pageHead } from "@/lib/seo/head";
 import { pageRowTranslation } from "@/lib/seo/pages";
-import { linkedEventFor, splitJourneys } from "@/lib/past-shelf";
+import { linkedEventFor, newestEndedFirst, splitJourneys } from "@/lib/past-shelf";
 
 /** Fallback copy — used only when the Supabase read fails. */
 const PAGE_META = {
@@ -61,27 +68,192 @@ const HERO = {
   },
 };
 
+/**
+ * 2026-11 首頁改版的新文案。
+ *
+ * 全部走 p.block("home.*", 這裡的預設值)：pages/'index' 目前**沒有**這些 key，所以畫面上
+ * 就是這裡的字；之後在 DB 補上同名 block，後台就能改字，不用動程式。
+ * 舊的 hero.titleSub（留一點時間給真正重要的事）與 hero.intro（留一段屬於自己的＿＿＿小時光）
+ * 繼續沿用 DB 那兩格——前者是首屏的署名句，後者是頁尾收尾句。
+ *
+ * ⚠️ 英文與日文是改版提案，待業主確認。
+ */
+const HOME = {
+  place: {
+    zh: "華山 1914．紅磚六合院 西7-3館",
+    en: "Huashan 1914 · Red Brick Courtyard, West 7-3",
+    ja: "華山1914・紅煉瓦六合院 西7-3館",
+  },
+  brandLine: {
+    zh: "小時光風土誌書店",
+    en: "Interval Books — a bookstore of place",
+    ja: "小時光 風土誌書店",
+  },
+  headline: {
+    zh: "從一份地方刊物，\n讀懂一片土地。",
+    en: "Read a place\nin its own words.",
+    ja: "一冊の地域誌から、\nひとつの土地を読む。",
+  },
+  /** {n} 換成刊物份數；讀不到份數時換成 countFallback。 */
+  lede: {
+    zh: "我們是華山紅磚六合院裡的風土誌書店。以土地為線索選書，典藏台灣與日本 {n} 份地方刊物；也辦讀書會與講座，和你一起走進台東。",
+    en: "We are a bookstore of place in Huashan’s Red Brick Courtyard. We choose books by the land they come from, keep an archive of {n} local publications from Taiwan and Japan, host reading circles and talks — and travel together to Taitung.",
+    ja: "華山・紅煉瓦六合院にある、風土をテーマにした書店です。土地を手がかりに本を選び、台湾と日本の地域刊行物 {n} 冊を所蔵。読書会やトークを開き、台東への旅もご一緒します。",
+  },
+  countFallback: { zh: "逾百", en: "over 100", ja: "百以上の" },
+  ctaPrimary: {
+    zh: "看近期活動與策旅",
+    en: "Upcoming events & journeys",
+    ja: "近日のイベントと旅",
+  },
+  ctaSecondary: { zh: "認識地方刊物", en: "Browse local publications", ja: "地域の刊行物を見る" },
+  heroInsetAlt: {
+    zh: "書店裡攤開在木桌上的台灣與日本地方刊物",
+    en: "Local publications from Taiwan and Japan laid out on wooden tables in the store",
+    ja: "店内の木の台に並ぶ、台湾と日本の地域刊行物",
+  },
+  heroCaption: {
+    zh: "華山 1914 文創園區，紅磚六合院西 7-3 館。",
+    en: "Huashan 1914 Creative Park, Red Brick Courtyard, West 7-3.",
+    ja: "華山1914文化創意産業園区、紅煉瓦六合院 西7-3館。",
+  },
+  factArchiveUnit: { zh: "份地方刊物", en: "local publications", ja: "冊の地域刊行物" },
+  factArchiveNote: {
+    zh: "台灣與日本，到店翻閱",
+    en: "From Taiwan and Japan, read in store",
+    ja: "台湾と日本、店頭で閲覧",
+  },
+  factGatherValue: { zh: "每月", en: "Monthly", ja: "毎月" },
+  factGatherUnit: { zh: "讀書會與講座", en: "reading circles & talks", ja: "読書会とトーク" },
+  factGatherNote: {
+    zh: "作家分享、手作工作坊",
+    en: "Author talks and workshops",
+    ja: "作家の話、手しごとのワークショップ",
+  },
+  factJourneyValue: { zh: "台東", en: "Taitung", ja: "台東" },
+  factJourneyUnit: { zh: "文化策旅", en: "cultural journeys", ja: "文化の旅" },
+  factJourneyNote: {
+    zh: "從主理人在台東的姊妹空間「馥自然」出發",
+    en: "Setting out from our sister space in Taitung",
+    ja: "台東の姉妹スペース「馥自然」から",
+  },
+
+  pillarsKicker: { zh: "我們做的事", en: "What we do", ja: "私たちのこと" },
+  pillarsTitle: {
+    zh: "讀懂一片土地，有三種方式。",
+    en: "Three ways to read a place.",
+    ja: "土地を読む、三つの方法。",
+  },
+  readChar: { zh: "讀", en: "Read", ja: "読" },
+  readTitle: { zh: "選書與地方刊物", en: "Books & local publications", ja: "選書と地域の刊行物" },
+  readBody: {
+    zh: "以風土為線索選書。地方刊物多由當地人自己編寫，記下文史、產業與日常——是一個地方寫給自己的信。",
+    en: "Books chosen by the land they come from. Local publications are mostly written by the people who live there — a place writing a letter to itself.",
+    ja: "風土を手がかりに本を選びます。地域の刊行物の多くは、そこに暮らす人が自ら編んだもの。土地が自分にあてた手紙です。",
+  },
+  readCta: { zh: "逛選書與選物", en: "Browse the shelves", ja: "選書とセレクトを見る" },
+  gatherChar: { zh: "聚", en: "Gather", ja: "集" },
+  gatherTitle: {
+    zh: "讀書會、講座與作家活動",
+    en: "Reading circles, talks & authors",
+    ja: "読書会・トーク・作家の会",
+  },
+  gatherBody: {
+    zh: "每月一場讀書會，不定期的講座、作家分享與手作工作坊。一張長桌，讓讀過的書被好好說出來。",
+    en: "A reading circle every month, plus talks, author evenings and hands-on workshops. One long table, where the books we read get talked through.",
+    ja: "毎月の読書会に、不定期のトーク、作家の会、手しごとのワークショップ。長いテーブルひとつで、読んだ本をゆっくり語り合います。",
+  },
+  gatherCta: { zh: "看活動", en: "See events", ja: "イベントを見る" },
+  goChar: { zh: "行", en: "Go", ja: "行" },
+  goTitle: { zh: "走進土地的策旅", en: "Journeys into the land", ja: "土地へ歩み入る旅" },
+  goBody: {
+    zh: "主理人 Alice 在台東另有一處人文空間 INNTERVAL 馥自然。我們從那裡出發，跟著書與作者走到現場——公東教堂、池上秋收。",
+    en: "Our founder Alice also runs INNTERVAL, a small cultural space in Taitung. From there we follow books and their authors to the places they describe — the Kung-Tung chapel, the Chishang harvest.",
+    ja: "店主 Alice は台東で INNTERVAL 馥自然という空間も営んでいます。そこを拠点に、本と作家に導かれて現地へ——公東教会、池上の秋の収穫。",
+  },
+  goCta: { zh: "看策旅", en: "See journeys", ja: "旅を見る" },
+  imgReadAlt: {
+    zh: "小時光書店店內，紅磚牆下的書架與平台",
+    en: "Inside Interval Books: shelves and tables under red brick walls",
+    ja: "小時光書店の店内。紅煉瓦の壁の下の書棚と平台",
+  },
+  imgGatherAlt: {
+    zh: "兩位讀者在書店裡一起翻讀一本書",
+    en: "Two readers sharing a book in the store",
+    ja: "店内で一冊の本を一緒に読む二人",
+  },
+  imgGoAlt: {
+    zh: "策旅途中，旅人在台東的草地與山景前合影",
+    en: "Travellers posing for a photo on a Taitung meadow during a journey",
+    ja: "旅の途中、台東の草原と山を背に記念撮影する参加者",
+  },
+
+  upcomingKicker: { zh: "近期", en: "Upcoming", ja: "近日" },
+  upcomingTitle: {
+    zh: "近期活動與策旅",
+    en: "Upcoming events & journeys",
+    ja: "近日のイベントと旅",
+  },
+  upcomingEmpty: {
+    zh: "下一場活動還在安排中。歡迎先來店裡坐坐，或到活動頁看看我們辦過什麼。",
+    en: "The next gathering is still being planned. Drop by the store, or see what we have hosted before.",
+    ja: "次の催しは準備中です。まずはお店へ、またはこれまでのイベントをご覧ください。",
+  },
+  upcomingEventsLabel: { zh: "活動", en: "Events", ja: "イベント" },
+  upcomingJourneysLabel: { zh: "策旅", en: "Journeys", ja: "旅" },
+
+  archiveKicker: {
+    zh: "地方刊物典藏",
+    en: "Local publications archive",
+    ja: "地域刊行物アーカイブ",
+  },
+  archiveUnit: { zh: "份地方刊物", en: "local publications", ja: "冊の地域刊行物" },
+  archiveSplit: {
+    zh: "台灣 {tw}．日本 {jp}",
+    en: "Taiwan {tw} · Japan {jp}",
+    ja: "台湾 {tw}・日本 {jp}",
+  },
+  archiveTitle: {
+    zh: "一個地方，怎麼被自己的人寫下來。",
+    en: "How a place gets written down by its own people.",
+    ja: "その土地の人が、その土地を書く。",
+  },
+  archiveBody: {
+    zh: "從基隆的漁村、花蓮的溪流，到日本山形的小鎮，這些刊物多半不是為了賣而做的，是為了留下來。大部分只在店裡展示，歡迎來翻。",
+    en: "From a Keelung fishing village and a Hualien river to a small town in Yamagata, most of these were not made to be sold — they were made to remain. Most are on display in the store only; come and leaf through them.",
+    ja: "基隆の漁村、花蓮の川、山形の小さな町。その多くは売るためではなく、遺すためにつくられました。ほとんどは店頭展示のみ。どうぞ手に取ってご覧ください。",
+  },
+  archiveCta: { zh: "翻閱刊物目錄", en: "Browse the archive", ja: "所蔵リストを見る" },
+  archiveCoverLabel: {
+    zh: "{title}（{region}）",
+    en: "{title} ({region})",
+    ja: "{title}（{region}）",
+  },
+
+  pastKicker: { zh: "回顧", en: "Looking back", ja: "これまで" },
+  pastTitle: { zh: "在這裡發生過的事", en: "What has happened here", ja: "ここで起きたこと" },
+  pastBadge: { zh: "已結束", en: "Past", ja: "終了" },
+  pastCta: { zh: "看所有過往活動", en: "All past events", ja: "過去のイベントをすべて見る" },
+
+  visitTitle: { zh: "來小時光坐坐", en: "Come and sit a while", ja: "小時光で、ひと休み" },
+  visitTransit: {
+    zh: "捷運板南線忠孝新生站 1 號出口，步行約 3 分鐘；穿過紅磚六合院中庭，西側第三間。",
+    en: "MRT Zhongxiao Xinsheng Station, Exit 1 — about 3 minutes on foot. Cross the Red Brick Courtyard; we are the third door on the west side.",
+    ja: "MRT板南線・忠孝新生駅1番出口から徒歩約3分。紅煉瓦六合院の中庭を抜け、西側の三軒目です。",
+  },
+  visitHoursLabel: { zh: "營業時間", en: "Hours", ja: "営業時間" },
+  visitWhereLabel: { zh: "地址", en: "Address", ja: "所在地" },
+  visitHowLabel: { zh: "交通", en: "Getting here", ja: "アクセス" },
+
+  closingKicker: { zh: "INTERVAL", en: "INTERVAL", ja: "INTERVAL" },
+  closingBody: {
+    zh: "INTERVAL 是樂譜上的休止符。休止不是空白，是讓音樂呼吸的地方。那一格留給你——讀的、聊的，或出發的。",
+    en: "INTERVAL is the rest in a musical score. A rest is not silence left empty; it is where the music breathes. That space is yours — for reading, for talking, or for setting out.",
+    ja: "INTERVAL は楽譜の休符のこと。休符は空白ではなく、音楽が息をつく場所。その一拍はあなたのために——読むために、語るために、出かけるために。",
+  },
+};
+
 const ENTRIES = {
-  events: { zh: "看活動", en: "Events", ja: "イベント" },
-  eventsDesc: {
-    zh: "讀書會、講座、工作坊與身心靈活動。",
-    en: "Reading circles, talks, workshops, and healing practice.",
-    ja: "読書会、トーク、ワークショップ、ヒーリング。",
-  },
-  journeys: { zh: "看策旅", en: "Journeys", ja: "旅" },
-  journeysDesc: {
-    zh: "由書與土地共同寫成的深度旅程。",
-    en: "Slow journeys co-written by books and the land.",
-    ja: "本と土地が共に綴る、深い旅。",
-  },
-  visit: { zh: "來店資訊", en: "Visit", ja: "ご来店" },
-  visitDesc: {
-    zh: "華山，紅磚六合院，西7-3館。",
-    en: "Huashan, Red Brick Courtyard, West 7-3.",
-    ja: "華山、紅煉瓦六合院、西7-3館。",
-  },
-  explore: { zh: "Explore", en: "Explore", ja: "Explore" },
-  goTo: { zh: "前往", en: "Enter", ja: "見る" },
   curatedTitle: {
     zh: "一本好書，一份心意，\n風帶不走了，都留在美好的人情連結裡。",
     en: "A window, not a shelf.",
@@ -96,32 +268,28 @@ const ENTRIES = {
   visitFull: { zh: "完整來訪資訊", en: "Full visit info", ja: "ご案内" },
 };
 
-/** entryCards page_list_items fallback — position 0/1/2 map to /events, /journeys, /visit. */
-const ENTRY_CARDS_FALLBACK = [
-  { label: ENTRIES.events, note: ENTRIES.eventsDesc, imageKey: null },
-  { label: ENTRIES.journeys, note: ENTRIES.journeysDesc, imageKey: null },
-  { label: ENTRIES.visit, note: ENTRIES.visitDesc, imageKey: null },
-];
-const ENTRY_LINKS = ["/events", "/journeys", "/visit"] as const;
+/** 「＿＿＿」：hero.intro 裡刻意的留白。畫成一段細線，螢幕閱讀器略過不唸。 */
+const BLANK_RE = /[＿_]{2,}/;
 
-/** Latin section eyebrows — same string in all three languages, matching current output. */
-const SECTION_EYEBROWS = {
-  journeys: { zh: "Journeys", en: "Journeys", ja: "Journeys" },
-};
+function fill(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (m, k: string) => (k in values ? String(values[k]) : m));
+}
 
 export const Route = createFileRoute("/")({
   loader: async () => {
     // shelf：「主理人的選品」那一排商品卡，跟其他讀取平行，不多一段等待。
     // journeyEvents：策旅卡片指著的那幾列 events（日期＋最晚場次＋封面），用來判斷
     // 「已結束」與決定卡片封面——與 /journeys 同一支查詢、同一套判準。
-    const [page, events, journeys, journeyEvents, shelf] = await Promise.all([
+    // archive：「地方刊物典藏」區塊的份數與幾張封面（2026-11 改版，只聚合後的數字進 payload）。
+    const [page, events, journeys, journeyEvents, shelf, archive] = await Promise.all([
       fetchPage("index"),
       fetchEvents(),
       fetchJourneys(),
       fetchJourneyEventDates(),
       fetchHomeShelfProducts(4),
+      fetchPublicationsTeaser(),
     ]);
-    return { page, events, journeys, journeyEvents, shelf };
+    return { page, events, journeys, journeyEvents, shelf, archive };
   },
   head: ({ loaderData, matches, match }) => {
     const p = pageText(loaderData?.page ?? null);
@@ -146,7 +314,7 @@ export const Route = createFileRoute("/")({
 function Index() {
   const t = useT();
   const localizeHref = useLocalizeHref();
-  const { page, events, journeys, journeyEvents, shelf } = Route.useLoaderData();
+  const { page, events, journeys, journeyEvents, shelf, archive } = Route.useLoaderData();
   const shelfProducts = shelf.products;
 
   // 策旅與活動用同一種卡片、同一套版面規則（見 featureLayout），所以這裡也
@@ -154,20 +322,26 @@ function Index() {
   //
   // 已結束的策旅不放精選（2026-10-29 業主：池上那趟 10 月就辦完了還掛在首頁）。判準
   // 與 /journeys 一模一樣：splitJourneys()（src/lib/past-shelf.ts）＝卡片指著的那場活動
-  // 最後一個場次已結束（台北時間）。結束的只出現在 /journeys 的「過往策旅」。
+  // 最後一個場次已結束（台北時間）。結束的只出現在下方「回顧」與 /journeys 的「過往策旅」。
   // 今天的日期在每次 render 時才取（splitJourneys 的預設參數），不是 build 時寫死。
   const featuredJourneys = splitJourneys(journeys, journeyEvents).open.slice(0, 3);
+  const endedJourneys = splitJourneys(journeys, journeyEvents).ended.slice(0, 2);
   // 🔴 一趟策旅在資料上是**兩列**（events 負責內頁與報名、journeys 負責策旅區卡片）。
   //    fetchEvents() 已經在資料層把**所有**策旅的那一列濾掉（見 src/lib/journey-events.ts），
   //    所以這裡的 events 只有一般活動，同一趟旅程不會在首頁出現兩次。
-  // 首頁不放已結束的活動 —— 「本月精選」印一場去年辦完的講座沒有意義。
-  // 已結束的活動只在 /events 的「已結束」那一格找得到。
+  // 首頁不放已結束的活動 —— 「近期活動」印一場去年辦完的講座沒有意義。
+  // 已結束的活動只出現在下方「回顧」（最近結束的幾場）與 /events 的「已結束」那一格。
   const featuredEvents = events.filter((e) => !isEventPast(e)).slice(0, 3);
+  const pastEvents = newestEndedFirst(events, 6 - endedJourneys.length);
   const eventsLayout = featureLayout(featuredEvents.length);
   const journeysLayout = featureLayout(featuredJourneys.length);
   const p = pageText(page);
   const { ui, site, map } = useSiteContent();
   const heroSrc = imageFor(page?.ogImageKey, heroImg);
+  const counts = archive.counts;
+  const countText = counts ? String(counts.total) : t(HOME.countFallback);
+  const motto = t(p.block("hero.intro", HERO.intro));
+  const [mottoBefore, mottoAfter] = BLANK_RE.test(motto) ? motto.split(BLANK_RE) : [motto, null];
 
   useDocumentMeta({
     title: p.metaTitle(PAGE_META.title),
@@ -176,162 +350,424 @@ function Index() {
     ogImage: heroSrc,
   });
 
+  const pillars = [
+    {
+      key: "read",
+      no: "01",
+      char: t(p.block("home.readChar", HOME.readChar)),
+      title: t(p.block("home.readTitle", HOME.readTitle)),
+      body: t(p.block("home.readBody", HOME.readBody)),
+      cta: t(p.block("home.readCta", HOME.readCta)),
+      img: bookstoreImg,
+      alt: t(HOME.imgReadAlt),
+      to: "/shop" as const,
+    },
+    {
+      key: "gather",
+      no: "02",
+      char: t(p.block("home.gatherChar", HOME.gatherChar)),
+      title: t(p.block("home.gatherTitle", HOME.gatherTitle)),
+      body: t(p.block("home.gatherBody", HOME.gatherBody)),
+      cta: t(p.block("home.gatherCta", HOME.gatherCta)),
+      img: eventReadingImg,
+      alt: t(HOME.imgGatherAlt),
+      to: "/events" as const,
+    },
+    {
+      key: "go",
+      no: "03",
+      char: t(p.block("home.goChar", HOME.goChar)),
+      title: t(p.block("home.goTitle", HOME.goTitle)),
+      body: t(p.block("home.goBody", HOME.goBody)),
+      cta: t(p.block("home.goCta", HOME.goCta)),
+      img: journeyImg,
+      alt: t(HOME.imgGoAlt),
+      to: "/journeys" as const,
+    },
+  ];
+
+  const hasUpcoming = featuredEvents.length > 0 || featuredJourneys.length > 0;
+
   return (
     <PageShell>
-      {/* Hero */}
-      <section className="container-editorial pt-16 md:pt-24 pb-20">
-        <div className="grid lg:grid-cols-12 gap-10 lg:gap-16 items-end">
+      {/* ── Hero ────────────────────────────────────────────────────────────
+          一進來要看懂三件事：這是哪裡（華山、書店）、在做什麼（風土誌、地方刊物、活動、策旅）、
+          下一步去哪（兩個行動）。h1 同時放店名與定位句，全頁只有這一個 h1。 */}
+      <section className="container-editorial pt-10 md:pt-16 pb-16 md:pb-20">
+        <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-16">
           <div className="lg:col-span-6">
-            <p className="eyebrow text-2xl">{t(p.block("hero.eyebrow", HERO.eyebrow))}</p>
-            <h1 className="display mt-6 text-5xl md:text-7xl lg:text-[5.5rem]">
-              {t(p.block("hero.titleMain", HERO.titleMain))}
-              <span className="block text-2xl md:text-3xl mt-6 text-muted-foreground font-light">
-                {t(p.block("hero.titleSub", HERO.titleSub))}
+            <p className="kicker">{t(p.block("home.place", HOME.place))}</p>
+            <h1 className="mt-8">
+              <span className="block font-serif text-xl md:text-2xl tracking-[0.08em] text-foreground/80">
+                {t(p.block("home.brandLine", HOME.brandLine))}
+              </span>
+              <span className="display mt-4 block whitespace-pre-line text-[2.35rem] leading-[1.18] sm:text-5xl md:text-6xl lg:text-[3.5rem] xl:text-[3.9rem]">
+                {t(p.block("home.headline", HOME.headline))}
               </span>
             </h1>
-            <p className="mt-10 max-w-lg text-base md:text-lg leading-relaxed text-foreground/75">
-              {t(p.block("hero.intro", HERO.intro))}
+            <p className="mt-8 max-w-xl text-base md:text-[1.0625rem] leading-[1.95] text-foreground/80">
+              {fill(t(p.block("home.lede", HOME.lede)), { n: countText })}
             </p>
-            <div className="rule mt-10" />
-            <p className="mt-8 max-w-lg text-sm leading-relaxed text-muted-foreground italic">
-              {t(site.shortDesc)}
+            <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              {hasUpcoming ? (
+                <a href="#upcoming" className="btn-solid">
+                  {t(p.block("home.ctaPrimary", HOME.ctaPrimary))}
+                  <span className="arrow" aria-hidden="true">
+                    →
+                  </span>
+                </a>
+              ) : (
+                <Link to="/events" className="btn-solid">
+                  {t(p.block("home.ctaPrimary", HOME.ctaPrimary))}
+                  <span className="arrow" aria-hidden="true">
+                    →
+                  </span>
+                </Link>
+              )}
+              <PublicationsLink className="btn-line">
+                {t(p.block("home.ctaSecondary", HOME.ctaSecondary))}
+              </PublicationsLink>
+            </div>
+            <p className="mt-10 font-serif text-lg italic text-muted-foreground">
+              <span aria-hidden="true">— </span>
+              {t(p.block("hero.titleSub", HERO.titleSub))}
             </p>
           </div>
-          <div className="lg:col-span-6">
-            <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-              {/* 首屏大圖（LCP）：WebP 多尺寸 srcset，JPG 留作 src 退路（2026-11 SEO 健檢 M5）。
-                  width/height 是原圖真實尺寸 1536×864；外框由 aspect-[4/3] 決定，不影響版面。 */}
-              <img
-                src={heroSrc}
-                srcSet={srcSetFor(heroSrc)}
-                sizes="(min-width: 1024px) 50vw, 100vw"
-                alt={t(p.block("hero.titleMain", HERO.titleMain))}
-                className="absolute inset-0 h-full w-full object-cover"
-                width={1536}
-                height={864}
-                fetchPriority="high"
-              />
+
+          <figure className="lg:col-span-6">
+            <div className="relative">
+              <div className="relative aspect-[4/3] overflow-hidden bg-muted lg:aspect-[5/4]">
+                {/* 首屏大圖（LCP）：WebP 多尺寸 srcset，JPG 留作 src 退路（2026-11 SEO 健檢 M5）。
+                    width/height 是原圖真實尺寸 1536×864；外框由 aspect 決定，不影響版面。
+                    React 依 fetchPriority＋srcSet 在 <head> 自動輸出 preload。 */}
+                <img
+                  src={heroSrc}
+                  srcSet={srcSetFor(heroSrc)}
+                  sizes="(min-width: 1024px) 50vw, 100vw"
+                  alt={t(p.block("hero.titleMain", HERO.titleMain))}
+                  className="absolute inset-0 h-full w-full object-cover"
+                  width={1536}
+                  height={864}
+                  fetchPriority="high"
+                />
+              </div>
+              {/* 疊在角落的第二張：店裡攤開的地方刊物——讓「書店」與「刊物」在首屏同時被看到。 */}
+              <div className="absolute -bottom-8 -left-4 hidden w-[38%] border-[6px] border-background bg-muted shadow-[0_24px_48px_-28px_oklch(0.245_0.018_60/0.55)] sm:block lg:-left-10">
+                <img
+                  src={exhibitionImg}
+                  alt={t(HOME.heroInsetAlt)}
+                  className="aspect-[4/3] h-full w-full object-cover"
+                  width={1200}
+                  height={800}
+                  loading="lazy"
+                />
+              </div>
+            </div>
+            <figcaption className="mt-4 text-right text-xs tracking-[0.12em] text-muted-foreground sm:mt-12">
+              {t(HOME.heroCaption)}
+            </figcaption>
+          </figure>
+        </div>
+
+        {/* 三個數字：一眼看懂這裡有什麼。 */}
+        <dl className="mt-16 grid gap-px overflow-hidden border-y border-border md:mt-24 md:grid-cols-3">
+          {[
+            {
+              value: countText,
+              unit: t(HOME.factArchiveUnit),
+              note: t(HOME.factArchiveNote),
+            },
+            {
+              value: t(HOME.factGatherValue),
+              unit: t(HOME.factGatherUnit),
+              note: t(HOME.factGatherNote),
+            },
+            {
+              value: t(HOME.factJourneyValue),
+              unit: t(HOME.factJourneyUnit),
+              note: t(HOME.factJourneyNote),
+            },
+          ].map((f, i) => (
+            <div
+              key={f.unit}
+              className={`py-6 md:px-8 md:py-8 ${i > 0 ? "border-t border-border md:border-t-0 md:border-l" : "md:pl-0"}`}
+            >
+              <dt className="flex items-baseline gap-3">
+                <span className="display text-4xl md:text-5xl [font-variant-numeric:lining-nums]">
+                  {f.value}
+                </span>
+                <span className="text-sm tracking-[0.08em] text-foreground/80">{f.unit}</span>
+              </dt>
+              <dd className="mt-2 text-sm text-muted-foreground">{f.note}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      {/* ── 三個支柱：讀．聚．行 ─────────────────────────────────────────── */}
+      <section className="container-editorial section-y" aria-labelledby="home-pillars">
+        <div className="max-w-2xl">
+          <p className="kicker">{t(p.block("home.pillarsKicker", HOME.pillarsKicker))}</p>
+          <h2 id="home-pillars" className="display mt-5 text-3xl md:text-5xl">
+            {t(p.block("home.pillarsTitle", HOME.pillarsTitle))}
+          </h2>
+        </div>
+        <ul className="mt-14 grid gap-12 md:grid-cols-3 md:gap-8 lg:gap-12">
+          {pillars.map((pl) => (
+            <li key={pl.key}>
+              <Link to={pl.to} className="group block">
+                <div className="aspect-[5/4] overflow-hidden bg-muted">
+                  <img
+                    src={pl.img}
+                    srcSet={srcSetFor(pl.img)}
+                    sizes="(min-width: 768px) 30vw, 100vw"
+                    alt={pl.alt}
+                    loading="lazy"
+                    className="img-zoom h-full w-full object-cover"
+                  />
+                </div>
+                <div className="mt-6 flex items-baseline gap-4">
+                  <span className="text-xs tracking-[0.2em] text-clay">{pl.no}</span>
+                  <span className="display text-4xl md:text-5xl" aria-hidden="true">
+                    {pl.char}
+                  </span>
+                </div>
+                <h3 className="mt-4 font-serif text-2xl">{pl.title}</h3>
+                <p className="mt-3 text-[0.95rem] leading-[1.9] text-foreground/75">{pl.body}</p>
+                <span className="link-arrow mt-5 text-sm">
+                  {pl.cta}
+                  <span className="arrow" aria-hidden="true">
+                    →
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* ── 近期活動與策旅 ───────────────────────────────────────────────────
+          已結束的不顯示（活動 isEventPast、策旅 splitJourneys）。兩邊都沒有時留一句話與入口，
+          不讓整區消失——「有在辦活動」是這間店的核心。 */}
+      <section
+        id="upcoming"
+        className="scroll-mt-24 border-t border-border"
+        aria-labelledby="home-upcoming"
+      >
+        <div className="container-editorial section-y">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="kicker">{t(p.block("home.upcomingKicker", HOME.upcomingKicker))}</p>
+              <h2 id="home-upcoming" className="display mt-5 text-3xl md:text-5xl">
+                {t(p.block("home.upcomingTitle", HOME.upcomingTitle))}
+              </h2>
             </div>
           </div>
+
+          {!hasUpcoming ? (
+            <div className="mt-12 border border-border bg-card/70 p-8 md:p-10">
+              <p className="max-w-xl leading-[1.9] text-foreground/80">
+                {t(p.block("home.upcomingEmpty", HOME.upcomingEmpty))}
+              </p>
+              <Link to="/events" className="link-arrow mt-6 text-sm">
+                {t(ui.buttons.viewAll)}
+                <span className="arrow" aria-hidden="true">
+                  →
+                </span>
+              </Link>
+            </div>
+          ) : null}
+
+          {/* 精選活動 —— 沒有任何一場就整組（含小標與「查看全部」）不出現 */}
+          {featuredEvents.length > 0 && (
+            <>
+              <SubHeader
+                label={t(p.block("home.upcomingEventsLabel", HOME.upcomingEventsLabel))}
+                link={{ to: "/events", label: t(ui.buttons.viewAll) }}
+              />
+              {/* ⚠️ 這裡連的是**站內**的 /events/$slug，不是 e.externalUrl。
+                  0001 的種子資料把 externalUrl 填成 https://example.com/event-N，首頁曾經
+                  有三顆按鈕直接把客人送去 example.com（那批 ev-1~ev-6 已於 2026-09-12 連同
+                  content.ts 與 seed.sql 裡的副本一起清掉）。規則不變：活動詳情頁才是正確的
+                  目的地，外部售票連結留在詳情頁上，由那一頁自己決定要不要顯示。 */}
+              <div className={eventsLayout.grid}>
+                {featuredEvents.map((e) => (
+                  <Link
+                    key={e.id}
+                    to="/events/$slug"
+                    params={{ slug: e.slug }}
+                    className={`${CARD} ${CARD_HOVER} ${eventsLayout.card}`}
+                  >
+                    {/* ⚠️ 先判斷 imageKey 非空**再**呼叫 imageFor()。imageFor(key, fallback)
+                        永遠會回一張圖，順序反過來就是每一張卡片都長同一張不相干的照片。 */}
+                    {e.imageKey ? (
+                      <CoverImage
+                        src={imageFor(e.imageKey, storefrontImg)}
+                        alt={t(e.title)}
+                        loading="lazy"
+                        className={`aspect-[4/3] ${eventsLayout.image}`}
+                        imgClassName="img-zoom"
+                      />
+                    ) : null}
+                    <div className={`flex flex-1 flex-col p-6 md:p-7 ${eventsLayout.body}`}>
+                      <p className="text-xs tracking-[0.18em] text-clay">{e.category}</p>
+                      <h3 className={`display mt-3 text-2xl leading-snug ${eventsLayout.title}`}>
+                        {t(e.title)}
+                      </h3>
+                      <p className="mt-3 text-sm text-muted-foreground">{e.date}</p>
+                      <p
+                        className={`mt-4 line-clamp-4 text-sm leading-[1.85] text-foreground/75 flex-1 ${eventsLayout.summary}`}
+                      >
+                        {t(e.summary)}
+                      </p>
+                      <span className="link-arrow mt-6 self-start text-sm">
+                        {t(ui.buttons.viewEvent)}
+                        <span className="arrow" aria-hidden="true">
+                          →
+                        </span>
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* 精選策旅 —— 沒有任何一趟就整組不出現 */}
+          {featuredJourneys.length > 0 && (
+            <>
+              <SubHeader
+                label={t(p.block("home.upcomingJourneysLabel", HOME.upcomingJourneysLabel))}
+                link={{ to: "/journeys", label: t(ui.buttons.viewAll) }}
+              />
+              <div className={journeysLayout.grid}>
+                {featuredJourneys.map((j) => {
+                  // 策旅的連結可能是站內路徑、也可能是外部網站（見 journeyLinkProps）。
+                  // 還沒設連結的策旅仍然要看得到卡片，只是整張卡不可點——不要讓它消失。
+                  const link = journeyLinkProps(j.externalUrl, localizeHref);
+                  const body = (
+                    <>
+                      {/* journeys 表沒有 image_key；封面用卡片指著的那場活動的 events.image_key
+                          （與 /journeys、過往策旅同一個來源），指不到或沒設圖才用固定意象圖。 */}
+                      <CoverImage
+                        src={imageFor(
+                          linkedEventFor(j.externalUrl, journeyEvents)?.imageKey,
+                          journeyImg,
+                        )}
+                        alt={t(j.title)}
+                        loading="lazy"
+                        className={`aspect-[4/3] ${journeysLayout.image}`}
+                        imgClassName="img-zoom"
+                      />
+                      <div className={`flex flex-1 flex-col p-6 md:p-7 ${journeysLayout.body}`}>
+                        <p className="text-xs tracking-[0.18em] text-clay">
+                          {t(j.days)} ／ {t(j.theme)}
+                        </p>
+                        <h3
+                          className={`display mt-3 text-2xl leading-snug whitespace-pre-line ${journeysLayout.title}`}
+                        >
+                          {t(j.title)}
+                        </h3>
+                        <p
+                          className={`mt-4 text-sm leading-[1.85] text-foreground/75 flex-1 ${journeysLayout.summary}`}
+                        >
+                          {t(j.summary)}
+                        </p>
+                        {link ? (
+                          <span className="link-arrow mt-6 self-start text-sm">
+                            {t(ui.buttons.toJourney)}
+                            <span className="arrow" aria-hidden="true">
+                              →
+                            </span>
+                          </span>
+                        ) : null}
+                      </div>
+                    </>
+                  );
+                  const cardClass = `${CARD} ${journeysLayout.card}`;
+                  return link ? (
+                    <a key={j.id} {...link} className={`${cardClass} ${CARD_HOVER}`}>
+                      {body}
+                    </a>
+                  ) : (
+                    <div key={j.id} className={cardClass}>
+                      {body}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       </section>
 
-      {/* 精選活動 —— 沒有任何一場就整區（含標題與「查看全部」）不出現 */}
-      {featuredEvents.length > 0 && (
-        <>
-          <SectionHeader
-            eyebrow={t(ui.sections.thisMonth)}
-            title={t(ui.sections.featuredEvents)}
-            link={{ to: "/events", label: t(ui.buttons.viewAll) }}
-          />
-          {/* ⚠️ 這裡連的是**站內**的 /events/$slug，不是 e.externalUrl。
-              0001 的種子資料把 externalUrl 填成 https://example.com/event-N，首頁曾經
-              有三顆按鈕直接把客人送去 example.com（那批 ev-1~ev-6 已於 2026-09-12 連同
-              content.ts 與 seed.sql 裡的副本一起清掉）。規則不變：活動詳情頁才是正確的
-              目的地，外部售票連結留在詳情頁上，由那一頁自己決定要不要顯示。 */}
-          <div className={`container-editorial pb-20 ${eventsLayout.grid}`}>
-            {featuredEvents.map((e) => (
-              <Link
-                key={e.id}
-                to="/events/$slug"
-                params={{ slug: e.slug }}
-                className={`group flex flex-col ${eventsLayout.card} border border-border bg-background/40 hover:border-foreground/40 transition-colors`}
-              >
-                {/* ⚠️ 先判斷 imageKey 非空**再**呼叫 imageFor()。imageFor(key, fallback)
-                    永遠會回一張圖，順序反過來就是每一張卡片都長同一張不相干的照片。 */}
-                {e.imageKey ? (
-                  <CoverImage
-                    src={imageFor(e.imageKey, storefrontImg)}
-                    alt={t(e.title)}
-                    loading="lazy"
-                    className={`aspect-[4/3] ${eventsLayout.image}`}
-                    imgClassName="transition-transform duration-500 group-hover:scale-[1.03]"
-                  />
-                ) : null}
-                <div className={`flex flex-1 flex-col p-6 ${eventsLayout.body}`}>
-                  <p className="eyebrow text-sm tracking-widest">{e.category}</p>
-                  <h3 className={`display mt-3 text-2xl leading-snug ${eventsLayout.title}`}>
-                    {t(e.title)}
-                  </h3>
-                  <p className="mt-3 text-sm text-muted-foreground">{e.date}</p>
-                  <p
-                    className={`mt-4 text-sm leading-relaxed text-foreground/75 flex-1 ${eventsLayout.summary}`}
-                  >
-                    {t(e.summary)}
-                  </p>
-                  <span className="mt-6 inline-block tracking-widest text-clay group-hover:underline self-start text-base">
-                    {t(ui.buttons.viewEvent)} →
-                  </span>
-                </div>
-              </Link>
-            ))}
+      {/* ── 地方刊物典藏 ─────────────────────────────────────────────────────
+          這間店最獨特的東西，給它一整條色帶與一個大數字。份數與封面來自 publications 表；
+          讀不到就不印數字（不顯示 0），封面區整塊不畫。 */}
+      <section className="bg-oat/80 border-y border-border" aria-labelledby="home-archive">
+        <div className="container-editorial section-y grid gap-14 lg:grid-cols-12 lg:gap-16 lg:items-center">
+          <div className="lg:col-span-5">
+            <p className="kicker">{t(p.block("home.archiveKicker", HOME.archiveKicker))}</p>
+            {counts ? (
+              <p className="mt-8 flex items-baseline gap-4">
+                <span className="display text-[5.5rem] leading-none md:text-[7.5rem] [font-variant-numeric:lining-nums]">
+                  {counts.total}
+                </span>
+                <span className="font-serif text-xl md:text-2xl">{t(HOME.archiveUnit)}</span>
+              </p>
+            ) : null}
+            {counts ? (
+              <p className="mt-3 text-sm tracking-[0.12em] text-muted-foreground">
+                {fill(t(HOME.archiveSplit), { tw: counts.tw, jp: counts.jp })}
+              </p>
+            ) : null}
+            <h2 id="home-archive" className="display mt-10 text-3xl md:text-4xl">
+              {t(p.block("home.archiveTitle", HOME.archiveTitle))}
+            </h2>
+            <p className="mt-6 max-w-md leading-[1.95] text-foreground/80">
+              {t(p.block("home.archiveBody", HOME.archiveBody))}
+            </p>
+            <PublicationsLink className="btn-line mt-10">
+              {t(p.block("home.archiveCta", HOME.archiveCta))}
+            </PublicationsLink>
           </div>
-        </>
-      )}
-
-      {/* 精選策旅 —— 沒有任何一趟就整區不出現 */}
-      {featuredJourneys.length > 0 && (
-        <>
-          <SectionHeader
-            eyebrow={t(p.block("sections.journeysEyebrow", SECTION_EYEBROWS.journeys))}
-            title={t(ui.sections.featuredJourney)}
-            link={{ to: "/journeys", label: t(ui.buttons.viewAll) }}
-          />
-          <div className={`container-editorial pb-24 ${journeysLayout.grid}`}>
-            {featuredJourneys.map((j) => {
-              // 策旅的連結可能是站內路徑、也可能是外部網站（見 journeyLinkProps）。
-              // 還沒設連結的策旅仍然要看得到卡片，只是整張卡不可點——不要讓它消失。
-              const link = journeyLinkProps(j.externalUrl, localizeHref);
-              const body = (
-                <>
-                  {/* journeys 表沒有 image_key；封面用卡片指著的那場活動的 events.image_key
-                      （與 /journeys、過往策旅同一個來源），指不到或沒設圖才用固定意象圖。 */}
-                  <CoverImage
-                    src={imageFor(
-                      linkedEventFor(j.externalUrl, journeyEvents)?.imageKey,
-                      journeyImg,
-                    )}
-                    alt={t(j.title)}
-                    loading="lazy"
-                    className={`aspect-[4/3] ${journeysLayout.image}`}
-                    imgClassName="transition-transform duration-500 group-hover:scale-[1.03]"
-                  />
-                  <div className={`flex flex-1 flex-col p-6 ${journeysLayout.body}`}>
-                    <p className="eyebrow text-sm tracking-widest">
-                      {t(j.days)} ／ {t(j.theme)}
-                    </p>
-                    <h3
-                      className={`display mt-3 text-2xl leading-snug whitespace-pre-line ${journeysLayout.title}`}
-                    >
-                      {t(j.title)}
-                    </h3>
-                    <p
-                      className={`mt-4 text-sm leading-relaxed text-foreground/75 flex-1 ${journeysLayout.summary}`}
-                    >
-                      {t(j.summary)}
-                    </p>
-                    {link ? (
-                      <span className="mt-6 inline-block tracking-widest text-clay group-hover:underline self-start text-base">
-                        {t(ui.buttons.toJourney)} →
-                      </span>
-                    ) : null}
-                  </div>
-                </>
-              );
-              const cardClass = `group flex flex-col ${journeysLayout.card} border border-border bg-background/40 transition-colors`;
-              return link ? (
-                <a key={j.id} {...link} className={`${cardClass} hover:border-foreground/40`}>
-                  {body}
-                </a>
-              ) : (
-                <div key={j.id} className={cardClass}>
-                  {body}
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
+          {archive.covers.length > 0 ? (
+            <ul className="-mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-6 px-6 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-6 sm:overflow-visible sm:px-0 lg:col-span-7 [&::-webkit-scrollbar]:hidden">
+              {archive.covers.map((c, i) => (
+                <li
+                  key={c.slug}
+                  className={`w-[42%] shrink-0 snap-start sm:w-auto ${i % 3 === 1 ? "sm:translate-y-8" : ""}`}
+                >
+                  <PublicationsLink hash={c.slug} className="group block" plain>
+                    <div className="aspect-[3/4] overflow-hidden bg-background/70 p-3 shadow-[0_18px_36px_-26px_oklch(0.245_0.018_60/0.6)]">
+                      <img
+                        src={imageFor(c.coverImageKey, exhibitionImg)}
+                        alt={fill(t(HOME.archiveCoverLabel), {
+                          title: t(c.title),
+                          region: c.region,
+                        })}
+                        loading="lazy"
+                        className="img-zoom h-full w-full object-contain"
+                      />
+                    </div>
+                    <p className="mt-3 text-sm leading-snug">{t(c.title)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{c.region}</p>
+                  </PublicationsLink>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="aspect-[3/2] overflow-hidden bg-muted lg:col-span-7">
+              <img
+                src={exhibitionImg}
+                alt={t(HOME.heroInsetAlt)}
+                loading="lazy"
+                className="h-full w-full object-cover"
+              />
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* 主理人的選品 —— 2026-10 起右邊那張花瓶大圖換成可以直接買的商品卡。
           標題與內文仍然是 pages/index 的可編輯區塊（entries.curatedTitle／curatedBody）。
@@ -340,14 +776,14 @@ function Index() {
           （見 src/lib/shop.ts#fetchHomeShelfProducts、src/lib/home-shelf.ts）。
           讀不到任何一件（讀取失敗或全部售完）時退回原本的單張意象圖，不開天窗。 */}
       {shelfProducts.length > 0 ? (
-        <section className="container-editorial pb-24" data-testid="home-curated">
+        <section className="container-editorial section-y" data-testid="home-curated">
           <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between md:gap-12">
             <div>
-              <p className="eyebrow text-2xl">{t(ui.nav.curated)}</p>
-              <h2 className="display mt-5 md:text-5xl text-3xl font-mono text-left whitespace-pre-line">
+              <p className="kicker">{t(ui.nav.curated)}</p>
+              <h2 className="display mt-5 text-3xl md:text-[2.6rem] leading-[1.3] whitespace-pre-line">
                 {t(p.block("entries.curatedTitle", ENTRIES.curatedTitle))}
               </h2>
-              <p className="mt-6 max-w-md text-base leading-relaxed text-foreground/75 whitespace-pre-line">
+              <p className="mt-6 max-w-md text-base leading-[1.95] text-foreground/75 whitespace-pre-line">
                 {t(p.block("entries.curatedBody", ENTRIES.curatedBody))}
               </p>
             </div>
@@ -356,9 +792,12 @@ function Index() {
             <Link
               to="/shop"
               search={{ tab: "products" }}
-              className="shrink-0 self-start md:self-end inline-block tracking-widest text-clay hover-underline text-base"
+              className="link-arrow shrink-0 self-start md:self-end"
             >
-              {t(p.block("entries.curatedCta", ENTRIES.curatedCta))} →
+              {t(p.block("entries.curatedCta", ENTRIES.curatedCta))}
+              <span className="arrow" aria-hidden="true">
+                →
+              </span>
             </Link>
           </div>
           <div className="mt-12">
@@ -366,22 +805,21 @@ function Index() {
           </div>
         </section>
       ) : (
-        <section className="container-editorial pb-24">
+        <section className="container-editorial section-y">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
-              <p className="eyebrow text-2xl">{t(ui.nav.curated)}</p>
-              <h2 className="display mt-5 md:text-5xl text-3xl font-mono text-left whitespace-pre-line">
+              <p className="kicker">{t(ui.nav.curated)}</p>
+              <h2 className="display mt-5 text-3xl md:text-[2.6rem] leading-[1.3] whitespace-pre-line">
                 {t(p.block("entries.curatedTitle", ENTRIES.curatedTitle))}
               </h2>
-              <p className="mt-6 max-w-md text-base leading-relaxed text-foreground/75 whitespace-pre-line">
+              <p className="mt-6 max-w-md text-base leading-[1.95] text-foreground/75 whitespace-pre-line">
                 {t(p.block("entries.curatedBody", ENTRIES.curatedBody))}
               </p>
-              <Link
-                to="/shop"
-                search={{ tab: "products" }}
-                className="mt-8 inline-block tracking-widest text-clay hover-underline text-base"
-              >
-                {t(p.block("entries.curatedCta", ENTRIES.curatedCta))} →
+              <Link to="/shop" search={{ tab: "products" }} className="link-arrow mt-8">
+                {t(p.block("entries.curatedCta", ENTRIES.curatedCta))}
+                <span className="arrow" aria-hidden="true">
+                  →
+                </span>
               </Link>
             </div>
             <div className="aspect-[4/5] overflow-hidden bg-muted">
@@ -396,61 +834,175 @@ function Index() {
         </section>
       )}
 
-      {/* 來店資訊 */}
-      <section className="container-editorial pb-24">
-        <div className="grid md:grid-cols-2 gap-12 items-stretch">
-          <div className="aspect-[4/3] md:aspect-auto bg-muted">
-            <iframe src={map.embed} className="h-full w-full border-0" loading="lazy" title="Map" />
-          </div>
-          <div className="flex flex-col justify-center">
-            <p className="eyebrow text-2xl">{t(ui.nav.visit)}</p>
-            <h2 className="display mt-5 text-3xl md:text-4xl">{t(site.address)}</h2>
-            <p className="mt-6 text-base text-foreground/75">{t(site.hours)}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{t(ui.footer.everyday)}</p>
-            <div className="mt-8 flex flex-wrap gap-4 text-xs tracking-widest">
-              <a
-                href={map.link}
-                target="_blank"
-                rel="noreferrer"
-                className="border border-foreground px-5 py-3 hover:bg-foreground hover:text-primary-foreground transition-colors"
-              >
+      {/* ── 回顧：最近結束的活動與策旅 ────────────────────────────────────────
+          與 /events「過往活動」、/journeys「過往策旅」同一個元件、同一套判準
+          （newestEndedFirst／splitJourneys）。零筆時 PastShelf 自己不畫。 */}
+      <PastShelf
+        testId="home-past-shelf"
+        eyebrow={t(p.block("home.pastKicker", HOME.pastKicker))}
+        title={t(p.block("home.pastTitle", HOME.pastTitle))}
+        badge={t(p.block("home.pastBadge", HOME.pastBadge))}
+        items={[
+          ...endedJourneys.map(({ journey: j, event: e }) => {
+            const link = journeyLinkProps(j.externalUrl, localizeHref);
+            return {
+              key: `j-${j.id}`,
+              title: t(j.title),
+              category: `${t(j.days)} ／ ${t(j.theme)}`,
+              date: e.date,
+              // 首頁上方「行」已經用了那張固定意象圖，這裡沒有封面就不放圖，避免同一張照片重複出現。
+              image: e.imageKey ? imageFor(e.imageKey, journeyImg) : null,
+              link: link ? { kind: "href" as const, ...link } : null,
+            };
+          }),
+          ...pastEvents.map((e) => ({
+            key: `e-${e.id}`,
+            title: t(e.title),
+            category: e.category,
+            date: e.date,
+            image: e.imageKey ? imageFor(e.imageKey, storefrontImg) : null,
+            link: { kind: "event" as const, slug: e.slug },
+          })),
+        ]}
+        cta={
+          <Link to="/events" className="link-arrow">
+            {t(p.block("home.pastCta", HOME.pastCta))}
+            <span className="arrow" aria-hidden="true">
+              →
+            </span>
+          </Link>
+        }
+      />
+
+      {/* ── 來訪資訊 ─────────────────────────────────────────────────────── */}
+      <section className="border-t border-border" aria-labelledby="home-visit">
+        <div className="container-editorial section-y grid items-stretch gap-12 md:grid-cols-2 lg:gap-16">
+          <div className="flex flex-col justify-center md:order-2">
+            <p className="kicker">{t(ui.nav.visit)}</p>
+            <h2 id="home-visit" className="display mt-5 text-3xl md:text-5xl">
+              {t(p.block("home.visitTitle", HOME.visitTitle))}
+            </h2>
+            <dl className="mt-10 space-y-6 text-[0.95rem] leading-[1.85]">
+              <div className="grid grid-cols-[5.5rem_1fr] gap-4 border-t border-border pt-5">
+                <dt className="text-sm text-muted-foreground">{t(HOME.visitWhereLabel)}</dt>
+                <dd>
+                  {t(site.address)}
+                  <span className="block text-muted-foreground">{t(site.city)}</span>
+                </dd>
+              </div>
+              <div className="grid grid-cols-[5.5rem_1fr] gap-4 border-t border-border pt-5">
+                <dt className="text-sm text-muted-foreground">{t(HOME.visitHoursLabel)}</dt>
+                <dd>
+                  {t(site.hours)}
+                  <span className="block text-muted-foreground">{t(ui.footer.everyday)}</span>
+                </dd>
+              </div>
+              <div className="grid grid-cols-[5.5rem_1fr] gap-4 border-y border-border py-5">
+                <dt className="text-sm text-muted-foreground">{t(HOME.visitHowLabel)}</dt>
+                <dd>{t(p.block("home.visitTransit", HOME.visitTransit))}</dd>
+              </div>
+            </dl>
+            <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
+              <a href={map.link} target="_blank" rel="noreferrer" className="btn-solid">
                 {t(ui.buttons.navigate)}
+                <span className="arrow" aria-hidden="true">
+                  ↗
+                </span>
               </a>
               {/* 來店資訊 2026-09-02 併進 /about 的後半。同上：站內連結直接指向新家。 */}
-              <Link to="/about" className="self-center text-clay hover-underline">
-                {t(p.block("entries.visitFull", ENTRIES.visitFull))} →
+              <Link to="/about" className="link-arrow">
+                {t(p.block("entries.visitFull", ENTRIES.visitFull))}
+                <span className="arrow" aria-hidden="true">
+                  →
+                </span>
               </Link>
             </div>
           </div>
+          <div className="aspect-[4/3] bg-muted md:order-1 md:aspect-auto md:min-h-[28rem]">
+            <iframe
+              src={map.embed}
+              className="h-full w-full border-0"
+              loading="lazy"
+              title={t(site.address)}
+            />
+          </div>
         </div>
+      </section>
+
+      {/* ── 收尾：休止符 ────────────────────────────────────────────────────
+          hero.intro（後台可改）裡的「＿＿＿」是刻意的留白——保留，畫成一段細線，
+          讓它成為這一頁的休止符。螢幕閱讀器略過那段線，唸成一句完整的話。 */}
+      <section className="container-editorial pt-8 pb-4 text-center" aria-label="INTERVAL">
+        <RestMark className="mx-auto text-clay" />
+        <p className="mt-6 text-xs tracking-[0.4em] text-clay">
+          {t(p.block("home.closingKicker", HOME.closingKicker))}
+        </p>
+        <p className="display mx-auto mt-6 max-w-3xl text-3xl leading-[1.5] md:text-[2.6rem]">
+          {mottoBefore}
+          {mottoAfter !== null ? (
+            <>
+              <span
+                aria-hidden="true"
+                className="mx-2 inline-block w-[3.5em] translate-y-[-0.2em] border-b border-clay align-baseline"
+              />
+              {mottoAfter}
+            </>
+          ) : null}
+        </p>
+        <p className="mx-auto mt-8 max-w-xl text-[0.95rem] leading-[1.95] text-muted-foreground">
+          {t(p.block("home.closingBody", HOME.closingBody))}
+        </p>
       </section>
     </PageShell>
   );
 }
 
-function SectionHeader({
-  eyebrow,
-  title,
+function SubHeader({
+  label,
   link,
 }: {
-  eyebrow: string;
-  title: string;
-  link?: { to: "/events" | "/journeys"; label: string };
+  label: string;
+  link: { to: "/events" | "/journeys"; label: string };
 }) {
   return (
-    <div className="container-editorial pt-12 pb-10 flex items-end justify-between border-t border-border">
-      <div>
-        <p className="eyebrow text-2xl">{eyebrow}</p>
-        <h2 className="display mt-3 text-3xl md:text-4xl">{title}</h2>
-      </div>
-      {link && (
-        <Link
-          to={link.to}
-          className="text-xs tracking-widest text-clay hover-underline hidden md:inline-block"
-        >
-          {link.label} →
-        </Link>
-      )}
+    <div className="mt-14 mb-6 flex items-center justify-between gap-6 border-b border-border pb-4">
+      <p className="font-serif text-xl md:text-2xl">{label}</p>
+      <Link to={link.to} className="link-arrow text-sm">
+        {link.label}
+        <span className="arrow" aria-hidden="true">
+          →
+        </span>
+      </Link>
     </div>
+  );
+}
+
+/**
+ * 連到「選物 →〈地方刊物〉分頁」。
+ *
+ * 獨立成小元件、放在檔案最後：nav-consolidation-selftest 以「首頁第一個帶 search 的
+ * <Link to="/shop">」確認主理人選品的「查看全部」落在 products 分頁；把刊物入口集中在這裡，
+ * 那條檢查仍然對準選品那一顆。
+ */
+function PublicationsLink({
+  className,
+  children,
+  hash,
+  plain = false,
+}: {
+  className?: string;
+  children: ReactNode;
+  hash?: string;
+  plain?: boolean;
+}) {
+  return (
+    <Link to="/shop" search={{ tab: "publications" }} hash={hash} className={className}>
+      {children}
+      {plain ? null : (
+        <span className="arrow" aria-hidden="true">
+          →
+        </span>
+      )}
+    </Link>
   );
 }

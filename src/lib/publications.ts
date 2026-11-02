@@ -346,7 +346,7 @@ export function regionGroupsFor(sheet: PublicationSheet): RegionGroup[] {
  * externalUrl 從來沒被用過。PublicationEntry 仍然能直接傳進來（它是
  * PublicationListEntry 多兩個欄位），呼叫端不必轉型。
  */
-export function regionGroupOf(entry: PublicationListEntry): string {
+export function regionGroupOf(entry: Pick<PublicationListEntry, "sheet" | "region">): string {
   for (const g of regionGroupsFor(entry.sheet)) {
     if (g.match.some((m) => entry.region.includes(m))) return g.key;
   }
@@ -368,3 +368,80 @@ export const SHEET_LABELS: Record<PublicationSheet, Localized> = {
   tw: { zh: "台灣刊物", en: "Taiwan", ja: "台湾の刊行物" },
   jp: { zh: "日本刊物", en: "Japan", ja: "日本の刊行物" },
 };
+
+// -----------------------------------------------------------------------------
+// 首頁「地方刊物典藏」區塊（2026-11 首頁改版）
+// -----------------------------------------------------------------------------
+/**
+ * 首頁只需要三個數字（總數／台灣／日本）和幾張封面，不需要整份清單。
+ *
+ * 一支查詢讀回所有已發布刊物的「卡片最小欄位」（不含 intro），在 loader 裡就聚合成
+ * 三個數字＋幾張封面再回傳——整份清單不會進 SSR payload（/shop 那份清單的教訓見上面
+ * PublicationListEntry）。
+ *
+ * 封面挑法：與 /shop〈地方刊物〉同一個排序，但**每個地區只取第一本**（regionGroupOf 的粗分類），
+ * 台灣 perSheet.tw 本、日本 perSheet.jp 本。照原排序直接取前幾本會全部是基隆（資料就是從
+ * 基隆開始編號的），首頁要讓人一眼看到「各地」。
+ *
+ * 讀取失敗 → unavailable: true、counts: null，呼叫端改用不帶數字的文案，不顯示 0。
+ */
+export type PublicationTeaserCover = {
+  slug: string;
+  sheet: PublicationSheet;
+  title: Localized;
+  region: string;
+  coverImageKey: string;
+};
+
+export type PublicationsTeaser = {
+  counts: { total: number; tw: number; jp: number } | null;
+  covers: PublicationTeaserCover[];
+  unavailable: boolean;
+};
+
+export async function fetchPublicationsTeaser(
+  perSheet: { tw: number; jp: number } = { tw: 4, jp: 2 },
+): Promise<PublicationsTeaser> {
+  const db = supabase;
+  if (!db) return { counts: null, covers: [], unavailable: true };
+  try {
+    const { data, error } = await db
+      .from("publications")
+      .select("slug, sheet, title, region, cover_image_key")
+      .eq("is_published", true)
+      .order("sheet", { ascending: false }) // tw 先於 jp
+      .order("sort_order", { ascending: true })
+      .order("seq", { ascending: true });
+    if (error || !Array.isArray(data)) {
+      console.warn(`[publications] teaser unavailable — ${error?.message ?? "bad shape"}`);
+      return { counts: null, covers: [], unavailable: true };
+    }
+    let tw = 0;
+    let jp = 0;
+    const covers: PublicationTeaserCover[] = [];
+    const seenGroups = new Set<string>();
+    const picked = { tw: 0, jp: 0 };
+    for (const r of data as unknown as Row[]) {
+      const sheet = r.sheet === "tw" || r.sheet === "jp" ? r.sheet : null;
+      if (!sheet) continue;
+      if (sheet === "tw") tw += 1;
+      else jp += 1;
+      if (picked[sheet] >= perSheet[sheet]) continue;
+      const title = loc(r.title);
+      const key = nullableStr(r.cover_image_key);
+      const region = typeof r.region === "string" ? r.region : "";
+      if (!title || !key || typeof r.slug !== "string") continue;
+      const group = `${sheet}:${regionGroupOf({ sheet, region })}`;
+      if (seenGroups.has(group)) continue;
+      seenGroups.add(group);
+      picked[sheet] += 1;
+      covers.push({ slug: r.slug, sheet, title, region, coverImageKey: key });
+    }
+    return { counts: { total: tw + jp, tw, jp }, covers, unavailable: false };
+  } catch (err) {
+    console.warn(
+      `[publications] teaser unavailable — ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return { counts: null, covers: [], unavailable: true };
+  }
+}
