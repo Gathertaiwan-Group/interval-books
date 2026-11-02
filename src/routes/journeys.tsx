@@ -23,9 +23,9 @@ const PAGE = {
     ja: "旅｜小時光 風土誌書店",
   },
   metaDescription: {
-    zh: "由書與土地共同寫成的深度旅程。每一趟策旅皆有獨立網站，本頁為彙整導流。",
-    en: "Slow journeys co-written by books and the land. Each trip has its own site; this page gathers the threads.",
-    ja: "本と土地が共に綴る、深い旅。各旅には専用サイトがあります。このページはその目次です。",
+    zh: "讓土地成為書的延伸：跟著書與作者，走到故事發生的地方。這一頁彙整小時光的文化策旅，像是范毅舜帶路的台東公東教堂三天兩夜、池上秋收山海旅行，每一趟都有自己的行程頁，也歡迎地方夥伴來信共創。",
+    en: "Cultural journeys that carry books out to the land — like three days at Taitung's Kung Tung Chapel with photographer Nicholas Fan. Each trip has its own page.",
+    ja: "本を土地へと延ばす文化の旅。写真家・范毅舜さんと巡る台東・公東教会の2泊3日や池上の秋の旅など、それぞれの旅の専用ページへご案内します。地域のパートナーとの共創も歓迎。",
   },
   eyebrowSuffix: { zh: "策旅", en: "策旅", ja: "策旅" },
   title: {

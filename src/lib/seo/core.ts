@@ -279,17 +279,6 @@ export const BRAND = {
   ja: "小時光 風土誌書店",
 } as const satisfies Localized;
 
-/**
- * 站名標語——描述太短時補在後面用。內容全部是站上已經寫著的事實：地址（/about、
- * 頁尾）、風土誌（首頁 title）、地方刊物（/shop 分頁）、讀書會／講座／工作坊與策旅
- * （首頁入口與 /journeys）。
- */
-export const SITE_BLURB: Localized = {
-  zh: "小時光風土誌書店位於台北華山文創園區紅磚六合院西7-3館，以土地為線索選書，展售地方刊物與選物，也舉辦讀書會、講座、工作坊與策旅。",
-  en: "Interval Books is a terroir-minded bookstore in the Red Brick Courtyard (West 7-3) of Huashan 1914 Creative Park, Taipei — books, local publications, curated objects, reading circles, talks, workshops and journeys.",
-  ja: "小時光 風土誌書店は台北・華山1914文化創意産業園区 紅煉瓦六合院 西7-3館にある、土地を手がかりに本を選ぶ書店。選書、地域の刊行物、セレクト品のほか、読書会・トーク・ワークショップ・旅も企画しています。",
-};
-
 /** 「＿＿＿」「___」這類還沒填的佔位符。 */
 export function hasPlaceholder(text: string | null | undefined): boolean {
   return /＿|_{3,}|\{\{|TODO|待補|待填/.test(text ?? "");
@@ -321,21 +310,32 @@ const DESC_LIMITS = {
 } as const;
 
 /**
- * 描述的長度整理：太短補上站名標語、太長截斷。佔位符（＿＿＿）視同沒寫，由 fallback 取代。
+ * 描述的長度整理：太短時接上**這一頁自己的**補充句（filler）、太長截斷。佔位符（＿＿＿）
+ * 視同沒寫，由 fallback 取代。
  *
- * 純粹的字串處理，**不新增任何事實**：補上去的只有 SITE_BLURB（站上已有的事實）。
+ * 2026-11 SEO 健檢：以前太短一律接同一段站名標語（地址＋「以土地為線索選書…」），結果
+ * /about、/events、/journeys、/privacy、短介紹的刊物頁……的描述後半段全都一樣，Google 會
+ * 當成重複描述。現在：
+ *   - 只接呼叫端給的 filler（活動名稱與日期、刊物的地區與製作單位……每一頁都不同）；
+ *   - 沒有 filler、或接了還是不到下限 → **就讓它短**。短而獨特的描述，比補成一樣的好。
+ *
+ * 純粹的字串處理，**不新增任何事實**：filler 由呼叫端從那一頁自己的資料組出來。
  */
-export function fitDescription(primary: Localized, fallback?: Localized): Localized {
+export function fitDescription(
+  primary: Localized,
+  fallback?: Localized | null,
+  filler?: Localized | null,
+): Localized {
   const pick = (lang: keyof Localized): string => {
     const own = collapse(primary[lang] ?? "");
     const fb = collapse(fallback?.[lang] ?? "");
     let text = own && !hasPlaceholder(own) ? own : fb || own.replace(/＿+|_{3,}/g, "");
     const { min, max } = DESC_LIMITS[lang];
-    if (charLength(text) < min) {
-      const blurb = SITE_BLURB[lang];
+    const extra = collapse(filler?.[lang] ?? "");
+    if (charLength(text) < min && extra && !text.includes(extra)) {
       text = text
-        ? `${text}${/[。.!?！？]$/.test(text) ? "" : lang === "en" ? "." : "。"}${lang === "en" ? " " : ""}${blurb}`
-        : blurb;
+        ? `${text}${/[。.!?！？]$/.test(text) ? "" : lang === "en" ? "." : "。"}${lang === "en" ? " " : ""}${extra}`
+        : extra;
     }
     return truncate(text, max);
   };

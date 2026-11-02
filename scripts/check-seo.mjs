@@ -15,6 +15,9 @@
  *   - 英日文網址（2026-11 /en /ja）：<html lang>、canonical 指自己、hreflang 三語＋x-default 且
  *     互相對應、站內連結帶前綴、中文限定著陸頁的英日版 noindex、私密頁 404、轉址、Vary、
  *     sitemap 的 xhtml:link（見 checkLanguageVersions()）
+ *   - description 不可重複（2026-11）：不同頁不可完全相同、不可共用超過 40 字的相同結尾。
+ *     本機抓 sitemap 全部網址（三語）；正式站只比對抽查頁、不另外發請求
+ *     （見 checkDescriptionUniqueness()）
  *
  * 用法：
  *   node scripts/check-seo.mjs                          # 預設打 https://www.intervalbooks.tw
@@ -242,6 +245,8 @@ const PAGES = [
 ];
 
 const titlesSeen = new Map();
+/** checkPage() 看過的 description（path → 內容），正式站模式的重複檢查用（不另外發請求）。 */
+const descriptionsSeen = new Map();
 
 async function checkPage({ path, canonical, ld }) {
   console.log(`\n[page] ${path}`);
@@ -269,6 +274,7 @@ async function checkPage({ path, canonical, ld }) {
     desc,
   );
   ok("description 只有一個", h.meta("description").length === 1);
+  descriptionsSeen.set(path, desc);
   const prev = titlesSeen.get(h.title);
   ok("title 沒有跟別的抽查頁重複", !prev, prev ? `與 ${prev} 相同` : "");
   titlesSeen.set(h.title, path);
@@ -888,12 +894,117 @@ async function checkPublications() {
   );
 }
 
+// =============================================================================
+// description 不可重複（2026-11 SEO 健檢：各頁描述後半段都是同一段站名標語）
+// =============================================================================
+
+/** 共用結尾的長度上限（字數，以 code point 計）：超過就算「共用長結尾」。 */
+const SHARED_TAIL = 40;
+const isLocalBase = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(BASE);
+
+/**
+ * 所有**可收錄**頁面（三語）的 description：
+ *   - 不同頁不可完全相同；
+ *   - 不可共用超過 SHARED_TAIL 字的相同結尾（以前「太短補站名標語」就是這種）。
+ *
+ * 本機（SEO_BASE=localhost）：抓 sitemap 的全部網址（<loc> 與 xhtml:link，三語）逐頁檢查，
+ * 跳過 noindex 與 canonical 指向別頁的。正式站：**不另外發請求**，只比對上面 checkPage()
+ * 抽查過的那幾頁（不對正式站大量請求）。
+ */
+async function checkDescriptionUniqueness() {
+  console.log(
+    `\n[description] 重複率（${isLocalBase ? "本機：sitemap 全部網址" : "正式站：只比對抽查頁"}）`,
+  );
+  const descs = new Map(); // path -> description
+  if (isLocalBase) {
+    const xml = await (await get("/sitemap.xml")).text();
+    const urls = new Set(
+      [
+        ...xml.matchAll(/<loc>([^<]+)<\/loc>/g),
+        ...xml.matchAll(/<xhtml:link\b[^>]*href="([^"]+)"/g),
+      ]
+        .map((m) => decode(m[1]))
+        .filter((u) => u.startsWith(ORIGIN)),
+    );
+    const queue = [...urls];
+    let skipped = 0;
+    const worker = async () => {
+      while (queue.length) {
+        const url = queue.shift();
+        const path = url.slice(ORIGIN.length) || "/";
+        const res = await get(path);
+        if (res.status !== 200) {
+          ok(`${path} 回 200`, false, `實得 ${res.status}`);
+          continue;
+        }
+        const h = parseHead(await res.text());
+        const noindex = h.meta("robots").some((v) => /noindex/.test(v));
+        if (noindex || (h.canonicals[0] && h.canonicals[0] !== url)) {
+          skipped += 1;
+          continue;
+        }
+        descs.set(path, h.meta("description")[0] ?? "");
+      }
+    };
+    await Promise.all(Array.from({ length: 6 }, worker));
+    console.log(
+      `  sitemap ${urls.size} 個網址，檢查 ${descs.size} 頁（略過 noindex／canonical 指別頁 ${skipped} 頁）`,
+    );
+  } else {
+    for (const [path, d] of descriptionsSeen) {
+      // canonical 指向別頁的抽查頁（例：/shop?tab=publications）不算
+      if (PAGES.find((p) => p.path === path)?.canonical !== `${ORIGIN}${path}`) continue;
+      descs.set(path, d);
+    }
+    console.log(`  比對 ${descs.size} 個抽查頁`);
+  }
+
+  const empty = [...descs].filter(([, d]) => !d.trim()).map(([p]) => p);
+  ok("每一頁都有 description", empty.length === 0, empty.slice(0, 10).join("、"));
+
+  const byText = new Map();
+  for (const [path, d] of descs) {
+    if (!d) continue;
+    byText.set(d, [...(byText.get(d) ?? []), path]);
+  }
+  const exact = [...byText.values()].filter((ps) => ps.length > 1);
+  ok(
+    `description 沒有完全相同的（${exact.length} 組）`,
+    exact.length === 0,
+    exact
+      .slice(0, 5)
+      .map((ps) => ps.join(" = "))
+      .join("；"),
+  );
+
+  const byTail = new Map();
+  for (const [d, ps] of byText) {
+    const chars = Array.from(d);
+    if (chars.length <= SHARED_TAIL) continue;
+    const tail = chars.slice(-SHARED_TAIL - 1).join("");
+    byTail.set(tail, [...(byTail.get(tail) ?? []), ps[0]]);
+  }
+  const shared = [...byTail.entries()].filter(([, ps]) => ps.length > 1);
+  ok(
+    `description 沒有共用超過 ${SHARED_TAIL} 字的相同結尾（${shared.length} 組）`,
+    shared.length === 0,
+    shared
+      .slice(0, 5)
+      .map(
+        ([t, ps]) =>
+          `${ps.slice(0, 4).join("、")}${ps.length > 4 ? `…等 ${ps.length} 頁` : ""} 都以「…${t}」結尾`,
+      )
+      .join("；"),
+  );
+}
+
 console.log(`→ SEO_BASE = ${BASE}`);
 await checkRobotsAndSitemap();
 for (const page of PAGES) await checkPage(page);
 await checkRedirectsAndNoindex();
 await checkLanguageVersions();
 await checkPublications();
+await checkDescriptionUniqueness();
 
 console.log(`\n${"─".repeat(52)}`);
 console.log(`check-seo: pass=${pass} fail=${fail}`);

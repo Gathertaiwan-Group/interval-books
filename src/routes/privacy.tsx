@@ -15,9 +15,9 @@ const PAGE = {
     ja: "プライバシー｜小時光 風土誌書店",
   },
   metaDescription: {
-    zh: "小時光風土誌書店之隱私權聲明。",
-    en: "Privacy statement of Interval Books.",
-    ja: "小時光 風土誌書店のプライバシーに関する声明。",
+    zh: "訂購、報名與會員帳號會收集哪些資料、為什麼不保存信用卡號、哪些金流發票與寄信服務會取得資料、保存多久、Cookie 與 Google Analytics 怎麼用，以及如何查詢、更正或刪除你的個人資料。",
+    en: "What we collect for orders, sign-ups and accounts, which payment, invoice and email services receive it, how long we keep it, cookies, and how to delete it.",
+    ja: "注文・申し込み・会員登録で集める情報、カード番号を保存しないこと、決済・電子発票・メール配信の委託先、保存期間、Cookie とアクセス解析、個人情報の照会・訂正・削除の方法。",
   },
   title: { zh: "隱私權聲明", en: "Privacy Statement", ja: "プライバシー" },
   body: {

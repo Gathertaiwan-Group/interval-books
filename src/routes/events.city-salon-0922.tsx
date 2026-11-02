@@ -57,7 +57,7 @@ const PAGE = {
     ja: "都市サロン #01｜台東は、遠い場所であるだけではない｜小時光 風土誌書店",
   },
   metaDescription: {
-    zh: "2026.9.22 於小時光風土誌書店。藝術、地方創生與一種新的商業生活方式——15 席限定的定向邀請沙龍。",
+    zh: "城市思享沙龍「空間的文藝復興」：2026.9.22 在小時光風土誌書店，商業地產協會理事長蔡明璋、藝術家賴純純與主理人 Alice，從閒置資產、地方創生談到台東的商業生活方式。15 席限定邀請制。",
     en: "22 Sep 2026 at Interval Books. Art, regional regeneration and a new way of living with commerce — an invitation-only salon limited to 15 seats.",
     ja: "2026年9月22日、小時光 風土誌書店にて。アート、地域創生、そして新しい商いの暮らし方——15席限定の招待制サロン。",
   },

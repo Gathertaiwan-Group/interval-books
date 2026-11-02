@@ -38,9 +38,9 @@ const PAGE = {
     ja: "地域の刊行物｜小時光 風土誌書店",
   },
   metaDescription: {
-    zh: "小時光風土誌書店的地方刊物展：從基隆的漁村到日本的山間小鎮，一個地方怎麼被自己的人寫下來。台灣與日本的地方刊物依地區整理，部分可線上選購，其餘在店內展閱。",
-    en: "The local-publications show at Interval Books: from a fishing village in Keelung to small mountain towns in Japan — how a place gets written down by its own people. Some titles can be ordered online; the rest are on display in the store.",
-    ja: "小時光 風土誌書店の地域の刊行物展。基隆の漁村から日本の山あいの町まで、土地がその土地の人によって書き残される姿を集めました。一部はオンラインで購入でき、その他は店頭でご覧いただけます。",
+    zh: "一個地方，怎麼被自己的人寫下來：從基隆的漁村到日本的山間小鎮，台灣與日本的地方刊物依地區排在同一張桌上。每一本附上製作單位與集數，部分可線上購買，其餘歡迎到店翻閱。",
+    en: "How a place is written by its own people: local publications from Keelung's fishing villages to Japan's mountain towns, by region. Some can be bought online.",
+    ja: "土地が、そこに暮らす人の手で書き残される。基隆の漁村から日本の山あいの町まで、台湾と日本の地域誌を地域別に紹介。発行元と号数つきで、一部はオンラインでも購入できます。",
   },
   title: {
     zh: "一個地方，怎麼被自己的人寫下來",

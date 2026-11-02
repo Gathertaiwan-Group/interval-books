@@ -17,9 +17,9 @@ const PAGE = {
     ja: "キュレーションと協働｜小時光 風土誌書店",
   },
   metaDescription: {
-    zh: "療癒藝術節、空間策展、書店展售與品牌共創——以低調而精緻的方式，與夥伴共創。",
-    en: "Healing arts festivals, spatial curation, in-store exhibitions, and quiet brand collaborations — co-created with care.",
-    ja: "ヒーリング・アートフェス、空間キュレーション、店内展示、ブランド共創。静かで丁寧な協働を。",
+    zh: "策展不只是擺放，是讓人、物、空間彼此看見。我們為節慶設計療癒藝術節現場、為旅宿與咖啡館策劃選書選物、做書與茶器的主題展售，也替品牌設計閱讀活動與企業接待。合作歡迎來信。",
+    en: "Curation with partners: healing arts festivals, book and object selections for hotels and cafés, tea-and-vessel showcases, and reading events for brands.",
+    ja: "人と物と空間が互いに見えるように。ヒーリング・アートフェスの現場づくり、宿やカフェの選書・選品、本と茶器のテーマ展示、ブランドの読書イベントや接待を企画します。",
   },
   eyebrowSuffix: { zh: "策展與合作", en: "策展與合作", ja: "策展與合作" },
   title: {

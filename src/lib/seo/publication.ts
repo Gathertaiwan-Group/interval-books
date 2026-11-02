@@ -27,6 +27,7 @@ import {
   ORG_ID,
   STORE_NAME,
   stripForeignBrandSuffix,
+  truncate,
   type JsonLd,
 } from "./core.ts";
 import { localizeHref, type PageTranslation } from "./i18n.ts";
@@ -133,9 +134,53 @@ export function publicationTitle(entry: PublicationSeoInput): Localized {
   return { zh: build("zh"), en: build("en"), ja: build("ja") };
 }
 
-/** description：介紹文截到 70–160 字（英文 110–300 字元；規則同全站 fitDescription）。 */
+/** description 的長度上限（同 core.ts 的 DESC_LIMITS；這裡要先扣掉結尾刊名的長度）。 */
+const DESC_MAX: Record<Lang, number> = { zh: 160, ja: 160, en: 300 };
+
+/**
+ * description：「介紹文——《刊名》」，整段 70–160 字（英文 110–300 字元；規則同全站
+ * fitDescription）。
+ *
+ * 2026-11 SEO 健檢：
+ *  · 結尾帶刊名——同一個製作團隊的幾本刊物，介紹文有逐字相同的（例：來義鄉刊／泰武鄉刊），
+ *    不帶刊名兩頁的描述就一模一樣；刊名放開頭也不夠（刊名一樣長時，截斷後的結尾仍相同），
+ *    所以放在**結尾**，介紹文先截短讓位。介紹文本身已經提到刊名就不加。
+ *  · 介紹太短時補的是**這一本的**地區、製作單位、集數（publicationFiller），不再接全站同一句
+ *    站名標語。補完仍不到 70 字就讓它短。
+ */
 export function publicationDescription(entry: PublicationSeoInput): Localized {
-  return fitDescription(entry.intro);
+  const body = fitDescription(entry.intro, null, publicationFiller(entry));
+  const build = (lang: Lang): string => {
+    const text = body[lang];
+    const name = stripForeignBrandSuffix(entry.title[lang] || entry.title.zh);
+    if (!text || !name || (entry.intro[lang] || "").includes(name)) return text;
+    const tag = lang === "en" ? ` — ${name}` : lang === "ja" ? `——『${name}』` : `——《${name}》`;
+    const room = DESC_MAX[lang] - charLength(tag);
+    return `${charLength(text) > room ? truncate(text, room) : text}${tag}`;
+  };
+  return { zh: build("zh"), en: build("en"), ja: build("ja") };
+}
+
+/**
+ * 刊物介紹太短時的補充句：地區、製作單位、集數——都是刊物頁上印著的欄位。
+ * 「店內翻閱」是固定的事實（每一本都在店內展示），放在句首；句尾是這一本自己的欄位，
+ * 兩本刊物的描述結尾才不會一樣。
+ */
+export function publicationFiller(entry: PublicationSeoInput): Localized {
+  const region = publicationRegionLabel(entry);
+  const issues = (entry.issues ?? "").trim();
+  const build = (lang: Lang): string => {
+    const where = region[lang] || region.zh;
+    const who = publisherShort(entry.publisher[lang] || entry.publisher.zh)
+      .replace(/\s*\n\s*/g, lang === "en" ? ", " : "、")
+      .trim();
+    if (lang === "en")
+      return `Kept at Interval Books to browse in store: a local publication from ${where}${who ? `, made by ${who}` : ""}${issues ? ` (${issues})` : ""}.`;
+    if (lang === "ja")
+      return `小時光 風土誌書店の店頭で閲覧できる、${where}の地域の刊行物${who ? `。発行は${who}` : ""}${issues ? `（${issues}）` : ""}。`;
+    return `收藏在小時光風土誌書店、可到店翻閱的${where}地方刊物${who ? `，由${who}製作` : ""}${issues ? `，店內有 ${issues}` : ""}。`;
+  };
+  return { zh: build("zh"), en: build("en"), ja: build("ja") };
 }
 
 const HAN = /[㐀-鿿豈-﫿]/;

@@ -58,9 +58,9 @@ const PAGE = {
     ja: "協働・コラボレーションのご相談｜小時光 風土誌書店",
   },
   metaDescription: {
-    zh: "小時光風土誌書店位於華山文創園區，歡迎品牌、企業、創作者與我們合作：活動、展覽、選物寄賣、品牌聯名、企業包場、講座與工作坊。填寫表單，我們會在 3 個工作天內回覆。",
-    en: "Interval Books at Huashan welcomes brands, companies and creators: events, exhibitions, consignment, brand collaborations, private bookings, talks and workshops. Send us a note — we reply within 3 business days.",
-    ja: "華山の小時光 風土誌書店では、ブランド・企業・作り手との協働を歓迎しています。イベント、展示、委託販売、ブランドコラボ、貸切、講座・ワークショップ。フォームからご相談ください。3営業日以内にお返事します。",
+    zh: "想在華山辦活動、展覽、選物寄賣、品牌聯名、企業包場或講座工作坊？這一頁說明六種合作形式、從填表到執行的流程、過去的合作案例與常見問題。留下你的想法，我們 3 個工作天內回覆。",
+    en: "Events, exhibitions, consignment, brand collabs, private bookings or workshops at Huashan: how we work, past cases and FAQs. We reply within 3 business days.",
+    ja: "イベント、展示、委託販売、ブランドコラボ、貸切、講座やワークショップ。華山の書店との協働の形と進め方、これまでの事例、よくある質問。3営業日以内にお返事します。",
   },
   eyebrowSuffix: { zh: "異業合作", en: "異業合作", ja: "異業合作" },
   title: {

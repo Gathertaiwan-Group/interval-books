@@ -42,9 +42,9 @@ const PAGE_META = {
    * fitDescription() 會偵測）時才用。
    */
   description: {
-    zh: "小時光風土誌書店（Interval Books）在台北華山文創園區紅磚六合院西7-3館。以土地為線索選書，典藏台灣與日本的地方刊物，也舉辦讀書會、講座與工作坊，並帶你走進台灣各地的文化策旅。",
-    en: "Interval Books is a bookstore of place in Taipei's Huashan 1914 park: books chosen by the land, local publications from Taiwan and Japan, talks, and journeys across Taiwan.",
-    ja: "小時光 風土誌書店（Interval Books）は台北・華山1914文化創意産業園区 紅煉瓦六合院 西7-3館の書店。土地を手がかりに本を選び、台湾と日本の地域誌を所蔵。読書会やトーク、ワークショップ、台湾各地への旅も企画しています。",
+    zh: "從一份地方刊物，讀懂一片土地。小時光風土誌書店在台北華山文創園區紅磚六合院，以土地為線索選書，典藏台灣與日本的地方刊物，舉辦讀書會、講座與工作坊，也帶你走進台灣各地的文化策旅。",
+    en: "Read a place through its local publications. Interval Books at Huashan 1914, Taipei: books chosen by the land, zines from Taiwan and Japan, talks and journeys.",
+    ja: "一冊の地域誌から、ひとつの土地を読む。台北・華山1914文化創意産業園区の小時光 風土誌書店は、土地を手がかりに本を選び、台湾と日本の地域の刊行物を所蔵。読書会やトーク、台湾各地への旅も企画しています。",
   },
 };
 

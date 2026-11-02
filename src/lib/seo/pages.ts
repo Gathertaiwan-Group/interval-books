@@ -164,6 +164,45 @@ export function storeAddressFromMatches(
   return null;
 }
 
+/**
+ * 活動描述太短時的補充句（fitDescription 的 filler）：只用這一場自己的欄位——名稱、
+ * 顯示日期、講者。變動的部分放在句尾，兩場活動的描述結尾才不會一樣。
+ * 不寫地點：/events/$slug 也有在台東的策旅，不一定在書店裡。
+ */
+export function eventFiller(event: {
+  title: Localized;
+  date?: string | null;
+  speaker?: { name?: string | null } | null;
+}): Localized {
+  const date = (event.date ?? "").trim();
+  const who = (event.speaker?.name ?? "").trim();
+  const build = (lang: Lang): string => {
+    const name = stripForeignBrandSuffix(event.title[lang] || event.title.zh);
+    if (lang === "en")
+      return `An Interval Books event: ${name}${date ? `, ${date}` : ""}${who ? `, with ${who}` : ""}.`;
+    if (lang === "ja")
+      return `小時光 風土誌書店のイベント「${name}」${date ? `（${date}）` : ""}${who ? `、${who}` : ""}。`;
+    return `小時光風土誌書店的活動「${name}」${date ? `，${date}` : ""}${who ? `，分享人${who}` : ""}。`;
+  };
+  return { zh: build("zh"), en: build("en"), ja: build("ja") };
+}
+
+/** 商品描述太短時的補充句：類別、名稱、售價（都是商品頁上印著的）。 */
+export function productFiller(
+  product: { title: Localized; price: number },
+  category: Localized,
+): Localized {
+  const price = `NT$${product.price.toLocaleString("en-US")}`;
+  const build = (lang: Lang): string => {
+    const name = product.title[lang] || product.title.zh;
+    const cat = category[lang] || category.zh;
+    if (lang === "en") return `${cat} at Interval Books: ${name}, ${price}.`;
+    if (lang === "ja") return `小時光 風土誌書店の${cat}「${name}」、${price}。`;
+    return `小時光風土誌書店的${cat}「${name}」，售價 ${price}。`;
+  };
+  return { zh: build("zh"), en: build("en"), ja: build("ja") };
+}
+
 /** /events/$slug。event 為 null（讀取失敗）時回頁面層的預設值，沒有 JSON-LD。 */
 export function eventSeo(
   event: EventDetailEntry | null,
@@ -182,7 +221,11 @@ export function eventSeo(
   }
   const path = `/events/${event.slug}`;
   const url = canonicalUrl(path, undefined, lang);
-  const description = fitDescription(joinLocalized(event.summary, event.description));
+  const description = fitDescription(
+    joinLocalized(event.summary, event.description),
+    null,
+    eventFiller(event),
+  );
   const image = event.imageKey ? imageFor(event.imageKey, "") : null;
   const name = stripForeignBrandSuffix(event.title[lang] || event.title.zh);
   return {
@@ -286,7 +329,11 @@ export function productSeo(
   const path = `/shop/${product.slug}`;
   const pub = isPublication(product);
   const category = pub ? PUBLICATION_LABEL : PRODUCT_TYPE_LABELS[product.productType];
-  const description = fitDescription(joinLocalized(product.summary, product.description));
+  const description = fitDescription(
+    joinLocalized(product.summary, product.description),
+    null,
+    productFiller(product, category),
+  );
   const image = imageFor(product.imageKey, fallbackImage);
   const name = product.title[lang] || product.title.zh;
   return {

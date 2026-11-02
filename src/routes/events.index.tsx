@@ -33,9 +33,9 @@ const PAGE = {
     ja: "イベント｜小時光 風土誌書店",
   },
   metaDescription: {
-    zh: "讀書會、療癒生活節、策旅說明會、陶藝家展售、身心靈工作坊與好書交流——本頁為策展式彙整，每場活動皆有獨立網站。",
-    en: "Reading circles, healing festivals, journey briefings, ceramicist showcases, somatic workshops, and book exchanges — a curated overview; each event has its own site.",
-    ja: "読書会、ヒーリング・フェス、旅の説明会、陶芸家の展示販売、ソマティック・ワークショップ、本の交流。各イベントには専用サイトがあります。",
+    zh: "在書店裡一起讀：讀書會、繪本分享會、陶作閱讀課與城市思享沙龍。這一頁整理正在報名與已結束的活動，附上日期與簡介，點進去就是每一場活動的專屬頁面與報名方式。",
+    en: "Reading circles, picture-book talks, pottery-and-reading classes and city salons at our Huashan bookstore — open and past events, each with its own page.",
+    ja: "読書会、絵本のおはなし会、陶芸と読書の教室、都市のサロン。受付中と終了したイベントを日付と紹介つきでまとめ、それぞれの専用ページと申し込み方法へご案内します。",
   },
   eyebrowSuffix: { zh: "活動", en: "Events", ja: "イベント" },
   title: {

@@ -44,9 +44,9 @@ const PAGE = {
     ja: "セレクト｜小時光 風土誌書店",
   },
   metaDescription: {
-    zh: "書籍、選物、活動與策旅名額，都可以在這裡直接選購；地方刊物展與主理人的選品也在同一頁。",
-    en: "Books, curated objects, event tickets and journey places — plus the local-publications show and the owner's curated window, all under one roof.",
-    ja: "書籍、セレクト品、イベントや旅の参加枠に加え、地域の刊行物展と店主の選品も同じページに。",
+    zh: "在線上帶走一本地方刊物：從基隆的東北風到新北的緬甸街，每一本都標上製作單位、價格與剩餘數量，可宅配或超商取貨。旁邊的分頁還有完整的地方刊物展，與主理人的選品櫥窗。",
+    en: "Take home a local publication: titles from Keelung to Taitung with maker, price and stock left, shipped to you — plus the full zine show and curated window.",
+    ja: "地域の刊行物をオンラインで。基隆から台東まで、発行元・価格・残り冊数を表示し、宅配やコンビニ受け取りに対応。タブでは地域誌の全展示と店主のセレクトもご覧いただけます。",
   },
   eyebrowSuffix: { zh: "選物", en: "Selection", ja: "セレクト" },
   title: {
@@ -75,9 +75,9 @@ const PAGE = {
     ja: "地域の刊行物｜小時光 風土誌書店",
   },
   publicationsMetaDescription: {
-    zh: "小時光風土誌書店的地方刊物展：從基隆的漁村到日本的山間小鎮，一個地方怎麼被自己的人寫下來。台灣與日本的地方刊物依地區整理，部分可線上選購，其餘在店內展閱。",
-    en: "The local-publications show at Interval Books: from a fishing village in Keelung to small mountain towns in Japan — how a place gets written down by its own people. Some titles can be ordered online; the rest are on display in the store.",
-    ja: "小時光 風土誌書店の地域の刊行物展。基隆の漁村から日本の山あいの町まで、土地がその土地の人によって書き残される姿を集めました。一部はオンラインで購入でき、その他は店頭でご覧いただけます。",
+    zh: "一個地方，怎麼被自己的人寫下來：從基隆的漁村到日本的山間小鎮，台灣與日本的地方刊物依地區排在同一張桌上。每一本附上製作單位與集數，部分可線上購買，其餘歡迎到店翻閱。",
+    en: "How a place is written by its own people: local publications from Keelung's fishing villages to Japan's mountain towns, by region. Some can be bought online.",
+    ja: "土地が、そこに暮らす人の手で書き残される。基隆の漁村から日本の山あいの町まで、台湾と日本の地域誌を地域別に紹介。発行元と号数つきで、一部はオンラインでも購入できます。",
   },
   curatedMetaTitle: {
     zh: "主理人的選品 Curated｜小時光風土誌書店",
@@ -85,9 +85,9 @@ const PAGE = {
     ja: "店主の選品｜小時光 風土誌書店",
   },
   curatedMetaDescription: {
-    zh: "三個主題櫥窗：地方風土、器物與陶、茶與日常。展示型呈現，請至店或來信詢問。",
-    en: "Three themed windows — local terroir, vessels and clay, tea and the everyday. Displayed rather than listed; visit the store or write to us to ask.",
-    ja: "三つのテーマのウィンドウ——土地の風土、器と陶、茶と日常。展示形式のため、店頭またはメールでお問い合わせください。",
+    zh: "主理人的選品不是商品清單，而是三個主題櫥窗：地方風土（桂花蜜、東海岸海鹽、阿里山烏龍）、器物與陶（粗陶茶碗、白瓷小皿）、茶與日常（焙茶包、海鹽可可）。想帶走，歡迎到店或用 Email、LINE 詢問。",
+    en: "The owner's picks in three windows — local terroir, vessels and clay, tea and daily life: osmanthus honey, sea salt, clay tea bowls. Ask in store, by email or LINE.",
+    ja: "店主のセレクトを三つの窓辺で。土地の風土（桂花蜜、東海岸の海塩）、器と陶（粗陶の茶碗、白磁の小皿）、茶と日常（ほうじ茶、海塩ココア）。店頭、メール、LINE でお問い合わせください。",
   },
 };
 

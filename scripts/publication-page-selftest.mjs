@@ -161,11 +161,28 @@ for (const lang of ["zh", "ja"]) {
   checkTrue(`tw-001 ${lang} 描述 70–160 字（實際 ${n}）`, n >= 70 && n <= 160);
 }
 checkTrue("tw-001 英文描述 110–300 字元", d1.en.length >= 110 && d1.en.length <= 300);
-checkTrue("描述以介紹開頭（取自 intro）", d1.zh.startsWith("許焜山先生有感於家鄉漁村記憶不斷流失"));
+checkTrue(
+  "描述是「介紹……——《刊名》」（取自 intro，結尾帶刊名）",
+  d1.zh.startsWith("許焜山先生有感於家鄉漁村記憶不斷流失") &&
+    d1.zh.endsWith(`——《${TW001.title.zh}》`),
+);
 const d2 = pub.publicationDescription(SHORT);
 checkTrue(
-  "介紹太短 → 補站名標語到 70 字以上",
-  core.charLength(d2.zh) >= 70 && d2.zh.startsWith("一份很短的介紹。"),
+  "介紹太短 → 補這一本的地區、製作單位（不是全站同一句站名標語）",
+  d2.zh.startsWith("一份很短的介紹。") &&
+    d2.zh.endsWith(`——《${SHORT.title.zh}》`) &&
+    d2.zh.includes("地方刊物") &&
+    !d2.zh.includes("華山文創園區"),
+  d2.zh,
+);
+const twin = pub.publicationDescription({
+  ...TW001,
+  slug: "tw-twin",
+  title: { zh: "西北雨", en: "Xibeiyu", ja: "西北雨" },
+});
+checkTrue(
+  "介紹逐字相同、刊名一樣長的兩本刊物，描述結尾仍不同（結尾帶刊名）",
+  twin.zh.slice(-20) !== d1.zh.slice(-20) && twin.en.slice(-20) !== d1.en.slice(-20),
 );
 
 // =============================================================================

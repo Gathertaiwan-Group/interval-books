@@ -193,13 +193,30 @@ const home = fitDescription(
 );
 checkTrue("有佔位符時用 fallback", home.zh.startsWith("替代描述"));
 checkTrue("太長截到 160 字以內", charLength(home.zh) <= 160);
+// 2026-11：太短不再接全站同一段站名標語（各頁描述後半段都一樣＝重複描述）。
 const short = fitDescription({
   zh: "小時光書店之隱私權聲明。",
   en: "Privacy.",
   ja: "プライバシー。",
 });
-checkTrue(`太短補標語（${charLength(short.zh)} 字 ≥ 70）`, charLength(short.zh) >= 70);
-checkTrue("補的是站名標語", short.zh.includes("華山文創園區"));
+check("太短、沒有 filler → 原樣保留（不補站名標語）", short.zh, "小時光書店之隱私權聲明。");
+checkTrue("不再出現站名標語", !short.zh.includes("華山文創園區") && !short.en.includes("Huashan"));
+const filled = fitDescription({ zh: "一場很短的介紹。", en: "Short.", ja: "短い紹介。" }, null, {
+  zh: "這一頁自己的補充句。",
+  en: "This page's own filler.",
+  ja: "このページの補足。",
+});
+check("太短 → 接這一頁自己的 filler", filled.zh, "一場很短的介紹。這一頁自己的補充句。");
+check("英文 filler 以空白接上", filled.en, "Short. This page's own filler.");
+const enough = fitDescription(
+  { zh: "夠長的描述。".repeat(14), en: "x".repeat(120), ja: "十分な長さ。".repeat(14) },
+  null,
+  { zh: "不該出現的補充句。", en: "should not appear", ja: "出ないはず。" },
+);
+checkTrue(
+  "已達下限 → 不接 filler",
+  !enough.zh.includes("不該出現") && !enough.en.includes("should"),
+);
 check(
   "外來品牌後綴拿掉（半形 | ）",
   stripForeignBrandSuffix("2026 台東池上秋收山海旅行 | 馥自然人文空間"),

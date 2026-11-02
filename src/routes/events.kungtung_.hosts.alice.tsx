@@ -29,7 +29,7 @@ const PAGE = {
     ja: "Alice 劉柳樺｜文化の旅のキュレーター｜公東教会文化の旅｜小時光 風土誌書店",
   },
   metaDescription: {
-    zh: "小時光風土誌書店主理人 × 馥自然人文空間策旅主理人 Alice 劉柳樺的經歷與策展。",
+    zh: "Alice 劉柳樺，小時光風土誌書店主理人、台東馥自然人文空間策旅主理人。從華山的一櫃書到台東山海間的餐桌，她策劃書展、讀書會與風土旅程，這次邀攝影作家范毅舜一起帶路公東教堂三天兩夜。",
     en: "Alice Liu, founder of Interval Books and journey curator at INNTERVAL Fu Nature & Humanities Space: her work and curation.",
     ja: "小時光 風土誌書店の店主であり、馥自然人文空間の旅のキュレーター、Alice 劉柳樺の経歴と企画。",
   },

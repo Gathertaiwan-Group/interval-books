@@ -29,7 +29,7 @@ const PAGE = {
     ja: "范毅舜｜文化の案内人｜公東教会文化の旅｜小時光 風土誌書店",
   },
   metaDescription: {
-    zh: "攝影作家范毅舜的經歷、代表著作與媒體報導。《公東的教堂》作者，親自帶領旅人走進公東教堂。",
+    zh: "攝影作家范毅舜（小五哥）的經歷、代表著作與媒體報導。《公東的教堂》《海岸山脈的瑞士人》作者，作品獲美國國會圖書館等單位典藏；這趟台東三天兩夜，他將親自帶旅人走進公東教堂。",
     en: "Photographer and author Nicholas Fan: career, major books and press. Author of The Chapel of Kung Tung, guiding travellers into the chapel in person.",
     ja: "写真家・作家、范毅舜の経歴、代表作とメディア掲載。『公東的教堂』の著者が公東教会を自ら案内します。",
   },
