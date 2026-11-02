@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { Lang, Localized } from "./types";
 import { localizeHref } from "@/lib/seo/i18n";
 import { syncRouterLang } from "@/lib/i18n-rewrite";
+import { isAutoRedirecting } from "@/lib/lang-autodetect";
 
 type Ctx = {
   lang: Lang;
@@ -29,7 +30,10 @@ const LanguageContext = createContext<Ctx | null>(null);
  * 記住的語言什麼時候寫入：按語言切換鈕、或打開 /en、/ja 的頁面（之後的購物車、結帳介面
  * 延續同一個語言）。打開中文頁**不**寫入（中文是預設值，不代表訪客選了中文）。
  *
- * 🔴 不要再依 navigator.language 自動換語言（2026-11 SEO 健檢 H2）。
+ * 🔴 這裡（React render／state）不要依 navigator.language 換語言（2026-11 SEO 健檢 H2）：
+ *    render 時讀 navigator 會讓 SSR 與 hydration 不一致，Googlebot（en-US）也會看到英文。
+ *    依瀏覽器語系的自動導向在 <head> 的 inline script 做（換網址、不換這一頁的語言），
+ *    排除爬蟲、只導一次、手動優先——見 src/lib/lang-autodetect.ts。
  *
  * urlLang：由 __root.tsx 依目前網址算好傳進來（src/lib/seo/i18n.ts 的 publicLangOf）。
  *   Lang = 公開頁的語言；null = 私密頁；undefined = 沒有 router 的地方（selftest 的
@@ -71,7 +75,9 @@ export function LanguageProvider({
   }, []);
 
   // 打開 /en、/ja 的頁面 = 選了那個語言（購物車、結帳沿用）。
+  // 這一頁正被自動導走（例：中文訪客開了 /en 連結）→ 不寫，免得導回中文後介面卻記成英文。
   useEffect(() => {
+    if (isAutoRedirecting()) return;
     if (urlLang === "en" || urlLang === "ja") {
       writeStoredLang(urlLang);
       setStored(urlLang);

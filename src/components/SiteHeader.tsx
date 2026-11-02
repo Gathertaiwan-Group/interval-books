@@ -2,7 +2,8 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { ShoppingBag, UserRound } from "lucide-react";
 import { useLang, useT, writeStoredLang } from "@/i18n/LanguageContext";
-import { HTML_LANG, LANGS, type Lang } from "@/i18n/types";
+import { HTML_LANG, type Lang } from "@/i18n/types";
+import { writeLangChoice } from "@/lib/lang-autodetect";
 import { switchLangHref } from "@/lib/seo/i18n";
 import { useCartCount, useCartHydrated } from "@/lib/cart";
 import { useSiteContent } from "@/lib/site-content";
@@ -53,23 +54,7 @@ export function SiteHeader() {
             </Link>
           ))}
 
-          <span className="ml-2 flex items-center gap-2 border-l border-border/80 pl-4 text-[0.7rem] tracking-widest">
-            {LANGS.map((l, i) => (
-              <span key={l.code} className="flex items-center gap-2">
-                {i > 0 && <span className="text-border">·</span>}
-                <LangSwitch
-                  code={l.code}
-                  className={
-                    lang === l.code
-                      ? "text-foreground border-b border-foreground pb-0.5"
-                      : "text-muted-foreground hover:text-foreground transition-colors"
-                  }
-                >
-                  {l.label}
-                </LangSwitch>
-              </span>
-            ))}
-          </span>
+          <LangSegmented className="ml-1" />
 
           <AccountLink label={t(ui.nav.account)} />
           <CartLink label={t(ui.nav.cart)} />
@@ -95,22 +80,9 @@ export function SiteHeader() {
 
       {open && (
         <div className="lg:hidden border-t border-border/60 bg-background">
-          <div className="container-editorial pt-5 pb-2 flex items-center gap-3 text-[0.7rem] tracking-widest border-b border-border/40">
-            {LANGS.map((l, i) => (
-              <span key={l.code} className="flex items-center gap-3">
-                {i > 0 && <span className="text-border">·</span>}
-                <LangSwitch
-                  code={l.code}
-                  className={
-                    lang === l.code
-                      ? "text-foreground border-b border-foreground pb-0.5"
-                      : "text-muted-foreground"
-                  }
-                >
-                  {l.label}
-                </LangSwitch>
-              </span>
-            ))}
+          {/* 手機：語言切換放在選單最上面（頁首放不下：店名＋帳號＋購物車＋選單鈕已經佔滿 390px）。 */}
+          <div className="container-editorial border-b border-border/40 pt-5 pb-4">
+            <LangSegmented />
           </div>
           <nav className="container-editorial flex flex-col py-6 gap-4 text-base">
             {NAV.map((n) => (
@@ -202,24 +174,51 @@ function AccountLink({ label, onNavigate }: { label: string; onNavigate?: () => 
 }
 
 /**
- * 語言切換（2026-11 /en /ja）。
+ * 語言切換：分段按鈕「中｜EN｜日」（2026-11 業主：「換成按鈕狀、簡潔」）。
  *
+ *   · 細線外框、三格等寬、目前語言實心（深咖啡底＋米白字），配合首頁改版的頁首。
+ *   · 每格高 40px、寬 44px（點擊範圍 ≥ 40px）；鍵盤 Tab 進得來，focus-visible 有外框。
  *   · 公開頁：連到**同一頁的另一個語言網址**的 <a href>（整頁載入；搜尋引擎也看得到這三個
- *     連結），按下時順便記住選擇（localStorage），之後的購物車、結帳介面跟著換。
- *   · 私密頁（購物車、結帳、會員…；沒有 /en 網址）：維持原本的按鈕，只換介面語言。
+ *     連結，hreflang／lang 屬性照舊），按下時記住選擇——
+ *       writeStoredLang：之後的購物車、結帳介面跟著換；
+ *       writeLangChoice：手動選過 → 以後永遠不再依瀏覽器語系自動導（src/lib/lang-autodetect.ts）。
+ *   · 私密頁（購物車、結帳、會員…；沒有 /en 網址）：同樣外觀的 <button>，只換介面語言。
  */
-function LangSwitch({
-  code,
-  className,
-  children,
-}: {
-  code: Lang;
-  className: string;
-  children: ReactNode;
-}) {
+const LANG_SEGMENTS: { code: Lang; label: string; name: string }[] = [
+  { code: "zh", label: "中", name: "中文" },
+  { code: "en", label: "EN", name: "English" },
+  { code: "ja", label: "日", name: "日本語" },
+];
+
+const GROUP_LABEL: Record<Lang, string> = { zh: "語言", en: "Language", ja: "言語" };
+
+function LangSegmented({ className = "" }: { className?: string }) {
+  const { lang } = useLang();
+  return (
+    <div
+      role="group"
+      aria-label={GROUP_LABEL[lang]}
+      className={`inline-flex shrink-0 divide-x divide-foreground/25 border border-foreground/35 ${className}`}
+    >
+      {LANG_SEGMENTS.map((seg) => (
+        <LangSwitch key={seg.code} code={seg.code} name={seg.name}>
+          {seg.label}
+        </LangSwitch>
+      ))}
+    </div>
+  );
+}
+
+const SEGMENT_BASE =
+  "relative inline-flex h-10 w-11 items-center justify-center text-[0.75rem] leading-none tracking-[0.08em] transition-colors focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground";
+const SEGMENT_ON = "bg-foreground text-primary-foreground";
+const SEGMENT_OFF = "text-foreground/70 hover:bg-foreground/[0.06] hover:text-foreground";
+
+function LangSwitch({ code, name, children }: { code: Lang; name: string; children: ReactNode }) {
   const { lang, urlLang, setLang } = useLang();
   const publicHref = useRouterState({ select: (s) => s.location.publicHref });
   const current = lang === code;
+  const className = `${SEGMENT_BASE} ${current ? SEGMENT_ON : SEGMENT_OFF}`;
   if (urlLang !== null) {
     return (
       <a
@@ -227,7 +226,12 @@ function LangSwitch({
         href={switchLangHref((publicHref ?? "/").split("#")[0], code)}
         hrefLang={HTML_LANG[code]}
         lang={HTML_LANG[code]}
-        onClick={() => writeStoredLang(code)}
+        title={name}
+        aria-label={name}
+        onClick={() => {
+          writeStoredLang(code);
+          writeLangChoice(code);
+        }}
         className={className}
         aria-current={current ? "true" : undefined}
       >
@@ -237,9 +241,16 @@ function LangSwitch({
   }
   return (
     <button
-      onClick={() => setLang(code)}
+      type="button"
+      lang={HTML_LANG[code]}
+      title={name}
+      aria-label={name}
+      onClick={() => {
+        setLang(code);
+        writeLangChoice(code);
+      }}
       className={className}
-      aria-current={current ? "true" : undefined}
+      aria-pressed={current}
     >
       {children}
     </button>

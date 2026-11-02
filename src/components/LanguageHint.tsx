@@ -3,6 +3,7 @@ import { useRouterState } from "@tanstack/react-router";
 import { X } from "lucide-react";
 import { useLang, writeStoredLang } from "@/i18n/LanguageContext";
 import { switchLangHref } from "@/lib/seo/i18n";
+import { writeLangChoice } from "@/lib/lang-autodetect";
 
 const DISMISS_KEY = "interval-books-lang-hint-dismissed";
 
@@ -14,8 +15,14 @@ const COPY = {
 /**
  * 中文頁上的「View in English?」小提示（2026-11 /en /ja）。
  *
- * 訪客記住的語言是英文或日文、但打開的是中文網址（例如別人分享的連結）時，**不自動轉走**——
- * Googlebot 與分享連結都不能被轉——只在角落放一個不擋畫面的提示，按了才去 /en、/ja。
+ * 有了依瀏覽器語系的自動導向（src/lib/lang-autodetect.ts）之後仍保留，但只負責**自動導向
+ * 不會發生**的情況：
+ *   · 自動導向每位訪客只做一次。英文訪客第一次來被導去 /en 之後，日後打開朋友分享的中文連結
+ *     就不再轉——這時給一個不擋畫面的提示，按了才去 /en。
+ *   · 訪客手動選過英文／日文（之後永遠不自動導），又打開中文連結。
+ * 會自動導的情況，<head> 的 script 在畫面出來前就轉走了，這個提示根本來不及出現；手動選回中文的
+ * 訪客，記住的語言是中文，也不會出現。
+ *
  * 掛載之後才可能出現（SSR 沒有記住的語言），所以不會造成 hydration 不一致。
  * 關掉之後這個分頁（sessionStorage）不再出現。
  */
@@ -73,7 +80,10 @@ export function LanguageHint() {
       <a
         href={target}
         hrefLang={stored}
-        onClick={() => writeStoredLang(stored)}
+        onClick={() => {
+          writeStoredLang(stored);
+          writeLangChoice(stored);
+        }}
         className="whitespace-nowrap border-b border-foreground pb-0.5 text-foreground"
       >
         {copy.action}

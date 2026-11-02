@@ -18,6 +18,7 @@ import { SiteContentProvider, useSiteContent } from "@/lib/site-content";
 import { ReferralCapture } from "@/components/ReferralCapture";
 import { absoluteUrl, isNoindexPath, siteGraphLd } from "@/lib/seo/core";
 import { ld } from "@/lib/seo/head";
+import { LANG_AUTODETECT_SCRIPT } from "@/lib/lang-autodetect";
 import {
   analyticsEnabledFor,
   ga4HeadScripts,
@@ -172,8 +173,16 @@ export const Route = createRootRoute({
         { rel: "icon", type: "image/png", href: "/logo.png" },
         { rel: "apple-touch-icon", href: "/logo.png" },
       ],
-      // GA4：前台才載（後台、廠商入口不載），見 src/lib/analytics.ts。
-      scripts: analyticsEnabledFor(pathname) ? ga4HeadScripts() : [],
+      scripts: [
+        // 依瀏覽器語系自動導向（2026-11）：瀏覽器端、排除爬蟲、只導一次、手動優先，
+        // 見 src/lib/lang-autodetect.ts。HeadContent 把 head scripts 排在所有 <link>（含各頁的
+        // hreflang）之後，script 才讀得到這一頁有哪些語言版本。
+        // 每一頁都輸出、內容固定（SSR 與 hydration 一致）。TanStack 換頁時會把它移掉再插一份
+        // 並執行——script 自己用 readyState／window 旗標擋掉，每個 document 只判斷一次。
+        { children: LANG_AUTODETECT_SCRIPT },
+        // GA4：前台才載（後台、廠商入口不載），見 src/lib/analytics.ts。
+        ...(analyticsEnabledFor(pathname) ? ga4HeadScripts() : []),
+      ],
     };
   },
   shellComponent: RootShell,

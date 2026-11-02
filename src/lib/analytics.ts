@@ -13,6 +13,7 @@
  * 這是 SPA：config 時關掉自動 send_page_view，由 __root.tsx 的 <GaPageViews /> 在每次
  * 路由完成（含第一頁）時手動送一次——不關的話第一頁會被算兩次。
  */
+import { isAutoRedirecting } from "@/lib/lang-autodetect";
 const FALLBACK_GA4_ID = "G-34972QC1RW";
 
 function resolveGa4Id(): string {
@@ -52,6 +53,8 @@ type Gtag = (...args: unknown[]) => void;
 export function sendPageView(): void {
   if (typeof window === "undefined") return;
   if (!analyticsEnabledFor(window.location.pathname)) return;
+  // 依瀏覽器語系自動導走的那一頁不算一次瀏覽（導到的那一頁會再送）。
+  if (isAutoRedirecting()) return;
   const gtag = (window as unknown as { gtag?: Gtag }).gtag;
   if (typeof gtag !== "function") return;
   gtag("event", "page_view", {

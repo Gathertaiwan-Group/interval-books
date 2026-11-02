@@ -13,7 +13,9 @@
  *
  * ── 為什麼語言只看網址 ─────────────────────────────────────────────────────────
  *   SSR 依網址輸出該語言，瀏覽器第一次 render 也依網址 → 一定一致（不會 #418）。
- *   中文頁**不**依 localStorage 自動轉去 /en：Googlebot（en-US）與分享出去的連結都會被轉走。
+ *   伺服器**永遠**只看網址（不看 Accept-Language／cookie，不 302、不加 Vary）。
+ *   依瀏覽器語系自動導向（2026-11 業主要求）只在瀏覽器端做，排除爬蟲、只導一次、手動選擇優先，
+ *   見 src/lib/lang-autodetect.ts。
  */
 import type { Lang, Localized, LocalizedList } from "../../i18n/types";
 
@@ -33,7 +35,7 @@ export const LD_LANGUAGE: Record<Lang, string> = { zh: "zh-Hant-TW", en: "en", j
  * 不加語言前綴的路徑。與 core.ts 的 NOINDEX_PREFIXES 大致相同，另外加上非頁面的
  * /media、/assets、/.well-known（圖片代理、bundle、OAuth discovery）。
  */
-const UNLOCALIZED_PREFIXES = [
+export const UNLOCALIZED_PREFIXES: readonly string[] = [
   "/admin",
   "/vendor",
   "/checkout",
