@@ -28,14 +28,10 @@ import {
 } from "@/lib/admin/inv-adjustment-labels";
 import { INV_PRODUCT_TYPE_LABELS } from "@/lib/admin/schemas";
 import type { AdminAdjustmentRow, StockCountProductRow } from "@/server/repos/inv-adjustments";
+import { isLowStock } from "@/lib/admin/low-stock";
 
-export function isLowStock(row: StockCountProductRow): boolean {
-  return (
-    row.low_stock_alert !== null &&
-    row.low_stock_alert > 0 &&
-    row.stock_quantity <= row.low_stock_alert
-  );
-}
+// 低庫存的唯一定義在 src/lib/admin/low-stock.ts（repo 的篩選與 MCP 共用）。
+export { isLowStock };
 
 function typeLabel(code: string) {
   return INV_PRODUCT_TYPE_LABELS[code as keyof typeof INV_PRODUCT_TYPE_LABELS] ?? code;

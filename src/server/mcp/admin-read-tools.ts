@@ -713,6 +713,7 @@ export const ADMIN_READ_HANDLERS: Handlers = {
     if (from > to) throw new McpInputError("date_from 不能晚於 date_to");
 
     const { summarisePosSales } = await import("@/server/repos/inv-sales");
+    const { readAllPages } = await import("@/server/repos/read-all-pages");
     const { supabaseAdmin } = await import("@/server/supabase-admin");
     const base = {
       from,
@@ -726,22 +727,27 @@ export const ADMIN_READ_HANDLERS: Handlers = {
     const [pos, online, ordersRes] = await Promise.all([
       summarisePosSales({ ...base, channel: "pos" }),
       summarisePosSales({ ...base, channel: "online" }),
-      supabaseAdmin()
-        .from("orders")
-        .select("total, payment_method, source")
-        .eq("payment_status", "paid")
-        .gte("paid_at", taipeiDayStartIso(from))
-        .lt("paid_at", taipeiDayEndIso(to))
-        .limit(20000),
+      // ⚠️ 不能 .limit(20000)：PostgREST 的 db-max-rows（1000）會靜默截斷，營收少算
+      //    （2026-11-03 審查）。依 id 分段讀完。
+      readAllPages(
+        (a, b) =>
+          supabaseAdmin()
+            .from("orders")
+            .select("id, total, payment_method, source")
+            .eq("payment_status", "paid")
+            .gte("paid_at", taipeiDayStartIso(from))
+            .lt("paid_at", taipeiDayEndIso(to))
+            .order("id", { ascending: true })
+            .range(a, b) as unknown as PromiseLike<{
+            data: { total: number; payment_method: string | null; source: string | null }[] | null;
+            error: { code?: string; message: string } | null;
+          }>,
+        { label: "網站訂單" },
+      ),
     ]);
-    if (ordersRes.error) throw new Error(`網站訂單讀取失敗：${ordersRes.error.code}`);
 
     const withProfit = (s: typeof pos) => ({ ...s, gross_profit: s.amount - s.cost });
-    const orders = (ordersRes.data ?? []) as {
-      total: number;
-      payment_method: string | null;
-      source: string | null;
-    }[];
+    const orders = ordersRes;
     const group = (key: (o: (typeof orders)[number]) => string) => {
       const out: Record<string, { count: number; amount: number }> = {};
       for (const o of orders) {
@@ -813,32 +819,22 @@ export const ADMIN_READ_HANDLERS: Handlers = {
     });
 
     if (args.low_stock_only) {
-      // 與盤點頁同一支（repos/inv-adjustments.ts#listStockCountProducts）：庫存 ≤ 5 粗篩，
-      // 再用每件自己的 low_stock_alert 精篩（= src/components/inventory/StockCountTable.tsx
-      // 的 isLowStock，那支在 UI 檔裡，這裡不 import 它以免把 React 拉進伺服器）。
+      // 與盤點頁同一支（repos/inv-adjustments.ts#listStockCountProducts）：分段讀完後用
+      // src/lib/admin/low-stock.ts#isLowStock（每件自己的警示值）篩，分頁也在 repo 裡做。
       const { listStockCountProducts } = await import("@/server/repos/inv-adjustments");
-      const { rows } = await listStockCountProducts({
+      const { rows, total } = await listStockCountProducts({
         keyword: args.keyword ?? null,
         categoryId: null,
         productType: args.product_type ?? null,
         lowStockOnly: true,
-        page: 0,
-        pageSize: 1000,
+        page: args.page - 1,
+        pageSize: args.limit,
       });
-      const low = rows
-        .filter(
-          (r) =>
-            r.low_stock_alert !== null &&
-            r.low_stock_alert > 0 &&
-            r.stock_quantity <= r.low_stock_alert,
-        )
-        .sort((a, b) => a.stock_quantity - b.stock_quantity);
-      const p = paged(low, args.limit, args.page);
       return jsonText({
         low_stock_only: true,
-        ...p,
-        rows: p.rows.map(slim),
-        note: "與後台盤點頁相同：只看啟用且已審核的品項；庫存 ≤ 5 粗篩後再比每件自己的警示數量。",
+        ...pageMeta(total, args.limit, args.page, rows.length),
+        rows: rows.map(slim),
+        note: "與後台盤點頁相同：只看啟用且已審核的品項；庫存 ≤ 該品項自己的警示數量（警示 0＝不警示），依品名排序。",
       });
     }
 

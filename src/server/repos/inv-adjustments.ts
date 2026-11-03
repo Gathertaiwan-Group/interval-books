@@ -21,6 +21,8 @@
  */
 import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
+import { readAllPages } from "@/server/repos/read-all-pages";
+import { isLowStock } from "@/lib/admin/low-stock";
 
 /** 0017 的 inv_admin_stock_adjustments。 */
 export type AdminAdjustmentRow = {
@@ -232,35 +234,50 @@ export async function listStockCountProducts(filter: {
 }): Promise<{ rows: StockCountProductRow[]; total: number }> {
   const from = filter.page * filter.pageSize;
 
-  let query = supabaseAdmin()
-    .from("inv_admin_products")
-    .select(
-      "inv_product_id, name, issue_number, series, barcode, product_type, stock_quantity, " +
-        "low_stock_alert, cost_price, category_id, category_name",
-      { count: "exact" },
-    )
-    .eq("is_active", true)
-    .eq("approval_status", "approved")
-    .order("name", { ascending: true })
-    .order("inv_product_id", { ascending: true })
-    .range(from, from + filter.pageSize - 1);
+  const build = () => {
+    let query = supabaseAdmin()
+      .from("inv_admin_products")
+      .select(
+        "inv_product_id, name, issue_number, series, barcode, product_type, stock_quantity, " +
+          "low_stock_alert, cost_price, category_id, category_name",
+        { count: "exact" },
+      )
+      .eq("is_active", true)
+      .eq("approval_status", "approved")
+      .order("name", { ascending: true })
+      .order("inv_product_id", { ascending: true });
 
-  if (filter.categoryId) query = query.eq("category_id", filter.categoryId);
-  if (filter.productType) query = query.eq("product_type", filter.productType);
-  // 低庫存門檻是 per-row 的（low_stock_alert，預設 5）。PostgREST 沒辦法比較兩個
-  // 欄位，所以這裡只做「庫存 <= 5」的粗篩，精確判斷留給顯示層。
-  if (filter.lowStockOnly) query = query.lte("stock_quantity", 5);
-
-  if (filter.keyword) {
-    const safe = filter.keyword.replace(/[(),]/g, " ").trim();
-    if (safe) {
-      query = query.or(
-        `name.ilike.%${safe}%,issue_number.ilike.%${safe}%,series.ilike.%${safe}%,barcode.ilike.%${safe}%`,
-      );
+    if (filter.categoryId) query = query.eq("category_id", filter.categoryId);
+    if (filter.productType) query = query.eq("product_type", filter.productType);
+    if (filter.keyword) {
+      const safe = filter.keyword.replace(/[(),]/g, " ").trim();
+      if (safe) {
+        query = query.or(
+          `name.ilike.%${safe}%,issue_number.ilike.%${safe}%,series.ilike.%${safe}%,barcode.ilike.%${safe}%`,
+        );
+      }
     }
+    return query;
+  };
+
+  if (filter.lowStockOnly) {
+    // 低庫存門檻是 per-row 的（low_stock_alert，預設 5），PostgREST 沒辦法比較兩個欄位。
+    // 原本在資料庫端粗篩「庫存 <= 5」，會漏掉警示值設得比 5 大的品項（2026-11-03 審查）。
+    // 改成把符合其他條件的品項分段讀完，用 isLowStock（唯一定義）在記憶體篩，再分頁。
+    // 啟用＋已審核的品項約幾千列，分段讀幾趟可以接受。
+    const all = await readAllPages(
+      (a, b) =>
+        build().range(a, b) as unknown as PromiseLike<{
+          data: StockCountProductRow[] | null;
+          error: { code?: string; message: string } | null;
+        }>,
+      { label: "[repo/inv-adjustments] 盤點商品（低庫存）" },
+    );
+    const low = all.filter(isLowStock);
+    return { rows: low.slice(from, from + filter.pageSize), total: low.length };
   }
 
-  const { data, error, count } = await query;
+  const { data, error, count } = await build().range(from, from + filter.pageSize - 1);
   if (error) throw new Error(`[repo/inv-adjustments] 盤點商品清單讀取失敗：${error.message}`);
   return { rows: (data ?? []) as unknown as StockCountProductRow[], total: count ?? 0 };
 }

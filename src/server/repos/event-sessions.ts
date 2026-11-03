@@ -29,6 +29,7 @@
  */
 import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
+import { readAllPages } from "@/server/repos/read-all-pages";
 import type { Localized } from "@/i18n/types";
 
 const COLUMNS =
@@ -75,14 +76,20 @@ export type SessionUpsertInput = {
  * plain one-table repo like every other repo in this directory.
  */
 export async function listEventSessions(): Promise<EventSessionRow[]> {
-  const { data, error } = await supabaseAdmin()
-    .from("event_sessions")
-    .select(COLUMNS)
-    .order("starts_at", { ascending: false })
-    .order("id", { ascending: true });
-
-  if (error) throw new Error(`[repo/event-sessions] list 失敗：${error.message}`);
-  return (data ?? []) as EventSessionRow[];
+  // 分段讀完：PostgREST 的 db-max-rows（1000）會靜默截斷整表讀取（2026-11-03 審查）。
+  return await readAllPages(
+    (from, to) =>
+      supabaseAdmin()
+        .from("event_sessions")
+        .select(COLUMNS)
+        .order("starts_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{
+        data: EventSessionRow[] | null;
+        error: { code?: string; message: string } | null;
+      }>,
+    { label: "[repo/event-sessions] list" },
+  );
 }
 
 export async function getEventSessionById(id: string): Promise<EventSessionRow | null> {
@@ -230,15 +237,21 @@ export type PlanUpsertInput = {
  * sessions are on screen.
  */
 export async function listEventSessionPlans(): Promise<EventSessionPlanRow[]> {
-  const { data, error } = await supabaseAdmin()
-    .from("event_session_plans")
-    .select(PLAN_COLUMNS)
-    .order("session_id", { ascending: true })
-    .order("sort_order", { ascending: true })
-    .order("id", { ascending: true });
-
-  if (error) throw new Error(`[repo/event-sessions] listPlans 失敗：${error.message}`);
-  return (data ?? []) as EventSessionPlanRow[];
+  // 分段讀完（同 listEventSessions）。
+  return await readAllPages(
+    (from, to) =>
+      supabaseAdmin()
+        .from("event_session_plans")
+        .select(PLAN_COLUMNS)
+        .order("session_id", { ascending: true })
+        .order("sort_order", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{
+        data: EventSessionPlanRow[] | null;
+        error: { code?: string; message: string } | null;
+      }>,
+    { label: "[repo/event-sessions] listPlans" },
+  );
 }
 
 /**

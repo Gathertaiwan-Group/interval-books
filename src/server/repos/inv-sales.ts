@@ -13,6 +13,7 @@
  */
 import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
+import { readAllPages } from "@/server/repos/read-all-pages";
 
 /**
  * 櫃檯賣得動的品項。available 已經是**銷售單位**，前端不要再乘 pack_size。
@@ -306,30 +307,34 @@ export async function getPosSale(saleId: string): Promise<PosSaleRow | null> {
 export async function summarisePosSales(
   filter: SalesFilter,
 ): Promise<{ count: number; quantity: number; amount: number; cost: number }> {
-  let query = supabaseAdmin().from("inv_pos_sales").select("quantity, amount, cost_price");
+  // ⚠️ 原本是 .limit(20000)，但 PostgREST 的 db-max-rows（1000）會靜默蓋過它：超過 1000 筆
+  //    合計就少算（2026-11-03 審查）。改成 readAllPages 依 sale_id 分段讀完。
+  const page = (from: number, to: number) => {
+    let query = supabaseAdmin()
+      .from("inv_pos_sales")
+      .select("sale_id, quantity, amount, cost_price")
+      .order("sale_id", { ascending: true })
+      .range(from, to);
 
-  if (filter.from) query = query.gte("sale_date", filter.from);
-  if (filter.to) query = query.lte("sale_date", filter.to);
-  if (filter.channel !== "all") query = query.eq("channel", filter.channel);
-  if (filter.reconciled !== "all") query = query.eq("is_reconciled", filter.reconciled === "yes");
-  if (filter.paymentMethodId) query = query.eq("payment_method_id", filter.paymentMethodId);
-  if (filter.keyword) {
-    const safe = filter.keyword.replace(/[(),]/g, " ").trim();
-    if (safe) {
-      query = query.or(
-        `product_name.ilike.%${safe}%,issue_number.ilike.%${safe}%,series.ilike.%${safe}%,notes.ilike.%${safe}%`,
-      );
+    if (filter.from) query = query.gte("sale_date", filter.from);
+    if (filter.to) query = query.lte("sale_date", filter.to);
+    if (filter.channel !== "all") query = query.eq("channel", filter.channel);
+    if (filter.reconciled !== "all") query = query.eq("is_reconciled", filter.reconciled === "yes");
+    if (filter.paymentMethodId) query = query.eq("payment_method_id", filter.paymentMethodId);
+    if (filter.keyword) {
+      const safe = filter.keyword.replace(/[(),]/g, " ").trim();
+      if (safe) {
+        query = query.or(
+          `product_name.ilike.%${safe}%,issue_number.ilike.%${safe}%,series.ilike.%${safe}%,notes.ilike.%${safe}%`,
+        );
+      }
     }
-  }
-
-  const { data, error } = await query.limit(20000);
-  if (error) throw new Error(`[repo/inv-sales] 銷售合計讀取失敗：${error.message}`);
-
-  const rows = (data ?? []) as {
-    quantity: number;
-    amount: number | null;
-    cost_price: number | null;
-  }[];
+    return query as unknown as PromiseLike<{
+      data: { quantity: number; amount: number | null; cost_price: number | null }[] | null;
+      error: { code?: string; message: string } | null;
+    }>;
+  };
+  const rows = await readAllPages(page, { label: "[repo/inv-sales] 銷售合計" });
   return {
     count: rows.length,
     quantity: rows.reduce((n, r) => n + r.quantity, 0),

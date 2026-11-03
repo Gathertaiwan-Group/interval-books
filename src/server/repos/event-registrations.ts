@@ -73,6 +73,7 @@
  */
 import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
+import { readAllPages } from "@/server/repos/read-all-pages";
 import type { Localized } from "@/i18n/types";
 import type { AdminOrderAttendee } from "@/lib/email-templates";
 
@@ -373,16 +374,21 @@ export async function loadOrderAttendeesForAdminNotify(
 export async function countRegistrationsBySession(): Promise<
   Record<string, { total: number; paid: number }>
 > {
-  const { data, error } = await supabaseAdmin()
-    .from("admin_event_roster")
-    .select("session_id, on_roster");
-
-  if (error) {
-    console.error(`[repo/event-registrations] count 失敗：${error.code} ${error.message}`);
-    throw new Error(`[repo/event-registrations] count 失敗：${error.code}`);
-  }
-
-  const rows = (data ?? []) as unknown as { session_id: string; on_roster: boolean }[];
+  // ⚠️ 整張 view 一次讀會被 PostgREST 的 db-max-rows（1000）靜默截斷（2026-11-03 審查）：
+  //    依 registration_id 分段讀完。
+  // readAllPages 的錯誤訊息只帶 code＋message（不帶 DETAIL 那一列客人資料）。
+  const rows: { session_id: string; on_roster: boolean }[] = await readAllPages(
+    (from, to) =>
+      supabaseAdmin()
+        .from("admin_event_roster")
+        .select("session_id, on_roster")
+        .order("registration_id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{
+        data: { session_id: string; on_roster: boolean }[] | null;
+        error: { code?: string; message: string } | null;
+      }>,
+    { label: "[repo/event-registrations] count" },
+  );
   const counts: Record<string, { total: number; paid: number }> = {};
   for (const r of rows) {
     const entry = (counts[r.session_id] ??= { total: 0, paid: 0 });
