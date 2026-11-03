@@ -524,6 +524,7 @@ async function audit(
     entity_id: entityId,
     action: "create",
     changes: { dry_run: dryRun, outcome, ...changes },
+    dry_run: dryRun,
   });
 }
 

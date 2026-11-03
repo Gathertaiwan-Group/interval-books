@@ -17,6 +17,7 @@ import { supabaseAdmin } from "@/server/supabase-admin";
 import {
   REFRESH_REUSE_GRACE_SECONDS,
   type EpochInfo,
+  type GrantAccessLevel,
   type NewGrant,
   type OAuthStore,
   type RotateResult,
@@ -27,7 +28,10 @@ const USED = "mcp_oauth_used_codes";
 const EPOCHS = "mcp_oauth_user_epochs";
 
 const CACHE_MS = 60_000;
-const activeCache = new Map<string, { ok: boolean; at: number }>();
+const activeCache = new Map<
+  string,
+  { ok: boolean; at: number; level?: GrantAccessLevel; clientName?: string | null }
+>();
 const epochCache = new Map<string, EpochInfo & { at: number }>();
 
 const iso = (sec: number) => new Date(sec * 1000).toISOString();
@@ -172,11 +176,20 @@ export const dbOAuthStore: OAuthStore = {
       .eq("user_id", userId)
       .is("revoked_at", null)
       .gt("expires_at", nowIso)
-      .select("id");
+      .select("id, access_level, client_name");
     if (error) fail("grantActive", error.code ?? "error");
     const ok = Array.isArray(data) && data.length === 1;
+    // 0054：讀寫權限跟著同一趟查詢回來、同一份 ≤60 秒快取（切換與撤銷同一條生效規則）。
+    const row = ok ? (data[0] as { access_level?: string; client_name?: string }) : null;
+    const level: GrantAccessLevel = row?.access_level === "write" ? "write" : "read";
     prune(activeCache, now);
-    activeCache.set(gid, { ok, at: now });
+    activeCache.set(gid, { ok, at: now, level, clientName: row?.client_name ?? null });
     return ok;
+  },
+
+  async grantDetails(gid: string) {
+    // 只在 grantActive 之後被呼叫（http.ts），正常一定命中快取；沒命中就保守回唯讀。
+    const hit = activeCache.get(gid);
+    return { accessLevel: hit?.level ?? "read", clientName: hit?.clientName ?? null };
   },
 };

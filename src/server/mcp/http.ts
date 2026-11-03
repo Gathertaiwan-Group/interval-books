@@ -25,19 +25,38 @@ export async function handleMcpRequest(
   request: Request,
   deps: { isActiveAdmin?: AdminLookup; oauthStore?: OAuthStore } = {},
 ): Promise<Response> {
-  const auth = authenticateMcpRequest(request, process.env.MCP_TOKEN, process.env.MCP_OAUTH_SECRET);
+  const auth = authenticateMcpRequest(
+    request,
+    process.env.MCP_TOKEN,
+    process.env.MCP_OAUTH_SECRET,
+    undefined,
+    process.env.MCP_READONLY_TOKEN,
+  );
   if (auth.kind === "deny") return auth.response;
 
-  let actor: McpActor = { via: "static_token" };
+  let actor: McpActor =
+    auth.kind === "static_readonly"
+      ? { via: "readonly_token", access: "read" }
+      : { via: "static_token", access: "write" };
   if (auth.kind === "oauth") {
     const isActiveAdmin = deps.isActiveAdmin ?? (await import("@/server/auth")).isActiveAdmin;
     let admin: Awaited<ReturnType<AdminLookup>>;
     let active = false;
+    let access: McpActor["access"] = "read";
+    let clientName: string | null = null;
     try {
       admin = await isActiveAdmin(auth.token.sub);
       if (admin) {
         const store = deps.oauthStore ?? (await import("./oauth-store")).dbOAuthStore;
         active = await accessTokenActive(auth.token, store);
+        // 0054：讀寫權限。0043 之前簽發、沒有 gid 的 token 沒有授權鏈可查，維持可寫入（與
+        // 0054 對既有連線的預設相同）。
+        if (active) {
+          const d =
+            auth.token.gid && store.grantDetails ? await store.grantDetails(auth.token.gid) : null;
+          access = d ? d.accessLevel : "write";
+          clientName = d?.clientName ?? null;
+        }
       }
     } catch {
       // 查不到 profiles 不等於「不是 admin」，但也絕不放行；回 503 讓客戶端稍後重試，
@@ -52,7 +71,14 @@ export async function handleMcpRequest(
       });
     }
     if (!admin || !active) return unauthorizedOAuthResponse(request);
-    actor = { via: "oauth", user_id: admin.userId, email: admin.email, client: auth.token.cid };
+    actor = {
+      via: "oauth",
+      user_id: admin.userId,
+      email: admin.email,
+      client: auth.token.cid,
+      client_name: clientName,
+      access,
+    };
   }
 
   const { mcpHandler } = await import("./handler");

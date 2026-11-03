@@ -74,6 +74,21 @@ function McpConnectionsPage() {
   const [busy, setBusy] = useState(false);
   const active = grants.filter((g) => grantState(g) === "active");
 
+  async function toggleAccess(g: McpGrantRow) {
+    const level = g.access_level === "write" ? "read" : "write";
+    setBusy(true);
+    try {
+      const fns = await import("@/lib/admin/fns/mcp-connections");
+      await fns.setMcpConnectionAccess({ data: { id: g.id, level } });
+      toast.success(level === "write" ? "已改成可寫入" : "已改成唯讀");
+      await router.invalidate({ sync: true });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "切換失敗，請稍後再試");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function confirm() {
     if (!target) return;
     setBusy(true);
@@ -127,13 +142,14 @@ function McpConnectionsPage() {
               <TableHead className="whitespace-nowrap">最後使用</TableHead>
               <TableHead className="whitespace-nowrap">最晚到期</TableHead>
               <TableHead>狀態</TableHead>
+              <TableHead className="whitespace-nowrap">權限</TableHead>
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {grants.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={8} className="h-24 text-center text-sm text-muted-foreground">
                   還沒有任何授權紀錄。0043
                   上線前就連著的連接器，會在下一次自動更新憑證時出現在這裡。
                 </TableCell>
@@ -176,6 +192,23 @@ function McpConnectionsPage() {
                         </span>
                       )}
                     </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <span className="flex items-center gap-2">
+                        <Badge variant={g.access_level === "write" ? "default" : "outline"}>
+                          {g.access_level === "write" ? "可寫入" : "唯讀"}
+                        </Badge>
+                        {st === "active" ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => toggleAccess(g)}
+                          >
+                            {g.access_level === "write" ? "改唯讀" : "改可寫入"}
+                          </Button>
+                        ) : null}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-right">
                       {st === "active" ? (
                         <Button
@@ -197,6 +230,7 @@ function McpConnectionsPage() {
       </div>
       <p className="text-xs text-muted-foreground">
         使用中 {active.length} 條。撤銷後 Claude 那邊最多 1 分鐘內就無法再讀寫後台。
+        「唯讀」連線只能查詢；寫入工具（含預覽）一律拒絕。新連線預設唯讀，切換最多 1 分鐘生效。
       </p>
 
       <AlertDialog open={target !== null} onOpenChange={(o) => !o && !busy && setTarget(null)}>

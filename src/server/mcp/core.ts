@@ -106,6 +106,8 @@ export function gateMcpRequest(req: Request, expectedToken: string | undefined):
 
 export type McpAuth =
   | { kind: "static" }
+  /** 2026-11-03：MCP_READONLY_TOKEN —— 只能用唯讀工具（驗收與只想查資料的客戶端用）。 */
+  | { kind: "static_readonly" }
   | { kind: "oauth"; token: AccessPayload }
   | { kind: "deny"; response: Response };
 
@@ -131,10 +133,12 @@ export function authenticateMcpRequest(
   staticToken: string | undefined,
   oauthSecret: string | undefined,
   now?: number,
+  readonlyToken?: string,
 ): McpAuth {
   const staticOn = staticTokenUsable(staticToken);
+  const readonlyOn = staticTokenUsable(readonlyToken);
   const oauthOn = oauthEnabled(oauthSecret);
-  if (!staticOn && !oauthOn) return { kind: "deny", response: notFoundResponse() };
+  if (!staticOn && !readonlyOn && !oauthOn) return { kind: "deny", response: notFoundResponse() };
 
   if (!originAllowed(req.headers.get("origin"))) {
     return { kind: "deny", response: plain(403, "forbidden_origin") };
@@ -159,6 +163,7 @@ export function authenticateMcpRequest(
     };
   }
   if (staticOn && tokenMatches(got, staticToken.trim())) return { kind: "static" };
+  if (readonlyOn && tokenMatches(got, readonlyToken.trim())) return { kind: "static_readonly" };
   if (oauthOn && got.startsWith(TOKEN_PREFIX.access)) {
     const token = verifyAccessToken(got, oauthSecret, base, now);
     if (token) return { kind: "oauth", token };

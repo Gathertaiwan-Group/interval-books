@@ -884,6 +884,12 @@ export const MIGRATION_LEDGER = Object.freeze([
     note: "MCP 圖片直傳的私有暫存 bucket mcp-image-uploads（public=false、2 MiB、只收 webp/jpeg/png、沒有任何 storage.objects policy）。create_image_upload_url 的 signed upload URL 指向這裡，finalize_image_upload 驗過才轉存 site-images。",
     touches: ["storage"],
   },
+  {
+    file: "0054_mcp_access_level_audit_actor.sql",
+    note: "MCP 讀寫分級＋操作紀錄正式欄位：mcp_oauth_grants 加 access_level（read／write CHECK；先以 default 'write' 補既有列、再把 default 改 'read'——既有連線維持可寫入、新連線預設唯讀）；mcp_audit_log 加 actor_via（CHECK）、actor_user_id、actor_email、client_name、dry_run（not null default false），action CHECK 改成格式檢查以納入營運寫入動作，加 (actor_user_id, created_at) 索引。不改任何權限、不碰其他表。",
+    // touches 用 AREAS 的識別字掃過剝掉註解的 SQL：只出現 mcp_oauth_grants 與 mcp_audit_log。
+    touches: ["mcp_audit", "mcp_oauth"],
+  },
 ]);
 
 /** 磁碟上的 migration 檔名，排序過。空目錄 = 丟例外（那不是「沒有違規」）。 */

@@ -831,9 +831,18 @@ export interface OAuthStore {
    * 實作可以順手更新 last_used_at。
    */
   grantActive(gid: string, userId: string, now: number): Promise<boolean>;
+  /**
+   * 0054：這條鏈的讀寫權限。只在 grantActive() 通過之後呼叫。沒實作（舊的替身）＝可寫入，
+   * 與 0054 對既有連線的預設相同。
+   */
+  grantDetails?(gid: string): Promise<{ accessLevel: GrantAccessLevel; clientName: string | null }>;
 }
 
+export type GrantAccessLevel = "read" | "write";
+
 type MemGrant = NewGrant & {
+  /** 自檢用：模擬 0054 的 access_level。沒設＝write（既有連線）。 */
+  accessLevel?: GrantAccessLevel;
   id: string;
   current: string;
   previous: string | null;
@@ -914,6 +923,10 @@ export function createMemoryOAuthStore(): OAuthStore & {
     async grantActive(gid, userId, now) {
       const g = grants.get(gid);
       return !!g && g.userId === userId && g.revokedAt === null && g.expiresAt > now;
+    },
+    async grantDetails(gid) {
+      const g = grants.get(gid);
+      return { accessLevel: g?.accessLevel ?? "write", clientName: g?.clientName ?? null };
     },
   };
 }

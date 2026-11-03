@@ -957,6 +957,69 @@ console.log("\n[7] MCP 協定");
   );
 
   check("MCP_INSTRUCTIONS 匯出", typeof handlerMod.MCP_INSTRUCTIONS, "string");
+
+  // ── 0054 讀寫分級：MCP_READONLY_TOKEN ─────────────────────────────────────
+  const RO = "r".repeat(20) + "fedcba9876543210fedcba98";
+  process.env.MCP_READONLY_TOKEN = RO;
+  const roCall = async (name, args) => {
+    const res = await http.handleMcpRequest(
+      new Request("https://www.intervalbooks.tw/api/mcp", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          authorization: `Bearer ${RO}`,
+          "mcp-protocol-version": "2025-11-25",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 9,
+          method: "tools/call",
+          params: { name, arguments: args },
+        }),
+      }),
+    );
+    const text = await res.text();
+    const line = text.split("\n").find((l) => l.startsWith("data:"));
+    return { status: res.status, json: JSON.parse(line ? line.slice(5) : text) };
+  };
+  const roWrite = await roCall("update_news", { id: "x", is_published: false });
+  check("唯讀 token 通過閘門（200）", roWrite.status, 200);
+  checkTrue(
+    "🔴 唯讀 token 呼叫寫入工具（dry_run 預設）→ 被拒、訊息講清楚",
+    roWrite.json?.result?.isError === true &&
+      (roWrite.json?.result?.content?.[0]?.text ?? "").includes("唯讀"),
+  );
+  const roCreate = await roCall("create_event", { title: "t", category: "c", description: "d" });
+  checkTrue(
+    "🔴 唯讀 token 呼叫新增工具 → 被拒",
+    roCreate.json?.result?.isError === true &&
+      (roCreate.json?.result?.content?.[0]?.text ?? "").includes("唯讀"),
+  );
+  const roBad = core.authenticateMcpRequest(
+    new Request("https://www.intervalbooks.tw/api/mcp", {
+      method: "POST",
+      headers: { authorization: `Bearer ${RO}x` },
+    }),
+    undefined,
+    undefined,
+    undefined,
+    RO,
+  );
+  check("唯讀 token 打錯一個字 → 401", roBad.kind === "deny" && roBad.response.status, 401);
+  const roOnly = core.authenticateMcpRequest(
+    new Request("https://www.intervalbooks.tw/api/mcp", {
+      method: "POST",
+      headers: { authorization: `Bearer ${RO}` },
+    }),
+    undefined,
+    undefined,
+    undefined,
+    RO,
+  );
+  check("只設 MCP_READONLY_TOKEN 也能通過（kind=static_readonly）", roOnly.kind, "static_readonly");
+  delete process.env.MCP_READONLY_TOKEN;
+
   if (saved === undefined) delete process.env.MCP_TOKEN;
   else process.env.MCP_TOKEN = saved;
 }
@@ -1017,13 +1080,30 @@ console.log("\n[8] 掛載與 migration");
     mig.includes("grant select, insert on table public.mcp_audit_log to service_role;"),
   );
   checkTrue("0039：actor_role CHECK 釘死 mcp", mig.includes("check (actor_role = 'mcp')"));
+  // 0054：加 actor／client／dry_run 欄位、action CHECK 改格式檢查；仍 append-only（不給 update／delete）。
+  const mig54 = readFile(join(MIG_DIR, "0054_mcp_access_level_audit_actor.sql"));
+  checkTrue(
+    "0054：mcp_audit_log 補 actor_via／actor_user_id／actor_email／client_name／dry_run",
+    ["actor_via", "actor_user_id", "actor_email", "client_name", "dry_run"].every((c) =>
+      mig54.includes(`add column if not exists ${c}`),
+    ),
+  );
+  checkTrue(
+    "🔴 0054：沒有對 mcp_audit_log 授權 update／delete（仍 append-only）",
+    !/grant[^;]*(update|delete)[^;]*mcp_audit_log/i.test(mig54),
+  );
+  checkTrue(
+    "🔴 0054：既有連線先以 default 'write' 補值，再把 default 改 'read'",
+    mig54.indexOf("default 'write'") > 0 &&
+      mig54.indexOf("set default 'read'") > mig54.indexOf("default 'write'"),
+  );
 
   assertLedgerMatchesDisk(check, MIG_DIR);
   assertLedgerDeclarationsHonest(check, MIG_DIR);
   assertMigrationDependencies(check, MIG_DIR, {
     suite: SELF,
     dependsOn: ["mcp_audit"],
-    reviewedThrough: "0039_mcp_audit_log.sql",
+    reviewedThrough: "0054_mcp_access_level_audit_actor.sql",
   });
 }
 
