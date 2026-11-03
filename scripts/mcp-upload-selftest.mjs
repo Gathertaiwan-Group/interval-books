@@ -670,7 +670,15 @@ console.log("\n[4] 稽核");
     rows.map((r) => r.action),
     ["upload", "upload", "create", "upload"],
   );
-  check("稽核帶呼叫者身分（靜態 token）", rows[0].changes._actor, { via: "static_token" });
+  check("稽核帶呼叫者身分（靜態 token）", rows[0].changes._actor, {
+    via: "static_token",
+    access: "write",
+  });
+  check(
+    "稽核正式欄位（0054）：actor_via／client_name／dry_run",
+    [rows[0].actor_via, rows[0].client_name, rows[0].dry_run],
+    ["static_token", "static_token", false],
+  );
 }
 
 // -----------------------------------------------------------------------------
