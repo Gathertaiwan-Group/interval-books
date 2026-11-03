@@ -23,6 +23,11 @@
  * 加欄位，所以「是誰」寫進 changes 的保留鍵 `_actor`（{via, user_id, email, client}；
  * 靜態 token 是 {via:"static_token"}）。changes 只 insert、從不被程式讀回，多一個鍵不影響
  * 任何地方。之後有正式的欄位再搬。
+ *
+ * 0054 起有正式欄位了：actor_via／actor_user_id／actor_email／client_name／dry_run。
+ * changes._actor 照舊保留（舊列只有它，查詢時兩邊都看得到），新欄位是給後台與 SQL 篩選用。
+ * dry_run 預覽也記（業主 2026-11-03：「會改什麼」本身就是一次操作）。0054 還沒套上時，
+ * insert 會因為欄位不存在而失敗 → 回 log_only，工具照常回應。
  */
 import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
@@ -34,8 +39,11 @@ export type McpAuditEntry = {
   tool: string;
   entity: string;
   entity_id: string;
-  action: "create" | "update" | "delete" | "upload";
+  /** 0054 起是格式檢查（小寫英文＋底線，2–40 字），不再是固定清單。 */
+  action: string;
   changes: unknown;
+  /** 預設 false。預覽（dry_run=true）也要記一筆。 */
+  dry_run?: boolean;
 };
 
 export type McpAuditStatus = "recorded" | "log_only";
@@ -48,7 +56,24 @@ export async function writeMcpAudit(entry: McpAuditEntry): Promise<McpAuditStatu
       : actor
         ? { value: entry.changes, _actor: actor }
         : entry.changes;
-  const record = { actor_role: "mcp" as const, ...entry, changes };
+  const { dry_run, ...rest } = entry;
+  const record = {
+    actor_role: "mcp" as const,
+    ...rest,
+    changes,
+    dry_run: dry_run === true,
+    actor_via: actor?.via ?? null,
+    actor_user_id: actor?.via === "oauth" ? actor.user_id : null,
+    actor_email: actor?.via === "oauth" ? actor.email : null,
+    client_name:
+      actor?.via === "oauth"
+        ? (actor.client_name ?? null)
+        : actor?.via === "static_token"
+          ? "static_token"
+          : actor?.via === "readonly_token"
+            ? "readonly_token"
+            : null,
+  };
   try {
     console.info(`[mcp-audit] ${JSON.stringify({ at: new Date().toISOString(), ...record })}`);
   } catch {

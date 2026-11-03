@@ -593,9 +593,10 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
     // 0052（活動／策旅單一上架狀態）：events／journeys 加 status、票券商品 status 改由 trigger
     // 推導、admin_upsert_event_with_session 多收 status；orders 與上面三支訂單 RPC 一個字沒動。
     // 0053（MCP 圖片直傳的私有暫存 bucket）：只 insert 一個 storage.buckets，orders 與訂單 RPC 一個字沒動。
-    "supabase/migrations 剛好 53 個 .sql 檔（0001–0051 原封不動 + 0052 單一上架狀態 + 0053 MCP 暫存 bucket）",
+    // 0054（MCP 讀寫分級＋稽核欄位）：只動 mcp_oauth_grants 與 mcp_audit_log，orders 與訂單 RPC 一個字沒動。
+    "supabase/migrations 剛好 54 個 .sql 檔（0001–0051 原封不動 + 0052 單一上架狀態 + 0053 MCP 暫存 bucket + 0054 MCP 讀寫分級）",
     migFiles.length,
-    53,
+    54,
   );
 }
 

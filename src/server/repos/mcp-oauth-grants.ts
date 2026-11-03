@@ -20,6 +20,8 @@ export type McpGrantRow = {
   expires_at: string;
   revoked_at: string | null;
   revoked_reason: string | null;
+  /** 0054：read 唯讀／write 可寫入。既有連線是 write，新連線預設 read。 */
+  access_level: "read" | "write";
 };
 
 const LIMIT = 200;
@@ -28,7 +30,7 @@ export async function listMcpGrants(): Promise<McpGrantRow[]> {
   const { data, error } = await supabaseAdmin()
     .from("mcp_oauth_grants")
     .select(
-      "id, user_id, client_name, redirect_uri, created_at, last_used_at, expires_at, revoked_at, revoked_reason",
+      "id, user_id, client_name, redirect_uri, created_at, last_used_at, expires_at, revoked_at, revoked_reason, access_level",
     )
     .order("created_at", { ascending: false })
     .limit(LIMIT);
@@ -45,6 +47,22 @@ export async function listMcpGrants(): Promise<McpGrantRow[]> {
     for (const p of ps ?? []) emails.set(p.id as string, (p.email as string) ?? "");
   }
   return rows.map((r) => ({ ...r, email: emails.get(r.user_id) ?? null }));
+}
+
+/**
+ * 切換一條連線的讀寫權限（0054）。只改還在使用中的連線。清掉本 instance 的快取，其他
+ * instance 最多晚 60 秒（與撤銷同一條規則）。
+ */
+export async function setMcpGrantAccess(id: string, level: "read" | "write"): Promise<boolean> {
+  const { data, error } = await supabaseAdmin()
+    .from("mcp_oauth_grants")
+    .update({ access_level: level })
+    .eq("id", id)
+    .is("revoked_at", null)
+    .select("id");
+  if (error) throw new Error(`[repo/mcp-oauth] 切換權限失敗：${error.message}`);
+  forgetOAuthCaches({ grantId: id });
+  return Array.isArray(data) && data.length === 1;
 }
 
 export async function revokeMcpGrant(id: string): Promise<void> {

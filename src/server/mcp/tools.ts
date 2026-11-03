@@ -251,6 +251,16 @@ async function runWrite(plan: WritePlan): Promise<TextResult> {
   }
 
   if (plan.dryRun) {
+    // 0054：預覽也記一筆（dry_run=true），業主要查得到「AI 打算改什麼」。
+    const { writeMcpAudit } = await import("./audit");
+    await writeMcpAudit({
+      tool: plan.tool,
+      entity: plan.entity,
+      entity_id: plan.id,
+      action: plan.action,
+      changes,
+      dry_run: true,
+    });
     return jsonText({
       ...base,
       dry_run: true,
@@ -293,6 +303,28 @@ async function safe(fn: () => Promise<TextResult>): Promise<TextResult> {
     console.error("[mcp] tool error", err);
     return errText(`執行失敗：${err instanceof Error ? err.message : String(err)}`);
   }
+}
+
+/**
+ * 唯讀連線（MCP_READONLY_TOKEN，或後台設成「唯讀」的 OAuth 連線）呼叫寫入工具 → 回錯誤文字並記
+ * 一筆 action=denied 的稽核。沒有 actor（自檢直接呼叫）視為可寫入，與 http.ts 以外沒有入口一致。
+ */
+export async function denyIfReadOnly(tool: string): Promise<TextResult | null> {
+  const { currentMcpActor } = await import("./actor");
+  const actor = currentMcpActor();
+  if (!actor || actor.access === "write") return null;
+  const { writeMcpAudit } = await import("./audit");
+  await writeMcpAudit({
+    tool,
+    entity: "mcp_access",
+    entity_id: "-",
+    action: "denied",
+    changes: { reason: "read_only_connection" },
+  });
+  return errText(
+    `這條連線是「唯讀」，不能使用寫入工具 ${tool}（預覽也不行）。` +
+      "請管理員到後台 /admin/mcp-connections 把這條連線改成「可寫入」，最多 1 分鐘後生效。",
+  );
 }
 
 function notFound(what: string, id: string): never {
@@ -634,7 +666,14 @@ export function registerContentTools(server: McpServer): void {
         ...(meta._meta ? { _meta: meta._meta } : {}),
       },
       // SDK 已經用同一支 schema 驗過並套上預設值；這裡的轉型只是把型別接回來。
-      (async (args: unknown) => safe(() => fn(args as Args<N>))) as never,
+      (async (args: unknown) => {
+        // 0054 讀寫分級：不是 readOnlyHint 的工具，唯讀連線一律拒絕（含 dry_run 預覽）。
+        if (meta.annotations.readOnlyHint !== true) {
+          const denied = await denyIfReadOnly(name);
+          if (denied) return denied;
+        }
+        return safe(() => fn(args as Args<N>));
+      }) as never,
     );
   }
 

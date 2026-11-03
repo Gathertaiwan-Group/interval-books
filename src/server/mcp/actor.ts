@@ -9,9 +9,26 @@
 import "@tanstack/react-start/server-only";
 import { AsyncLocalStorage } from "node:async_hooks";
 
+/**
+ * access：這一次請求能不能用寫入工具（0054 讀寫分級）。static_token＝write；
+ * readonly_token（MCP_READONLY_TOKEN）＝read；OAuth＝那條授權鏈的 access_level。
+ * 擋在 tools.ts 的 add()：readOnlyHint 不是 true 的工具，read 一律拒絕（含 dry_run 預覽）。
+ */
+export type McpAccess = "read" | "write";
+
 export type McpActor =
-  | { via: "static_token" }
-  | { via: "oauth"; user_id: string; email: string; client: string };
+  | { via: "static_token"; access: "write" }
+  | { via: "readonly_token"; access: "read" }
+  | {
+      via: "oauth";
+      user_id: string;
+      email: string;
+      /** client_id 的雜湊（token 裡的 cid）。 */
+      client: string;
+      /** 授權時 client 自報的名稱（mcp_oauth_grants.client_name，例如 Claude／ChatGPT）。 */
+      client_name: string | null;
+      access: McpAccess;
+    };
 
 const store = new AsyncLocalStorage<McpActor>();
 
