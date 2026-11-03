@@ -156,6 +156,40 @@ const SETTINGS_READABLE = [...SETTINGS_LOCALIZED, ...SETTINGS_TEXT, "notify_emai
 
 /* ------------------------------------------------------------------ 輸入 schema */
 
+/** 會建立新列的寫入工具：dry_run=false 時必填（審查 2026-11-03）。預覽會產生一組。 */
+const idempotencyKeyArg = z
+  .string()
+  .trim()
+  .uuid()
+  .optional()
+  .describe(
+    "防重複送出的 UUID。dry_run=false 時必填：先用 dry_run=true 預覽取得一組，正式送出帶同一組；同一組只會建立一次。",
+  );
+
+/**
+ * dry_run=false 的建立動作：idempotency_key 必填，並在送出前佔用它（重用 OAuth 的一次性表
+ * mcp_oauth_used_codes，30 天）。同一組 key 第二次送出 → 拒絕，不會建出第二筆。
+ * 先佔再寫：寫入失敗之後同一組 key 也不能再用——訊息請 AI 先查清單確認，再用新的 key。
+ */
+async function claimIdempotencyKey(tool: string, key: string | undefined): Promise<void> {
+  if (!key) {
+    throw new McpInputError(
+      "dry_run=false 時 idempotency_key 必填：先用 dry_run=true 預覽取得一組，正式送出時帶同一組。",
+    );
+  }
+  const { dbOAuthStore } = await import("./oauth-store");
+  // jti 上限 80 字：idem:＋工具名（≤24）＋UUID（36）。
+  const ok = await dbOAuthStore.consumeOnce(
+    `idem:${tool}:${key.toLowerCase()}`,
+    Math.floor(Date.now() / 1000) + 30 * 86400,
+  );
+  if (!ok) {
+    throw new McpInputError(
+      `這組 idempotency_key 已經送出過（${tool}），可能已建立或上次失敗。請先查清單確認；確定沒有建立，再預覽取得新的一組。`,
+    );
+  }
+}
+
 export const OPS_WRITE_TOOL_INPUTS = {
   /* ---- 訂單 ---- */
   update_order_fulfillment: z
@@ -352,6 +386,7 @@ export const OPS_WRITE_TOOL_INPUTS = {
       .boolean()
       .default(true)
       .describe("true 送出（要不要進待審由資料庫的審核設定決定）／false 存成草稿"),
+    idempotency_key: idempotencyKeyArg,
     dry_run: dryRunArg,
   }),
   record_stock_count: z.object({
@@ -368,6 +403,7 @@ export const OPS_WRITE_TOOL_INPUTS = {
     reason: z.enum(INV_ADJUSTMENT_REASONS).describe("差異原因"),
     notes: z.string().trim().max(2000).optional(),
     adjustment_date: dateArg("盤點日期，省略＝今天").optional(),
+    idempotency_key: idempotencyKeyArg,
     dry_run: dryRunArg,
   }),
   create_purchase: z.object({
@@ -388,6 +424,7 @@ export const OPS_WRITE_TOOL_INPUTS = {
       .max(365)
       .optional()
       .describe("到期前幾天警示（預設 7）"),
+    idempotency_key: idempotencyKeyArg,
     dry_run: dryRunArg,
   }),
 
@@ -972,6 +1009,13 @@ const IMPL: Handlers = {
     const overrideErr = priceOverrideError(args.price_override ?? null, quote.total);
     if (overrideErr) throw new McpInputError(`手動改價不合法：${overrideErr}`);
 
+    // dry_run=false 時必填（審查 2026-11-03）：沒帶就不建單，避免 AI 重送時每次換一組 key。
+    // 防重複由 createAdminPhoneOrder 的 RPC 以這組 key 保證（同一組 key 重送拿回同一張單）。
+    if (!args.dry_run && !args.idempotency_key) {
+      throw new McpInputError(
+        "dry_run=false 時 idempotency_key 必填：先用 dry_run=true 預覽取得一組，正式送出時帶同一組。",
+      );
+    }
     const idempotencyKey = args.idempotency_key ?? randomUUID();
     const inv = args.invoice;
     const data = validateWith(phoneOrderSchema, {
@@ -1484,10 +1528,11 @@ const IMPL: Handlers = {
         "inv_stock_adjustment",
         "(未建立)",
         "create",
-        { will_create: willCreate },
+        { idempotency_key: args.idempotency_key ?? randomUUID(), will_create: willCreate },
         auditChanges,
       );
     }
+    await claimIdempotencyKey("create_stock_adjustment", args.idempotency_key);
     const { saveAdjustment } = await import("@/server/repos/inv-adjustments");
     const res = await commitOrAudit(
       tool,
@@ -1571,6 +1616,7 @@ const IMPL: Handlers = {
         "(未建立)",
         "count",
         {
+          idempotency_key: args.idempotency_key ?? randomUUID(),
           options: data.options,
           rows: lines,
           summary: {
@@ -1586,6 +1632,7 @@ const IMPL: Handlers = {
         auditChanges,
       );
     }
+    await claimIdempotencyKey("record_stock_count", args.idempotency_key);
     const { recordStockCount } = await import("@/server/repos/inv-adjustments");
     const res = await commitOrAudit(
       tool,
@@ -1641,10 +1688,11 @@ const IMPL: Handlers = {
         "inv_purchase",
         "(未建立)",
         "create",
-        { will_create: willCreate },
+        { idempotency_key: args.idempotency_key ?? randomUUID(), will_create: willCreate },
         payload,
       );
     }
+    await claimIdempotencyKey("create_purchase", args.idempotency_key);
     const { savePurchase } = await import("@/server/repos/inv-purchases");
     const res = await commitOrAudit(tool, "inv_purchase", "(未建立)", "create", payload, () =>
       savePurchase({ userId, id: null, payload }),

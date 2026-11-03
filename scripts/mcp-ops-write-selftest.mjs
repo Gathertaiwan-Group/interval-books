@@ -87,6 +87,15 @@ function builder(table) {
         if (st.op !== "select") log.writes.push({ table, op: st.op, payload: st.payload });
         if (st.op === "update") for (const r of rows) Object.assign(r, st.payload);
         if (st.op === "insert") {
+          // 一次性表：主鍵重複 → 23505（idempotency_key 重送）。
+          if (table === "mcp_oauth_used_codes") {
+            const used = (tables[table] ??= []);
+            if (used.some((r) => r.jti === st.payload.jti)) {
+              resolve({ data: null, error: { code: "23505", message: "duplicate key" } });
+              return;
+            }
+            used.push({ ...st.payload });
+          }
           resolve({ data: null, error: null });
           return;
         }
@@ -176,7 +185,9 @@ const parseOut = (r) => {
   }
 };
 const audits = () => log.writes.filter((w) => w.table === "mcp_audit_log").map((w) => w.payload);
-const dataWrites = () => log.writes.filter((w) => w.table !== "mcp_audit_log");
+// 業務資料的寫入（稽核表與 idempotency_key 的一次性表不算）。
+const dataWrites = () =>
+  log.writes.filter((w) => w.table !== "mcp_audit_log" && w.table !== "mcp_oauth_used_codes");
 
 console.log("═══ MCP 營運寫入工具（階段 B）自檢 ═══");
 
@@ -577,6 +588,7 @@ const CASES = {
   },
   create_stock_adjustment: {
     args: {
+      idempotency_key: "11111111-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
       product_id: PROD1,
       category: "EXP",
       quantity: -2,
@@ -602,6 +614,7 @@ const CASES = {
   },
   record_stock_count: {
     args: {
+      idempotency_key: "11111111-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
       rows: [
         { product_id: PROD1, actual_quantity: 8 },
         { product_id: PROD2, actual_quantity: 4 },
@@ -624,6 +637,7 @@ const CASES = {
   },
   create_purchase: {
     args: {
+      idempotency_key: "11111111-aaaa-4aaa-8aaa-aaaaaaaaaaa3",
       product_id: PROD1,
       quantity: 20,
       unit_cost: 80,
@@ -825,6 +839,24 @@ await expectError("update_order_fulfillment 未付款不能出貨", () =>
 await expectError("mark_order_paid 線上金流的單不能手動標記", () =>
   H.mark_order_paid({ order_id: ORDER_CARD, dry_run: false }),
 );
+// ── idempotency_key（審查 2026-11-03）：dry_run=false 必填、同一組只建一次 ─────────
+for (const n of ["create_stock_adjustment", "record_stock_count", "create_purchase"]) {
+  const { idempotency_key: _k, ...noKey } = CASES[n].args;
+  await expectError(`${n}：dry_run=false 沒帶 idempotency_key → 拒絕`, () =>
+    asOAuth(() => H[n]({ ...noKey, dry_run: false })),
+  );
+  await expectError(`${n}：同一組 idempotency_key 第二次送出 → 拒絕（不呼叫 RPC）`, () => {
+    // 模擬第一次已送出：一次性表裡已有這組 key。
+    tables.mcp_oauth_used_codes = [{ jti: `idem:${n}:${CASES[n].args.idempotency_key}` }];
+    return asOAuth(() => H[n]({ ...CASES[n].args, dry_run: false }));
+  });
+}
+{
+  const { idempotency_key: _k, ...noKey } = CASES.create_phone_order.args;
+  await expectError("create_phone_order：dry_run=false 沒帶 idempotency_key → 拒絕", () =>
+    asOAuth(() => H.create_phone_order({ ...noKey, dry_run: false })),
+  );
+}
 await expectError("create_stock_adjustment 數量 0", () =>
   H.create_stock_adjustment({ product_id: PROD1, category: "EXP", quantity: 0, dry_run: false }),
 );
