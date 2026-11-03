@@ -283,6 +283,35 @@ export async function loadPaidRosterByOrder(orderId: string): Promise<RosterView
 }
 
 /**
+ * 這張訂單上的**所有**報名（不篩 on_roster，未付款／已取消的也在），每一列帶著 view 的
+ * on_roster 讓呼叫端自己分 —— MCP 的 get_order 用（src/server/mcp/admin-read-tools.ts）。
+ * 只回姓名與座位，不回聯絡方式（訂購人的聯絡方式在訂單本身）。
+ */
+export async function listRegistrationsByOrder(
+  orderId: string,
+): Promise<
+  Pick<
+    RosterViewRow,
+    "registration_id" | "session_id" | "seat_no" | "name" | "payment_status" | "on_roster"
+  >[]
+> {
+  const { data, error } = await supabaseAdmin()
+    .from("admin_event_roster")
+    .select("registration_id, session_id, seat_no, name, payment_status, on_roster")
+    .eq("order_id", orderId)
+    .order("session_id", { ascending: true })
+    .order("seat_no", { ascending: true });
+  if (error) {
+    console.error(`[repo/event-registrations] byOrder 失敗：${error.code} ${error.message}`);
+    throw new Error(`[repo/event-registrations] byOrder 失敗：${error.code}`);
+  }
+  return (data ?? []) as unknown as Pick<
+    RosterViewRow,
+    "registration_id" | "session_id" | "seat_no" | "name" | "payment_status" | "on_roster"
+  >[];
+}
+
+/**
  * 這張訂單上的每一位參加者，依場次分組——店家通知信用。
  *
  * **明文**，直接讀 event_registrations 本表，**不寫** pii_access_log：業主

@@ -550,9 +550,78 @@ const EXPECTED_TOOLS = [
   "upload_image_base64",
   "upload_image_file",
 ];
+// 2026-11-03 後台資料唯讀查詢（src/server/mcp/admin-read-tools.ts）。訂單、名單、銷售、進銷存
+// 這些「排除領域」只准出現在這份清單，而且全部 READ_ONLY、沒有任何寫入參數（下面逐條守）。
+const ADMIN_READ_EXPECTED = [
+  "get_admin_dashboard",
+  "list_orders",
+  "get_order",
+  "list_registrations",
+  "get_session_roster",
+  "list_journey_wishes",
+  "get_journey_wish",
+  "list_sales",
+  "get_sale",
+  "get_sales_summary",
+  "list_inventory",
+  "get_inventory_product",
+  "list_stock_alerts",
+  "list_purchases",
+  "get_purchase",
+  "list_vendors",
+  "get_vendor",
+  "list_referrers",
+  "get_referral_report",
+  "list_partnership_inquiries",
+  "get_partnership_inquiry",
+];
+EXPECTED_TOOLS.push(...ADMIN_READ_EXPECTED);
 {
   const names = Object.keys(tools.TOOL_INPUTS).sort();
   check("工具清單（白名單）與預期一致", names, [...EXPECTED_TOOLS].sort());
+  check(
+    "後台唯讀查詢清單（ADMIN_READ_TOOLS）與預期一致",
+    [...tools.ADMIN_READ_TOOLS].sort(),
+    [...ADMIN_READ_EXPECTED].sort(),
+  );
+  const adminRead = new Set(tools.ADMIN_READ_TOOLS);
+  check(
+    "🔴 後台唯讀查詢沒有任何一支在 WRITE_TOOLS／UPLOAD_TOOLS",
+    [...tools.WRITE_TOOLS, ...tools.UPLOAD_TOOLS].filter((n) => adminRead.has(n)),
+    [],
+  );
+  // 寫入意味的參數一個都不准有（dry_run、confirm、status 以外的「改成什麼」都算）。
+  const WRITE_ISH =
+    /^(dry_run|confirm|publish|note|admin_note|amount|price|reason|void|refund|mark|resolve|settle|delete|remove)/;
+  const writeIshFields = [];
+  for (const n of tools.ADMIN_READ_TOOLS) {
+    for (const f of Object.keys(tools.TOOL_INPUTS[n].shape)) {
+      if (WRITE_ISH.test(f)) writeIshFields.push(`${n}.${f}`);
+    }
+  }
+  check("🔴 後台唯讀查詢沒有任何寫入意味的參數", writeIshFields, []);
+  const listNoLimit = tools.ADMIN_READ_TOOLS.filter((n) => n.startsWith("list_")).filter((n) => {
+    const d = tools.TOOL_INPUTS[n].safeParse({}).data;
+    const over = tools.TOOL_INPUTS[n].safeParse({ limit: 101 }).success;
+    return !(d && d.limit === 20 && d.page === 1 && over === false);
+  });
+  check("list_* 後台查詢：limit 預設 20、上限 100、page 從 1", listNoLimit, []);
+  const adminReadSrc = readFile(join(SRC, "server/mcp/admin-read-tools.ts"));
+  check(
+    "🔴 admin-read-tools.ts 沒有任何寫入呼叫（insert／update／upsert／delete／rpc）",
+    adminReadSrc.match(/\.(insert|update|upsert|delete|rpc)\(/g) ?? [],
+    [],
+  );
+  checkTrue(
+    "🔴 付款紀錄不 select raw_response、不讀 webhook_events",
+    !/raw_response|webhook_events/.test(adminReadSrc.replace(/^\s*(\/\/|\*).*$/gm, "")),
+  );
+  checkTrue(
+    "🔴 廠商：識別碼遮罩版本也拿掉，不讀匯款帳戶／敏感欄位",
+    adminReadSrc.includes("tax_id_masked: _tax") &&
+      adminReadSrc.includes("id_number_masked: _idn") &&
+      !/listVendorBankAccounts|readVendorSensitive/.test(adminReadSrc),
+  );
 
   // 用「底線切開後的整個字」比對；sort_order（排序）的 order 不是訂單，先換掉。
   const BANNED_WORDS = new Set([
@@ -596,8 +665,8 @@ const EXPECTED_TOOLS = [
         .some((w) => BANNED_WORDS.has(w)),
   };
   check(
-    "沒有任何一支工具的名字碰到排除的領域",
-    names.filter((n) => banned.test(n)),
+    "沒有任何一支工具的名字碰到排除的領域（後台唯讀查詢除外）",
+    names.filter((n) => banned.test(n) && !adminRead.has(n)),
     [],
   );
   check(
@@ -616,6 +685,7 @@ const EXPECTED_TOOLS = [
   const bannedFields = [];
   const allowedHit = [];
   for (const [n, s] of Object.entries(tools.TOOL_INPUTS)) {
+    if (adminRead.has(n)) continue;
     for (const f of Object.keys(s.shape)) {
       if (!banned.test(f)) continue;
       if (ALLOWED_FIELDS.has(`${n}.${f}`)) allowedHit.push(`${n}.${f}`);
@@ -859,6 +929,16 @@ console.log("\n[7] MCP 協定");
   );
   const listNews = (list.json?.result?.tools ?? []).find((t) => t.name === "list_news");
   check("讀取工具標 readOnlyHint", listNews?.annotations?.readOnlyHint, true);
+  check(
+    "🔴 後台唯讀查詢全部標 readOnlyHint=true、destructiveHint=false",
+    (list.json?.result?.tools ?? [])
+      .filter((t) => ADMIN_READ_EXPECTED.includes(t.name))
+      .filter(
+        (t) => t.annotations?.readOnlyHint !== true || t.annotations?.destructiveHint !== false,
+      )
+      .map((t) => t.name),
+    [],
+  );
   const delNews = (list.json?.result?.tools ?? []).find((t) => t.name === "delete_news");
   check("delete_news 標 destructiveHint", delNews?.annotations?.destructiveHint, true);
 

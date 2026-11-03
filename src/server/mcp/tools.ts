@@ -14,8 +14,12 @@
  * ── 授權 ──────────────────────────────────────────────────────────────────
  * 這裡的每一支都假設呼叫端已經通過 src/server/mcp/core.ts#gateMcpRequest()（與 repos
  * 假設呼叫端通過 adminFnMiddleware 是同一個模型）。能做什麼由**這個檔案註冊了哪些工具**
- * 決定 —— 這份清單就是白名單。訂單、金流、發票、報名名單、人員權限、進銷存、付款與寄信
- * 設定、既有活動的票價／場次／票種修改，一支都沒有註冊。
+ * 決定 —— 這份清單就是白名單。**寫入**工具碰不到訂單、金流、發票、報名名單、人員權限、
+ * 進銷存、付款與寄信設定、既有活動的票價／場次／票種修改。
+ *
+ * 2026-11-03 起多了一組**唯讀**的後台查詢（訂單、報名名單、策旅意願單、銷售、進銷存、推廣、
+ * 合作邀約、首頁待辦，業主要在連接器裡直接問），實作在 ./admin-read-tools.ts，全部 READ_ONLY、
+ * 沒有任何寫入參數；人員帳號與權限、付款與寄信設定仍然一支都沒有。
  *
  * 例外是「新增」：create_event／create_journey 會連同場次與票種一起建（走後台一頁新增
  * 同一支 src/server/event-quick-create.ts），create_shop_product 建一般商品但不寫庫存。
@@ -49,6 +53,12 @@ import {
   runCreateShopProduct,
 } from "./create-tools";
 import { UPLOAD_TOOL_INPUTS } from "./image-upload";
+import {
+  ADMIN_READ_HANDLERS,
+  ADMIN_READ_TOOL_INPUTS,
+  ADMIN_READ_TOOL_META,
+  type AdminReadToolName,
+} from "./admin-read-tools";
 
 /* ------------------------------------------------------------------ 共用 */
 
@@ -553,6 +563,9 @@ export const TOOL_INPUTS = {
 
   /* 直接上傳圖片（./image-upload.ts）。只上傳素材、不改任何頁面，所以沒有 dry_run。 */
   ...UPLOAD_TOOL_INPUTS,
+
+  /* 後台資料唯讀查詢（./admin-read-tools.ts）。 */
+  ...ADMIN_READ_TOOL_INPUTS,
 } as const;
 
 export type ToolName = keyof typeof TOOL_INPUTS;
@@ -586,6 +599,12 @@ export const UPLOAD_TOOLS: readonly ToolName[] = [
   "upload_image_base64",
   "upload_image_file",
 ];
+
+/**
+ * 後台資料唯讀查詢（./admin-read-tools.ts）。訂單、名單、銷售、進銷存等「排除領域」只准出現在
+ * 這份清單裡，而且全部 READ_ONLY —— scripts/mcp-selftest.mjs 守著這兩件事。
+ */
+export const ADMIN_READ_TOOLS = Object.keys(ADMIN_READ_TOOL_INPUTS) as readonly AdminReadToolName[];
 
 type Args<N extends ToolName> = z.output<(typeof TOOL_INPUTS)[N]>;
 
@@ -2003,4 +2022,12 @@ export function registerContentTools(server: McpServer): void {
     { ...CREATE_TOOL_META.create_shop_product, annotations: CREATE, auditInvalid: true },
     async (args) => runCreateShopProduct(args, { translator }),
   );
+
+  /* ============================================================ 後台資料（唯讀，./admin-read-tools.ts） */
+  // 一律 READ_ONLY；說明與實作都在那個檔案，這裡只負責註冊。
+
+  for (const name of ADMIN_READ_TOOLS) {
+    const run = ADMIN_READ_HANDLERS[name] as (args: unknown) => Promise<TextResult>;
+    add(name, { ...ADMIN_READ_TOOL_META[name], annotations: READ_ONLY }, (args) => run(args));
+  }
 }
