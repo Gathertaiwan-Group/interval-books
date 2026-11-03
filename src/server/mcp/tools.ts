@@ -59,6 +59,9 @@ import {
   ADMIN_READ_TOOL_META,
   type AdminReadToolName,
 } from "./admin-read-tools";
+import { OPS_WRITE_HANDLERS, OPS_WRITE_TOOL_INPUTS, OPS_WRITE_TOOL_META } from "./ops-write-tools";
+import { OUTBOUND_HANDLERS, OUTBOUND_TOOL_INPUTS, OUTBOUND_TOOL_META } from "./outbound-tools";
+import { REPORT_HANDLERS, REPORT_TOOL_INPUTS, REPORT_TOOL_META } from "./report-tools";
 
 /* ------------------------------------------------------------------ 共用 */
 
@@ -598,6 +601,12 @@ export const TOOL_INPUTS = {
 
   /* 後台資料唯讀查詢（./admin-read-tools.ts）。 */
   ...ADMIN_READ_TOOL_INPUTS,
+
+  /* 2026-11-03 營運寫入（./ops-write-tools.ts）、對外動作（./outbound-tools.ts）、報表（./report-tools.ts）。
+     讀寫分級由 add() 依 annotations 擋（0054）；寫入一律預設 dry_run=true。 */
+  ...OPS_WRITE_TOOL_INPUTS,
+  ...OUTBOUND_TOOL_INPUTS,
+  ...REPORT_TOOL_INPUTS,
 } as const;
 
 export type ToolName = keyof typeof TOOL_INPUTS;
@@ -2068,5 +2077,22 @@ export function registerContentTools(server: McpServer): void {
   for (const name of ADMIN_READ_TOOLS) {
     const run = ADMIN_READ_HANDLERS[name] as (args: unknown) => Promise<TextResult>;
     add(name, { ...ADMIN_READ_TOOL_META[name], annotations: READ_ONLY }, (args) => run(args));
+  }
+
+  /* ============================================================ 營運寫入／對外動作／報表 */
+  // META 自帶 annotations（寫入 readOnlyHint=false → 唯讀連線在 add() 被擋）。
+  const extra: [
+    Record<string, { title: string; description: string; annotations: ToolAnnotations }>,
+    Record<string, (args: never) => Promise<TextResult>>,
+  ][] = [
+    [OPS_WRITE_TOOL_META, OPS_WRITE_HANDLERS as never],
+    [OUTBOUND_TOOL_META, OUTBOUND_HANDLERS as never],
+    [REPORT_TOOL_META, REPORT_HANDLERS as never],
+  ];
+  for (const [metaMap, handlers] of extra) {
+    for (const name of Object.keys(metaMap) as ToolName[]) {
+      const run = handlers[name] as unknown as (args: unknown) => Promise<TextResult>;
+      add(name, metaMap[name], (args) => run(args));
+    }
   }
 }

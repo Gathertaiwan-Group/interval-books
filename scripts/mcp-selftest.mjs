@@ -576,6 +576,39 @@ const ADMIN_READ_EXPECTED = [
   "get_partnership_inquiry",
 ];
 EXPECTED_TOOLS.push(...ADMIN_READ_EXPECTED);
+// 2026-11-03 營運寫入／對外動作／報表（ops-write-tools.ts、outbound-tools.ts、report-tools.ts；
+// 各自的行為測試在 mcp-ops-write／mcp-outbound／mcp-report-selftest）。寫入的那幾支必須預設
+// dry_run=true、不是 readOnlyHint（唯讀連線在 add() 被擋），下面守。
+const OPS_WRITE_EXPECTED = [
+  "update_order_fulfillment",
+  "mark_order_paid",
+  "create_phone_order",
+  "update_phone_order_contacts",
+  "remove_registration",
+  "update_journey_wish",
+  "update_partnership_inquiry",
+  "create_stock_adjustment",
+  "record_stock_count",
+  "create_purchase",
+  "update_ui_string",
+  "update_site_settings",
+  "resend_order_email",
+  "reissue_invoice",
+  "request_invoice_void",
+];
+const OPS_READ_EXPECTED = [
+  "list_phone_order_options",
+  "get_ui_strings",
+  "get_site_settings",
+  "get_email_copy",
+  "export_roster_csv",
+  "export_orders_csv",
+  "export_sales_csv",
+  "get_top_products",
+  "get_event_fill_rates",
+  "get_repurchase_rate",
+];
+EXPECTED_TOOLS.push(...OPS_WRITE_EXPECTED, ...OPS_READ_EXPECTED);
 {
   const names = Object.keys(tools.TOOL_INPUTS).sort();
   check("工具清單（白名單）與預期一致", names, [...EXPECTED_TOOLS].sort());
@@ -584,10 +617,19 @@ EXPECTED_TOOLS.push(...ADMIN_READ_EXPECTED);
     [...tools.ADMIN_READ_TOOLS].sort(),
     [...ADMIN_READ_EXPECTED].sort(),
   );
-  const adminRead = new Set(tools.ADMIN_READ_TOOLS);
+  // 排除領域的名稱／欄位檢查只套在內容工具上；後台查詢與營運工具另有各自的規則（下面）。
+  const adminRead = new Set([
+    ...tools.ADMIN_READ_TOOLS,
+    ...OPS_WRITE_EXPECTED,
+    ...OPS_READ_EXPECTED,
+  ]);
+  for (const n of OPS_WRITE_EXPECTED) {
+    const parsed = tools.TOOL_INPUTS[n]?.shape?.dry_run?.safeParse(undefined);
+    check(`🔴 ${n}：沒送 dry_run → 預設 true`, parsed?.success && parsed.data, true);
+  }
   check(
     "🔴 後台唯讀查詢沒有任何一支在 WRITE_TOOLS／UPLOAD_TOOLS",
-    [...tools.WRITE_TOOLS, ...tools.UPLOAD_TOOLS].filter((n) => adminRead.has(n)),
+    [...tools.WRITE_TOOLS, ...tools.UPLOAD_TOOLS].filter((n) => tools.ADMIN_READ_TOOLS.includes(n)),
     [],
   );
   // 寫入意味的參數一個都不准有（dry_run、confirm、status 以外的「改成什麼」都算）。
@@ -932,7 +974,7 @@ console.log("\n[7] MCP 協定");
   check(
     "🔴 後台唯讀查詢全部標 readOnlyHint=true、destructiveHint=false",
     (list.json?.result?.tools ?? [])
-      .filter((t) => ADMIN_READ_EXPECTED.includes(t.name))
+      .filter((t) => [...ADMIN_READ_EXPECTED, ...OPS_READ_EXPECTED].includes(t.name))
       .filter(
         (t) => t.annotations?.readOnlyHint !== true || t.annotations?.destructiveHint !== false,
       )
@@ -990,6 +1032,23 @@ console.log("\n[7] MCP 協定");
     roWrite.json?.result?.isError === true &&
       (roWrite.json?.result?.content?.[0]?.text ?? "").includes("唯讀"),
   );
+  const ROW = {
+    mark_order_paid: { order_id: "00000000-0000-4000-8000-000000000001" },
+    remove_registration: {
+      session_id: "00000000-0000-4000-8000-000000000001",
+      registration_id: "00000000-0000-4000-8000-000000000001",
+    },
+    resend_order_email: { order: "00000000-0000-4000-8000-000000000001", kind: "order_paid" },
+    request_invoice_void: { order: "00000000-0000-4000-8000-000000000001", reason: "測試" },
+  };
+  for (const [n, args] of Object.entries(ROW)) {
+    const r = await roCall(n, args);
+    checkTrue(
+      `🔴 唯讀 token 呼叫 ${n}（合法參數）→ 被拒，不碰資料庫`,
+      r.json?.result?.isError === true &&
+        (r.json?.result?.content?.[0]?.text ?? "").includes("唯讀"),
+    );
+  }
   const roCreate = await roCall("create_event", { title: "t", category: "c", description: "d" });
   checkTrue(
     "🔴 唯讀 token 呼叫新增工具 → 被拒",
