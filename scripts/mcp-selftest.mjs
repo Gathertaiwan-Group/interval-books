@@ -1041,6 +1041,24 @@ console.log("\n[7] MCP 協定");
     resend_order_email: { order: "00000000-0000-4000-8000-000000000001", kind: "order_paid" },
     request_invoice_void: { order: "00000000-0000-4000-8000-000000000001", reason: "測試" },
   };
+  check(
+    "含個資的 CSV 匯出列在 REQUIRE_WRITE_ACCESS（唯讀連線不可用）",
+    [...tools.REQUIRE_WRITE_ACCESS].sort(),
+    ["export_orders_csv", "export_roster_csv", "export_sales_csv"],
+  );
+  const EXPORT_ROW = {
+    export_roster_csv: { session_id: "00000000-0000-4000-8000-000000000001" },
+    export_orders_csv: { date_from: "2026-10-01", date_to: "2026-10-31" },
+    export_sales_csv: { date_from: "2026-10-01", date_to: "2026-10-31" },
+  };
+  for (const [n, args] of Object.entries(EXPORT_ROW)) {
+    const r = await roCall(n, args);
+    checkTrue(
+      `🔴 唯讀 token 呼叫 ${n}（合法參數）→ 被拒，不產生下載連結`,
+      r.json?.result?.isError === true &&
+        (r.json?.result?.content?.[0]?.text ?? "").includes("唯讀"),
+    );
+  }
   for (const [n, args] of Object.entries(ROW)) {
     const r = await roCall(n, args);
     checkTrue(

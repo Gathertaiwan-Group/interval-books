@@ -309,6 +309,16 @@ async function safe(fn: () => Promise<TextResult>): Promise<TextResult> {
 }
 
 /**
+ * 不改資料、但只開放「可寫入」連線的工具：會產生含個資的 CSV 下載連結（業主 2026-11-03 決定）。
+ * readOnlyHint 照實維持 true，權限另外在 add() 擋。
+ */
+export const REQUIRE_WRITE_ACCESS: ReadonlySet<string> = new Set([
+  "export_roster_csv",
+  "export_orders_csv",
+  "export_sales_csv",
+]);
+
+/**
  * 唯讀連線（MCP_READONLY_TOKEN，或後台設成「唯讀」的 OAuth 連線）呼叫寫入工具 → 回錯誤文字並記
  * 一筆 action=denied 的稽核。沒有 actor（自檢直接呼叫）視為可寫入，與 http.ts 以外沒有入口一致。
  */
@@ -677,7 +687,8 @@ export function registerContentTools(server: McpServer): void {
       // SDK 已經用同一支 schema 驗過並套上預設值；這裡的轉型只是把型別接回來。
       (async (args: unknown) => {
         // 0054 讀寫分級：不是 readOnlyHint 的工具，唯讀連線一律拒絕（含 dry_run 預覽）。
-        if (meta.annotations.readOnlyHint !== true) {
+        // 含個資的 CSV 匯出雖然不改資料（readOnlyHint=true），也只開放可寫入連線（業主 2026-11-03）。
+        if (meta.annotations.readOnlyHint !== true || REQUIRE_WRITE_ACCESS.has(name)) {
           const denied = await denyIfReadOnly(name);
           if (denied) return denied;
         }

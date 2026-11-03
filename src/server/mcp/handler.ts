@@ -20,7 +20,7 @@ export const MCP_INSTRUCTIONS = `小時光風土誌書店（www.intervalbooks.tw
 
 營運寫入（需「可寫入」連線，全部預設 dry_run=true）：訂單出貨／完成（update_order_fulfillment）、標記已收款（mark_order_paid）、電話報名（create_phone_order／update_phone_order_contacts）、移除報名（remove_registration，名額自動釋放）、意願單與合作邀約狀態、庫存異動／盤點／進貨、介面文字與網站設定（祕密與匯款欄位不開放）。
 對外動作：重寄訂單信（resend_order_email，預設只寄管理員；寄客人要 send_to_customer=true 並用第一次回傳的 confirm_token 再呼叫一次）、重新開立發票（reissue_invoice）、申請作廢發票（request_invoice_void，只在後台產生待辦，由人按「作廢發票」）。不退款、不直接作廢。
-報表：CSV 匯出（名單／訂單／營收，回 15 分鐘到期的下載連結）、熱銷排行、活動報名率、回購率。唯讀連線呼叫寫入工具一律被拒（含預覽）。
+報表：CSV 匯出（名單／訂單／營收，回 15 分鐘到期的下載連結）、熱銷排行、活動報名率、回購率。唯讀連線呼叫寫入工具一律被拒（含預覽）；含個資的 CSV 匯出也只開放可寫入連線。
 
 【寫入流程】
 1. 每一支寫入工具預設 dry_run=true，只回傳「改前 → 改後」差異，不會寫入。
