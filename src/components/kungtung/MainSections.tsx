@@ -623,7 +623,7 @@ export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
               </li>
               <li>
                 <time>20:00</time>
-                <span>夜間沙龍｜公東的教堂</span>
+                <span>夜間沙龍｜公東的教堂｜主談人：范毅舜</span>
               </li>
             </ol>
           </article>
