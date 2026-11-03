@@ -373,7 +373,7 @@ console.log("\n[1] dry_run");
   check(
     "稽核：changes 記 dry_run=true、outcome=preview、身分",
     [a?.changes?.dry_run, a?.changes?.outcome, a?.changes?._actor],
-    [true, "preview", { via: "static_token" }],
+    [true, "preview", { via: "static_token", access: "write" }],
   );
   check("結果帶 audit 狀態", r.data?.audit, "recorded");
 

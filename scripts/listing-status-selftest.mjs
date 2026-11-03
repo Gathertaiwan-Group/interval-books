@@ -663,7 +663,12 @@ const writes = (m) =>
     "下架有提醒（客人看不到、訂單保留）",
     (r.data?.warnings ?? []).some((w) => /訂單與報名紀錄都保留/.test(w)),
   );
-  check("預覽不寫稽核（與其他 update 工具一致：寫入才記）", m.audits.length, 0);
+  // 0054 起預覽也記一筆（dry_run=true），業主要查得到「AI 打算改什麼」。
+  check(
+    "預覽記一筆 dry_run=true 的稽核（0054）",
+    m.audits.map((x) => x.record?.dry_run),
+    [true],
+  );
 }
 {
   const m = reset();
