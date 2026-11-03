@@ -6,9 +6,9 @@
 --       哪一筆、改前改後摘要、是不是預覽。
 --
 -- §1 mcp_oauth_grants.access_level
---   · 先以 default 'write' 加欄位：**既有的每一條連線都是可寫入**，現在接著的 Claude／
---     ChatGPT 連接器行為一個字都不變（它們今天本來就能用內容寫入工具）。
---   · 再把 default 改成 'read'：之後新授權的連線預設唯讀，要寫入由 admin 在後台切。
+--   · default 'write'：**既有與新授權的連線都是可寫入**。只有 admin 能授權，業主要的是全面
+--     控制；重新授權後若突然變唯讀，連接器會壞（2026-11-03 審查）。要限制某條連線，由 admin
+--     在後台降成唯讀。
 --   · access token 本身不帶這個值（token 格式不變、舊 token 不失效）；每一次請求由
 --     src/server/mcp/http.ts 經 oauth-store 重讀，切換後 ≤60 秒生效（同撤銷的快取）。
 --
@@ -30,9 +30,6 @@ alter table public.mcp_oauth_grants
   drop constraint if exists mcp_oauth_grants_access_level_valid;
 alter table public.mcp_oauth_grants
   add constraint mcp_oauth_grants_access_level_valid check (access_level in ('read', 'write'));
-
-alter table public.mcp_oauth_grants
-  alter column access_level set default 'read';
 
 -- 後台切換要 update 這一欄（0043 已給 service_role update，這裡不另外授權）。
 

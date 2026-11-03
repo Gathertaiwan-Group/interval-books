@@ -230,7 +230,7 @@ function McpConnectionsPage() {
       </div>
       <p className="text-xs text-muted-foreground">
         使用中 {active.length} 條。撤銷後 Claude 那邊最多 1 分鐘內就無法再讀寫後台。
-        「唯讀」連線只能查詢；寫入工具（含預覽）一律拒絕。新連線預設唯讀，切換最多 1 分鐘生效。
+        「唯讀」連線只能查詢；寫入工具（含預覽）一律拒絕。新連線預設可寫入，切換最多 1 分鐘生效。
       </p>
 
       <AlertDialog open={target !== null} onOpenChange={(o) => !o && !busy && setTarget(null)}>

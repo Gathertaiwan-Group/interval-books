@@ -20,7 +20,7 @@ export type McpGrantRow = {
   expires_at: string;
   revoked_at: string | null;
   revoked_reason: string | null;
-  /** 0054：read 唯讀／write 可寫入。既有連線是 write，新連線預設 read。 */
+  /** 0054：read 唯讀／write 可寫入。預設 write（既有與新連線），admin 可在後台降成 read。 */
   access_level: "read" | "write";
 };
 

@@ -886,7 +886,7 @@ export const MIGRATION_LEDGER = Object.freeze([
   },
   {
     file: "0054_mcp_access_level_audit_actor.sql",
-    note: "MCP 讀寫分級＋操作紀錄正式欄位：mcp_oauth_grants 加 access_level（read／write CHECK；先以 default 'write' 補既有列、再把 default 改 'read'——既有連線維持可寫入、新連線預設唯讀）；mcp_audit_log 加 actor_via（CHECK）、actor_user_id、actor_email、client_name、dry_run（not null default false），action CHECK 改成格式檢查以納入營運寫入動作，加 (actor_user_id, created_at) 索引。不改任何權限、不碰其他表。",
+    note: "MCP 讀寫分級＋操作紀錄正式欄位：mcp_oauth_grants 加 access_level（read／write CHECK；default 'write'——既有與新連線都可寫入，admin 可在後台降成唯讀）；mcp_audit_log 加 actor_via（CHECK）、actor_user_id、actor_email、client_name、dry_run（not null default false），action CHECK 改成格式檢查以納入營運寫入動作，加 (actor_user_id, created_at) 索引。不改任何權限、不碰其他表。",
     // touches 用 AREAS 的識別字掃過剝掉註解的 SQL：只出現 mcp_oauth_grants 與 mcp_audit_log。
     touches: ["mcp_audit", "mcp_oauth"],
   },

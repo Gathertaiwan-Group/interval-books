@@ -1170,9 +1170,8 @@ console.log("\n[8] 掛載與 migration");
     !/grant[^;]*(update|delete)[^;]*mcp_audit_log/i.test(mig54),
   );
   checkTrue(
-    "🔴 0054：既有連線先以 default 'write' 補值，再把 default 改 'read'",
-    mig54.indexOf("default 'write'") > 0 &&
-      mig54.indexOf("set default 'read'") > mig54.indexOf("default 'write'"),
+    "🔴 0054：access_level 預設 write（既有與新連線都可寫入），而且沒有改成 read",
+    mig54.includes("default 'write'") && !/set default 'read'/.test(mig54),
   );
 
   assertLedgerMatchesDisk(check, MIG_DIR);

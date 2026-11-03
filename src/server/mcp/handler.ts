@@ -20,7 +20,7 @@ export const MCP_INSTRUCTIONS = `小時光風土誌書店（www.intervalbooks.tw
 
 營運寫入（需「可寫入」連線，全部預設 dry_run=true）：訂單出貨／完成（update_order_fulfillment）、標記已收款（mark_order_paid）、電話報名（create_phone_order／update_phone_order_contacts）、移除報名（remove_registration，名額自動釋放）、意願單與合作邀約狀態、庫存異動／盤點／進貨、介面文字與網站設定（祕密與匯款欄位不開放）。
 對外動作：重寄訂單信（resend_order_email，預設只寄管理員；寄客人要 send_to_customer=true 並用第一次回傳的 confirm_token 再呼叫一次）、重新開立發票（reissue_invoice）、申請作廢發票（request_invoice_void，只在後台產生待辦，由人按「作廢發票」）。不退款、不直接作廢。
-報表：CSV 匯出（名單／訂單／營收，回 15 分鐘到期的下載連結）、熱銷排行、活動報名率、回購率。唯讀連線呼叫寫入工具一律被拒（含預覽）；含個資的 CSV 匯出也只開放可寫入連線。
+報表：CSV 匯出（名單／訂單／營收，回 15 分鐘到期的下載連結）、熱銷排行、活動報名率、回購率。連線分「可寫入」（預設）與「唯讀」（管理員在後台 /admin/mcp-connections 降級）；唯讀連線呼叫寫入工具一律被拒（含預覽），含個資的 CSV 匯出也只開放可寫入連線。
 
 【寫入流程】
 1. 每一支寫入工具預設 dry_run=true，只回傳「改前 → 改後」差異，不會寫入。
@@ -38,7 +38,7 @@ export const MCP_INSTRUCTIONS = `小時光風土誌書店（www.intervalbooks.tw
 8. 新增活動／策旅／商品（create_*）預設建成草稿（publish=false），網站上看不到；dry_run=true 回傳「將會建立什麼」的完整預覽（每次呼叫都記稽核）。時間一律台北時間。新增商品不設庫存，由店員在後台處理後再上架。
 
 【不開放（請到 /admin 後台處理）】
-訂單、付款、發票、退款、報名名單、進銷存（庫存、進貨、廠商）、推薦碼結算、意願單與合作邀約的任何修改（這些只開放唯讀查詢）；人員帳號與權限；付款帳戶與通知信設定；廠商身分證／統編／匯款帳戶；既有活動／策旅的票價、場次、票種、名額的修改（新增時一起建立的除外）；既有資料的網址代稱；頁面區塊的新增或刪除。
+退款、直接作廢發票、單筆取消訂單（訂單、報名、進銷存只開放上面列出的那幾種寫入）；推薦碼結算；人員帳號與權限；付款帳戶與通知信設定；廠商身分證／統編／匯款帳戶；既有活動／策旅的票價、場次、票種、名額的修改（新增時一起建立的除外）；既有資料的網址代稱；頁面區塊的新增或刪除。
 
 ---
 
@@ -50,7 +50,7 @@ Write: create / update / delete news; create an event (create_event) or journey 
 
 Every write tool defaults to dry_run=true and returns a before/after diff without writing. Show the diff to the user, then call again with dry_run=false to apply. Send only the fields you want to change. Localized fields accept a Chinese string (en/ja are auto-translated) or {"zh","en","ja"}. Deleting is allowed for news only and needs dry_run=false plus confirm=true. Upload images first, then put the returned key (storage:…) into image_key — uploading alone changes no page, so upload tools have no dry_run. Pick by situation: the image has a public https URL → upload_image_from_url; you can run shell commands (Claude Code, Codex) → create_image_upload_url, PUT the file with the returned curl line within 10 minutes, then finalize_image_upload to get the key; an image generated in ChatGPT or attached in the chat → upload_image_file; you can only pass base64 (e.g. Claude on the web) → upload_image_base64 (original file ≤ 2MB). Only JPEG / PNG / WebP up to 2MB; SVG, HTML, GIF and AVIF are rejected. Price changes report old → new. Every write is audit-logged with actor "mcp". create_* tools default to a draft (publish=false) and to dry_run=true (a full preview of what would be created; every call, including dry runs, is audit-logged). Times are Asia/Taipei. New products have no stock set; staff handle stock in the back office before listing.
 
-Not available (use the /admin back office): any change to orders, payments, invoices, refunds, registrations, inventory (stock, purchases, vendors), referral settlements, journey wishes or partnership inquiries (these are read-only here); staff accounts and permissions; payment-account and notification-email settings; vendor ID / tax numbers and bank accounts; changing ticket prices, sessions, plans or capacity of existing events (creating them with a new event is allowed); stock quantities; slugs of existing records; adding or removing page blocks.`;
+Not available (use the /admin back office): refunds, voiding invoices directly, cancelling single orders (orders, registrations and inventory only allow the writes listed above); referral settlements; connections are write-enabled by default and an admin can downgrade one to read-only, which rejects every write tool including previews; staff accounts and permissions; payment-account and notification-email settings; vendor ID / tax numbers and bank accounts; changing ticket prices, sessions, plans or capacity of existing events (creating them with a new event is allowed); stock quantities; slugs of existing records; adding or removing page blocks.`;
 
 let handler: ((request: Request) => Promise<Response>) | null = null;
 
