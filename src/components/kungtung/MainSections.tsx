@@ -638,7 +638,7 @@ export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
             <ol>
               <li>
                 <time>06:00</time>
-                <span>自由日出約會・晨間漫遊（自由參加）</span>
+                <span>解憂快樂瑜伽</span>
               </li>
               <li>
                 <time>08:00</time>
