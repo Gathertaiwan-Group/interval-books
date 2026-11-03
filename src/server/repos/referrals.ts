@@ -12,6 +12,7 @@
  */
 import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
+import { readAllPages } from "@/server/repos/read-all-pages";
 import {
   computeMonthlyReport,
   DEFAULT_REFERRAL_SETTINGS,
@@ -362,29 +363,44 @@ export async function getMonthlyReport(period: string): Promise<MonthlyReport> {
   const db = supabaseAdmin();
   const { startIso, endIso } = taipeiMonthBounds(period);
 
-  const [settings, referrers, ordersRes, settlementsRes] = await Promise.all([
+  // ⚠️ 原本是 .limit(5000)，但 PostgREST 的 db-max-rows（1000）會靜默蓋過它：一個月超過
+  //    1000 張已付款訂單，分潤就少算（2026-11-03 審查）。訂單、結算紀錄、客人歷史訂單一律
+  //    readAllPages 依唯一鍵分段讀完。
+  type Page<T> = PromiseLike<{
+    data: T[] | null;
+    error: { code?: string; message: string } | null;
+  }>;
+  const [settings, referrers, orderRows, settlementRows] = await Promise.all([
     getReferralSettings(),
     listReferrers(),
-    db
-      .from("orders")
-      .select(ORDER_COLUMNS)
-      .eq("payment_status", "paid")
-      .gte("paid_at", startIso)
-      .lt("paid_at", endIso)
-      .limit(5000),
-    db
-      .from("referral_settlements")
-      .select(
-        "referrer_id, period, amount, commission, pool_share, clawback, snapshot, settled_at, settled_by_email",
-      ),
+    readAllPages(
+      (from, to) =>
+        db
+          .from("orders")
+          .select(ORDER_COLUMNS)
+          .eq("payment_status", "paid")
+          .gte("paid_at", startIso)
+          .lt("paid_at", endIso)
+          .order("id", { ascending: true })
+          .range(from, to) as unknown as Page<OrderRaw>,
+      { label: "讀取訂單" },
+    ),
+    readAllPages(
+      (from, to) =>
+        db
+          .from("referral_settlements")
+          .select(
+            "referrer_id, period, amount, commission, pool_share, clawback, snapshot, settled_at, settled_by_email",
+          )
+          .order("referrer_id", { ascending: true })
+          .order("period", { ascending: true })
+          .range(from, to) as unknown as Page<Record<string, unknown>>,
+      { label: "讀取結算紀錄" },
+    ),
   ]);
-  if (ordersRes.error) throw new Error(`讀取訂單失敗：${ordersRes.error.message}`);
-  if (settlementsRes.error) throw new Error(`讀取結算紀錄失敗：${settlementsRes.error.message}`);
 
-  const orders = ((ordersRes.data ?? []) as unknown as OrderRaw[]).map(toReportOrder);
-  const settlements = ((settlementsRes.data ?? []) as unknown as Record<string, unknown>[]).map(
-    settlementFromRow,
-  );
+  const orders = orderRows.map(toReportOrder);
+  const settlements = settlementRows.map(settlementFromRow);
 
   // 新舊客：只查有推薦人的那幾張單的客人。
   const attributed = orders.filter((o) => o.referrerId !== null);
@@ -414,13 +430,18 @@ export async function getMonthlyReport(period: string): Promise<MonthlyReport> {
     ["customer_phone", phones],
   ] as const) {
     if (values.length === 0) continue;
-    const { data, error } = await db
-      .from("orders")
-      .select("id, customer_email, customer_phone, created_at")
-      .in("payment_status", ["paid", "refunded"])
-      .lt("created_at", endIso)
-      .in(col, values);
-    if (error) throw new Error(`讀取客人歷史訂單失敗：${error.message}`);
+    const data = await readAllPages(
+      (from, to) =>
+        db
+          .from("orders")
+          .select("id, customer_email, customer_phone, created_at")
+          .in("payment_status", ["paid", "refunded"])
+          .lt("created_at", endIso)
+          .in(col, values)
+          .order("id", { ascending: true })
+          .range(from, to) as unknown as Page<Record<string, unknown>>,
+      { label: "讀取客人歷史訂單" },
+    );
     addHistory(data);
   }
 

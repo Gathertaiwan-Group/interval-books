@@ -60,6 +60,9 @@ function builder(table) {
     or: () => b,
     limit: () => b,
     range: (a, z) => ((range = [a, z]), b),
+    maybeSingle: () => ({
+      then: (res) => res({ data: (tables.get(table) ?? [])[0] ?? null, error: null }),
+    }),
     then(resolve, reject) {
       calls += 1;
       try {
@@ -300,6 +303,37 @@ console.log("\n[3] production 函式 × 假 Supabase（每次最多 1000 列）"
   );
 }
 
+{
+  // 推薦碼月報：一個月 1500 張已付款訂單（舊寫法 .limit(5000) 只會拿回 1000 張）。
+  tables.set("referral_settings", []);
+  tables.set("referrers", []);
+  tables.set("referral_settlements", []);
+  tables.set("product_inventory_links", []);
+  tables.set(
+    "orders",
+    Array.from({ length: 1500 }, (_, i) => ({
+      id: `o${String(i).padStart(5, "0")}`,
+      order_no: `N${i}`,
+      created_at: "2026-10-10T02:00:00Z",
+      paid_at: "2026-10-10T02:00:00Z",
+      status: "processing",
+      payment_status: "paid",
+      payment_method: "card",
+      discount: 0,
+      customer_email: null,
+      customer_phone: null,
+      referrer_id: null,
+      referral_code: null,
+      order_items: [
+        { product_id: null, product_type: "book", unit_price: 100, quantity: 1, subtotal: 100 },
+      ],
+    })),
+  );
+  const { getMonthlyReport } = await import(join(SRC, "server/repos/referrals.ts"));
+  const rep = await getMonthlyReport("2026-10");
+  check("推薦碼月報：1500 張已付款訂單全算進全店張數（不是 1000）", rep.shop.orderCount, 1500);
+}
+
 // [4] ------------------------------------------------------------------------
 console.log("\n[4] 靜態");
 const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
@@ -310,6 +344,11 @@ for (const f of [
 ]) {
   check(`${f} 沒有 .limit(20000)`, /\.limit\(20000\)/.test(strip(readFile(join(SRC, f)))), false);
 }
+check(
+  "referrals.ts 月報不再 .limit(5000)（改 readAllPages）",
+  /\.limit\(5000\)/.test(strip(readFile(join(SRC, "server/repos/referrals.ts")))),
+  false,
+);
 check(
   "inv-adjustments.ts 不再用 stock_quantity <= 5 粗篩",
   /lte\("stock_quantity", 5\)/.test(strip(readFile(join(SRC, "server/repos/inv-adjustments.ts")))),
