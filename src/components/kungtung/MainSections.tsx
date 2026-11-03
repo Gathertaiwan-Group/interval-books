@@ -637,7 +637,7 @@ export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
             </div>
             <ol>
               <li>
-                <time>06:00</time>
+                <time>06:30</time>
                 <span>解憂快樂瑜伽</span>
               </li>
               <li>
