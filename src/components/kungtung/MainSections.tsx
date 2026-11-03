@@ -701,7 +701,7 @@ export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
               </li>
               <li>
                 <time>14:00</time>
-                <span>Katomayan（旮都瑪樣）遊程</span>
+                <span>Katomayan（旮都瑪樣）遊程｜阿美族民俗中心</span>
               </li>
               <li>
                 <time>15:30</time>
