@@ -1000,6 +1000,36 @@ console.log("\n[7] MCP 協定");
 
   check("MCP_INSTRUCTIONS 匯出", typeof handlerMod.MCP_INSTRUCTIONS, "string");
 
+  // ── 寫入工具被業務規則擋下 → 也記一筆 action=rejected（審查 2026-11-03）────────
+  {
+    const seen = [];
+    const origInfo = console.info;
+    console.info = (line, ...rest) => {
+      if (typeof line === "string" && line.startsWith("[mcp-audit] ")) {
+        seen.push(JSON.parse(line.slice("[mcp-audit] ".length)));
+      } else origInfo(line, ...rest);
+    };
+    const rej = await rpc(
+      {
+        jsonrpc: "2.0",
+        id: 31,
+        method: "tools/call",
+        params: {
+          name: "set_event_status",
+          arguments: { id: "ev-x", journey_id: "jo-x", status: "archived" },
+        },
+      },
+      { "mcp-protocol-version": "2025-11-25" },
+    );
+    console.info = origInfo;
+    checkTrue("業務規則拒絕 → 回 isError", rej.json?.result?.isError === true);
+    check(
+      "🔴 業務規則拒絕也記稽核（action=rejected、dry_run=true、帶原因、只記 id 類參數）",
+      seen.map((r) => [r.tool, r.action, r.dry_run, typeof r.changes?.reason, r.entity_id]),
+      [["set_event_status", "rejected", true, "string", "id=ev-x"]],
+    );
+  }
+
   // ── 0054 讀寫分級：MCP_READONLY_TOKEN ─────────────────────────────────────
   const RO = "r".repeat(20) + "fedcba9876543210fedcba98";
   process.env.MCP_READONLY_TOKEN = RO;

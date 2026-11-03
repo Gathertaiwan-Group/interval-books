@@ -296,13 +296,22 @@ async function runWrite(plan: WritePlan): Promise<TextResult> {
 }
 
 /** 包住每一支 handler：輸入錯誤回 isError 文字，不回協定錯誤。 */
-async function safe(fn: () => Promise<TextResult>): Promise<TextResult> {
+async function safe(
+  fn: () => Promise<TextResult>,
+  onRejected?: (reason: string) => Promise<unknown>,
+): Promise<TextResult> {
   try {
     return await fn();
   } catch (err) {
-    if (err instanceof McpInputError) return errText(err.message);
+    if (err instanceof McpInputError) {
+      if (onRejected) await onRejected(err.message);
+      return errText(err.message);
+    }
     const zodText = zodIssuesText(err);
-    if (zodText) return errText(`欄位驗證失敗：${zodText}`);
+    if (zodText) {
+      if (onRejected) await onRejected(`欄位驗證失敗：${zodText}`);
+      return errText(`欄位驗證失敗：${zodText}`);
+    }
     console.error("[mcp] tool error", err);
     return errText(`執行失敗：${err instanceof Error ? err.message : String(err)}`);
   }
@@ -317,6 +326,24 @@ export const REQUIRE_WRITE_ACCESS: ReadonlySet<string> = new Set([
   "export_orders_csv",
   "export_sales_csv",
 ]);
+
+/** 寫入工具被業務規則拒絕時的稽核。原因截到 300 字；只記 id 類參數，不記內容。 */
+async function auditRejected(tool: string, reason: string, args: unknown): Promise<void> {
+  const a = (args ?? {}) as Record<string, unknown>;
+  const ref = ["id", "order_id", "order_no", "order", "session_id", "registration_id", "page_slug"]
+    .map((k) => (typeof a[k] === "string" ? `${k}=${a[k] as string}` : null))
+    .filter(Boolean)
+    .join(" ");
+  const { writeMcpAudit } = await import("./audit");
+  await writeMcpAudit({
+    tool,
+    entity: "mcp_rejected",
+    entity_id: ref || "-",
+    action: "rejected",
+    changes: { reason: reason.slice(0, 300) },
+    dry_run: a.dry_run !== false,
+  });
+}
 
 /**
  * 唯讀連線（MCP_READONLY_TOKEN，或後台設成「唯讀」的 OAuth 連線）呼叫寫入工具 → 回錯誤文字並記
@@ -692,7 +719,14 @@ export function registerContentTools(server: McpServer): void {
           const denied = await denyIfReadOnly(name);
           if (denied) return denied;
         }
-        return safe(() => fn(args as Args<N>));
+        // 寫入工具被業務規則擋下（handler 在預覽前丟 McpInputError，例如線上金流單不能手動標
+        // 收款、沒有收件人）也記一筆 action=rejected（審查 2026-11-03）。內容工具之外的新增工具
+        // 自己在 create-tools.ts#withAudit 記，不會丟到這裡。
+        const isWrite = meta.annotations.readOnlyHint !== true || REQUIRE_WRITE_ACCESS.has(name);
+        return safe(
+          () => fn(args as Args<N>),
+          isWrite ? (reason) => auditRejected(name, reason, args) : undefined,
+        );
       }) as never,
     );
   }
