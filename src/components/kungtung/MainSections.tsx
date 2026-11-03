@@ -692,7 +692,7 @@ export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
                 <span>退房・專車出發</span>
               </li>
               <li>
-                <time>10:00</time>
+                <time>11:00</time>
                 <span>江賢二藝術園區</span>
               </li>
               <li>
