@@ -890,6 +890,12 @@ export const MIGRATION_LEDGER = Object.freeze([
     // touches 用 AREAS 的識別字掃過剝掉註解的 SQL：只出現 mcp_oauth_grants 與 mcp_audit_log。
     touches: ["mcp_audit", "mcp_oauth"],
   },
+  {
+    file: "0055_mcp_report_exports.sql",
+    note: "MCP 報表匯出的私有 bucket mcp-report-exports（public=false、20 MiB、只收 text/csv、沒有任何 storage.objects policy）。export_roster_csv／export_orders_csv／export_sales_csv 把 CSV 上傳到這裡、回 15 分鐘到期的 signed URL。不碰任何表、不改任何權限。",
+    // touches 用 AREAS 的識別字掃過剝掉註解的 SQL：只出現 storage.buckets。
+    touches: ["storage"],
+  },
 ]);
 
 /** 磁碟上的 migration 檔名，排序過。空目錄 = 丟例外（那不是「沒有違規」）。 */
