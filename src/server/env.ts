@@ -88,3 +88,19 @@ export function geminiOcrModel(): string {
 export function geminiTranslateModel(): string {
   return process.env.GEMINI_TRANSLATE_MODEL || "gemini-3.5-flash";
 }
+
+/**
+ * MCP「對外動作」兩步確認（寄信給客人）的 HMAC 祕密來源（src/server/mcp/outbound-tools.ts）。
+ *
+ * 不新增環境變數：沿用 MCP 已經有的伺服器祕密，優先 MCP_OAUTH_SECRET（OAuth 連接器必設），
+ * 沒有才退回 MCP_TOKEN（靜態 token）。兩個都沒有（或短於 16 字）→ null，呼叫端一律拒絕寄給
+ * 客人（fail closed）。呼叫端會再用固定標籤 HMAC 派生一把專用金鑰，不直接拿這把當簽章鑰匙，
+ * 所以確認碼與 OAuth token 不會互相通用。
+ */
+export function mcpConfirmSecret(): string | null {
+  const oauth = (process.env.MCP_OAUTH_SECRET ?? "").trim();
+  if (oauth.length >= 16) return oauth;
+  const token = (process.env.MCP_TOKEN ?? "").trim();
+  if (token.length >= 16) return token;
+  return null;
+}

@@ -2,6 +2,7 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { AlertTriangle, CalendarDays, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InvoiceProblemBanner } from "@/components/admin/InvoiceProblemBanner";
+import { McpVoidRequestBanner } from "@/components/admin/McpVoidRequestBanner";
 import { buildTodoCards, sortTodoCards, type TodoCard } from "@/lib/admin/todo";
 import { formatTaipeiDateTime } from "@/lib/taipei-time";
 
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/admin/_shell/")({
 
 function AdminDashboard() {
   const { admin } = Route.useRouteContext();
-  const { counts, sessions, invoiceProblems } = Route.useLoaderData();
+  const { counts, sessions, invoiceProblems, mcpVoidRequests } = Route.useLoaderData();
   const cards = sortTodoCards(buildTodoCards(counts));
 
   return (
@@ -43,6 +44,7 @@ function AdminDashboard() {
       </div>
 
       <InvoiceProblemBanner count={invoiceProblems} />
+      <McpVoidRequestBanner requests={mcpVoidRequests} />
 
       <section className="space-y-3">
         <h2 className="text-sm font-medium text-muted-foreground">需要處理的事</h2>
