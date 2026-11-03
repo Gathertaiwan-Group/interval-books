@@ -688,7 +688,7 @@ export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
                 <span>馥自然早餐</span>
               </li>
               <li>
-                <time>09:30</time>
+                <time>10:45</time>
                 <span>退房・專車出發</span>
               </li>
               <li>
@@ -696,8 +696,12 @@ export function Itinerary({ bookingClosed }: { bookingClosed: boolean }) {
                 <span>江賢二藝術園區</span>
               </li>
               <li>
-                <time>12:00</time>
-                <span>午餐</span>
+                <time>12:30</time>
+                <span>德布西咖啡</span>
+              </li>
+              <li>
+                <time>14:00</time>
+                <span>Katomayan（旮都瑪樣）遊程</span>
               </li>
               <li>
                 <time>16:00</time>
