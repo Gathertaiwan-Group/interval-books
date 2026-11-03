@@ -554,6 +554,18 @@ let token1;
     send_to_customer: true,
   });
   check("匯款資訊信（未付款匯款單）可預覽", [p.ok, p.json.recipient_count], [true, 1]);
+  const pj = JSON.stringify(p.json);
+  check(
+    "🔴 匯款資訊信的預覽輸出不含匯款帳號／銀行代號／銀行名稱（審查 2026-11-03）",
+    ["1234567890", "測試銀行"].filter((v) => pj.includes(v)),
+    [],
+  );
+  const pAdmin = await call("resend_order_email", { order: O2, kind: "remittance" });
+  check(
+    "🔴 寄管理員的匯款信預覽也不含帳號",
+    pAdmin.ok && !JSON.stringify(pAdmin.json).includes("1234567890"),
+    true,
+  );
   const bad = await call("resend_order_email", { order: O1, kind: "remittance" });
   check("已付款訂單不寄匯款資訊信", bad.ok, false);
   const bad2 = await call("resend_order_email", { order: O2, kind: "order_paid" });

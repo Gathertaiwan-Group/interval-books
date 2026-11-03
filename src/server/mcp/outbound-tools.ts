@@ -305,9 +305,22 @@ async function actorLabel(): Promise<string> {
   return a.via === "oauth" ? `mcp:${a.email}` : `mcp:${a.via}`;
 }
 
-function summaryOf(text: string): string {
-  const s = text.replace(/\s+/g, " ").trim();
-  return s.length > 240 ? `${s.slice(0, 240)}…` : s;
+/**
+ * 給 AI 看的預覽摘要：**只有**信件的開頭段落（標題另外回）。
+ *
+ * 🔴 匯款資訊信的內文有店家匯款帳戶（戶名／銀行／代號／帳號），那些不能回給 AI
+ *    （2026-11-03 審查）。所以：只取第一段、再把 redact 裡的值（建信時登記的帳戶欄位）
+ *    與任何 6 位以上的連續數字一律遮掉——開頭段落理論上不含帳戶，這兩道是保險。
+ */
+function summaryOf(text: string, redact: readonly string[] = []): string {
+  const first = (text.split(/\n\s*\n/).find((p) => p.trim()) ?? "").replace(/\s+/g, " ").trim();
+  let s = first;
+  for (const v of redact) {
+    const t = v.trim();
+    if (t) s = s.split(t).join("＊＊＊");
+  }
+  s = s.replace(/\d[\d\s-]{5,}\d/g, "＊＊＊");
+  return s.length > 200 ? `${s.slice(0, 200)}…` : s;
 }
 
 type BuiltMail = {
@@ -316,6 +329,8 @@ type BuiltMail = {
   subject: string;
   text: string;
   html: string;
+  /** 不可出現在預覽摘要裡的值（匯款帳戶欄位）。 */
+  redact?: string[];
 };
 
 /**
@@ -415,7 +430,18 @@ async function buildMails(
       copy,
       n.locale,
     );
-    return { mails: [{ target: { type: "order" }, ...m }], customerEmails: orderEmails };
+    return {
+      mails: [
+        {
+          target: { type: "order" },
+          ...m,
+          redact: [account.bankName, account.bankCode, account.bankAccount, account.accountName]
+            .map((v) => String(v ?? ""))
+            .filter((v) => v.trim().length >= 2),
+        },
+      ],
+      customerEmails: orderEmails,
+    };
   }
 
   // session_reminder —— 名單一律 loadPaidRosterByOrder()（簽到表的唯一定義），同 notify.ts。
@@ -461,7 +487,7 @@ function previewOf(mails: readonly BuiltMail[]) {
   return {
     mail_count: mails.length,
     subject: mails[0]?.subject ?? null,
-    summary: mails[0] ? summaryOf(mails[0].text) : null,
+    summary: mails[0] ? summaryOf(mails[0].text, mails[0].redact) : null,
   };
 }
 
