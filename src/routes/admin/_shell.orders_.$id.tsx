@@ -95,6 +95,7 @@ import { invoiceStatusLabel } from "@/lib/invoice-alerts";
 import { normalizeVoidReason, VOID_REASON_MAX } from "@/lib/invoice-void";
 // ⚠️ type-only：編譯後整行消失，不會把 server-only 的 repo 模組拉進瀏覽器 bundle。
 import type { AdminOrderDetail } from "@/server/repos/orders-admin";
+import type { PendingVoidRequest } from "@/lib/mcp-void-requests";
 
 export const Route = createFileRoute("/admin/_shell/orders_/$id")({
   // 列表的篩選條件原樣帶著，「回訂單列表」才回得到原本的分頁。
@@ -105,10 +106,15 @@ export const Route = createFileRoute("/admin/_shell/orders_/$id")({
   preloadStaleTime: 30_000,
   loader: async ({ params }) => {
     // 不是 uuid 的網址直接當「找不到」，不打一趟注定被 zod 擋下的請求。
-    if (!isUuid(params.id)) return { detail: null };
+    if (!isUuid(params.id)) return { detail: null, voidRequests: [] };
     const { getAdminOrderDetail } = await import("@/lib/admin/fns/orders");
-    const detail = await getAdminOrderDetail({ data: { orderId: params.id } });
-    return { detail };
+    const { getMcpVoidRequestsAdmin } = await import("@/lib/admin/fns/mcp-void-requests");
+    const [detail, voidRequests] = await Promise.all([
+      getAdminOrderDetail({ data: { orderId: params.id } }),
+      // 「MCP 申請作廢待處理」。讀失敗＝null（畫面說讀取失敗），不讓訂單頁掛掉。
+      getMcpVoidRequestsAdmin({ data: { orderId: params.id } }).catch(() => null),
+    ]);
+    return { detail, voidRequests };
   },
   head: ({ loaderData }) => ({
     meta: [
@@ -123,7 +129,7 @@ export const Route = createFileRoute("/admin/_shell/orders_/$id")({
 });
 
 function AdminOrderDetailRoute() {
-  const { detail } = Route.useLoaderData();
+  const { detail, voidRequests } = Route.useLoaderData();
   const search = Route.useSearch();
   if (!detail) {
     return (
@@ -136,10 +142,16 @@ function AdminOrderDetailRoute() {
     );
   }
   // 換一張訂單＝重新掛載，確認框與備註不會跨訂單殘留。
-  return <AdminOrderDetailPage key={detail.id} detail={detail} />;
+  return <AdminOrderDetailPage key={detail.id} detail={detail} voidRequests={voidRequests} />;
 }
 
-function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
+function AdminOrderDetailPage({
+  detail,
+  voidRequests,
+}: {
+  detail: AdminOrderDetail;
+  voidRequests: PendingVoidRequest[] | null;
+}) {
   const router = useRouter();
   const navigate = Route.useNavigate();
   const search = Route.useSearch();
@@ -162,6 +174,23 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
   const [voiding, setVoiding] = useState(false);
   const [voidReason, setVoidReason] = useState("");
   const voidReasonCheck = normalizeVoidReason(voidReason);
+  const [dismissing, setDismissing] = useState(false);
+
+  /** 「MCP 申請作廢」不處理：寫一筆關閉紀錄（不碰發票）。 */
+  async function submitDismissVoidRequest() {
+    setDismissing(true);
+    try {
+      const { dismissMcpVoidRequestAdmin } = await import("@/lib/admin/fns/mcp-void-requests");
+      await dismissMcpVoidRequestAdmin({ data: { orderId: detail.id } });
+      toast.success("已關閉這筆 MCP 作廢申請（發票沒有變動）");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "關閉申請失敗，請稍後再試");
+      return;
+    } finally {
+      setDismissing(false);
+    }
+    await refresh();
+  }
 
   /** 動作做完之後重跑 loader。失敗只代表畫面沒跟上，不是動作失敗。 */
   async function refresh() {
@@ -566,6 +595,11 @@ function AdminOrderDetailPage({ detail }: { detail: AdminOrderDetail }) {
       </Section>
 
       <Section title="發票">
+        <McpVoidRequestNotice
+          requests={voidRequests}
+          busy={dismissing || voiding}
+          onDismiss={submitDismissVoidRequest}
+        />
         <InvoiceStatusBlock
           detail={detail}
           busy={reissuing || voiding}
@@ -993,6 +1027,54 @@ function FulfillmentSection({
         {ACTION_BUTTON_LABEL[action]}
       </Button>
     </section>
+  );
+}
+
+/**
+ * 「MCP 申請作廢待處理」（MCP 的 request_invoice_void 只記申請、不作廢）。要作廢就用下面既有的
+ * 「作廢發票」按鈕——作廢成功後發票變成 voided，這則提示自動消失；不作廢就按「不處理，關閉申請」。
+ * 待處理的定義在 src/lib/mcp-void-requests.ts。
+ */
+function McpVoidRequestNotice({
+  requests,
+  busy,
+  onDismiss,
+}: {
+  requests: PendingVoidRequest[] | null;
+  busy: boolean;
+  onDismiss: () => void;
+}) {
+  if (requests === null) {
+    return <p className="mb-2 text-sm text-amber-700">MCP 作廢申請讀取失敗，請重新整理。</p>;
+  }
+  const r = requests[0];
+  if (!r) return null;
+  return (
+    <div
+      role="alert"
+      className="mb-3 space-y-2 rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm"
+    >
+      <p className="font-medium text-destructive">MCP 申請作廢待處理</p>
+      <dl className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-1">
+        <dt className="text-muted-foreground">發票號碼</dt>
+        <dd className="font-mono">{r.invoice_number}</dd>
+        <dt className="text-muted-foreground">申請原因</dt>
+        <dd>{r.reason || "—"}</dd>
+        <dt className="text-muted-foreground">申請時間</dt>
+        <dd>{formatTaipeiDateTime(r.requested_at)}</dd>
+        <dt className="text-muted-foreground">申請來源</dt>
+        <dd>
+          {r.requested_by ?? "靜態 MCP token"}
+          {r.client_name ? `（${r.client_name}）` : ""}
+        </dd>
+      </dl>
+      <p className="text-xs text-muted-foreground">
+        AI 連接器不會自己作廢。確認要作廢，請按下方「作廢發票」；不作廢就關閉這筆申請。
+      </p>
+      <Button variant="outline" size="sm" disabled={busy} onClick={onDismiss}>
+        不處理，關閉申請
+      </Button>
+    </div>
   );
 }
 
