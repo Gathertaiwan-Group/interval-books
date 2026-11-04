@@ -44,7 +44,7 @@
  *    否定斷言在路徑打錯時靜默通過）。
  */
 
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
@@ -52,8 +52,16 @@ import { dirname, join } from "node:path";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = "scripts/bundle-admin-leak-selftest.mjs";
 
-const SERVER_FUNC_DIR = join(ROOT, ".vercel/output/functions/__server.func");
-const STATIC_DIR = join(ROOT, ".vercel/output/static");
+// 🔴 每次執行用自己專屬的輸出目錄，不共用 .vercel/output。
+// 以前這裡 build 到共用的 .vercel/output：同一個 checkout 裡只要有第二個程序（另一個
+// agent 的 npm test、或手動 npm run build）同時在重建，nitro 會先清空該目錄，這支自檢
+// 在 [3] 讀 chunk 時就丟「讀不到 chunk 檔案」、沒印收尾行（偶發紅燈，單獨跑會過）。
+// 目錄放在 .vercel/ 底下（已被 .gitignore），結束時清掉。
+const OUT_REL = `.vercel/selftest-${process.pid}-${Date.now()}/output`;
+const OUT_ABS = join(ROOT, OUT_REL);
+process.on("exit", () => rmSync(join(ROOT, dirname(OUT_REL)), { recursive: true, force: true }));
+const SERVER_FUNC_DIR = join(OUT_ABS, "functions/__server.func");
+const STATIC_DIR = join(OUT_ABS, "static");
 
 // 訪客一定會走到的路由 id（TanStack Start manifest 裡的 key，不是 URL 路徑——
 // index 路由在 manifest 裡帶著結尾斜線，這是實測 build 產物確認過的形狀）。
@@ -107,6 +115,8 @@ const buildStart = Date.now();
 const build = spawnSync("npm", ["run", "build"], {
   cwd: ROOT,
   encoding: "utf8",
+  maxBuffer: 64 * 1024 * 1024,
+  env: { ...process.env, BUILD_OUTPUT_DIR: OUT_REL },
 });
 const buildSeconds = ((Date.now() - buildStart) / 1000).toFixed(1);
 
