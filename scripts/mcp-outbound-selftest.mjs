@@ -161,6 +161,8 @@ const FAKES = {
     ),
   },
   "@/server/repos/event-registrations": {
+    // 0059：行前提醒重寄會問 onsiteDueFor()（現場付款未收款才有值）；這裡的參加者都已付款。
+    onsiteDueFor: (row) => (row.onsite_unpaid ? { amount: 0, participants: 1, total: 0 } : null),
     loadPaidRosterByOrder: async (id) =>
       id === O1
         ? ["r1", "r2"].map((rid, i) => ({

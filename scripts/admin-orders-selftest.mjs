@@ -599,10 +599,11 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
     // 0056（現場付款）：orders 的 payment_method CHECK 加 'onsite'、expire_unpaid_orders 跳過 onsite。
     // 0057（staff 權限 event.onsite.collect）：只換 staff_permissions 的 CHECK 值域。
     // 0058（名單含現場付款未收款）：只重建 admin_event_roster view。
-    //   三支都沒碰 admin_delete_order／admin_archive_order／admin_mark_order_paid（現場收款就是呼叫它）。
-    "supabase/migrations 剛好 58 個 .sql 檔（0001–0055 + 0056 現場付款 + 0057 現場收款權限 + 0058 名單含現場付款未收款）",
+    // 0059（名單 view 加每位的票價）：只重建 admin_event_roster view。
+    //   四支都沒碰 admin_delete_order／admin_archive_order／admin_mark_order_paid（現場收款就是呼叫它）。
+    "supabase/migrations 剛好 59 個 .sql 檔（0001–0055 + 0056–0059 現場付款）",
     migFiles.length,
-    58,
+    59,
   );
 }
 

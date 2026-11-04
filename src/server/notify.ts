@@ -66,6 +66,7 @@ import {
   loadOrderAttendeesForAdminNotify,
   loadPaidRoster,
   loadPaidRosterByOrder,
+  onsiteDueFor,
 } from "@/server/repos/event-registrations";
 import { getEventSessionById } from "@/server/repos/event-sessions";
 import { getRemittanceAccount } from "@/server/repos/site-settings";
@@ -313,7 +314,7 @@ async function queueWithClaim(orderId: string): Promise<NotifyOutcome> {
           orderNo: row.order_no,
           session,
           // 0058：付款成功之後這條路的 onsite_unpaid 恆為 false；寫在這裡是讓兩條路同一個規則。
-          onsiteDue: row.onsite_unpaid ? row.order_total : null,
+          onsiteDue: onsiteDueFor(row, "order"),
         },
         copy,
         lang,
@@ -525,7 +526,7 @@ export async function queueOrderPlacedNotifications(orderId: string): Promise<No
               seatNo: row.seat_no,
               orderNo: row.order_no,
               session,
-              onsiteDue: row.onsite_unpaid ? row.order_total : null,
+              onsiteDue: onsiteDueFor(row, "order"),
             },
             copy,
             order.locale,
@@ -977,7 +978,7 @@ export async function runSessionReminders(
               session: brief,
               // 0058：現場付款、還沒付錢的人也收提醒（loadPaidRoster 讀 on_roster），信裡多一句
               // 「尚未付款，請於當天現場繳費 NT$x」。
-              onsiteDue: row.onsite_unpaid ? row.order_total : null,
+              onsiteDue: onsiteDueFor(row, "session"),
             },
             copy,
             lang,

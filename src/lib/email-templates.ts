@@ -126,10 +126,21 @@ export type RegistrationEmailInput = {
   orderNo: string;
   session: SessionBrief;
   /**
-   * 0058：現場付款、還沒付錢——當天要在現場繳的金額（訂單總額）。有值時信裡多一列
-   * 「尚未付款，請於當天現場繳費 NT$x」。不傳／null＝已付款，信與 0058 之前逐字相同。
+   * 0058／0059：現場付款、還沒付錢。有值時信裡多一列「尚未付款，請於當天現場繳費 NT$x」，
+   * x 是**這位參加者自己的票價**（amount）；同一張單（行前提醒：同一場次）不只一位時，再補
+   * 「本訂單共 N 位、合計 NT$total」。不傳／null＝已付款，信與 0058 之前逐字相同。
    */
-  onsiteDue?: number | null;
+  onsiteDue?: OnsiteDue | null;
+};
+
+/** 0059：繳費提醒的金額。amount＝這位的票價；participants／total＝同一張單（或同一場次）的人數與合計。 */
+export type OnsiteDue = { amount: number; participants: number; total: number };
+
+/** 0059：多人訂單時補的那一句。{n} 人數、{total} 合計。 */
+export const ONSITE_DUE_GROUP_NOTE: Localized = {
+  zh: "本訂單共 {n} 位、合計 {total}",
+  en: "This order: {n} people, {total} in total",
+  ja: "本ご注文は計 {n} 名、合計 {total}",
 };
 
 /** 0058：報名成功信／行前提醒信上的繳費提醒（現場付款、還沒付錢的人）。{amount} = NT$x。 */
@@ -146,11 +157,18 @@ function registrationRows(input: RegistrationEmailInput, lang: Lang): Row[] {
     { label: pick(LABELS.seatNo, lang), value: String(input.seatNo) },
     { label: pick(LABELS.orderNo, lang), value: input.orderNo },
   ];
-  if (typeof input.onsiteDue === "number") {
-    rows.push({
-      label: pick(LABELS.onsiteHow, lang),
-      value: fill(pick(ONSITE_DUE_NOTE, lang), { amount: formatMoney(input.onsiteDue) }),
-    });
+  const due = input.onsiteDue;
+  if (due) {
+    const lines = [fill(pick(ONSITE_DUE_NOTE, lang), { amount: formatMoney(due.amount) })];
+    if (due.participants > 1) {
+      lines.push(
+        fill(pick(ONSITE_DUE_GROUP_NOTE, lang), {
+          n: String(due.participants),
+          total: formatMoney(due.total),
+        }),
+      );
+    }
+    rows.push({ label: pick(LABELS.onsiteHow, lang), value: lines.join("\n") });
   }
   return rows;
 }

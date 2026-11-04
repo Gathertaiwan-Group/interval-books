@@ -929,6 +929,21 @@ export const MIGRATION_LEDGER = Object.freeze([
     // inventory（逐字沿用的 inv.mask_email／inv.mask_tail）。
     touches: ["event_registrations", "inventory", "orders_payments", "roster_pii"],
   },
+  {
+    file: "0059_roster_ticket_price.sql",
+    note: "現場付款繳費提醒改寫每位自己的票價：admin_event_roster 以 create or replace view 重建（0058 的十八欄與 on_roster 定義逐字不動），left join order_items／event_session_plans，最後面加 ticket_price（unit_price ÷ seats_per_unit，四捨五入）、order_participants（同單人數）、session_order_participants／session_order_amount（同單同場次的人數與票價合計，window function）。comment on column ×4，重申只 grant service_role。沒有碰任何函式",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：roster_pii（admin_event_roster、
+    // on_roster）、event_registrations、orders_payments（public.orders）、order_expiry（order_items）、
+    // session_plans（event_session_plans、seats_per_unit）、inventory（inv.mask_*）。
+    touches: [
+      "event_registrations",
+      "inventory",
+      "order_expiry",
+      "orders_payments",
+      "roster_pii",
+      "session_plans",
+    ],
+  },
 ]);
 
 /**

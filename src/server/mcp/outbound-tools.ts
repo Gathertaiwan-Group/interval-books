@@ -445,7 +445,8 @@ async function buildMails(
   }
 
   // session_reminder —— 名單一律 loadPaidRosterByOrder()（簽到表的唯一定義），同 notify.ts。
-  const { loadPaidRosterByOrder } = await import("@/server/repos/event-registrations");
+  const { loadPaidRosterByOrder, onsiteDueFor } =
+    await import("@/server/repos/event-registrations");
   const roster = (await loadPaidRosterByOrder(order.id)).filter(
     (r) => r.has_email && (!sessionId || r.session_id === sessionId) && briefs.has(r.session_id),
   );
@@ -461,6 +462,8 @@ async function buildMails(
         seatNo: row.seat_no,
         orderNo: row.order_no,
         session: briefs.get(row.session_id)!,
+        // 0059：與排程寄的行前提醒同一個規則——現場付款未收款的人印這位的票價＋該場次合計。
+        onsiteDue: onsiteDueFor(row, "session"),
       },
       copy,
       n.locale,

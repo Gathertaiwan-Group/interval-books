@@ -419,7 +419,9 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 名單、場次或庫存的任何表或函式。
   // 0058 重審：admin_event_roster 的 on_roster 多收「現場付款且未取消」、最後加 onsite_unpaid／
   // order_total 兩欄；既有欄位與其他付款方式的語意不變——這支的斷言照樣成立。
-  reviewedThrough: "0058_roster_includes_onsite_unpaid.sql",
+  // 0059 重審：admin_event_roster 只在最後加 ticket_price 等四欄（left join order_items／
+  // event_session_plans），既有十八欄與 on_roster 定義不動——這支的斷言照樣成立。
+  reviewedThrough: "0059_roster_ticket_price.sql",
 });
 // 這一期不准動到既有的 0001–0020，所以它們也必須都還在。
 for (let n = 1; n <= 20; n += 1) {

@@ -1360,9 +1360,14 @@ const IMPL: Handlers = {
       payment_status: r.payment_status,
       on_roster: r.on_roster,
     };
-    const warning = r.on_roster
-      ? "這位參加者在簽到表上（訂單已付款）。移除只會還名額，不會退款；退款要另外處理。"
-      : undefined;
+    // 0059：用實際的付款狀態判斷。0058 起 on_roster 也包含「現場付款、還沒付錢」的人，
+    // 他們沒付過錢，不該出現退款警告。
+    const warning =
+      r.payment_status === "paid"
+        ? "這位參加者的訂單已付款。移除只會還名額，不會退款；退款要另外處理。"
+        : r.onsite_unpaid
+          ? "這位參加者是現場付款、尚未付款（在簽到表上）。移除會還名額；沒有款項要退。"
+          : undefined;
 
     if (args.dry_run) {
       return preview(

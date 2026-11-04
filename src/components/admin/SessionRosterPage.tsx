@@ -88,7 +88,10 @@ export function SessionRosterPage({
     }
   }
 
-  const paidCount = (roster ?? []).filter((r) => r.on_roster).length;
+  // 0059：on_roster（簽到表）自 0058 起＝已付款＋現場付款待收。兩個數字分開，已付款只數真的付了的。
+  const onRosterCount = (roster ?? []).filter((r) => r.on_roster).length;
+  const paidCount = (roster ?? []).filter((r) => r.payment_status === "paid").length;
+  const onsiteUnpaidCount = (roster ?? []).filter((r) => r.onsite_unpaid).length;
 
   const actions = (
     <>
@@ -119,7 +122,7 @@ export function SessionRosterPage({
         size="sm"
         className="gap-1.5"
         // ⚠️ disabled 只是畫面。擋住直接呼叫的是 server fn 的 requireRosterRead()。
-        disabled={exporting || !roster || !canReadRoster || paidCount === 0}
+        disabled={exporting || !roster || !canReadRoster || onRosterCount === 0}
         title={canReadRoster ? undefined : "需要「查看活動報名名單」權限"}
         onClick={() => void handleExport()}
       >
@@ -153,16 +156,16 @@ export function SessionRosterPage({
       }
       actions={actions}
     >
-      {/* ⚠️ 匯出只含已付款（on_roster）。未付款的人不會來，印進簽到表會讓現場
-          多準備座位與講義。那個條件寫在 0021 §3 的 view 裡，畫面、CSV 與
-          Phase 3 的提醒信共用同一份。 */}
+      {/* ⚠️ 匯出只含簽到表上的人（on_roster＝已付款＋現場付款待收，0058）。其他付款方式
+          未付款的人不會出現，條件寫在 view 裡，畫面、CSV 與提醒信共用同一份。 */}
       <div className="rounded-md border border-border p-3 text-sm text-muted-foreground">
         {rosterError ? (
           <span className="text-destructive">名單讀取失敗：{rosterError}</span>
         ) : (
           <>
-            共 {roster?.length ?? 0} 筆，其中 <strong>{paidCount}</strong>{" "}
-            位已付款（＝會出現在簽到表上）；其餘是被未付款的訂單押著的位子。
+            共 {roster?.length ?? 0} 筆：已付款 <strong>{paidCount}</strong> 位・現場付款待收{" "}
+            <strong>{onsiteUnpaidCount}</strong> 位（皆在簽到表）；其餘{" "}
+            {Math.max(0, (roster?.length ?? 0) - onRosterCount)} 筆是被未付款的訂單押著的位子。
           </>
         )}
       </div>

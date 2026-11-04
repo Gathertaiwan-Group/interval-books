@@ -254,7 +254,9 @@ assertMigrationDependencies(check, MIG_DIR, {
   // payment_method is distinct from 'onsite'，本體其餘逐字沿用 0050——這支的斷言照樣成立。
   // 0058 重審：admin_event_roster 的 on_roster 多收「現場付款且未取消」、最後加 onsite_unpaid／
   // order_total 兩欄；既有欄位與其他付款方式的語意不變——這支的斷言照樣成立。
-  reviewedThrough: "0058_roster_includes_onsite_unpaid.sql",
+  // 0059 重審：admin_event_roster 只在最後加 ticket_price 等四欄（left join order_items／
+  // event_session_plans），既有十八欄與 on_roster 定義不動——這支的斷言照樣成立。
+  reviewedThrough: "0059_roster_ticket_price.sql",
 });
 
 // =============================================================================

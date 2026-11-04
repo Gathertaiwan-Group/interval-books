@@ -229,7 +229,9 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 名單、場次或庫存的任何表或函式。
   // 0058 重審：admin_event_roster 的 on_roster 多收「現場付款且未取消」、最後加 onsite_unpaid／
   // order_total 兩欄；既有欄位與其他付款方式的語意不變——這支的斷言照樣成立。
-  reviewedThrough: "0058_roster_includes_onsite_unpaid.sql",
+  // 0059 重審：admin_event_roster 只在最後加 ticket_price 等四欄（left join order_items／
+  // event_session_plans），既有十八欄與 on_roster 定義不動——這支的斷言照樣成立。
+  reviewedThrough: "0059_roster_ticket_price.sql",
 });
 
 // =============================================================================
@@ -608,8 +610,10 @@ console.log("\n[11] 🔴 名單頁的移除按鈕與確認對話框");
   const alertSrc = sliceBetween(regRouteSrc, "open={removeTarget !== null}", "</AlertDialog>");
   checkTrue("抓得到移除確認對話框", alertSrc.length > 100);
   checkTrue(
-    "🔴 已付款（on_roster）時明確警告「已經付過錢」",
-    /removeTarget\?\.on_roster/.test(alertSrc) && /已經付過錢/.test(alertSrc),
+    // 0059：判斷改看實際的 payment_status——0058 起 on_roster 也包含現場付款未收款的人，
+    // 他們沒付過錢，不該跳「已經付過錢」。
+    "🔴 已付款（payment_status = paid）時明確警告「已經付過錢」",
+    /removeTarget\?\.payment_status === "paid"/.test(alertSrc) && /已經付過錢/.test(alertSrc),
   );
   checkTrue("🔴 對話框說明名額會還回去", /名額會立即還給場次|名額/.test(alertSrc));
   checkTrue(

@@ -378,7 +378,10 @@ const BASE_TABLES = {
       created_at: "2026-11-01T00:00:00Z",
     },
   ],
-  // 0021 的名單 view（listSessionRoster 讀它）。REG1 在簽到表上（on_roster）。
+  // 0021 的名單 view（listSessionRoster 讀它）。REG1 在簽到表上（on_roster）且已付款。
+  // ⚠️ 0059 之前這一列是 payment_status 'pending' + on_roster true——那個組合在 0058 之前
+  //    根本不存在（on_roster 就是 paid），測試靠 on_roster 判斷退款警告才過得了。0059 起警告
+  //    看實際的 payment_status，所以 fixture 改成真的已付款。
   admin_event_roster: [
     {
       registration_id: REG1,
@@ -390,9 +393,10 @@ const BASE_TABLES = {
       notice_ack_at: null,
       created_at: "2026-11-01T00:00:00Z",
       order_no: "B001",
-      payment_status: "pending",
-      paid_at: null,
+      payment_status: "paid",
+      paid_at: "2026-11-01T01:00:00Z",
       on_roster: true,
+      onsite_unpaid: false,
     },
   ],
   event_sessions: [
@@ -759,12 +763,37 @@ const rrPreview = parseOut(
   await asOAuth(() => H.remove_registration({ session_id: SESS1, registration_id: REG1 })),
 );
 check(
-  "remove_registration 預覽：在簽到表上（on_roster）→ 警告不退款",
+  "remove_registration 預覽：已付款 → 警告不退款",
   [
     rrPreview.will_remove?.name,
     typeof rrPreview.warning === "string" && rrPreview.warning.includes("不會退款"),
   ],
   ["王小明", true],
+);
+// 0059：現場付款、還沒付錢的人也在簽到表上（on_roster），但沒有錢可退——不跳退款警告。
+resetDb(
+  {
+    ...BASE_TABLES,
+    admin_event_roster: BASE_TABLES.admin_event_roster.map((r) => ({
+      ...r,
+      payment_status: "pending",
+      paid_at: null,
+      on_roster: true,
+      onsite_unpaid: true,
+    })),
+  },
+  BASE_RPC,
+);
+const rrOnsite = parseOut(
+  await asOAuth(() => H.remove_registration({ session_id: SESS1, registration_id: REG1 })),
+);
+check(
+  "🔴 remove_registration 預覽：現場付款未收款（on_roster）→ 不跳退款警告",
+  [
+    typeof rrOnsite.warning === "string" && rrOnsite.warning.includes("不會退款"),
+    typeof rrOnsite.warning === "string" && rrOnsite.warning.includes("沒有款項要退"),
+  ],
+  [false, true],
 );
 resetDb(BASE_TABLES, BASE_RPC);
 await asOAuth(() =>

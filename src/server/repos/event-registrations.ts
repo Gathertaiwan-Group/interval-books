@@ -82,7 +82,7 @@ import type { AdminOrderAttendee } from "@/lib/email-templates";
  * 從這裡讀；明文 email／phone 另外從 event_registrations 讀（見 listSessionRoster）。
  */
 const ROSTER_COLUMNS =
-  "registration_id, session_id, order_id, order_item_id, seat_no, name, email_masked, phone_masked, has_email, has_phone, notice_ack_at, created_at, order_no, payment_status, paid_at, on_roster, onsite_unpaid, order_total";
+  "registration_id, session_id, order_id, order_item_id, seat_no, name, email_masked, phone_masked, has_email, has_phone, notice_ack_at, created_at, order_no, payment_status, paid_at, on_roster, onsite_unpaid, order_total, ticket_price, order_participants, session_order_participants, session_order_amount";
 
 /** view 的一列（遮罩值）。只在這個檔案內部用；loadPaidRoster*() 回這個形狀。 */
 export type RosterViewRow = {
@@ -104,9 +104,43 @@ export type RosterViewRow = {
   on_roster: boolean;
   /** 0058：現場付款、還沒付錢（但在簽到表上）。 */
   onsite_unpaid: boolean;
-  /** 0058：所屬訂單的總額（信裡「請於當天現場繳費 NT$x」）。 */
+  /** 0058：所屬訂單的總額。 */
   order_total: number;
+  /** 0059：這位參加者自己的票價（unit_price ÷ seats_per_unit）。 */
+  ticket_price: number;
+  /** 0059：同一張單的參加者人數（所有場次）。 */
+  order_participants: number;
+  /** 0059：同一張單在這個場次的人數與票價合計（行前提醒用）。 */
+  session_order_participants: number;
+  session_order_amount: number;
 };
+
+/**
+ * 0059：現場付款繳費提醒的金額——報名成功信看整張單（scope = "order"），行前提醒只看該場次
+ * （scope = "session"）。不是現場付款未收款 → null（信裡不印這一句）。
+ * notify.ts 三處與 MCP 手動重寄（outbound-tools.ts）共用這一支，金額規則只有一份。
+ */
+export function onsiteDueFor(
+  row: Pick<
+    RosterViewRow,
+    | "onsite_unpaid"
+    | "ticket_price"
+    | "order_total"
+    | "order_participants"
+    | "session_order_participants"
+    | "session_order_amount"
+  >,
+  scope: "order" | "session",
+): { amount: number; participants: number; total: number } | null {
+  if (!row.onsite_unpaid) return null;
+  return scope === "order"
+    ? { amount: row.ticket_price, participants: row.order_participants, total: row.order_total }
+    : {
+        amount: row.ticket_price,
+        participants: row.session_order_participants,
+        total: row.session_order_amount,
+      };
+}
 
 /** 名單頁看得到的一列。**email／phone 是明文**（業主 2026-10-25；2026-10-26 起不寫紀錄）。 */
 export type RegistrationRosterRow = {

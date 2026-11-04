@@ -597,6 +597,9 @@ export const ADMIN_READ_HANDLERS: Handlers = {
     if (!session) notFound("場次", session_id);
     const product = products.find((p) => p.id === session.product_id) ?? null;
     const onRoster = roster.filter((r) => r.on_roster).length;
+    // 0059：on_roster 自 0058 起包含現場付款未收款，拆成兩個數字。
+    const paid = roster.filter((r) => r.payment_status === "paid").length;
+    const onsiteUnpaid = roster.filter((r) => r.onsite_unpaid).length;
     return jsonText({
       session: {
         id: session.id,
@@ -631,8 +634,10 @@ export const ADMIN_READ_HANDLERS: Handlers = {
       summary: {
         registrations_total: roster.length,
         on_roster: onRoster,
+        paid,
+        onsite_unpaid: onsiteUnpaid,
         not_on_roster: roster.length - onRoster,
-        note: "on_roster＝已付款、算在簽到表上（0021 §3 的唯一定義）；其餘是未付款或已取消的訂單押著的名額。",
+        note: "on_roster＝算在簽到表上（0021 §3 的唯一定義）＝ paid（已付款）＋ onsite_unpaid（現場付款、尚未付款、未取消，0058）；not_on_roster 是其他付款方式未付款或已取消的訂單押著的名額。",
       },
       roster,
       removal_log: removedRes.error

@@ -316,7 +316,7 @@ assertLedgerDeclarationsHonest(check, MIG_DIR);
 assertMigrationDependencies(check, MIG_DIR, {
   suite: "onsite-payment-selftest",
   dependsOn: ["orders_payments", "order_expiry", "event_registrations", "session_seats"],
-  reviewedThrough: "0058_roster_includes_onsite_unpaid.sql",
+  reviewedThrough: "0059_roster_ticket_price.sql",
 });
 
 // =============================================================================
@@ -788,8 +788,9 @@ console.log("\n[6c] 0058：現場付款未收款的人在簽到表上、收得�
   );
   for (const lang of ["zh", "en", "ja"]) {
     const base = { participantName: "甲", seatNo: 1, orderNo: "IB-1", session: SESSION_BRIEF };
-    const t = tpl.renderRegistrationTicketEmail({ ...base, onsiteDue: 1200 }, {}, lang);
-    const r = tpl.renderSessionReminderEmail({ ...base, onsiteDue: 1200 }, {}, lang);
+    const one = { amount: 1200, participants: 1, total: 1200 };
+    const t = tpl.renderRegistrationTicketEmail({ ...base, onsiteDue: one }, {}, lang);
+    const r = tpl.renderSessionReminderEmail({ ...base, onsiteDue: one }, {}, lang);
     const note = {
       zh: "尚未付款，請於當天現場繳費 NT$1,200",
       en: "Not yet paid",
@@ -818,6 +819,184 @@ console.log("\n[6c] 0058：現場付款未收款的人在簽到表上、收得�
     /2026/.test(payCol.value({ onsite_unpaid: false, paid_at: "2026-12-01T02:00:00Z" })),
   );
   check("名單頁標示文字", labels.ONSITE_UNPAID_LABEL, "未收款（現場付款）");
+}
+
+// =============================================================================
+console.log("\n[6d] 審查 2026-11-05：每位的票價、名單頁計數、退款警告、MCP、註解、正式庫自檢開關");
+{
+  // 1. 0059 view＋金額規則
+  const sql0059 = stripSqlComments(readFile(join(MIG_DIR, "0059_roster_ticket_price.sql")));
+  checkTrue(
+    "0059：ticket_price = unit_price ÷ seats_per_unit（沒有方案視同 1）",
+    /round\(oi\.unit_price::numeric \/ greatest\(coalesce\(esp\.seats_per_unit, 1\), 1\)\)::integer\s*as ticket_price/.test(
+      sql0059,
+    ),
+  );
+  checkTrue(
+    "0059：行前提醒用的金額只算同一張單的同一場次",
+    /over \(partition by r\.order_id, r\.session_id\)\)::integer as session_order_amount/.test(
+      sql0059,
+    ),
+  );
+  checkTrue(
+    "0059：on_roster 定義與 0058 逐字相同",
+    sql0059.includes(
+      "(o.payment_status = 'paid'\n   or (o.payment_method = 'onsite' and o.status = 'pending')) as on_roster",
+    ),
+  );
+  checkTrue(
+    "0059：只 grant service_role",
+    /grant\s+select on public\.admin_event_roster to service_role;/.test(sql0059),
+  );
+  const regsLib = await import(
+    pathToFileURL(join(ROOT, "src/server/repos/event-registrations.ts")).href
+  );
+  const row = {
+    onsite_unpaid: true,
+    ticket_price: 600,
+    order_total: 1800,
+    order_participants: 3,
+    session_order_participants: 2,
+    session_order_amount: 1200,
+  };
+  check(
+    "onsiteDueFor(order)：這位的票價＋整張單",
+    JSON.stringify(regsLib.onsiteDueFor(row, "order")),
+    JSON.stringify({ amount: 600, participants: 3, total: 1800 }),
+  );
+  check(
+    "🔴 onsiteDueFor(session)：行前提醒只算該場次",
+    JSON.stringify(regsLib.onsiteDueFor(row, "session")),
+    JSON.stringify({ amount: 600, participants: 2, total: 1200 }),
+  );
+  check(
+    "onsiteDueFor：已付款 → null",
+    regsLib.onsiteDueFor({ ...row, onsite_unpaid: false }, "order"),
+    null,
+  );
+  for (const lang of ["zh", "en", "ja"]) {
+    const t = tpl.renderRegistrationTicketEmail(
+      {
+        participantName: "甲",
+        seatNo: 1,
+        orderNo: "IB-1",
+        session: SESSION_BRIEF,
+        onsiteDue: { amount: 600, participants: 3, total: 1800 },
+      },
+      {},
+      lang,
+    );
+    const g = {
+      zh: "本訂單共 3 位、合計 NT$1,800",
+      en: "3 people, NT$1,800",
+      ja: "計 3 名、合計 NT$1,800",
+    }[lang];
+    checkTrue(
+      `${lang}：多人訂單的信寫這位 NT$600 並補合計`,
+      t.text.includes("600") && t.text.includes(g),
+    );
+  }
+  const notifySrc = readFile("src/server/notify.ts");
+  check(
+    "notify.ts 三處都改用 onsiteDueFor（不再用 order_total）",
+    (notifySrc.match(/onsiteDue: onsiteDueFor\(row, "(order|session)"\)/g) ?? []).length,
+    3,
+  );
+  checkFalse(
+    "notify.ts 不再拿 order_total 當繳費金額",
+    /onsiteDue: row\.onsite_unpaid \? row\.order_total/.test(notifySrc),
+  );
+  checkTrue(
+    "行前提醒（runSessionReminders）用 session",
+    /session: brief,[\s\S]{0,300}onsiteDue: onsiteDueFor\(row, "session"\)/.test(notifySrc),
+  );
+  // 5. MCP 手動重寄行前提醒
+  checkTrue(
+    "MCP 手動重寄行前提醒帶 onsiteDue（同一個規則，session）",
+    /renderSessionReminderEmail\([\s\S]{0,400}onsiteDue: onsiteDueFor\(row, "session"\)/.test(
+      readFile("src/server/mcp/outbound-tools.ts"),
+    ),
+  );
+  // 2. 名單頁頁首
+  const pageSrc = readFile("src/components/admin/SessionRosterPage.tsx");
+  checkTrue(
+    "🔴 名單頁 paidCount 只數 payment_status = paid",
+    /const paidCount = \(roster \?\? \[\]\)\.filter\(\(r\) => r\.payment_status === "paid"\)\.length;/.test(
+      pageSrc,
+    ),
+  );
+  checkTrue(
+    "名單頁頁首分開顯示「已付款 N 位・現場付款待收 M 位（皆在簽到表）」",
+    /已付款 <strong>\{paidCount\}<\/strong> 位・現場付款待收[\s\S]{0,60}\{onsiteUnpaidCount\}<\/strong> 位（皆在簽到表）/.test(
+      pageSrc,
+    ),
+  );
+  // 3. 退款警告
+  checkTrue(
+    "🔴 名單頁移除警告看 payment_status，不看 on_roster",
+    /removeTarget\?\.payment_status === "paid" \?/.test(
+      readFile("src/components/admin/SessionRosterTable.tsx"),
+    ),
+  );
+  const opsSrc = readFile("src/server/mcp/ops-write-tools.ts");
+  checkTrue(
+    "🔴 MCP remove_registration 的退款警告看 payment_status",
+    /const warning =\s*r\.payment_status === "paid"/.test(opsSrc),
+  );
+  checkFalse("MCP 不再用 on_roster 判斷退款警告", /const warning = r\.on_roster/.test(opsSrc));
+  // 4. MCP get_session_roster summary
+  const readSrc = readFile("src/server/mcp/admin-read-tools.ts");
+  checkTrue(
+    "MCP summary 拆成 paid 與 onsite_unpaid",
+    /\bpaid,\s*onsite_unpaid: onsiteUnpaid,/.test(readSrc),
+  );
+  checkTrue(
+    "MCP 附註寫明 on_roster = paid + onsite_unpaid",
+    readSrc.includes("paid（已付款）＋ onsite_unpaid"),
+  );
+  // 6. 註解指到對的檔案
+  for (const f of ["src/server/auth.ts", "src/lib/admin/schemas.ts"]) {
+    const src = readFile(f);
+    checkTrue(
+      `${f}：markOnsiteOrderPaidStaff 的位置寫 onsite-collect.ts`,
+      /onsite-collect\.ts/.test(src) &&
+        !/fns\/orders\.ts[^\n]{0,4}markOnsiteOrderPaidStaff|markOnsiteOrderPaidStaff（src\/lib\/admin\/fns\/orders\.ts）/.test(
+          src,
+        ),
+    );
+  }
+  // 0057 是已套用的 migration，不准改（scripts 有守門：相對 origin/main 只准新增）。
+  // 它檔頭寫錯的位置由 0059 的檔頭更正。
+  checkTrue(
+    "0059 檔頭更正 0057 寫錯的檔案位置（onsite-collect.ts）",
+    readFile(join(MIG_DIR, "0059_roster_ticket_price.sql")).includes(
+      "0057 檔頭寫的 src/lib/admin/fns/orders.ts 是錯的",
+    ),
+  );
+  // 正式庫自檢的開關
+  for (const n of [
+    "inventory-products",
+    "inventory-adjustments",
+    "inventory-combos",
+    "inventory-migration",
+    "inventory-stock",
+    "inventory-vendors",
+    "pos-counter",
+  ]) {
+    const src = readFile(`scripts/${n}-selftest.mjs`);
+    checkTrue(
+      `${n}：連正式庫的那一段要明確設 INVENTORY_SELFTEST_LIVE=1`,
+      /process\.env\.INVENTORY_SELFTEST_LIVE === "1" \? process\.env\.SUPABASE_ACCESS_TOKEN : undefined/.test(
+        src,
+      ),
+    );
+  }
+  for (const n of ["inventory-stock", "inventory-migration"]) {
+    checkFalse(
+      `${n}：不再讀 .env.local`,
+      /join\(ROOT, "\.env\.local"\)/.test(readFile(`scripts/${n}-selftest.mjs`)),
+    );
+  }
 }
 
 // =============================================================================
@@ -1053,9 +1232,17 @@ if (!PG_URL) {
       );
       check("0058：兩位參加者各排了一封報名成功信", tickets.length, 2);
       checkTrue(
-        "0058：報名成功信寫「尚未付款，請於當天現場繳費 NT$1,200」",
+        "🔴 0059：每封報名成功信寫這位自己的票價 NT$600（不是整張單的 NT$1,200）",
         tickets.length === 2 &&
-          tickets.every((t) => t.bt.includes("尚未付款，請於當天現場繳費 NT$1,200")),
+          tickets.every(
+            (t) =>
+              t.bt.includes("尚未付款，請於當天現場繳費 NT$600") &&
+              !t.bt.includes("現場繳費 NT$1,200"),
+          ),
+      );
+      checkTrue(
+        "0059：兩人訂單補一句「本訂單共 2 位、合計 NT$1,200」",
+        tickets.length === 2 && tickets.every((t) => t.bt.includes("本訂單共 2 位、合計 NT$1,200")),
       );
       const v = await must(
         `select on_roster, onsite_unpaid, order_total from public.admin_event_roster where order_id = '${row.id}'`,
@@ -1168,6 +1355,10 @@ if (!PG_URL) {
       checkTrue(
         "提醒信有「尚未付款，請於當天現場繳費 NT$600」",
         (rmails[0]?.bt ?? "").includes("尚未付款，請於當天現場繳費 NT$600"),
+      );
+      checkFalse(
+        "0059：這張單在這個場次只有一位 → 不補「本訂單共 N 位」",
+        (rmails[0]?.bt ?? "").includes("本訂單共"),
       );
       const regs2 = await import(
         pathToFileURL(join(ROOT, "src/server/repos/event-registrations.ts")).href

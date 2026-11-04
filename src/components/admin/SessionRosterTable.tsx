@@ -182,8 +182,8 @@ export function SessionRosterTable({ rows, onRemoved, canMarkPaid = false, onMar
                         {ONSITE_UNPAID_LABEL}
                       </Badge>
                     ) : (
-                      <Badge variant={r.on_roster ? "default" : "secondary"}>
-                        {r.on_roster ? "已付款" : r.payment_status}
+                      <Badge variant={r.payment_status === "paid" ? "default" : "secondary"}>
+                        {r.payment_status === "paid" ? "已付款" : r.payment_status}
                       </Badge>
                     )}
                   </TableCell>
@@ -258,7 +258,9 @@ export function SessionRosterTable({ rows, onRemoved, canMarkPaid = false, onMar
           <AlertDialogHeader>
             <AlertDialogTitle>確定要移除「{removeTarget?.name}」的報名嗎？</AlertDialogTitle>
             <AlertDialogDescription>
-              {removeTarget?.on_roster ? (
+              {/* 0059：用實際的付款狀態判斷——現場付款未收款的人在簽到表上（on_roster），
+                  但沒付過錢，不該跳退款警告。 */}
+              {removeTarget?.payment_status === "paid" ? (
                 <span className="block font-medium text-destructive">
                   警告：這位已經付過錢（訂單 {removeTarget?.order_no}）。移除只會刪掉報名
                   紀錄並還原名額，不會辦理退款——退款要另外處理。
