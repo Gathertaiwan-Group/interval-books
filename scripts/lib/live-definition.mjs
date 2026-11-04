@@ -60,21 +60,35 @@ export function latestDefinition(migDir, fnName, strip = (s) => s) {
   }
 
   const head = `create or replace function public.${fnName}`;
+  // 🔴 不分大小寫比對。0050 起有些 migration 是照正式庫 pg_get_functiondef() 抄的，寫成
+  //    `CREATE OR REPLACE FUNCTION … AS $function$ … $function$;`。只認小寫 + `$$` 時，
+  //    那幾支會被當成「沒有重新定義」，回傳的是更早的一份死定義——斷言照綠、覆蓋是零。
+  //    結尾也跟著認那一份定義自己的 dollar-quote 標籤（`$$` 或 `$function$` 之類）。
+  const headLower = head.toLowerCase();
   for (let i = files.length - 1; i >= 0; i -= 1) {
     const sql = strip(readFileSync(join(migDir, files[i]), "utf8"));
-    const at = sql.indexOf(head);
-    if (at === -1) continue;
+    const lower = sql.toLowerCase();
+    // 名字後面必須緊接 `(`（允許空白），免得 public.foo 撞到 public.foo_bar。
+    const starts = [];
+    for (let at = lower.indexOf(headLower); at !== -1; at = lower.indexOf(headLower, at + 1)) {
+      if (/^\s*\(/.test(lower.slice(at + headLower.length, at + headLower.length + 20))) {
+        starts.push(at);
+      }
+    }
+    if (starts.length === 0) continue;
     // 一支 migration 可能定義同一支函式不只一次（理論上不該，但要抓得出來）：
     // 取**最後**一次，那才是這支 migration 跑完之後留在資料庫裡的那一份。
-    const start = sql.lastIndexOf(head);
-    const end = sql.indexOf("\n$$;", start);
-    if (end === -1) {
+    const start = starts[starts.length - 1];
+    const tagMatch = /\bas\s+(\$[a-z_0-9]*\$)/i.exec(sql.slice(start));
+    const tag = tagMatch ? tagMatch[1] : "$$";
+    const endAt = sql.indexOf(`\n${tag};`, start);
+    if (endAt === -1) {
       throw new Error(
-        `live-definition：在 ${files[i]} 找到 ${fnName} 的定義開頭，卻找不到結尾的 $$; —— ` +
+        `live-definition：在 ${files[i]} 找到 ${fnName} 的定義開頭，卻找不到結尾的 ${tag}; —— ` +
           "切不出完整的函式本體就不要回一段半截的字串（半截的本體會讓否定斷言誤判）。",
       );
     }
-    return { file: files[i], body: sql.slice(start, end + 4) };
+    return { file: files[i], body: sql.slice(start, endAt + tag.length + 2) };
   }
 
   throw new Error(
