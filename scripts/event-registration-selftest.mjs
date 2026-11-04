@@ -558,16 +558,63 @@ checkTrue("扣回去用 greatest(0, …)", /greatest\(0, s\.seats_taken - v_free
 //    區塊各自抽出來、正規化空白之後**比對相等**，而不是只 grep 其中一個欄位名。
 console.log("\n[5] expire_unpaid_orders 的回傳形狀");
 
-function returnsTableBlock(sql) {
-  const i = sql.indexOf("create or replace function public.expire_unpaid_orders");
-  if (i === -1) return "";
-  const start = sql.indexOf("returns table", i);
-  const end = sql.indexOf(")", sql.indexOf("restored_seats", start));
-  if (start === -1 || end === -1) return "";
-  return sql
-    .slice(start, end + 1)
+/**
+ * expire_unpaid_orders 的 `returns table (…)` 區塊，**正規化之後**的形狀。
+ *
+ * 不分大小寫抽取，再把空白與大小寫正規化（全部小寫、括號與逗號旁的空白拿掉、其餘空白壓成
+ * 一個）——0050 起的定義是照正式庫 pg_get_functiondef() 抄的（`RETURNS TABLE(expired_id
+ * uuid, …)`），與 0011 手寫的 `returns table (\n  expired_id uuid, …)` 只差格式。這裡比的是
+ * 實際的欄位名與型別，不是排版。
+ */
+function normalizeSig(text) {
+  return text
+    .toLowerCase()
     .replace(/\s+/g, " ")
+    .replace(/\s*([(),])\s*/g, "$1")
     .trim();
+}
+function returnsTableBlock(sql) {
+  const lower = sql.toLowerCase();
+  const i = lower.indexOf("create or replace function public.expire_unpaid_orders");
+  if (i === -1) return "";
+  const start = lower.indexOf("returns table", i);
+  if (start === -1) return "";
+  const end = lower.indexOf(")", lower.indexOf("restored_seats", start));
+  if (end === -1) return "";
+  return normalizeSig(sql.slice(start, end + 1));
+}
+
+/**
+ * 參數簽章（名字、型別、預設值），正規化之後。預設值的 interval 字面值換算成秒再比——
+ * pg_get_functiondef() 把 `'30 minutes'` 印成 `'00:30:00'::interval`，兩者是同一個值。
+ */
+function intervalSeconds(lit) {
+  const v = lit.trim().toLowerCase();
+  let m = /^(\d+):(\d{2}):(\d{2})$/.exec(v);
+  if (m) return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+  m = /^(\d+)\s*(second|minute|hour|day)s?$/.exec(v);
+  if (m) return Number(m[1]) * { second: 1, minute: 60, hour: 3600, day: 86400 }[m[2]];
+  return NaN;
+}
+function expireParams(sql) {
+  const lower = sql.toLowerCase();
+  const i = lower.indexOf("create or replace function public.expire_unpaid_orders");
+  if (i === -1) return null;
+  const open = lower.indexOf("(", i);
+  const close = lower.indexOf(")", open);
+  if (open === -1 || close === -1) return null;
+  return lower
+    .slice(open + 1, close)
+    .split(",")
+    .map((p) => {
+      const m = /^\s*(\w+)\s+(\w+)\s+default\s+(.+?)\s*$/.exec(p.replace(/\s+/g, " "));
+      if (!m) return `?${p.trim()}`;
+      const raw = m[3].replace(/::interval$/, "");
+      const lit = /^'(.*)'$/.exec(raw);
+      const def = m[2] === "interval" && lit ? `${intervalSeconds(lit[1])}s` : raw;
+      return `${m[1]} ${m[2]} = ${def}`;
+    })
+    .join("; ");
 }
 
 const shape0011 = returnsTableBlock(exec0011);
@@ -618,11 +665,14 @@ const shapeLive = returnsTableBlock(liveExpire.body);
 checkTrue("抽得出 live 版的 returns table 區塊", shapeLive.length > 60);
 check("🔴 live 版的回傳形狀與 0011 逐字相同", shapeLive, shape0011);
 // 參數簽章也不准動（drop 的另一個理由）。
-checkTrue(
-  "live 版的參數簽章逐字未變",
-  /p_older_than interval default '30 minutes',\s*\n?\s*p_limit\s+integer\s+default 200/.test(
-    liveExpire.body,
-  ),
+// 比的是名字、型別、預設值（interval 換算成秒），不是排版：0050 起的定義是 pg_get_functiondef()
+// 的格式（`DEFAULT '00:30:00'::interval`），與 0011 的 `default '30 minutes'` 是同一個值。
+const params0011 = expireParams(exec0011);
+check("抽得出 0011 的參數簽章", params0011, "p_older_than interval = 1800s; p_limit integer = 200");
+check(
+  "live 版的參數簽章與 0011 相同（名字、型別、預設值）",
+  expireParams(liveExpire.body),
+  params0011,
 );
 
 // 0020 訂下的三件事，在 live 那一份裡必須還在。

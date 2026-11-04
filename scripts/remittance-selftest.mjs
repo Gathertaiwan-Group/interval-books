@@ -374,16 +374,31 @@ console.log("\n[3] 匯款期限 3 天 —— 兩邊同步");
 {
   const liveExpire = latestDefinition(MIG_DIR, "expire_unpaid_orders", stripSqlComments);
   checkTrue("反空殼：切得到現在生效的 expire 定義", liveExpire.body.length > 1000);
-  // 0036：新增了第 4d 步（一併回沖方案的 units_taken），create or replace 了
-  // 這支函式，所以「現在生效的那一份」從 0034 換成 0036——這是 latestDefinition()
-  // 存在的理由本身（見它的檔頭）：機械地掃到最後一支定義它的檔案，不必每次改動
-  // 這支函式都手動去改這裡指到哪一支。這裡仍然寫死檔名，而不是隨便什麼都算過，
-  // 是為了在「以為改到了、其實漏了」的情況下當場報錯，而不是安靜地通過。
-  // 0045：票種改依實際刪掉的報名列數退，又 create or replace 了一次；認領條件逐字沿用。
-  check(
-    "現在生效的那一份來自 0045",
-    liveExpire.file,
-    "0045_plan_units_release_by_registrations.sql",
+  // 現在生效的那一份由 latestDefinition() 動態找（0036、0045、0050、0056 都 create or replace
+  // 過這支函式），不寫死檔名——寫死的話，每一次重寫都會讓這裡驗一份已經不生效的定義。
+  // 改成斷言那一份裡**必須有的條件**：匯款 3 天寬限、現場付款不回收、只收未付款的單。
+  console.log(`      （現在生效的 expire_unpaid_orders 來自 ${liveExpire.file}）`);
+  checkTrue(
+    "現在生效的那一份是 0045 之後的版本（不是更早的死定義）",
+    liveExpire.file >= "0045_plan_units_release_by_registrations.sql",
+  );
+  checkTrue(
+    "只回收還沒付錢的單（status = 'pending'、payment_status <> 'paid'、paid_at is null）",
+    /o\.status = 'pending'\s*and o\.payment_status <> 'paid'\s*and o\.paid_at is null/.test(
+      liveExpire.body,
+    ),
+  );
+  checkTrue(
+    "🔴 現場付款（onsite，0056）不被逾時回收",
+    /and o\.payment_method is distinct from 'onsite'/.test(liveExpire.body),
+  );
+  checkTrue(
+    "後台電話報名（admin_phone，0050）不被逾時回收",
+    /and o\.source <> 'admin_phone'/.test(liveExpire.body),
+  );
+  checkTrue(
+    "逾時的單真的會被取消（failed_reason = 'unpaid_timeout'）",
+    /failed_reason\s*=\s*'unpaid_timeout'/.test(liveExpire.body),
   );
   checkTrue(
     "🔴 匯款訂單的門檻是 greatest(p_older_than, interval '3 days')",
