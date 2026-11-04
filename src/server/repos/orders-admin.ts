@@ -616,6 +616,24 @@ export async function markOrderPaidByAdmin(input: {
   };
 }
 
+/**
+ * 0057：一張訂單的 payment_method（給 markOnsiteOrderPaidStaff 判斷「是不是現場付款」）。
+ * undefined＝找不到這張訂單；null＝舊的「由店家聯繫付款」。查詢失敗丟例外（fail closed）。
+ */
+export async function getOrderPaymentMethod(orderId: string): Promise<string | null | undefined> {
+  const { data, error } = await supabaseAdmin()
+    .from("orders")
+    .select("payment_method")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (error) {
+    console.error(`[repo/orders-admin] 讀付款方式失敗：${error.code} ${error.message}`);
+    throw new Error(`[repo/orders-admin] 讀付款方式失敗：${error.code}`);
+  }
+  if (!data) return undefined;
+  return (data as { payment_method: string | null }).payment_method;
+}
+
 // ---------------------------------------------------------------------------
 // 刪除（0035）
 // ---------------------------------------------------------------------------

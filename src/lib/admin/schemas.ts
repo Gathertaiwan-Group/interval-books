@@ -1947,6 +1947,9 @@ export const STAFF_PERMISSIONS = [
   "approve_inventory_adjustments",
   "inv.vendor.pii.read",
   "event.roster.read",
+  // 0057：把現場付款（payment_method = 'onsite'）的訂單標記已收款。只限 onsite，其他付款方式
+  // 照舊只有 admin（檢查在 src/lib/admin/fns/orders.ts markOnsiteOrderPaidStaff）。
+  "event.onsite.collect",
 ] as const;
 
 /**

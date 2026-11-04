@@ -674,8 +674,8 @@ checkTrue(
   /rowOnsiteUnpaid\(r\) \?[\s\S]{0,200}ONSITE_UNPAID_LABEL/.test(rosterCode),
 );
 checkTrue(
-  "🔴 名單：一鍵標記已收款走的是同一支 markOrderPaidAdmin（admin_mark_order_paid）",
-  /markOrderPaidAdmin\(\{\s*data: \{ orderId: payTarget\.order_id/.test(rosterCode),
+  "🔴 名單：一鍵標記已收款走 markOnsiteOrderPaidStaff（0057，server 端驗權限與 onsite）",
+  /markOnsiteOrderPaidStaff\(\{\s*data: \{ orderId: payTarget\.order_id/.test(rosterCode),
 );
 checkTrue(
   "名單：按鈕只給 admin（canMarkPaid）",
@@ -687,6 +687,66 @@ checkTrue(
     readFile("src/server/repos/event-registrations.ts"),
   ),
 );
+
+// =============================================================================
+console.log("\n[6b] 0057：門市人員只能標記「現場付款」的訂單");
+{
+  const fnSrc = stripTs(readFile("src/lib/admin/fns/onsite-collect.ts"));
+  checkTrue(
+    '🔴 server fn 掛 staffFnMiddleware("event.onsite.collect")（權限在 server 端）',
+    /markOnsiteOrderPaidStaff = createServerFn\(\{ method: "POST" \}\)\s*\.middleware\(\[staffFnMiddleware\("event\.onsite\.collect"\)\]\)/.test(
+      fnSrc,
+    ),
+  );
+  const iCheck = fnSrc.indexOf('if (method !== "onsite")');
+  const iMark = fnSrc.indexOf("await markOrderPaidByAdmin(");
+  checkTrue(
+    "🔴 付款方式不是 onsite → not_onsite（不標記）",
+    iCheck !== -1 && /not_onsite/.test(fnSrc),
+  );
+  checkTrue("   這道檢查排在標記之前", iCheck !== -1 && iMark !== -1 && iCheck < iMark);
+  checkTrue(
+    "   付款方式從資料庫重讀（getOrderPaymentMethod），不信任呼叫端",
+    /await getOrderPaymentMethod\(data\.orderId\)/.test(fnSrc),
+  );
+  checkTrue(
+    "   actor 只認 session（context.staff.userId）",
+    /actorId: context\.staff\.userId/.test(fnSrc),
+  );
+  checkFalse("   inputValidator 沒有 paymentMethod 欄位可以宣稱", /paymentMethod:/.test(fnSrc));
+  const ordersFns = stripTs(readFile("src/lib/admin/fns/orders.ts"));
+  checkFalse(
+    "其他付款方式照舊只有 admin：fns/orders.ts 沒有 staffFnMiddleware",
+    /staffFnMiddleware/.test(ordersFns),
+  );
+  checkTrue(
+    "markOrderPaidAdmin 仍掛 adminFnMiddleware",
+    /markOrderPaidAdmin = createServerFn\(\{ method: "POST" \}\)\s*\.middleware\(\[adminFnMiddleware\]\)/.test(
+      ordersFns,
+    ),
+  );
+  checkTrue(
+    "auth.ts 的 STAFF_PERMISSIONS 有 event.onsite.collect",
+    /"event\.onsite\.collect",/.test(readFile("src/server/auth.ts")),
+  );
+  checkTrue(
+    "人員頁有這個權限的中文名",
+    /"event\.onsite\.collect": "現場付款收款/.test(readFile("src/lib/admin/permission-labels.ts")),
+  );
+  const sql0057 = stripSqlComments(
+    readFile(join(MIG_DIR, "0057_staff_onsite_collect_permission.sql")),
+  );
+  checkTrue(
+    "0057 的 CHECK 收 event.onsite.collect",
+    /'event\.roster\.read',\s*'event\.onsite\.collect'\s*\)\);/.test(sql0057),
+  );
+  checkTrue(
+    "名單頁按鈕依權限顯示（canCollectOnsite）",
+    /canCollectOnsite=\{user\.permissions\.includes\("event\.onsite\.collect"\)\}/.test(
+      readFile("src/routes/admin/_shell.registrations_.$sessionId.index.tsx"),
+    ),
+  );
+}
 
 // =============================================================================
 // [7–10] 連線段
@@ -1039,6 +1099,33 @@ if (!PG_URL) {
         await must(`select * from public.admin_mark_order_paid('${id}'::uuid, null, null)`),
       );
       check("冪等：第二次 → already_paid", again2?.reason, "already_paid");
+    }
+    {
+      // 0057：staff_permissions 收 event.onsite.collect（CHECK 真的套上了）。
+      const uid = "ffff0000-0000-4000-8000-000000000057";
+      await must(
+        `delete from public.staff_permissions where user_id = '${uid}';
+         insert into auth.users (id, email) values ('${uid}', '${P}staff@example.invalid')
+           on conflict (id) do nothing;`,
+        false,
+      );
+      await q(
+        `insert into public.profiles (id, email, role) values ('${uid}', '${P}staff@example.invalid', 'staff') on conflict (id) do nothing`,
+        false,
+      );
+      const ok = await q(
+        `insert into public.staff_permissions (user_id, permission) values ('${uid}', 'event.onsite.collect')`,
+        false,
+      );
+      checkTrue("0057：staff_permissions 收 event.onsite.collect", ok.ok);
+      if (!ok.ok) console.log(red(`      ${ok.error.slice(0, 300)}`));
+      const nope = await q(
+        `insert into public.staff_permissions (user_id, permission) values ('${uid}', 'event.onsite.anything')`,
+        false,
+      );
+      checkFalse("0057：未知的權限仍被 CHECK 擋下", nope.ok);
+      // profiles 有 LAST_ADMIN 保底 trigger（0033），測試用的 staff 帳號留在本機庫，只清權限列。
+      await must(`delete from public.staff_permissions where user_id = '${uid}';`, false);
     }
     {
       const bad = await q(

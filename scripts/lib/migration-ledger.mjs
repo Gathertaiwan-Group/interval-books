@@ -914,6 +914,13 @@ export const MIGRATION_LEDGER = Object.freeze([
       "session_seats",
     ],
   },
+  {
+    file: "0057_staff_onsite_collect_permission.sql",
+    note: "第十種 staff 權限 event.onsite.collect（門市人員把現場付款訂單標記已收款，只限 payment_method = 'onsite'）：staff_permissions_permission_check 換成 0021 的九種再加一個（drop if exists + add），comment on column 更新。沒有碰任何函式——收款仍是 admin_mark_order_paid()（DB 端本來就沒有限定 admin），權限與 onsite 檢查在 server fn markOnsiteOrderPaidStaff",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：admin_auth（staff_permissions）與
+    // inventory（CHECK 值域逐字沿用的 approve_* 那幾種權限名）。
+    touches: ["admin_auth", "inventory"],
+  },
 ]);
 
 /**

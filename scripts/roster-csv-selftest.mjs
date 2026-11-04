@@ -415,7 +415,9 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 本體的場次段逐字沿用，seats_taken 一個字沒動）。本檔的斷言逐條重跑全綠，原樣成立。
   // 0056（現場付款）重審：CHECK 只多一個值 onsite、expire_unpaid_orders 候選條件只多一行
   // payment_method is distinct from 'onsite'，本體其餘逐字沿用 0050——這支的斷言照樣成立。
-  reviewedThrough: "0056_onsite_payment.sql",
+  // 0057 重審：只換 staff_permissions 的 CHECK 值域（多一個 event.onsite.collect），沒有碰訂單、
+  // 名單、場次或庫存的任何表或函式。
+  reviewedThrough: "0057_staff_onsite_collect_permission.sql",
 });
 // 這一期不准動到既有的 0001–0020，所以它們也必須都還在。
 for (let n = 1; n <= 20; n += 1) {
@@ -635,8 +637,16 @@ checkTrue(
   /"event\.roster\.read"/.test(authTs),
 );
 // 兩邊的數量必須一樣：CHECK 是真正的值域，auth.ts 是鏡射。
-const checkBlock = exec0021.slice(
-  exec0021.indexOf("add constraint staff_permissions_permission_check"),
+// 比的是**最後一支**重設這條 CHECK 的 migration（0057 起是第十種 event.onsite.collect），
+// 不是釘死 0021——釘死的話，往後每一次加權限，這條都在比一份已經不生效的值域。
+const latestCheckFile = [...migrations]
+  .reverse()
+  .find((f) =>
+    readFile(join(MIG_DIR, f)).includes("add constraint staff_permissions_permission_check"),
+  );
+const latestCheckSql = readFile(join(MIG_DIR, latestCheckFile));
+const checkBlock = latestCheckSql.slice(
+  latestCheckSql.indexOf("add constraint staff_permissions_permission_check"),
 );
 const permsInCheck = (checkBlock.slice(0, checkBlock.indexOf("));")).match(/'[a-z_.]+'/g) ?? [])
   .length;
@@ -647,7 +657,8 @@ const permsBlock = authTs.slice(
 const permsInTs = (permsBlock.match(/"[a-z_.]+"/g) ?? []).length;
 check("反空殼：CHECK 裡數得出權限", permsInCheck > 0, true);
 check("CHECK 與 auth.ts 的權限數一致", permsInTs, permsInCheck);
-check("而且是九種", permsInCheck, 9);
+check("現行 CHECK 來自 0057", latestCheckFile, "0057_staff_onsite_collect_permission.sql");
+check("而且是十種（0057 加了 event.onsite.collect）", permsInCheck, 10);
 
 // =============================================================================
 // [7] 兩支明文函式：先寫紀錄，再取值

@@ -202,7 +202,9 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 本體的場次段逐字沿用，seats_taken 一個字沒動）。本檔的斷言逐條重跑全綠，原樣成立。
   // 0056（現場付款）重審：CHECK 只多一個值 onsite、expire_unpaid_orders 候選條件只多一行
   // payment_method is distinct from 'onsite'，本體其餘逐字沿用 0050——這支的斷言照樣成立。
-  reviewedThrough: "0056_onsite_payment.sql",
+  // 0057 重審：只換 staff_permissions 的 CHECK 值域（多一個 event.onsite.collect），沒有碰訂單、
+  // 名單、場次或庫存的任何表或函式。
+  reviewedThrough: "0057_staff_onsite_collect_permission.sql",
 });
 
 // =============================================================================

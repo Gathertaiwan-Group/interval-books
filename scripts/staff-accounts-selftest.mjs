@@ -154,7 +154,9 @@ assertLedgerDeclarationsHonest(check, MIG_DIR);
 assertMigrationDependencies(check, MIG_DIR, {
   suite: "staff-accounts-selftest",
   dependsOn: ["admin_auth"],
-  reviewedThrough: "0033_admin_staff_management.sql",
+  // 0057 重審：只換 staff_permissions 的 CHECK 值域（九種＋event.onsite.collect），沒有碰
+  // profiles、保底 trigger 或任何 RPC——這支的斷言照樣成立。
+  reviewedThrough: "0057_staff_onsite_collect_permission.sql",
 });
 
 // =============================================================================
@@ -551,10 +553,14 @@ function extractStringArray(src, constName) {
 const schemasPermissions = extractStringArray(schemasSrc, "STAFF_PERMISSIONS");
 const authSrcForPermissions = stripTs(authSrc);
 const authPermissions = extractStringArray(authSrcForPermissions, "STAFF_PERMISSIONS");
-checkTrue("schemas.ts 的 STAFF_PERMISSIONS 抓得到 9 個值", (schemasPermissions ?? []).length === 9);
+// 0057 加了第十種 event.onsite.collect（現場付款收款）。
 checkTrue(
-  "src/server/auth.ts 的 STAFF_PERMISSIONS 抓得到 9 個值",
-  (authPermissions ?? []).length === 9,
+  "schemas.ts 的 STAFF_PERMISSIONS 抓得到 10 個值",
+  (schemasPermissions ?? []).length === 10,
+);
+checkTrue(
+  "src/server/auth.ts 的 STAFF_PERMISSIONS 抓得到 10 個值",
+  (authPermissions ?? []).length === 10,
 );
 check(
   "🔴 兩份 STAFF_PERMISSIONS 清單逐字一致（schemas.ts 不能悄悄漂移離 auth.ts 的真正值域）",

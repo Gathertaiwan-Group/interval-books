@@ -61,6 +61,8 @@ function SessionRosterRoute() {
       //    requireRosterRead()，而它是從 staff_permissions 重讀出來的。
       canReadRoster={user.permissions.includes("event.roster.read")}
       canCreatePhoneOrder={user.role === "admin"}
+      // 0057：admin 的 permissions 恆為全有，所以這一條同時涵蓋 admin 與被授權的門市人員。
+      canCollectOnsite={user.permissions.includes("event.onsite.collect")}
     />
   );
 }

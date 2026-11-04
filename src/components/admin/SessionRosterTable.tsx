@@ -10,8 +10,9 @@
  * 明確示警「這位已經付過錢」，不需要等 RPC 回來才知道。
  *
  * ── 現場付款（0056）────────────────────────────────────────────────────────
- * 現場付款、還沒收到錢的列標「現場付款・未收款」，並給一顆「標記已收款」（admin 才有）。
- * 呼叫的就是訂單內頁那一支 markOrderPaidAdmin()（admin_mark_order_paid()），一張訂單一次；
+ * 現場付款、還沒收到錢的列標「現場付款・未收款」，並給一顆「標記已收款」（admin，或有
+ * event.onsite.collect 的門市人員，0057）。呼叫 markOnsiteOrderPaidStaff()——它在 server 端
+ * 驗權限與「只限 onsite」，收款本身仍是 admin_mark_order_paid()，一張訂單一次；
  * 同一張單的其他參加者會在重抓之後一起變成已付款。
  *
  * 成功後呼叫 onRemoved：呼叫端 router.invalidate()，名單頁的 loader 重抓名單（2026-10-26
@@ -49,7 +50,10 @@ type Props = {
   rows: RosterRow[];
   /** 移除成功（reason === "deleted"）之後。 */
   onRemoved: (registrationId: string) => Promise<void>;
-  /** 0056：顯示現場付款的「標記已收款」。只控制畫面；擋人的是 adminFnMiddleware。 */
+  /**
+   * 0056／0057：顯示現場付款的「標記已收款」。admin 或有 event.onsite.collect 的 staff。
+   * 只控制畫面；擋人的是 markOnsiteOrderPaidStaff 的 staffFnMiddleware＋onsite 檢查。
+   */
   canMarkPaid?: boolean;
   /** 0056：標記已收款成功（或發現早就付過）之後。 */
   onMarkedPaid?: () => Promise<void>;
@@ -74,14 +78,17 @@ export function SessionRosterTable({ rows, onRemoved, canMarkPaid = false, onMar
     if (!payTarget) return;
     setMarking(true);
     try {
-      const { markOrderPaidAdmin } = await import("@/lib/admin/fns/orders");
-      const result = await markOrderPaidAdmin({
+      // 0057：走 staff 版（event.onsite.collect；admin 自動有），server 端再驗一次是 onsite。
+      const { markOnsiteOrderPaidStaff } = await import("@/lib/admin/fns/onsite-collect");
+      const result = await markOnsiteOrderPaidStaff({
         data: { orderId: payTarget.order_id, note: "現場付款（報名名單標記）" },
       });
       if (result.reason === "marked") {
         toast.success(`訂單 ${payTarget.order_no} 已標記為已收款，發票會接著開立`);
       } else if (result.reason === "already_paid") {
         toast.info("這張訂單已經是已收款狀態");
+      } else if (result.reason === "not_onsite") {
+        toast.error("這張訂單不是現場付款，請由店長在訂單頁處理");
       } else {
         toast.error("這張訂單無法標記（可能已取消或不存在）");
       }

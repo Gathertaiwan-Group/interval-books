@@ -597,9 +597,10 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
     // 0055（MCP 報表匯出的私有 bucket）：只 insert 一個 storage.buckets，orders 與訂單 RPC 一個字沒動
     //   （report-tools.ts 只讀 orders，不呼叫任何訂單 RPC）。
     // 0056 現場付款：orders 的 payment_method CHECK／expire／名單 view／staff 權限，admin_delete_order／admin_archive_order／admin_mark_order_paid 一個字沒動。
-    "supabase/migrations 剛好 56 個 .sql 檔（0001–0055 + 0056 現場付款）",
+    // 0056 現場付款 + 0057 現場收款權限：orders 的 payment_method CHECK／expire／名單 view／staff 權限，admin_delete_order／admin_archive_order／admin_mark_order_paid 一個字沒動。
+    "supabase/migrations 剛好 57 個 .sql 檔（0001–0055 + 0056 現場付款 + 0057 現場收款權限）",
     migFiles.length,
-    56,
+    57,
   );
 }
 

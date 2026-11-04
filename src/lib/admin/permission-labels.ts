@@ -18,6 +18,7 @@ export const PERMISSION_LABELS: Record<PermissionValue, string> = {
   approve_inventory_adjustments: "審核庫存調整（目前未啟用：沒有畫面在檢查這個權限）",
   "inv.vendor.pii.read": "查看廠商完整身分資料（統編、身分證、匯款帳戶）",
   "event.roster.read": "查看活動報名名單",
+  "event.onsite.collect": "現場付款收款（把現場付款的報名標記已收款）",
 };
 
 /**

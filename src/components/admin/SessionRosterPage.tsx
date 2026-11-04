@@ -35,6 +35,8 @@ type Props = {
    * 自己掛 adminFnMiddleware。
    */
   canCreatePhoneOrder?: boolean;
+  /** 0057：能不能把現場付款的報名標記已收款（admin 或 event.onsite.collect）。只控制畫面。 */
+  canCollectOnsite?: boolean;
 };
 
 export function SessionRosterPage({
@@ -44,6 +46,7 @@ export function SessionRosterPage({
   rosterError,
   canReadRoster,
   canCreatePhoneOrder = false,
+  canCollectOnsite = false,
 }: Props) {
   const router = useRouter();
   const [exporting, setExporting] = useState(false);
@@ -167,8 +170,8 @@ export function SessionRosterPage({
       {roster ? (
         <SessionRosterTable
           rows={roster}
-          // 0056：現場付款「標記已收款」只有 admin 能按（markOrderPaidAdmin 掛 adminFnMiddleware）。
-          canMarkPaid={canCreatePhoneOrder}
+          // 0057：admin 或有 event.onsite.collect 的門市人員（server 端 markOnsiteOrderPaidStaff 再驗）。
+          canMarkPaid={canCollectOnsite}
           onMarkedPaid={async () => {
             await router.invalidate();
           }}
