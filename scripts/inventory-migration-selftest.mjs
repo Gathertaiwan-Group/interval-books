@@ -20,7 +20,7 @@
  * 環境變數：
  *   SUPABASE_ACCESS_TOKEN   Management API token（連線段的開關）
  *   SUPABASE_PROJECT_REF    目標專案 ref，預設 noijrmhdfbfvjyvchvzj（2026-10 三站合併後的專案；小時光的表仍在 public／inv）
- *   VITE_SUPABASE_URL       anon 可達性測試用；沒設會去讀 .env.local
+ *   VITE_SUPABASE_URL       anon 可達性測試用；只認環境變數（不讀 .env.local）
  *   VITE_SUPABASE_ANON_KEY  同上
  */
 
@@ -264,7 +264,11 @@ checkTrue(
 // 第二段：連線 —— 對目標資料庫實際對帳
 // ══════════════════════════════════════════════════════════════════════════
 
-const TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
+// 🔴 這一段會在**正式庫**建資料再刪掉。只有明確設了 INVENTORY_SELFTEST_LIVE=1 才跑——
+//    SUPABASE_ACCESS_TOKEN 是 supabase CLI 的通用變數，開發機的 shell 裡常常本來就有，
+//    單靠它當開關，一次 `npm test` 就會對正式庫寫入（審查 2026-11-05）。
+const TOKEN =
+  process.env.INVENTORY_SELFTEST_LIVE === "1" ? process.env.SUPABASE_ACCESS_TOKEN : undefined;
 const REF = process.env.SUPABASE_PROJECT_REF ?? "noijrmhdfbfvjyvchvzj";
 
 async function q(sql) {
@@ -278,25 +282,20 @@ async function q(sql) {
   return res.json();
 }
 
-/** anon 可達性測試要的兩個值：先看 env，沒有就退回讀 .env.local。 */
+/** anon 可達性測試要的兩個值：只看環境變數。 */
 function readAnonCreds() {
-  let url = process.env.VITE_SUPABASE_URL;
-  let key = process.env.VITE_SUPABASE_ANON_KEY;
-  const envFile = join(ROOT, ".env.local");
-  if ((!url || !key) && existsSync(envFile)) {
-    for (const line of readFileSync(envFile, "utf8").split("\n")) {
-      const m = /^([A-Z_]+)=(.*)$/.exec(line.trim());
-      if (!m) continue;
-      if (m[1] === "VITE_SUPABASE_URL" && !url) url = m[2].replace(/^["']|["']$/g, "");
-      if (m[1] === "VITE_SUPABASE_ANON_KEY" && !key) key = m[2].replace(/^["']|["']$/g, "");
-    }
-  }
+  const url = process.env.VITE_SUPABASE_URL;
+  const key = process.env.VITE_SUPABASE_ANON_KEY;
+  // 不再退回讀 .env.local（審查 2026-11-05）：那個檔案指向哪個專案不受這支測試控制
+  //（實測是舊專案），anon 測試只認明確設定的環境變數。
   return { url, key };
 }
 
 if (!TOKEN) {
-  skipped.push("連線對帳（缺 SUPABASE_ACCESS_TOKEN）");
-  console.log(yellow("\n[6–10] 連線對帳 —— 跳過：沒有 SUPABASE_ACCESS_TOKEN"));
+  skipped.push("連線對帳（缺 INVENTORY_SELFTEST_LIVE=1＋SUPABASE_ACCESS_TOKEN）");
+  console.log(
+    yellow("\n[6–10] 連線對帳 —— 跳過：沒有 INVENTORY_SELFTEST_LIVE=1＋SUPABASE_ACCESS_TOKEN"),
+  );
   console.log(yellow("       設好之後重跑，才會驗到 2,864 筆與 anon 可達性那幾條。"));
 } else {
   console.log("\n[6] 21 張表逐張對帳");

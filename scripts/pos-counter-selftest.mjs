@@ -382,7 +382,11 @@ check(
 // -----------------------------------------------------------------------------
 
 const REF = process.env.SUPABASE_PROJECT_REF ?? "noijrmhdfbfvjyvchvzj";
-const TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
+// 🔴 這一段會在**正式庫**建資料再刪掉。只有明確設了 INVENTORY_SELFTEST_LIVE=1 才跑——
+//    SUPABASE_ACCESS_TOKEN 是 supabase CLI 的通用變數，開發機的 shell 裡常常本來就有，
+//    單靠它當開關，一次 `npm test` 就會對正式庫寫入（審查 2026-11-05）。
+const TOKEN =
+  process.env.INVENTORY_SELFTEST_LIVE === "1" ? process.env.SUPABASE_ACCESS_TOKEN : undefined;
 
 async function q(sql) {
   const res = await fetch(`https://api.supabase.com/v1/projects/${REF}/database/query`, {
@@ -420,8 +424,10 @@ async function cleanup() {
 }
 
 if (!TOKEN) {
-  skipped.push("實測段（缺 SUPABASE_ACCESS_TOKEN）");
-  console.log(yellow("\n[9–12] 實測 —— 跳過：沒有 SUPABASE_ACCESS_TOKEN"));
+  skipped.push("實測段（缺 INVENTORY_SELFTEST_LIVE=1＋SUPABASE_ACCESS_TOKEN）");
+  console.log(
+    yellow("\n[9–12] 實測 —— 跳過：沒有 INVENTORY_SELFTEST_LIVE=1＋SUPABASE_ACCESS_TOKEN"),
+  );
 } else {
   await cleanup();
 
