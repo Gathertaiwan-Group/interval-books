@@ -175,7 +175,8 @@ function AdminOrdersPage() {
             <TabsTrigger value="transfer_pending">待收款的匯款訂單</TabsTrigger>
             {/* 0048：客人勾了「我需要專人聯繫協助付款」、還沒付款也還沒取消的訂單。 */}
             <TabsTrigger value="needs_contact">{NEEDS_CONTACT_LABEL}</TabsTrigger>
-            {/* 0056：現場付款、還沒收到錢也還沒取消——活動當天店員要找的就是這一頁。 */}
+            {/* 0056：現場付款、還沒收到錢也還沒取消——活動當天店員要找的就是這一頁。
+                活動結束後仍未付款的不會自動取消（業主決定），會一直留在這個分頁等人工處理。 */}
             <TabsTrigger value="onsite_pending">現場付款待收款</TabsTrigger>
             <TabsTrigger value="to_ship">待出貨</TabsTrigger>
             <TabsTrigger value="all">全部訂單</TabsTrigger>

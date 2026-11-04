@@ -14,6 +14,8 @@
  * event.onsite.collect 的門市人員，0057）。呼叫 markOnsiteOrderPaidStaff()——它在 server 端
  * 驗權限與「只限 onsite」，收款本身仍是 admin_mark_order_paid()，一張訂單一次；
  * 同一張單的其他參加者會在重抓之後一起變成已付款。
+ * 活動結束後仍未付款的不會被自動取消（業主決定），名單上會一直標「未收款（現場付款）」，
+ * 由店員手動標記已收款或請 admin 刪除訂單。
  *
  * 成功後呼叫 onRemoved：呼叫端 router.invalidate()，名單頁的 loader 重抓名單（2026-10-26
  * 起不寫查閱紀錄，重抓沒有副作用），列表的「報名」「名額」欄也是新的數字。

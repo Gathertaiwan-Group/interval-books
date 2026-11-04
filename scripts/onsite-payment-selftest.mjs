@@ -671,6 +671,16 @@ checkTrue("列表：每列標示", /showOnsiteUnpaid\(o\) \?/.test(listCode));
 const detailCode = stripTs(readFile("src/routes/admin/_shell.orders_.$id.tsx"));
 checkTrue("內頁：頂端標示", /showOnsiteUnpaid\(detail\) \?/.test(detailCode));
 checkTrue(
+  "業主決定：活動結束後未付款不自動取消——內頁說明寫清楚、由店員手動處理",
+  readFile("src/routes/admin/_shell.orders_.$id.tsx").includes(
+    "這張單不會被系統自動取消——活動結束後仍未付款",
+  ),
+);
+checkTrue(
+  "server fn 檔頭寫明「活動結束後仍未付款也不自動取消」",
+  readFile("src/lib/admin/fns/onsite-collect.ts").includes("活動結束後仍未付款也不自動取消"),
+);
+checkTrue(
   "內頁：onsite 給「標記已收款」",
   /detail\.payment_method === "onsite" \|\|/.test(detailCode),
 );

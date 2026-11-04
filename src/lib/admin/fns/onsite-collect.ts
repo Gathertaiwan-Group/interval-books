@@ -4,6 +4,11 @@
  * 刻意不放進 fns/orders.ts：那個檔案每一支都只給 admin（對帳與手動核銷付款不下放，見它的
  * 檔頭），有自檢守著「不 import staffFnMiddleware」。這裡是那條規則唯一、而且範圍被釘死的
  * 例外：只限 payment_method = 'onsite'，而且要 event.onsite.collect 細權限。
+ *
+ * ⚠️ 業主決定（2026-11-04）：現場付款的單**活動結束後仍未付款也不自動取消**。
+ *    expire_unpaid_orders() 跳過 onsite（0056），也沒有任何「場次結束後回收」的排程——
+ *    一律由店員手動處理：收到錢就用這支標記已收款，沒來就由 admin 在訂單內頁刪除訂單
+ *    （admin_delete_order，照舊退名額）。要改成自動處理，是新的需求，不是這裡的 bug。
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";

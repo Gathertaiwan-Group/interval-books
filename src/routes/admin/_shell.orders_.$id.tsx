@@ -729,6 +729,7 @@ function AdminOrderDetailPage({
                 <dt className="text-muted-foreground">{ONSITE_UNPAID_LABEL}</dt>
                 <dd className="font-medium">
                   客人選擇活動當天到現場付款。收到款項後請按下方「標記已收款」，發票會在標記之後開立。
+                  這張單不會被系統自動取消——活動結束後仍未付款，也請由店員手動標記已收款或刪除訂單。
                 </dd>
               </>
             ) : null}
