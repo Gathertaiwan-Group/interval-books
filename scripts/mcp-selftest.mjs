@@ -1021,11 +1021,32 @@ console.log("\n[7] MCP 協定");
       },
       { "mcp-protocol-version": "2025-11-25" },
     );
+    // 營運工具的 handler 自己把錯誤轉成 isError 文字（不丟例外）——也要記（2026-11-05 正式站實測）。
+    const rej2 = await rpc(
+      {
+        jsonrpc: "2.0",
+        id: 32,
+        method: "tools/call",
+        params: {
+          name: "update_journey_wish",
+          arguments: { id: "00000000-0000-4000-8000-000000000009", status: "reviewed" },
+        },
+      },
+      { "mcp-protocol-version": "2025-11-25" },
+    );
     console.info = origInfo;
+    checkTrue("營運工具回 isError（selftest 沒有資料庫）", rej2.json?.result?.isError === true);
+    check(
+      "🔴 營運工具回傳的 isError 也記一筆 rejected（只一筆，不重複）",
+      seen.filter((r) => r.tool === "update_journey_wish").map((r) => [r.action, r.dry_run]),
+      [["rejected", true]],
+    );
     checkTrue("業務規則拒絕 → 回 isError", rej.json?.result?.isError === true);
     check(
       "🔴 業務規則拒絕也記稽核（action=rejected、dry_run=true、帶原因、只記 id 類參數）",
-      seen.map((r) => [r.tool, r.action, r.dry_run, typeof r.changes?.reason, r.entity_id]),
+      seen
+        .filter((r) => r.tool === "set_event_status")
+        .map((r) => [r.tool, r.action, r.dry_run, typeof r.changes?.reason, r.entity_id]),
       [["set_event_status", "rejected", true, "string", "id=ev-x"]],
     );
   }

@@ -723,10 +723,24 @@ export function registerContentTools(server: McpServer): void {
         // 收款、沒有收件人）也記一筆 action=rejected（審查 2026-11-03）。內容工具之外的新增工具
         // 自己在 create-tools.ts#withAudit 記，不會丟到這裡。
         const isWrite = meta.annotations.readOnlyHint !== true || REQUIRE_WRITE_ACCESS.has(name);
-        return safe(
+        // create_*（auditInvalid）自己在 create-tools.ts 記，這裡不重複。
+        const audits = isWrite && !meta.auditInvalid;
+        let recorded = false;
+        const res = await safe(
           () => fn(args as Args<N>),
-          isWrite ? (reason) => auditRejected(name, reason, args) : undefined,
+          audits
+            ? async (reason) => {
+                recorded = true;
+                await auditRejected(name, reason, args);
+              }
+            : undefined,
         );
+        // ops-write／outbound 的 handler 會自己把 McpInputError 轉成 isError 文字回傳、不丟到
+        // safe()，所以「回了 isError、而且還沒記過」也記一筆（正式站實測 2026-11-05 抓到漏記）。
+        if (audits && !recorded && res.isError) {
+          await auditRejected(name, res.content[0]?.text ?? "", args);
+        }
+        return res;
       }) as never,
     );
   }
