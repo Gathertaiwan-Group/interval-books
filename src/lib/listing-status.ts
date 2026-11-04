@@ -15,7 +15,7 @@
  *   admin_set_event_status(event_id, status)     後台列表、MCP set_event_status、一頁新增「直接上架」
  *   admin_upsert_event_with_session(payload)     活動編輯頁的「儲存」（payload.event.status）
  */
-import { isSessionClosedForBooking, isEventEnded } from "@/lib/event-status";
+import { isSessionClosedForBooking, isEventEnded, todayInTaipei } from "@/lib/event-status";
 
 export const LISTING_STATUSES = ["draft", "live", "archived"] as const;
 export type ListingStatus = (typeof LISTING_STATUSES)[number];
@@ -94,9 +94,12 @@ export function bookingPhase(
   now: number = Date.now(),
 ): BookingPhase {
   const sessions = input.sessions;
+  // 「今天」也從同一個 now 推出來，不讀系統時鐘：同一次判斷裡「已結束」與「還收不收報名」
+  // 必須用同一個時間點（自檢注入固定的 now 時，這兩個答案才不會隨著真實日期漂移）。
   const ended = isEventEnded(
     input.isoDate,
     sessions.map((s) => ({ startsAt: s.starts_at, endsAt: s.ends_at ?? null })),
+    todayInTaipei(new Date(now)),
   );
   if (ended) return "ended";
   if (input.registrationType === "external") return "external";

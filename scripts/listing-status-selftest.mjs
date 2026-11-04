@@ -182,6 +182,32 @@ check(
 check("站內報名但沒有場次 → 尚無可報名場次", phase("internal", "2026-12-20", []), "no_sessions");
 check("外部報名 → 外部報名", phase("external", "2026-12-20", []), "external");
 check("外部報名但日期已過 → 已結束", phase("external", "2026-10-01", []), "ended");
+// 守著「now 是唯一的時間來源」：同一組輸入，注入的 now 換到活動結束之後，答案就跟著變成
+// 已結束——不看跑測試那天的系統日期。
+check(
+  "注入的 now 在多日策旅結束之後 → 已結束（「今天」從 now 推，不讀系統時鐘）",
+  ls.bookingPhase(
+    {
+      registrationType: "internal",
+      isoDate: "2026-11-03",
+      sessions: [{ ...s("2026-11-01T08:00:00Z", 20, 3), ends_at: "2026-11-03T08:00:00Z" }],
+    },
+    Date.parse("2026-11-05T04:00:00Z"),
+  ),
+  "ended",
+);
+check(
+  "注入的 now 在活動很久以前 → 報名中（與系統日期無關）",
+  ls.bookingPhase(
+    {
+      registrationType: "internal",
+      isoDate: "2026-12-20",
+      sessions: [s("2026-12-20T05:00:00Z", 30, 0)],
+    },
+    Date.parse("2020-01-01T00:00:00Z"),
+  ),
+  "open",
+);
 
 // =============================================================================
 console.log("\n[3] 結帳第二道門 ticketSellable");
