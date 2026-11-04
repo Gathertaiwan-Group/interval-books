@@ -14,6 +14,7 @@ import {
   stripHtml,
   inferEndFromDisplay,
   formatUtc,
+  distinctSessionTitle,
 } from "../src/lib/calendar-ics.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -270,6 +271,55 @@ checkTrue(
   checkTrue(
     "多場次：SUMMARY 接場次名",
     m.lines.join().includes("SUMMARY:植生布植生牆｜布苔球｜第二梯"),
+  );
+}
+
+// 場次名稱去重（池上：活動名「…旅行 | 馥自然人文空間」，場次名「馥自然人文空間｜第一梯次｜10/23（五）–10/25（日）」）
+{
+  const evTitle = "2026 台東池上秋收山海旅行 | 馥自然人文空間";
+  check(
+    "場次名去重：只留梯次",
+    distinctSessionTitle("馥自然人文空間｜第一梯次｜10/23（五）–10/25（日）", evTitle),
+    "第一梯次",
+  );
+  check(
+    "場次名去重：開頭帶活動名",
+    distinctSessionTitle(`${evTitle}｜第二梯次`, evTitle),
+    "第二梯次",
+  );
+  check("場次名去重：完全相同 → 空", distinctSessionTitle(evTitle, evTitle), "");
+  check("場次名去重：不重複的原樣保留", distinctSessionTitle("下午場", "布苔球"), "下午場");
+  const j = structuredClone(base);
+  j.events.push(ev({ slug: "chishang", titleZh: evTitle, productId: "p-cs" }));
+  j.sessions.push(
+    ses({
+      id: "cs-1",
+      productId: "p-cs",
+      titleZh: "馥自然人文空間｜第一梯次｜10/23（五）–10/25（日）",
+      startsAt: "2026-10-23T06:00:00Z",
+    }),
+    ses({
+      id: "cs-2",
+      productId: "p-cs",
+      titleZh: "馥自然人文空間｜第二梯次｜10/25（日）–10/27（二）",
+      startsAt: "2026-10-25T06:00:00Z",
+    }),
+  );
+  const sums = buildVevents(j)
+    .filter((v) => v.uid.startsWith("cs-"))
+    .map((v) => v.lines.find((l) => l.startsWith("SUMMARY:")));
+  check("多場次 SUMMARY：活動名｜梯次", sums, [
+    `SUMMARY:${evTitle}｜第一梯次`,
+    `SUMMARY:${evTitle}｜第二梯次`,
+  ]);
+  const one = structuredClone(j);
+  one.sessions = one.sessions.filter((x) => x.id !== "cs-2");
+  check(
+    "單一場次 SUMMARY：只用活動名",
+    buildVevents(one)
+      .find((v) => v.uid.startsWith("cs-1"))
+      .lines.find((l) => l.startsWith("SUMMARY:")),
+    `SUMMARY:${evTitle}`,
   );
 }
 

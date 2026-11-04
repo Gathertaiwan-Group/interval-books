@@ -233,6 +233,27 @@ function maxIso(values: Array<string | null | undefined>): number | null {
   return best;
 }
 
+/** 只有日期／星期／符號的片段（「10/23（五）–10/25（日）」）：日曆本來就有時間，不重複寫。 */
+const DATE_ONLY_SEGMENT = /^[\d\s/.:\-–—~（）()一二三四五六日]+$/;
+
+/**
+ * 場次名稱裡「和活動名稱不重複」的部分。場次名常是「活動名｜第一梯次｜10/23（五）–10/25（日）」，
+ * 直接接在活動名後面會變成同一個名字講兩次。以 ｜ 或 | 切段：和活動名稱相同、被活動名稱
+ * 包含、包含活動名稱的片段，以及純日期片段都拿掉（包含活動名稱者先去掉那段字再看剩什麼）。
+ * 剩下的用「｜」接回；什麼都不剩 → 空字串。
+ */
+export function distinctSessionTitle(sessionTitle: string, eventTitle: string): string {
+  const ev = eventTitle.trim();
+  const keep: string[] = [];
+  for (const raw of sessionTitle.split(/[｜|]/)) {
+    let seg = raw.trim();
+    if (ev && seg.includes(ev)) seg = seg.replace(ev, "").trim();
+    if (!seg || (ev && ev.includes(seg)) || DATE_ONLY_SEGMENT.test(seg)) continue;
+    keep.push(seg);
+  }
+  return keep.join("｜");
+}
+
 export type BuiltVevent = { uid: string; startMs: number; lines: string[] };
 
 /** 組出所有要輸出的 VEVENT（已排序）。 */
@@ -274,10 +295,10 @@ export function buildVevents(input: CalendarInput): BuiltVevent[] {
       if (endMs < cutoff) continue;
 
       const plans = plansBySession.get(s.id) ?? [];
-      const sessionTitle = s.titleZh.trim();
+      const sessionTitle = distinctSessionTitle(s.titleZh, event.titleZh);
       const eventTitle = event.titleZh.trim();
       let summary = `${journey ? JOURNEY_PREFIX : ""}${eventTitle}`;
-      if (sessions.length > 1 && sessionTitle && sessionTitle !== eventTitle) {
+      if (sessions.length > 1 && sessionTitle) {
         summary += `｜${sessionTitle}`;
       }
 
