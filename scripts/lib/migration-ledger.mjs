@@ -932,33 +932,15 @@ export const MIGRATION_LEDGER = Object.freeze([
 ]);
 
 /**
- * 已經被**其他還沒 merge 進 main 的分支**用掉的 migration 編號。
+ * 給「編號從 0001 起連續、不重複」用的期望值：1..最大編號。各支自檢自己寫的那條連續性
+ * 斷言也用這一支，規則只有一份。
  *
- * 2026-11-04：feat/mcp-ops-write 用了 0054、0055（MCP 權限稽核、報表匯出），還沒 merge；
- * feat/onsite-payment 因此從 0056 開始。這兩個編號在這條分支上不在磁碟上是**預期的**，
- * 不是有人刪檔。那條分支 merge 之後檔案就補上了，這一筆可以刪（留著也無害：在磁碟上的
- * 保留編號照一般編號檢查）。
- *
- * ⚠️ 只能放「確實有另一條分支在用」的編號，並寫明是哪一條。拿它來跳號是在拆守門。
- */
-export const RESERVED_MIGRATION_NUMBERS = new Map([
-  [54, "feat/mcp-ops-write：0054_mcp_access_level_audit_actor.sql"],
-  [55, "feat/mcp-ops-write：0055_mcp_report_exports.sql"],
-]);
-
-/**
- * 給「編號從 0001 起連續、不重複」用的期望值：1..最大編號，扣掉**不在磁碟上的**保留編號。
- * 各支自檢自己寫的那條連續性斷言也用這一支，保留清單只有一份。
+ * （2026-11-04 曾有一份「其他分支保留的編號」清單讓 0054／0055 暫時不在磁碟上；
+ * feat/mcp-ops-write merge 之後那兩支已經在了，清單拿掉——不再允許任何跳號。）
  */
 export function expectedMigrationNumbers(nums) {
   const maxNum = nums.length > 0 ? Math.max(...nums) : 0;
-  const present = new Set(nums);
-  const out = [];
-  for (let n = 1; n <= maxNum; n += 1) {
-    if (RESERVED_MIGRATION_NUMBERS.has(n) && !present.has(n)) continue;
-    out.push(n);
-  }
-  return out;
+  return Array.from({ length: maxNum }, (_, i) => i + 1);
 }
 
 /** 磁碟上的 migration 檔名，排序過。空目錄 = 丟例外（那不是「沒有違規」）。 */
@@ -1075,14 +1057,8 @@ export function assertLedgerMatchesDisk(check, migDir) {
   check("帳本與磁碟的順序完全一致", orderDiff, "（一致）");
 
   const nums = disk.map((f) => Number(f.slice(0, 4)));
-  // 被其他還沒 merge 的分支佔走的編號（RESERVED_MIGRATION_NUMBERS）可以暫時不在磁碟上；
-  // 其餘仍然必須從 0001 起連續、不重複。保留的編號一旦出現在磁碟上，就跟一般編號一樣算。
   const expectedNums = expectedMigrationNumbers(nums);
-  check(
-    "migration 編號從 0001 起連續、不重複（其他分支保留的編號除外）",
-    nums.join(","),
-    expectedNums.join(","),
-  );
+  check("migration 編號從 0001 起連續、不重複", nums.join(","), expectedNums.join(","));
 
   const noteless = MIGRATION_LEDGER.filter((e) => !e.note || e.note.trim().length < 4);
   check(
