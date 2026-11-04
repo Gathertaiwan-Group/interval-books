@@ -56,6 +56,9 @@
  *                          ⚠️ /oauth/authorize **不在這裡**：那是老闆的瀏覽器、要讀後台 cookie、
  *                          要畫同意頁 —— 它是一般的 TanStack 頁面（src/routes/oauth/authorize.tsx），
  *                          只在下面補上防 iframe 的標頭。
+ *   /calendar.ics          iCalendar 訂閱網址（書店的 Google 日曆「透過網址訂閱」）。呼叫者是
+ *                          Google 日曆的伺服器，要的是 text/calendar；內容即時從資料庫組出
+ *                          （src/server/calendar.ts），CDN 快取 15 分鐘。不進 sitemap。
  *   /robots.txt、/sitemap.xml  搜尋引擎要的兩個檔（2026-11 SEO 健檢 H1）。呼叫者是爬蟲，
  *                          要的是純文字／XML 而不是 HTML 頁面；sitemap 要即時從資料庫列出
  *                          所有公開網址（src/server/sitemap.ts）。
@@ -104,6 +107,11 @@ export default {
     if (pathname.startsWith("/media/site-images/")) {
       const { handleMediaProxy } = await import("@/server/media-proxy");
       return handleMediaProxy(request, pathname);
+    }
+
+    if (pathname === "/calendar.ics") {
+      const { handleCalendarIcs } = await import("@/server/calendar");
+      return handleCalendarIcs(request);
     }
 
     if (pathname === "/sitemap.xml") {
