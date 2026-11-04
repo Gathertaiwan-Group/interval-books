@@ -80,6 +80,7 @@ import {
   isUuid,
   money,
   NEEDS_CONTACT_LABEL,
+  ONSITE_UNPAID_LABEL,
   PHONE_ORDER_LABEL,
   parseOrderListSearch,
   PAYMENT_STATUS_LABEL,
@@ -87,6 +88,7 @@ import {
   paymentStatusBadgeVariant,
   shippingMethodLabel,
   showNeedsContact,
+  showOnsiteUnpaid,
   STATUS_LABEL,
   statusBadgeVariant,
   type OrderListSearch,
@@ -459,6 +461,12 @@ function AdminOrderDetailPage({
           {showNeedsContact(detail) ? (
             <Badge variant="destructive">{NEEDS_CONTACT_LABEL}</Badge>
           ) : null}
+          {/* 0056：現場付款、還沒收到錢也還沒取消。 */}
+          {showOnsiteUnpaid(detail) ? (
+            <Badge className="bg-amber-600 text-white hover:bg-amber-600">
+              {ONSITE_UNPAID_LABEL}
+            </Badge>
+          ) : null}
           <span>
             下單於 {formatTaipeiDateTime(detail.created_at)}
             {detail.paid_at ? `・付款於 ${formatTaipeiDateTime(detail.paid_at)}` : ""}
@@ -716,6 +724,14 @@ function AdminOrderDetailPage({
                 </dd>
               </>
             ) : null}
+            {showOnsiteUnpaid(detail) ? (
+              <>
+                <dt className="text-muted-foreground">{ONSITE_UNPAID_LABEL}</dt>
+                <dd className="font-medium">
+                  客人選擇活動當天到現場付款。收到款項後請按下方「標記已收款」，發票會在標記之後開立。
+                </dd>
+              </>
+            ) : null}
             {detail.payment_method === "transfer" ? (
               <>
                 <dt className="text-muted-foreground">回報末五碼</dt>
@@ -732,13 +748,17 @@ function AdminOrderDetailPage({
         <p className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
           這張訂單已經是已收款狀態。
         </p>
-      ) : detail.payment_method === "transfer" || detail.payment_method === null ? (
+      ) : detail.payment_method === "transfer" ||
+        detail.payment_method === "onsite" ||
+        detail.payment_method === null ? (
         <section className="space-y-2 rounded-md border border-border p-3">
           <h2 className="text-sm font-medium">標記已收款</h2>
           <p className="text-xs text-muted-foreground">
             {detail.payment_method === "transfer"
               ? "對過銀行對帳單、確認這筆款項真的入帳之後才按下面這顆按鈕。"
-              : "這張訂單由店家另行聯繫付款——確認款項已經用約定的方式收到之後才按下面這顆按鈕。"}
+              : detail.payment_method === "onsite"
+                ? "現場付款：客人在活動當天把款項交給你之後才按下面這顆按鈕。標記之後會寄付款成功信與報名成功信，並開立發票。"
+                : "這張訂單由店家另行聯繫付款——確認款項已經用約定的方式收到之後才按下面這顆按鈕。"}
           </p>
           <div className="space-y-1.5">
             <Label htmlFor="mark-paid-note">備註（選填）</Label>
@@ -761,7 +781,7 @@ function AdminOrderDetailPage({
         // 佐證的情況下宣稱收到錢。
         <p className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
           這張訂單透過線上金流付款，但還沒收到付款成功的通知。請到金流商後台核對，
-          不建議在這裡手動標記——這一頁的「標記已收款」只服務匯款與店家另行聯繫付款 這兩種情況。
+          不建議在這裡手動標記——這一頁的「標記已收款」只服務匯款、現場付款與店家另行聯繫付款。
         </p>
       )}
 
@@ -823,7 +843,9 @@ function AdminOrderDetailPage({
                 "。" +
                 (detail.payment_method === "transfer"
                   ? "請先確認銀行對帳單上真的有這一筆"
-                  : "請先確認款項真的已經用約定的方式收到") +
+                  : detail.payment_method === "onsite"
+                    ? "請先確認已經在現場收到這筆款項"
+                    : "請先確認款項真的已經用約定的方式收到") +
                 "——這個動作無法在這一頁復原。"}
             </AlertDialogDescription>
           </AlertDialogHeader>

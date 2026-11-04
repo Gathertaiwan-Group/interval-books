@@ -47,6 +47,7 @@ import {
   isUuid,
   money,
   NEEDS_CONTACT_LABEL,
+  ONSITE_UNPAID_LABEL,
   parseOrderListSearch,
   PAYMENT_STATUS_LABEL,
   PHONE_ORDER_LABEL,
@@ -54,6 +55,7 @@ import {
   paymentStatusBadgeVariant,
   scopeOf,
   showNeedsContact,
+  showOnsiteUnpaid,
   STATUS_LABEL,
   statusBadgeVariant,
   type OrderListScope,
@@ -173,6 +175,8 @@ function AdminOrdersPage() {
             <TabsTrigger value="transfer_pending">待收款的匯款訂單</TabsTrigger>
             {/* 0048：客人勾了「我需要專人聯繫協助付款」、還沒付款也還沒取消的訂單。 */}
             <TabsTrigger value="needs_contact">{NEEDS_CONTACT_LABEL}</TabsTrigger>
+            {/* 0056：現場付款、還沒收到錢也還沒取消——活動當天店員要找的就是這一頁。 */}
+            <TabsTrigger value="onsite_pending">現場付款待收款</TabsTrigger>
             <TabsTrigger value="to_ship">待出貨</TabsTrigger>
             <TabsTrigger value="all">全部訂單</TabsTrigger>
             <TabsTrigger value="phone">{PHONE_ORDER_LABEL}</TabsTrigger>
@@ -227,13 +231,15 @@ function AdminOrdersPage() {
                     ? "目前沒有待收款的匯款訂單"
                     : scope === "needs_contact"
                       ? "目前沒有需要專人聯繫的訂單"
-                      : scope === "to_ship"
-                        ? "目前沒有待出貨的訂單"
-                        : scope === "invoice_problem"
-                          ? "目前沒有發票尚未開立的已付款訂單"
-                          : scope === "phone"
-                            ? "目前沒有後台電話報名的訂單"
-                            : "目前沒有訂單"}
+                      : scope === "onsite_pending"
+                        ? "目前沒有待收款的現場付款訂單"
+                        : scope === "to_ship"
+                          ? "目前沒有待出貨的訂單"
+                          : scope === "invoice_problem"
+                            ? "目前沒有發票尚未開立的已付款訂單"
+                            : scope === "phone"
+                              ? "目前沒有後台電話報名的訂單"
+                              : "目前沒有訂單"}
                 </TableCell>
               </TableRow>
             ) : (
@@ -285,6 +291,11 @@ function AdminOrdersPage() {
                     {showNeedsContact(o) ? (
                       <Badge variant="destructive" className="ml-2 font-normal">
                         {NEEDS_CONTACT_LABEL}
+                      </Badge>
+                    ) : null}
+                    {showOnsiteUnpaid(o) ? (
+                      <Badge className="ml-2 bg-amber-600 font-normal text-white hover:bg-amber-600">
+                        {ONSITE_UNPAID_LABEL}
                       </Badge>
                     ) : null}
                   </TableCell>

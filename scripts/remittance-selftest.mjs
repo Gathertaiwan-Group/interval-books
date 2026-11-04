@@ -322,7 +322,9 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 訂單欄位一個都沒動。這一支的連線段建的測試場次都在 now() 之後，斷言原樣成立。
   // 0050（後台電話報名）已審：orders 只加有 default／nullable 的欄位（前台 insert 形狀不變）；enqueue_order_email／enqueue_registration_emails 只多 notify_customer 條件（預設 true，前台訂單行為不變）；expire_unpaid_orders 只多一行 source <> 'admin_phone'（前台訂單行為不變）。這支守的不變式原樣成立。
   // 0051（電話報名聯絡資料放寬）已審：event_registrations_contactable 由 CHECK 換成同名觸發器，web 訂單照舊擋、只有 source='admin_phone' 放行；orders 只多兩條限定 admin_phone 的 CHECK 與新表 order_contact_edit_log／RPC admin_update_phone_order_contacts。前台訂單、reserve_session_seat、enqueue_*、expire_unpaid_orders、金流／發票函式一個字沒動，這支守的不變式原樣成立。
-  reviewedThrough: "0051_phone_order_optional_contact.sql",
+  // 0056（現場付款）重審：CHECK 只多一個值 onsite、expire_unpaid_orders 候選條件只多一行
+  // payment_method is distinct from 'onsite'，本體其餘逐字沿用 0050——這支的斷言照樣成立。
+  reviewedThrough: "0056_onsite_payment.sql",
 });
 
 const sql0034 = readFile(MIG_0034);
@@ -397,7 +399,12 @@ console.log("\n[3] 匯款期限 3 天 —— 兩邊同步");
 console.log("\n[4] 純函式（真的呼叫，不是讀原始碼）");
 const checkout = await import(pathToFileURL(join(ROOT, "src/lib/checkout.ts")).href);
 {
-  check("PAYMENT_METHODS 是三個值", checkout.PAYMENT_METHODS.join(","), "card,transfer,offline");
+  // 0056 加了 onsite（現場付款，只給活動票券；見 scripts/onsite-payment-selftest.mjs）。
+  check(
+    "PAYMENT_METHODS 是四個值",
+    checkout.PAYMENT_METHODS.join(","),
+    "card,transfer,onsite,offline",
+  );
   check("REMITTANCE_DUE_DAYS", checkout.REMITTANCE_DUE_DAYS, 3);
 
   // 期限：下單 + 3 天。

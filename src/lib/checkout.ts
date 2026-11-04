@@ -37,7 +37,7 @@ export type ProductTypeForOrder = "goods" | "book" | "event" | "journey";
  * What the shopper may ask to pay with.
  *
  * A subset of orders.payment_method's CHECK
- * ('card','atm','cvs_cod','test_paid','free','transfer'):
+ * ('card','atm','cvs_cod','test_paid','free','transfer','onsite'):
  *
  *   card      → the gateway path (黑貓 PAY / PayUni). Writes 'card'.
  *   transfer  → 匯款：the shopper wires money to the shop's own fixed bank
@@ -46,6 +46,10 @@ export type ProductTypeForOrder = "goods" | "book" | "event" | "journey";
  *               that value means "the gateway minted a virtual account number
  *               and will reconcile it automatically" (src/server/blackcat.ts),
  *               which is a different thing with a different failure mode.
+ *   onsite    → 現場付款（0056）：只給「整車都是活動票券」的結帳。訂單成立、名額保留、
+ *               不去任何金流，客人活動當天到店裡付錢；店員在後台按「標記已收款」
+ *               （admin_mark_order_paid）之後才算付清、才開發票。Writes 'onsite'.
+ *               expire_unpaid_orders() 不回收它（0056）。
  *   offline   → not a payment_method at all: it writes NULL and means "we will
  *               arrange payment with you", which is what this shop did before
  *               the gateway existed and what it falls back to when no gateway
@@ -56,7 +60,7 @@ export type ProductTypeForOrder = "goods" | "book" | "event" | "journey";
  * choosing a payment method changes where the shopper is sent next and nothing
  * else.
  */
-export const PAYMENT_METHODS = ["card", "transfer", "offline"] as const;
+export const PAYMENT_METHODS = ["card", "transfer", "onsite", "offline"] as const;
 export type PaymentMethodChoice = (typeof PAYMENT_METHODS)[number];
 
 /**
@@ -72,12 +76,37 @@ export type PaymentMethodChoice = (typeof PAYMENT_METHODS)[number];
 export function checkoutMethodOptions(opts: {
   cardAvailable: boolean;
   transferAvailable: boolean;
+  /**
+   * 0056：這一車可以選「現場付款」——由 onsiteEligible() 判斷（整車都是活動票券、
+   * 而且要付錢）。不帶＝false，所以商品結帳與舊呼叫端的選項逐字不變。
+   */
+  onsiteAvailable?: boolean;
 }): PaymentMethodChoice[] {
   const out: PaymentMethodChoice[] = [];
   if (opts.cardAvailable) out.push("card");
   if (opts.transferAvailable) out.push("transfer");
+  if (opts.onsiteAvailable === true) out.push("onsite");
   if (out.length === 0) out.push("offline");
   return out;
+}
+
+/**
+ * 0056：這一車能不能選「現場付款」。規則只有一份，結帳頁（畫不畫那顆 radio）與
+ * 伺服器（收不收這個請求）都問它：
+ *
+ *   · 至少一行，而且**每一行**都是 product_type = 'event'（活動票券）。一般商品、書、
+ *     策旅（journey）只要混進一行就不行——商品要出貨、策旅有訂金與行前作業，都不是
+ *     「當天到店裡付」能處理的。
+ *   · 要付錢（total > 0）。0 元的單走 settle_free_order() 當場結清（0028），
+ *     付款方式根本不會被用到；不畫這顆選項，免得客人以為免費活動要到現場繳費。
+ */
+export function onsiteEligible(input: {
+  lines: readonly { productType: ProductTypeForOrder }[];
+  total: number;
+}): boolean {
+  return (
+    input.lines.length > 0 && input.lines.every((l) => l.productType === "event") && input.total > 0
+  );
 }
 
 /**
@@ -100,8 +129,11 @@ export function resolveOrderPaymentChoice(input: {
   paymentMethod: PaymentMethodChoice;
   needsContact: boolean;
   transferAvailable: boolean;
-}): { paymentMethod: "card" | "transfer" | null; needsContact: boolean } {
+}): { paymentMethod: "card" | "transfer" | "onsite" | null; needsContact: boolean } {
   if (input.paymentMethod === "card") return { paymentMethod: "card", needsContact: false };
+  // 0056：現場付款。這裡只翻譯選擇；「這一車可不可以」在 createOrder() 拿到定價後的
+  // 品項才判斷（onsiteEligible），不合格整筆拒絕（onsite_not_allowed），不偷偷改成別的。
+  if (input.paymentMethod === "onsite") return { paymentMethod: "onsite", needsContact: false };
   if (input.paymentMethod === "transfer") {
     return { paymentMethod: "transfer", needsContact: input.needsContact === true };
   }
@@ -284,7 +316,9 @@ export type CheckoutErrorCode =
   | "payment_already_settled"
   | "referral_invalid"
   /** 0050：後台電話報名的手動改價不合法（高於原價、負數、或沒填原因）。前台不會出現。 */
-  | "price_override_invalid";
+  | "price_override_invalid"
+  /** 0056：選了現場付款，但這一車不是全部都是活動票券（見 onsiteEligible）。 */
+  | "onsite_not_allowed";
 
 export class CheckoutError extends Error {
   readonly code: CheckoutErrorCode;
@@ -354,6 +388,11 @@ export const CHECKOUT_ERROR_COPY: Record<CheckoutErrorCode, Localized> = {
     zh: "手動改價只能改成 0 到原價之間的金額，而且要填改價原因。",
     en: "A manual price must be between 0 and the original price, with a reason.",
     ja: "手動価格は 0 から元の価格までの金額で、理由の入力が必要です。",
+  },
+  onsite_not_allowed: {
+    zh: "現場付款只適用於活動報名，訂單沒有成立。請改選其他付款方式後再送出。",
+    en: "Pay at the venue is only available for event tickets, so no order was created. Please choose another payment method.",
+    ja: "当日現地払いはイベントのお申し込みのみご利用いただけます。ご注文は成立していません。別のお支払い方法をお選びください。",
   },
 };
 
@@ -941,6 +980,13 @@ export type OrderConfirmation = {
     reportedAt: string | null;
     /** 0048：客人勾了「我需要專人聯繫協助付款」。完成頁在匯款資訊旁加一句「我們會盡快與你聯繫」。 */
     needsContact: boolean;
+  } | null;
+  /**
+   * 0056：現場付款、而且還沒付清的訂單才不是 null。完成頁用它印「請於活動當天至現場
+   * 繳費」與每一場的時間地點（金額用下面的 total）。已付清的走 isPaid 那條，不再提醒繳費。
+   */
+  onsite: {
+    sessions: { title: Localized; location: Localized; startsAt: string; endsAt: string | null }[];
   } | null;
   subtotal: number;
   shippingFee: number;

@@ -48,6 +48,7 @@ import {
   checkoutFormSchemaWithParticipants,
   checkoutMethodOptions,
   computeShippingFee,
+  onsiteEligible,
   SHIPPING_RULES,
   type CheckoutFormValues,
   type OfferedShippingMethod,
@@ -200,6 +201,18 @@ const PAGE = {
     zh: "線上付款目前未開放，訂單成立後我們會直接與你聯繫付款方式。",
     en: "Online payment is not open yet — we will contact you about payment once the order is placed.",
     ja: "オンライン決済は現在ご利用いただけません。ご注文後にお支払い方法をご連絡いたします。",
+  },
+  // 0056：現場付款。只在整車都是活動票券、而且要付錢時出現（onsiteEligible）。
+  payOnsite: { zh: "現場付款", en: "Pay at the venue", ja: "当日現地払い" },
+  payOnsiteNote: {
+    zh: "送出後名額會為你保留，請於活動當天至現場繳費（現金或店內可用的付款方式）。不需要先線上付款，也不會收到匯款帳號；這張報名不會因為未付款被自動取消，若無法出席請提早告訴我們。發票會在現場收款後開立。",
+    en: "Your place is held once you submit. Please pay at the venue on the day of the event — no online payment or bank transfer is needed beforehand, and the registration is not cancelled for being unpaid. If you can no longer come, please let us know in advance. The e-invoice is issued once you have paid at the venue.",
+    ja: "送信後、お席をお取り置きします。イベント当日に会場にてお支払いください。事前のオンライン決済やお振込は不要で、未払いを理由に自動キャンセルされることはありません。ご参加いただけなくなった場合はお早めにご連絡ください。電子インボイスは当日のお支払い後に発行します。",
+  },
+  submitOnsite: {
+    zh: "送出報名（現場付款）",
+    en: "Register — pay at the venue",
+    ja: "申し込む（当日現地払い）",
   },
   invoiceSection: { zh: "電子發票", en: "Invoice", ja: "電子インボイス" },
   submitTransfer: { zh: "送出訂單並取得匯款帳號", en: "Place order", ja: "注文して振込先を表示" },
@@ -364,12 +377,14 @@ function directProblemText(reason: DirectFailureReason) {
 const PAYMENT_LABELS: Record<PaymentMethodChoice, Localized> = {
   card: PAGE.payCard,
   transfer: PAGE.payTransfer,
+  onsite: PAGE.payOnsite,
   offline: PAGE.payOffline,
 };
 
 const PAYMENT_NOTES: Record<PaymentMethodChoice, Localized> = {
   card: PAGE.payCardNote,
   transfer: PAGE.payTransferNote,
+  onsite: PAGE.payOnsiteNote,
   offline: PAGE.payOfflineNote,
 };
 
@@ -499,11 +514,26 @@ function Checkout() {
   // 0048（業主方案 A）：結帳頁只剩 card 與 transfer。「由我們與你聯繫付款」併進匯款，
   // 改成匯款底下的「我需要專人聯繫協助付款」勾選框。offline 只在兩者都沒設定時出現
   // （不畫 radio 的降級畫面）。規則只有一份：checkoutMethodOptions()。
+  // 0056：現場付款只給「整車都是活動票券、而且要付錢」（判準只有 onsiteEligible() 一份，
+  // 伺服器拿定價後的品項再問一次）。活動票券的車沒有運費、推薦碼也不折票券，所以
+  // 這裡的 subtotal 就是 total。
+  const onsiteAvailable = useMemo(() => {
+    const live = items.filter((i) => !i.unavailable);
+    return onsiteEligible({
+      lines: live,
+      total: live.reduce((sum, l) => sum + l.price * l.qty, 0),
+    });
+  }, [items]);
   const methodOptions = useMemo<PaymentMethodChoice[]>(
-    () => checkoutMethodOptions({ cardAvailable, transferAvailable }),
-    [cardAvailable, transferAvailable],
+    () => checkoutMethodOptions({ cardAvailable, transferAvailable, onsiteAvailable }),
+    [cardAvailable, transferAvailable, onsiteAvailable],
   );
   const [payWith, setPayWith] = useState<PaymentMethodChoice>(methodOptions[0]);
+  // 0056：選了現場付款之後購物車變了（混進一般商品）→ 那顆選項消失，選擇退回第一個，
+  // 不留一個畫面上看不到的選擇（說明文字與送出按鈕都跟著 payWith 走）。
+  useEffect(() => {
+    if (!methodOptions.includes(payWith)) setPayWith(methodOptions[0]);
+  }, [methodOptions, payWith]);
   const hasPaymentChoice = methodOptions[0] !== "offline";
   /** 0048：匯款時的「我需要專人聯繫協助付款」。預設 false；只有 payWith = transfer 時送 true。 */
   const [needsContact, setNeedsContact] = useState(false);
@@ -1204,7 +1234,9 @@ function Checkout() {
                   與需聯繫勾選框），不能被當成「沒有付款方式」。
                 */}
                 {hasPaymentChoice ? (
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div
+                    className={`grid gap-3 ${methodOptions.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
+                  >
                     {methodOptions.map((p) => {
                       const selected = payWith === p;
                       return (
@@ -1523,7 +1555,9 @@ function Checkout() {
                         ? t(PAGE.submitPay)
                         : payWith === "transfer"
                           ? t(PAGE.submitTransfer)
-                          : t(PAGE.submit)}
+                          : payWith === "onsite"
+                            ? t(PAGE.submitOnsite)
+                            : t(PAGE.submit)}
                 </Button>
                 {redirecting && (
                   <p className="text-xs leading-relaxed text-muted-foreground">

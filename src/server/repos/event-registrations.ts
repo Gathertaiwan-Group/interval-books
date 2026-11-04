@@ -126,6 +126,14 @@ export type RegistrationRosterRow = {
   paid_at: string | null;
   /** 「這一列算不算在簽到表上」的唯一定義（0021 §3）。 */
   on_roster: boolean;
+  /**
+   * 0056：所屬訂單的 payment_method、status 與 total（另一句從 orders 讀，view 不動）。
+   * 名單頁用它標「現場付款・未收款」、並在那一列給「標記已收款」。讀不到時是 null／0，
+   * 畫面就不標、不給按鈕（名單本身照常顯示）。
+   */
+  payment_method: string | null;
+  order_status: string | null;
+  order_total: number;
 };
 
 /** CSV 匯出的一列（欄位與舊的 SQL export_event_roster() 相同）。**這裡面是明文。** */
@@ -186,6 +194,34 @@ export async function listSessionRoster(sessionId: string): Promise<Registration
     throw new Error(`[repo/event-registrations] roster 聯絡方式失敗：${plainRes.error.code}`);
   }
 
+  // 0056：訂單層的付款方式與金額。best-effort：讀不到就當作沒有（不標、不給按鈕）。
+  const viewRows = (viewRes.data ?? []) as unknown as RosterViewRow[];
+  const orderIds = [...new Set(viewRows.map((v) => v.order_id))];
+  const orderInfo = new Map<
+    string,
+    { payment_method: string | null; status: string | null; total: number }
+  >();
+  if (orderIds.length > 0) {
+    const { data: orderRows, error: orderErr } = await db
+      .from("orders")
+      .select("id, payment_method, status, total")
+      .in("id", orderIds);
+    if (orderErr) {
+      console.error(
+        `[repo/event-registrations] roster 訂單付款方式失敗：${orderErr.code} ${orderErr.message}`,
+      );
+    } else {
+      for (const o of (orderRows ?? []) as {
+        id: string;
+        payment_method: string | null;
+        status: string | null;
+        total: number;
+      }[]) {
+        orderInfo.set(o.id, { payment_method: o.payment_method, status: o.status, total: o.total });
+      }
+    }
+  }
+
   const contact = new Map<string, { email: string | null; phone: string | null }>();
   for (const r of (plainRes.data ?? []) as {
     id: string;
@@ -195,8 +231,9 @@ export async function listSessionRoster(sessionId: string): Promise<Registration
     contact.set(r.id, { email: blankToNull(r.email), phone: blankToNull(r.phone) });
   }
 
-  return ((viewRes.data ?? []) as unknown as RosterViewRow[]).map((v) => {
+  return viewRows.map((v) => {
     const c = contact.get(v.registration_id);
+    const oi = orderInfo.get(v.order_id);
     return {
       registration_id: v.registration_id,
       session_id: v.session_id,
@@ -212,6 +249,9 @@ export async function listSessionRoster(sessionId: string): Promise<Registration
       payment_status: v.payment_status,
       paid_at: v.paid_at,
       on_roster: v.on_roster,
+      payment_method: oi?.payment_method ?? null,
+      order_status: oi?.status ?? null,
+      order_total: oi?.total ?? 0,
     };
   });
 }

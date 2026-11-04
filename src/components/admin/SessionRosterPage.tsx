@@ -167,6 +167,11 @@ export function SessionRosterPage({
       {roster ? (
         <SessionRosterTable
           rows={roster}
+          // 0056：現場付款「標記已收款」只有 admin 能按（markOrderPaidAdmin 掛 adminFnMiddleware）。
+          canMarkPaid={canCreatePhoneOrder}
+          onMarkedPaid={async () => {
+            await router.invalidate();
+          }}
           // 移除成功後重跑 loader：名單與列表的報名數／名額一起更新。
           onRemoved={async () => {
             await router.invalidate();

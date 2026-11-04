@@ -67,7 +67,9 @@ export type AdminOrderListScope =
   | "needs_contact"
   | "to_ship"
   | "all"
-  | "invoice_problem";
+  | "invoice_problem"
+  /** 0056 */
+  | "onsite_pending";
 
 export type AdminOrderListFilter = {
   scope: AdminOrderListScope;
@@ -157,6 +159,13 @@ export async function listAdminOrders(filter: AdminOrderListFilter): Promise<Adm
 
   if (filter.scope === "transfer_pending") {
     query = query.eq("payment_method", "transfer").neq("payment_status", "paid");
+  } else if (filter.scope === "onsite_pending") {
+    // 0056：現場付款、還沒收到錢也還沒取消——與列表／內頁「現場付款・未收款」標示亮起的
+    // 條件相同（src/lib/admin/order-labels.ts showOnsiteUnpaid）。
+    query = query
+      .eq("payment_method", "onsite")
+      .neq("payment_status", "paid")
+      .neq("status", "cancelled");
   } else if (filter.scope === "phone") {
     // 0050：後台電話報名（吃 orders_admin_phone_idx）。已付款、未付款、免費都列。
     query = query.eq("source", "admin_phone");

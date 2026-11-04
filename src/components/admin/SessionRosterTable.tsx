@@ -9,6 +9,11 @@
  * 對話框用這一列既有的 payment_status／on_roster（listSessionRoster() 早就回傳了）
  * 明確示警「這位已經付過錢」，不需要等 RPC 回來才知道。
  *
+ * ── 現場付款（0056）────────────────────────────────────────────────────────
+ * 現場付款、還沒收到錢的列標「現場付款・未收款」，並給一顆「標記已收款」（admin 才有）。
+ * 呼叫的就是訂單內頁那一支 markOrderPaidAdmin()（admin_mark_order_paid()），一張訂單一次；
+ * 同一張單的其他參加者會在重抓之後一起變成已付款。
+ *
  * 成功後呼叫 onRemoved：呼叫端 router.invalidate()，名單頁的 loader 重抓名單（2026-10-26
  * 起不寫查閱紀錄，重抓沒有副作用），列表的「報名」「名額」欄也是新的數字。
  */
@@ -36,6 +41,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { listSessionRoster } from "@/lib/admin/fns/event-registrations";
+import { money, ONSITE_UNPAID_LABEL, showOnsiteUnpaid } from "@/lib/admin/order-labels";
 
 export type RosterRow = Awaited<ReturnType<typeof listSessionRoster>>[number];
 
@@ -43,11 +49,50 @@ type Props = {
   rows: RosterRow[];
   /** 移除成功（reason === "deleted"）之後。 */
   onRemoved: (registrationId: string) => Promise<void>;
+  /** 0056：顯示現場付款的「標記已收款」。只控制畫面；擋人的是 adminFnMiddleware。 */
+  canMarkPaid?: boolean;
+  /** 0056：標記已收款成功（或發現早就付過）之後。 */
+  onMarkedPaid?: () => Promise<void>;
 };
 
-export function SessionRosterTable({ rows, onRemoved }: Props) {
+/** 0056：這一列要不要標「現場付款・未收款」。 */
+function rowOnsiteUnpaid(r: RosterRow): boolean {
+  return showOnsiteUnpaid({
+    payment_method: r.payment_method,
+    payment_status: r.payment_status,
+    status: r.order_status ?? "",
+  });
+}
+
+export function SessionRosterTable({ rows, onRemoved, canMarkPaid = false, onMarkedPaid }: Props) {
   const [removeTarget, setRemoveTarget] = useState<RosterRow | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [payTarget, setPayTarget] = useState<RosterRow | null>(null);
+  const [marking, setMarking] = useState(false);
+
+  async function handleMarkPaid() {
+    if (!payTarget) return;
+    setMarking(true);
+    try {
+      const { markOrderPaidAdmin } = await import("@/lib/admin/fns/orders");
+      const result = await markOrderPaidAdmin({
+        data: { orderId: payTarget.order_id, note: "現場付款（報名名單標記）" },
+      });
+      if (result.reason === "marked") {
+        toast.success(`訂單 ${payTarget.order_no} 已標記為已收款，發票會接著開立`);
+      } else if (result.reason === "already_paid") {
+        toast.info("這張訂單已經是已收款狀態");
+      } else {
+        toast.error("這張訂單無法標記（可能已取消或不存在）");
+      }
+      setPayTarget(null);
+      await onMarkedPaid?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "標記失敗，請稍後再試");
+    } finally {
+      setMarking(false);
+    }
+  }
 
   async function handleRemoveRegistration() {
     if (!removeTarget) return;
@@ -86,7 +131,7 @@ export function SessionRosterTable({ rows, onRemoved }: Props) {
                 <TableHead>信箱</TableHead>
                 <TableHead>電話</TableHead>
                 <TableHead>訂單</TableHead>
-                <TableHead className="w-24">付款</TableHead>
+                <TableHead className="w-32">付款</TableHead>
                 <TableHead className="w-24">注意事項</TableHead>
                 <TableHead className="w-24 text-right">操作</TableHead>
               </TableRow>
@@ -121,15 +166,31 @@ export function SessionRosterTable({ rows, onRemoved }: Props) {
                     {r.order_no}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={r.on_roster ? "default" : "secondary"}>
-                      {r.on_roster ? "已付款" : r.payment_status}
-                    </Badge>
+                    {rowOnsiteUnpaid(r) ? (
+                      <Badge className="whitespace-nowrap bg-amber-600 text-white hover:bg-amber-600">
+                        {ONSITE_UNPAID_LABEL}
+                      </Badge>
+                    ) : (
+                      <Badge variant={r.on_roster ? "default" : "secondary"}>
+                        {r.on_roster ? "已付款" : r.payment_status}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {r.notice_ack_at ? "已同意" : "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      {canMarkPaid && rowOnsiteUnpaid(r) ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="whitespace-nowrap"
+                          onClick={() => setPayTarget(r)}
+                        >
+                          標記已收款
+                        </Button>
+                      ) : null}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -147,6 +208,33 @@ export function SessionRosterTable({ rows, onRemoved }: Props) {
           </Table>
         </div>
       )}
+
+      {/* 0056：現場付款標記已收款。整張訂單一次（同單的其他參加者一起變已付款）。 */}
+      <AlertDialog open={payTarget !== null} onOpenChange={(open) => !open && setPayTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確定已在現場收到「{payTarget?.name}」的款項？</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="block">
+                {`訂單 ${payTarget?.order_no ?? ""}，金額 ${money(payTarget?.order_total ?? 0)}。`}
+                整張訂單會一起標記為已收款（同一張單的其他參加者也是），接著寄出付款成功信與報名成功信，並開立發票。這個動作無法在這一頁復原。
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={marking}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={marking}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleMarkPaid();
+              }}
+            >
+              {marking ? "標記中…" : "確定已收款"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* 移除單筆報名（0035）。已付款的列（on_roster）在這裡明確示警——這一列的
           payment_status／on_roster 從 listSessionRoster() 就有了，不用等 RPC

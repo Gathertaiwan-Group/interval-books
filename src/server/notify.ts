@@ -76,6 +76,7 @@ import {
   renderOrderPaidEmail,
   renderRegistrationTicketEmail,
   renderOrderShippedEmail,
+  renderOnsitePaymentEmail,
   renderRemittanceEmail,
   renderSessionReminderEmail,
   type AdminOrderAttendee,
@@ -99,6 +100,8 @@ export const dedupeKeys = {
   orderNotifyAdmin: (orderId: string) => `order_notify_admin:${orderId}`,
   /** 0034：匯款資訊信（客人），下單當下寄。 */
   remittance: (orderId: string) => `remittance:${orderId}`,
+  /** 0056：現場付款確認信（客人），下單當下寄。不含匯款帳號。 */
+  onsitePayment: (orderId: string) => `onsite_payment:${orderId}`,
   /**
    * 0034：店家的「有一筆待收款的新訂單」通知，**下單當下**寄。
    *
@@ -351,6 +354,8 @@ async function queueWithClaim(orderId: string): Promise<NotifyOutcome> {
  *   · payment_method = 'transfer' → 客人 1 封匯款資訊信
  *   · payment_method = 'transfer' 或 NULL（＝舊的「由我們與你聯繫付款」，0048 起結帳頁
  *     不再提供，只剩舊訂單）→ 店家 1 封「有一筆待收款的新訂單」
+ *   · 0056：payment_method = 'onsite'（現場付款）→ 客人 1 封現場付款確認信（**不含匯款
+ *     帳號**：「請於活動當天至現場繳費」＋金額＋場次時間地點）＋店家 1 封待收款（標「現場付款」）
  *   · 0048：orders.needs_contact = true（匯款＋勾了「我需要專人聯繫協助付款」）時，
  *     客人那封在匯款資訊旁加「我們會盡快與你聯繫」，店家那封主旨與內文標「需聯繫」。
  *
@@ -375,7 +380,8 @@ export async function queueOrderPlacedNotifications(orderId: string): Promise<No
 
     const isTransfer = order.paymentMethod === "transfer";
     const isOffline = order.paymentMethod === null;
-    if (!isTransfer && !isOffline) return { ok: true, queued: 0, adopted: false };
+    const isOnsite = order.paymentMethod === "onsite";
+    if (!isTransfer && !isOffline && !isOnsite) return { ok: true, queued: 0, adopted: false };
 
     const sessionIds = [...new Set(items.map((i) => i.sessionId).filter((s): s is string => !!s))];
     const sessions = await loadSessionBriefs(sessionIds);
@@ -457,6 +463,43 @@ export async function queueOrderPlacedNotifications(orderId: string): Promise<No
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         console.error(`[notify] 匯款資訊信排入失敗 order=${order.orderNo} ${message}`);
+      }
+    }
+
+    // ---- 1b. 0056：客人的現場付款確認信（只有現場付款訂單有）-------------------
+    // 與匯款資訊信同一個立場：自己一個 try/catch，失敗不影響店家那封、不影響訂單。
+    // 連結組不出來（SITE_URL 沒設）時信照寄、只是不放連結——這封信的重點是「當天到
+    // 現場付錢」與時間地點，不像匯款信要靠連結回填末五碼。
+    if (isOnsite && notifyCustomer) {
+      try {
+        const token = await getOrderPublicToken(orderId);
+        const orderUrl = token ? publicUrlFor("/checkout/complete", { token }) : null;
+        const copy = await loadEmailCopy();
+        const mail = renderOnsitePaymentEmail(
+          {
+            orderNo: order.orderNo,
+            customerName: order.customerName,
+            total: order.total,
+            items: items.map((i) => ({ name: i.name, quantity: i.quantity, subtotal: i.subtotal })),
+            sessions: sessionIds
+              .map((id) => sessions.get(id))
+              .filter((s): s is SessionBrief => !!s),
+            orderUrl,
+          },
+          copy,
+          order.locale,
+        );
+        const added = await enqueueOrderEmail({
+          orderId,
+          dedupeKey: dedupeKeys.onsitePayment(orderId),
+          subject: mail.subject,
+          text: mail.text,
+          html: mail.html,
+        });
+        if (added) queued += 1;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[notify] 現場付款確認信排入失敗 order=${order.orderNo} ${message}`);
       }
     }
 

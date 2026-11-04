@@ -44,6 +44,7 @@ import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
+import { expectedMigrationNumbers } from "./lib/migration-ledger.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -217,7 +218,7 @@ const migNumbers = migrations.map(migNumber);
 check(
   "migration 編號從 0001 起連續、不重複",
   migNumbers.join(",") || "（無）",
-  migNumbers.map((_, i) => i + 1).join(",") || "（無）",
+  expectedMigrationNumbers(migNumbers).join(",") || "（無）",
 );
 
 const sql0025raw = readFile(join(MIG_DIR, MIG_0025_NAME));

@@ -596,9 +596,10 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
     // 0054（MCP 讀寫分級＋稽核欄位）：只動 mcp_oauth_grants 與 mcp_audit_log，orders 與訂單 RPC 一個字沒動。
     // 0055（MCP 報表匯出的私有 bucket）：只 insert 一個 storage.buckets，orders 與訂單 RPC 一個字沒動
     //   （report-tools.ts 只讀 orders，不呼叫任何訂單 RPC）。
-    "supabase/migrations 剛好 55 個 .sql 檔（0001–0051 原封不動 + 0052 單一上架狀態 + 0053 MCP 暫存 bucket + 0054 MCP 讀寫分級 + 0055 MCP 報表匯出 bucket）",
+    // 0056 現場付款：orders 的 payment_method CHECK／expire／名單 view／staff 權限，admin_delete_order／admin_archive_order／admin_mark_order_paid 一個字沒動。
+    "supabase/migrations 剛好 56 個 .sql 檔（0001–0055 + 0056 現場付款）",
     migFiles.length,
-    55,
+    56,
   );
 }
 
@@ -633,8 +634,10 @@ console.log("\n[7] 側欄有訂單的入口");
 console.log("\n[7b] 標記已收款的可用範圍，以及標記結果與畫面刷新的錯誤互不干擾");
 {
   checkTrue(
-    "🔴 「標記已收款」只在 payment_method 是 transfer 或 null 時可用",
-    /payment_method === "transfer" \|\| detail\.payment_method === null/.test(detailSrc),
+    "🔴 「標記已收款」只在 payment_method 是 transfer、onsite（0056 現場付款）或 null 時可用",
+    /payment_method === "transfer" \|\|\s*detail\.payment_method === "onsite" \|\|\s*detail\.payment_method === null/.test(
+      detailSrc,
+    ),
     "card／atm／cvs_cod／test_paid／free 卡在待付款時不該出現這顆按鈕——那些正常都由金流商 webhook 自動結清，卡住代表要去查金流商後台，不是對銀行對帳單。",
   );
 

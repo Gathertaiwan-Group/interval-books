@@ -17,14 +17,16 @@ export type OrderListScope =
   | "all"
   | "invoice_problem"
   /** 0050：後台電話報名。 */
-  | "phone";
+  | "phone"
+  /** 0056：現場付款、還沒收到錢也還沒取消。 */
+  | "onsite_pending";
 
 /**
  * 列表頁的篩選條件，也是詳情頁「回訂單列表」要帶回去的網址參數。
  * transfer_pending 是預設分頁，網址上不寫；archived 只在打開時寫 `archived=1`。
  */
 export type OrderListSearch = {
-  scope?: "needs_contact" | "to_ship" | "all" | "invoice_problem" | "phone";
+  scope?: "needs_contact" | "to_ship" | "all" | "invoice_problem" | "phone" | "onsite_pending";
   archived?: 1;
 };
 
@@ -35,7 +37,8 @@ export function parseOrderListSearch(search: Record<string, unknown>): OrderList
     search.scope === "to_ship" ||
     search.scope === "all" ||
     search.scope === "invoice_problem" ||
-    search.scope === "phone"
+    search.scope === "phone" ||
+    search.scope === "onsite_pending"
   ) {
     out.scope = search.scope;
   }
@@ -69,6 +72,8 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
   // 0034。與 'atm' 刻意用不同的字：'atm' 是金流商動態虛擬帳號、自動核帳；
   // 'transfer' 是客人匯到店家固定帳戶、人工對帳。
   transfer: "匯款（人工對帳）",
+  // 0056：活動當天在店裡收錢。與 src/lib/email-templates.ts 的 ADMIN_ONSITE_LABEL 同字。
+  onsite: "現場付款",
 };
 export function paymentMethodLabel(code: string | null): string {
   if (!code) return "由店家聯繫付款";
@@ -86,6 +91,24 @@ export function showNeedsContact(o: {
   status: string;
 }): boolean {
   return o.needs_contact === true && o.payment_status !== "paid" && o.status !== "cancelled";
+}
+
+/**
+ * 0056：現場付款。列表、內頁、報名名單的標示用同一個字。
+ * showOnsiteUnpaid()：現場付款、還沒收到錢、也還沒取消——店員在現場要找的就是這些人，
+ * 「標記已收款」的按鈕也只對這些列出現。已付清的單仍印付款方式「現場付款」，只是不亮標示。
+ */
+export const ONSITE_LABEL = "現場付款";
+export const ONSITE_UNPAID_LABEL = "現場付款・未收款";
+export function isOnsiteOrder(o: { payment_method: string | null }): boolean {
+  return o.payment_method === "onsite";
+}
+export function showOnsiteUnpaid(o: {
+  payment_method: string | null;
+  payment_status: string;
+  status: string;
+}): boolean {
+  return o.payment_method === "onsite" && o.payment_status !== "paid" && o.status !== "cancelled";
 }
 
 const SHIPPING_METHOD_LABEL: Record<string, string> = {

@@ -23,6 +23,7 @@ const ORDER_LIST_SCOPES = [
   "all",
   "invoice_problem",
   "phone",
+  "onsite_pending",
 ] as const;
 
 export const listAdminOrders = createServerFn({ method: "GET" })

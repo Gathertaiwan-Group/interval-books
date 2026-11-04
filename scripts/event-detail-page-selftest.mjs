@@ -25,6 +25,7 @@
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { expectedMigrationNumbers } from "./lib/migration-ledger.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = "scripts/event-detail-page-selftest.mjs";
@@ -705,7 +706,7 @@ const migNums = migrations.map((f) => Number(f.slice(0, 4)));
 check(
   "migration 編號從 0001 起連續、不重複",
   migNums.join(","),
-  migNums.map((_, i) => i + 1).join(","),
+  expectedMigrationNumbers(migNums).join(","),
 );
 checkTrue(
   "0025_event_speaker.sql 還在原位（沒有人回頭改編號）",

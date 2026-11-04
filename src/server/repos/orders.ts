@@ -140,6 +140,7 @@ import {
 } from "@/lib/checkout";
 import { normalizeInvoiceChoice } from "@/lib/invoice-format";
 import { getRemittanceAccount } from "@/server/repos/site-settings";
+import { getEventSessionById } from "@/server/repos/event-sessions";
 import { computeReferralDiscount, resolveReferralCode } from "@/lib/referral";
 import { findReferrerForCheckout } from "@/server/repos/referrals";
 import { isSessionClosedForBooking } from "@/lib/event-status";
@@ -974,6 +975,8 @@ export async function reissuePayment(token: string): Promise<PaymentHandoff | nu
   //    對 transfer 是 false）只是不畫那顆按鈕，不是一道防線。少了這一句，一張已經
   //    匯了款的訂單可以被同一個 token 再送去刷一次卡，變成收兩次錢。
   if (order.payment_method === "transfer") return null;
+  // 0056：現場付款同理——錢是活動當天在店裡收的，沒有任何金流頁可以重送。
+  if (order.payment_method === "onsite") return null;
 
   return buildCardHandoff(order);
 }
@@ -1044,6 +1047,12 @@ export async function createOrder(
    * 什麼、step 7 要不要去金流（不要）、step 7.5 要寄哪一封信。
    */
   const wantsTransfer = choice.paymentMethod === "transfer";
+  /**
+   * 0056：現場付款。同樣只決定去向：不去金流、不寄匯款帳號、expire 不回收。
+   * 「這一車可不可以選」要等 priceLines() 讀出每一行真正的 product_type 才知道，
+   * 判斷在下面 lines 算完之後（onsiteEligible）。
+   */
+  const wantsOnsite = choice.paymentMethod === "onsite";
 
   // ---- step 0: has this exact attempt already succeeded? --------------------
   // This has to come before the availability pre-check, not after. A replay is
@@ -1058,6 +1067,13 @@ export async function createOrder(
   const lines = await priceLines(payload.items, {
     allowParticipantWithoutContact: admin !== null,
   });
+
+  // 0056：現場付款只給「整車都是活動票券」。看的是伺服器從 public.products 讀出的
+  // product_type，不是瀏覽器說的；不合格整筆拒絕，不偷偷改成別的付款方式（客人選的是
+  // 「當天再付」，改成匯款或刷卡都不是他同意的事）。後台電話報名不走這個選項。
+  if (wantsOnsite && (admin !== null || !lines.every((l) => l.productType === "event"))) {
+    throw new CheckoutError("onsite_not_allowed");
+  }
 
   // Shipping is decided by the products, not by the form. A cart of nothing but
   // bookings collects no address and pays no freight; see computeShippingFee().
@@ -1150,7 +1166,15 @@ export async function createOrder(
       // 'transfer'（0034）是第三種：客人要匯款到店家的固定帳戶，人工對帳。它與
       // NULL 的差別是「錢要怎麼進來這件事已經談定了」——所以完成頁印得出帳號、
       // 信寄得出去，而 expire_unpaid_orders() 也認得它要多留三天。
-      payment_method: wantsCard ? "card" : wantsTransfer ? "transfer" : null,
+      // 'onsite'（0056）：活動當天到現場付款。只在 total > 0 時寫——0 元的單照舊以 NULL
+      // 寫入、由 step 5b 的 settle_free_order() 改成 'free'，免費票的路一個字不變。
+      payment_method: wantsCard
+        ? "card"
+        : wantsTransfer
+          ? "transfer"
+          : wantsOnsite && total > 0
+            ? "onsite"
+            : null,
       // 0048：需專人聯繫。只有匯款訂單可能是 true（resolveOrderPaymentChoice）；
       // 免費訂單（total = 0）在 step 5b 就結清了，沒有款項要聯繫，一律 false。
       needs_contact: choice.needsContact && total > 0,
@@ -1808,19 +1832,52 @@ export async function getOrderByToken(token: string): Promise<OrderSummary | nul
 
   const { data: itemRows } = await db
     .from("order_items")
-    .select("name, unit_price, quantity, subtotal, product_type")
+    .select("name, unit_price, quantity, subtotal, product_type, session_id")
     .eq("order_id", o.id)
     .order("id", { ascending: true });
 
-  const items = (
-    (itemRows ?? []) as unknown as {
-      name: Localized;
-      unit_price: number;
-      quantity: number;
-      subtotal: number;
-      product_type: ProductTypeForOrder;
-    }[]
-  ).map((r) => ({
+  const itemList = (itemRows ?? []) as unknown as {
+    name: Localized;
+    unit_price: number;
+    quantity: number;
+    subtotal: number;
+    product_type: ProductTypeForOrder;
+    session_id: string | null;
+  }[];
+
+  /**
+   * 0056：現場付款、還沒付清 → 完成頁要印「請於活動當天至現場繳費」與每一場的時間地點。
+   * 場次讀不到就略過那一場（不讓整頁失敗）；全部讀不到時 sessions 是空陣列，完成頁
+   * 照樣印繳費提醒與金額。
+   */
+  let onsite: OrderSummary["onsite"] = null;
+  if (o.payment_method === "onsite" && o.payment_status !== "paid" && o.status !== "cancelled") {
+    const sessionIds = [
+      ...new Set(itemList.map((r) => r.session_id).filter((v): v is string => !!v)),
+    ];
+    const sessions: NonNullable<OrderSummary["onsite"]>["sessions"] = [];
+    for (const id of sessionIds) {
+      try {
+        const s = await getEventSessionById(id);
+        if (s) {
+          sessions.push({
+            title: s.title,
+            location: s.location,
+            startsAt: s.starts_at,
+            endsAt: s.ends_at,
+          });
+        }
+      } catch (err) {
+        console.error(
+          `[repo/orders] 完成頁讀場次失敗 session=${id}：${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+    sessions.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    onsite = { sessions };
+  }
+
+  const items = itemList.map((r) => ({
     name: r.name,
     unitPrice: r.unit_price,
     quantity: r.quantity,
@@ -1854,6 +1911,8 @@ export async function getOrderByToken(token: string): Promise<OrderSummary | nul
     awaitingPayment:
       o.payment_method !== null &&
       o.payment_method !== "transfer" &&
+      // 0056：現場付款同理——等的是客人活動當天到店裡，不是金流的回覆。
+      o.payment_method !== "onsite" &&
       o.status === "pending" &&
       (o.payment_status === "pending" || o.payment_status === "failed"),
     subtotal: o.subtotal,
@@ -1862,6 +1921,7 @@ export async function getOrderByToken(token: string): Promise<OrderSummary | nul
     total: o.total,
     referralCode: o.referral_code ?? null,
     remittance,
+    onsite,
     shippingMethod: o.shipping_method,
     createdAt: o.created_at,
     items,

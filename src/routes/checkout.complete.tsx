@@ -55,6 +55,12 @@ const PAGE = {
   },
   eyebrowSuffix: { zh: "訂單完成", en: "Order complete", ja: "ご注文完了" },
   title: { zh: "訂單已成立", en: "Your order is in", ja: "ご注文を承りました" },
+  // 0056：現場付款不需要「聯繫付款與寄送方式」——那句話對這張單是錯的。
+  introOnsite: {
+    zh: "謝謝你的報名。活動當天請到現場繳費，訂單編號請先留著。",
+    en: "Thank you for registering. Please pay at the venue on the day — keep the order number handy.",
+    ja: "お申し込みありがとうございます。当日、会場にてお支払いください。ご注文番号はお控えください。",
+  },
   intro: {
     zh: "謝謝你。我們會盡快與你聯繫付款與寄送方式，訂單編號請先留著。",
     en: "Thank you. We will be in touch shortly about payment and delivery — please keep the order number.",
@@ -127,6 +133,21 @@ const PAGE = {
     en: "Orders that are not paid by then are cancelled automatically, and the items and places are released.",
     ja: "期限までにご入金がない場合、ご注文は自動的にキャンセルとなり、商品・お席は解放されます。",
   },
+  // ---- 現場付款（0056）-----------------------------------------------------
+  titleOnsite: {
+    zh: "報名已成立，請於活動當天至現場繳費",
+    en: "You're registered — please pay at the venue on the day",
+    ja: "お申し込みを承りました。当日、会場にてお支払いください",
+  },
+  onsiteCopy: {
+    zh: "你的名額已經保留。這張訂單選擇現場付款：請於活動當天至現場繳費，不需要先線上付款或匯款。確認信也已經寄到你的信箱。若無法出席，請提早告訴我們。",
+    en: "Your place is held. You chose to pay at the venue: please pay on the day of the event — there is nothing to pay online or by transfer beforehand. A confirmation is already in your inbox. If you can no longer come, please let us know in advance.",
+    ja: "お席をお取り置きしました。お支払い方法は当日現地払いです。イベント当日に会場にてお支払いください。事前のオンライン決済やお振込は不要です。確認メールもお送りしています。ご参加いただけなくなった場合はお早めにご連絡ください。",
+  },
+  onsiteSection: { zh: "現場付款", en: "Pay at the venue", ja: "当日現地払い" },
+  onsiteAmount: { zh: "現場應付金額", en: "Amount due at the venue", ja: "当日のお支払い金額" },
+  onsiteWhen: { zh: "時間", en: "When", ja: "日時" },
+  onsiteWhere: { zh: "地點", en: "Where", ja: "場所" },
   last5Section: {
     zh: "回報匯款帳號末五碼",
     en: "Tell us your last five digits",
@@ -390,39 +411,45 @@ function CheckoutComplete() {
    * 錢已經進來了，再印一次帳號只會讓人以為要再匯一次。
    */
   const transfer = !isPaid && order.remittance ? order.remittance : null;
+  /** 0056：現場付款、還沒付清。同樣只看伺服器組的那一包（getOrderByToken）。 */
+  const onsite = !isPaid && order.onsite ? order.onsite : null;
 
   const StatusIcon = isPaid
     ? Check
     : isFailed
       ? TriangleAlert
-      : isWaiting || transfer
+      : isWaiting || transfer || onsite
         ? Clock
         : Check;
   const heading = isPaid
     ? PAGE.titlePaid
     : transfer
       ? PAGE.titleTransfer
-      : isWaiting
-        ? PAGE.titleWaiting
-        : isFailed
+      : onsite
+        ? PAGE.titleOnsite
+        : isWaiting
           ? PAGE.titleWaiting
-          : PAGE.title;
+          : isFailed
+            ? PAGE.titleWaiting
+            : PAGE.title;
   const statusCopy = isPaid
     ? PAGE.paid
     : isFailed
       ? PAGE.failed
       : transfer
         ? PAGE.transferCopy
-        : isWaiting
-          ? PAGE.waiting
-          : PAGE.paymentPending;
+        : onsite
+          ? PAGE.onsiteCopy
+          : isWaiting
+            ? PAGE.waiting
+            : PAGE.paymentPending;
 
   return (
     <PageShell>
       <PageHeader
         eyebrow={`Order  ／  ${t(PAGE.eyebrowSuffix)}`}
         title={t(heading)}
-        intro={t(PAGE.intro)}
+        intro={t(onsite ? PAGE.introOnsite : PAGE.intro)}
       />
 
       <section className="container-editorial pb-32 max-w-2xl">
@@ -444,6 +471,39 @@ function CheckoutComplete() {
             <Link to="/cart" className="text-xs tracking-widest underline underline-offset-4">
               {t(PAGE.backToCart)}
             </Link>
+          </div>
+        )}
+
+        {/* ---- 現場付款（0056）：金額＋每一場的時間地點。沒有任何匯款帳號。 ---- */}
+        {onsite && (
+          <div className="mt-10 border border-foreground p-7 md:p-8" data-testid="onsite-payment">
+            <p className="eyebrow text-xl">{t(PAGE.onsiteSection)}</p>
+            <dl className="mt-6 space-y-3 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">{t(PAGE.onsiteAmount)}</dt>
+                <dd className="text-right font-serif text-xl tabular-nums">
+                  {formatPrice(order.total)}
+                </dd>
+              </div>
+            </dl>
+            {onsite.sessions.map((s, i) => (
+              <dl key={i} className="mt-6 space-y-3 border-t border-border pt-6 text-sm">
+                <p className="font-medium">{t(s.title)}</p>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">{t(PAGE.onsiteWhen)}</dt>
+                  <dd className="text-right tabular-nums">
+                    {formatTaipeiDateTime(s.startsAt)}
+                    {s.endsAt ? ` – ${formatTaipeiDateTime(s.endsAt)}` : ""}
+                  </dd>
+                </div>
+                {t(s.location) !== "" && (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">{t(PAGE.onsiteWhere)}</dt>
+                    <dd className="text-right">{t(s.location)}</dd>
+                  </div>
+                )}
+              </dl>
+            ))}
           </div>
         )}
 

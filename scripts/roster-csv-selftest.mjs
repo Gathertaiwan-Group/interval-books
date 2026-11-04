@@ -413,7 +413,9 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 2026-11-02 0052_event_listing_status.sql：帳本標了 products_availability（只有 source_type='event'
   // 的票券商品 status 改由 trigger 跟著活動推導）與 session_seats（admin_upsert_event_with_session
   // 本體的場次段逐字沿用，seats_taken 一個字沒動）。本檔的斷言逐條重跑全綠，原樣成立。
-  reviewedThrough: "0052_event_listing_status.sql",
+  // 0056（現場付款）重審：CHECK 只多一個值 onsite、expire_unpaid_orders 候選條件只多一行
+  // payment_method is distinct from 'onsite'，本體其餘逐字沿用 0050——這支的斷言照樣成立。
+  reviewedThrough: "0056_onsite_payment.sql",
 });
 // 這一期不准動到既有的 0001–0020，所以它們也必須都還在。
 for (let n = 1; n <= 20; n += 1) {

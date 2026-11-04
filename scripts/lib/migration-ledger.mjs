@@ -896,7 +896,55 @@ export const MIGRATION_LEDGER = Object.freeze([
     // touches 用 AREAS 的識別字掃過剝掉註解的 SQL：只出現 storage.buckets。
     touches: ["storage"],
   },
+  {
+    file: "0056_onsite_payment.sql",
+    note: "活動報名結帳的第三種付款方式「現場付款」：orders_payment_method_check 加 'onsite'（drop if exists + add，值域取自 0034 再加一個值），comment on column 更新。expire_unpaid_orders() 候選條件多一行 o.payment_method is distinct from 'onsite'（現場付款未付款單不自動取消；NULL 的舊單照舊回收）；函式本體取自 0050（正式庫現行版本），只加這一行，簽章與回傳形狀不變（create or replace），security definer／search_path 不變，重申只 grant service_role，comment on function 更新。admin_mark_order_paid／invoice_backlog／settle_free_order／reserve_session_seat／enqueue_* 一個字沒動",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：orders_payments（public.orders 的
+    // CHECK 與 comment、expire 本體的 public.payments）、order_expiry（expire_unpaid_orders、order_items），
+    // 以及 expire 本體逐字沿用的 products_availability（public.products）、inventory（inv.products、
+    // stock_reservations）、session_seats（event_sessions、seats_taken）、session_plans
+    // （event_session_plans、units_taken）、event_registrations（4c 的 delete）。
+    touches: [
+      "event_registrations",
+      "inventory",
+      "order_expiry",
+      "orders_payments",
+      "products_availability",
+      "session_plans",
+      "session_seats",
+    ],
+  },
 ]);
+
+/**
+ * 已經被**其他還沒 merge 進 main 的分支**用掉的 migration 編號。
+ *
+ * 2026-11-04：feat/mcp-ops-write 用了 0054、0055（MCP 權限稽核、報表匯出），還沒 merge；
+ * feat/onsite-payment 因此從 0056 開始。這兩個編號在這條分支上不在磁碟上是**預期的**，
+ * 不是有人刪檔。那條分支 merge 之後檔案就補上了，這一筆可以刪（留著也無害：在磁碟上的
+ * 保留編號照一般編號檢查）。
+ *
+ * ⚠️ 只能放「確實有另一條分支在用」的編號，並寫明是哪一條。拿它來跳號是在拆守門。
+ */
+export const RESERVED_MIGRATION_NUMBERS = new Map([
+  [54, "feat/mcp-ops-write：0054_mcp_access_level_audit_actor.sql"],
+  [55, "feat/mcp-ops-write：0055_mcp_report_exports.sql"],
+]);
+
+/**
+ * 給「編號從 0001 起連續、不重複」用的期望值：1..最大編號，扣掉**不在磁碟上的**保留編號。
+ * 各支自檢自己寫的那條連續性斷言也用這一支，保留清單只有一份。
+ */
+export function expectedMigrationNumbers(nums) {
+  const maxNum = nums.length > 0 ? Math.max(...nums) : 0;
+  const present = new Set(nums);
+  const out = [];
+  for (let n = 1; n <= maxNum; n += 1) {
+    if (RESERVED_MIGRATION_NUMBERS.has(n) && !present.has(n)) continue;
+    out.push(n);
+  }
+  return out;
+}
 
 /** 磁碟上的 migration 檔名，排序過。空目錄 = 丟例外（那不是「沒有違規」）。 */
 export function readMigrationFiles(migDir) {
@@ -1012,10 +1060,13 @@ export function assertLedgerMatchesDisk(check, migDir) {
   check("帳本與磁碟的順序完全一致", orderDiff, "（一致）");
 
   const nums = disk.map((f) => Number(f.slice(0, 4)));
+  // 被其他還沒 merge 的分支佔走的編號（RESERVED_MIGRATION_NUMBERS）可以暫時不在磁碟上；
+  // 其餘仍然必須從 0001 起連續、不重複。保留的編號一旦出現在磁碟上，就跟一般編號一樣算。
+  const expectedNums = expectedMigrationNumbers(nums);
   check(
-    "migration 編號從 0001 起連續、不重複",
+    "migration 編號從 0001 起連續、不重複（其他分支保留的編號除外）",
     nums.join(","),
-    nums.map((_, i) => i + 1).join(","),
+    expectedNums.join(","),
   );
 
   const noteless = MIGRATION_LEDGER.filter((e) => !e.note || e.note.trim().length < 4);

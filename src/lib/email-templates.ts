@@ -171,6 +171,52 @@ export type AdminOrderAttendee = {
   email: string | null;
 };
 
+/**
+ * 現場付款確認信（0056，寄給訂購人，**下單當下**，錢還沒進來）。
+ * dedupe_key = `onsite_payment:<order_id>`。
+ *
+ * 與匯款資訊信是同一條路（queueOrderPlacedNotifications），差別：**不印任何匯款帳號**，
+ * 改印「請於活動當天至現場繳費」＋金額＋每一場的時間地點。
+ */
+export type OnsitePaymentEmailInput = {
+  orderNo: string;
+  customerName: string;
+  total: number;
+  items: { name: Localized; quantity: number; subtotal: number }[];
+  /** 這張訂單買到的場次。現場付款只給活動票券，正常至少一個。 */
+  sessions: SessionBrief[];
+  /** 回到訂單頁的網址；組不出可用的公開網址時是 null，信裡就不放連結（信照寄）。 */
+  orderUrl: string | null;
+};
+
+/**
+ * 現場付款的文案。刻意寫死在程式碼、不進 email_copy CMS：這幾句是「這張單怎麼付錢」
+ * 的事實陳述，被後台清成空字串的代價（客人不知道要帶錢去現場）比彈性貴。
+ * 同一組字也用在結帳頁與完成頁（各自一份，見那兩支 route 的 PAGE）。
+ */
+export const ONSITE_PAYMENT_COPY = {
+  subject: {
+    zh: "報名已成立：訂單 {orderNo}（請於活動當天至現場繳費）",
+    en: "Registration confirmed: order {orderNo} (please pay at the venue on the day)",
+    ja: "お申し込みを承りました：ご注文 {orderNo}（当日現地にてお支払いください）",
+  },
+  heading: {
+    zh: "報名已成立，請於活動當天至現場繳費",
+    en: "You're registered — please pay at the venue on the day",
+    ja: "お申し込みを承りました。当日、会場にてお支払いください",
+  },
+  intro: {
+    zh: "{customerName} 你好，你的名額已經保留。這張訂單選擇的是現場付款：請於活動當天至現場繳費，金額與活動時間地點如下。",
+    en: "Hi {customerName}, your place is held. You chose to pay at the venue: please pay on the day of the event. The amount, time and place are below.",
+    ja: "{customerName} 様、お席をお取り置きしました。お支払い方法は当日現地払いです。イベント当日に会場にてお支払いください。金額・日時・場所は以下のとおりです。",
+  },
+  outro: {
+    zh: "無法出席請提早告訴我們，讓名額留給其他人。",
+    en: "If you can no longer come, please let us know in advance so the place can go to someone else.",
+    ja: "ご参加いただけなくなった場合は、お早めにご連絡ください。お席を他の方にお譲りいたします。",
+  },
+} satisfies Record<string, Localized>;
+
 export type AdminOrderNotificationInput = {
   orderNo: string;
   total: number;
@@ -371,6 +417,15 @@ const LABELS: Record<string, Localized> = {
   remittanceDue: { zh: "匯款期限", en: "Transfer by", ja: "お振込期限" },
   remittanceAccount: { zh: "匯款帳戶", en: "Bank account", ja: "お振込先" },
   remittanceContact: { zh: "專人聯繫", en: "Payment help", ja: "担当者からのご連絡" },
+  // 現場付款（0056）
+  onsiteAmount: { zh: "現場應付金額", en: "Amount due at the venue", ja: "当日のお支払い金額" },
+  onsiteHow: { zh: "付款方式", en: "Payment", ja: "お支払い方法" },
+  onsiteHowValue: {
+    zh: "現場付款（請於活動當天至現場繳費）",
+    en: "Pay at the venue (on the day of the event)",
+    ja: "当日現地払い（イベント当日に会場でお支払い）",
+  },
+  onsiteOrderLink: { zh: "查看訂單", en: "View your order", ja: "ご注文を確認する" },
   remittanceReportLink: {
     zh: "匯款後請回訂單頁填寫帳號末五碼",
     en: "After transferring, tell us your last five digits",
@@ -401,6 +456,8 @@ const PAYMENT_METHOD_LABEL_ZH: Record<string, string> = {
   //         自動核帳；'transfer' 是客人匯到店家的固定帳戶、人工對帳。店家看到
   //         這兩個字要能立刻知道「這張單要不要我自己去看銀行對帳單」。
   transfer: "匯款（人工對帳）",
+  // 0056：活動當天在店裡收錢，店員在後台按「標記已收款」。
+  onsite: "現場付款",
 };
 
 const SHIPPING_METHOD_LABEL_ZH: Record<string, string> = {
@@ -851,6 +908,46 @@ export function renderRemittanceEmail(
 }
 
 /**
+ * 現場付款確認信（0056）。見 OnsitePaymentEmailInput。**不含任何匯款帳號。**
+ */
+export function renderOnsitePaymentEmail(
+  input: OnsitePaymentEmailInput,
+  copy: EmailCopy | undefined,
+  lang: Lang,
+): RenderedEmail {
+  const vars = { orderNo: input.orderNo, customerName: input.customerName };
+
+  const itemLines = input.items
+    .map((it) => `${pick(it.name, lang)} × ${it.quantity}　${formatMoney(it.subtotal)}`)
+    .join("\n");
+
+  const rows: Row[] = [
+    { label: pick(LABELS.orderNo, lang), value: input.orderNo },
+    { label: pick(LABELS.onsiteAmount, lang), value: formatMoney(input.total) },
+    { label: pick(LABELS.onsiteHow, lang), value: pick(LABELS.onsiteHowValue, lang) },
+  ];
+  if (itemLines) rows.push({ label: pick(LABELS.items, lang), value: itemLines });
+
+  const { text, html } = layout({
+    heading: fill(pick(ONSITE_PAYMENT_COPY.heading, lang), vars),
+    intro: fill(pick(ONSITE_PAYMENT_COPY.intro, lang), vars),
+    rows,
+    blocks: input.sessions.map((s) => ({
+      title: pick(LABELS.sessionTitle, lang),
+      rows: sessionRows(s, lang),
+    })),
+    link: input.orderUrl
+      ? { label: pick(LABELS.onsiteOrderLink, lang), url: input.orderUrl }
+      : undefined,
+    outro: pick(ONSITE_PAYMENT_COPY.outro, lang),
+    signature: copyText(copy, "common.signature", lang),
+    footerNote: copyText(copy, "common.footerNote", lang),
+  });
+
+  return { subject: fill(pick(ONSITE_PAYMENT_COPY.subject, lang), vars), text, html };
+}
+
+/**
  * 報名成功（寄給**每一位**參加者，不是訂購人）。
  * dedupe_key = `registration_ticket:<registration_id>`。
  */
@@ -973,6 +1070,9 @@ export function renderAdminOrderNotificationEmail(
       : "有新的訂單";
   const buyerName = subjectSafe(contact?.customerName ?? "");
   const needsContact = input.needsContact === true;
+  // 0056：現場付款——客人活動當天才到店裡付錢。店家要在主旨就看得出來，免得去追一筆
+  // 本來就不會在活動前進來的款。
+  const onsite = input.paymentMethod === "onsite";
   const phoneOrder = input.phoneOrder ?? null;
   const subject =
     (placed
@@ -980,6 +1080,7 @@ export function renderAdminOrderNotificationEmail(
       : `【小時光風土誌書店】新訂單 ${input.orderNo}`) +
     (phoneOrder ? `｜${ADMIN_PHONE_ORDER_LABEL}` : "") +
     (needsContact ? "｜需聯繫" : "") +
+    (onsite && placed ? `｜${ADMIN_ONSITE_LABEL}` : "") +
     (buyerName ? `｜${buyerName}` : "") +
     `｜${formatMoney(input.total)}`;
 
@@ -1043,9 +1144,11 @@ export function renderAdminOrderNotificationEmail(
     // ⚠️ 純文字，不要用 **粗體** 這類 markdown —— layout() 會把它逐字跳脫之後印出來
     //    （信裡就會出現兩個星號），它沒有 markdown 轉換那一步。
     intro: placed
-      ? needsContact
-        ? "後台收到一筆新訂單，款項尚未入帳，客人需要專人聯繫協助付款。品項與座位已經先保留起來。"
-        : "後台收到一筆新訂單，款項尚未入帳。品項與座位已經先保留起來。"
+      ? onsite
+        ? "後台收到一筆活動報名，客人選擇現場付款：活動當天到店裡繳費。座位已經先保留起來，這張單不會被逾時自動取消。"
+        : needsContact
+          ? "後台收到一筆新訂單，款項尚未入帳，客人需要專人聯繫協助付款。品項與座位已經先保留起來。"
+          : "後台收到一筆新訂單，款項尚未入帳。品項與座位已經先保留起來。"
       : "後台收到一筆新訂單，摘要如下。",
     leadBlocks,
     rows,
@@ -1062,7 +1165,9 @@ export function renderAdminOrderNotificationEmail(
     })),
     link: input.adminUrl ? { label: "到後台查看這張訂單", url: input.adminUrl } : undefined,
     outro: placed
-      ? "收到款項之後，請到後台把這張訂單標記為已付款——標記之後才會寄出付款成功信與報名成功信，發票也才會開立。"
+      ? onsite
+        ? "活動當天在現場收到款項之後，請到後台（訂單或報名名單）把這張訂單標記為已付款——標記之後才會寄出付款成功信與報名成功信，發票也才會開立。"
+        : "收到款項之後，請到後台把這張訂單標記為已付款——標記之後才會寄出付款成功信與報名成功信，發票也才會開立。"
       : input.adminUrl
         ? ""
         : "完整資料請登入後台「訂單」查看。",
@@ -1072,6 +1177,9 @@ export function renderAdminOrderNotificationEmail(
 
   return { subject, text, html };
 }
+
+/** 0056：現場付款的標籤。與 src/lib/admin/order-labels.ts 的 ONSITE_LABEL 同字。 */
+export const ADMIN_ONSITE_LABEL = "現場付款";
 
 /** 0050：後台電話報名的標籤。主旨、店家信內文、後台列表共用這幾個字。 */
 export const ADMIN_PHONE_ORDER_LABEL = "後台電話報名";
