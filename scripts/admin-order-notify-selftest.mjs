@@ -244,7 +244,9 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 0051（電話報名聯絡資料放寬）已審：event_registrations_contactable 由 CHECK 換成同名觸發器，web 訂單照舊擋、只有 source='admin_phone' 放行；orders 只多兩條限定 admin_phone 的 CHECK 與新表 order_contact_edit_log／RPC admin_update_phone_order_contacts。前台訂單、reserve_session_seat、enqueue_*、expire_unpaid_orders、金流／發票函式一個字沒動，這支守的不變式原樣成立。
   // 0056（現場付款）重審：CHECK 只多一個值 onsite、expire_unpaid_orders 候選條件只多一行
   // payment_method is distinct from 'onsite'，本體其餘逐字沿用 0050——這支的斷言照樣成立。
-  reviewedThrough: "0056_onsite_payment.sql",
+  // 0058 重審：admin_event_roster 的 on_roster 多收「現場付款且未取消」、最後加 onsite_unpaid／
+  // order_total 兩欄；既有欄位與其他付款方式的語意不變——這支的斷言照樣成立。
+  reviewedThrough: "0058_roster_includes_onsite_unpaid.sql",
 });
 
 // =============================================================================

@@ -99,7 +99,7 @@ export function showNeedsContact(o: {
  * 「標記已收款」的按鈕也只對這些列出現。已付清的單仍印付款方式「現場付款」，只是不亮標示。
  */
 export const ONSITE_LABEL = "現場付款";
-export const ONSITE_UNPAID_LABEL = "現場付款・未收款";
+export const ONSITE_UNPAID_LABEL = "未收款（現場付款）";
 export function isOnsiteOrder(o: { payment_method: string | null }): boolean {
   return o.payment_method === "onsite";
 }

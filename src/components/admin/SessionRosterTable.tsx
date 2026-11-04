@@ -61,6 +61,8 @@ type Props = {
 
 /** 0056：這一列要不要標「現場付款・未收款」。 */
 function rowOnsiteUnpaid(r: RosterRow): boolean {
+  // 0058：view 的 onsite_unpaid 是第一來源；訂單層那三欄是同一件事的備援（讀不到 view 欄位時）。
+  if (r.onsite_unpaid) return true;
   return showOnsiteUnpaid({
     payment_method: r.payment_method,
     payment_status: r.payment_status,

@@ -312,6 +312,8 @@ async function queueWithClaim(orderId: string): Promise<NotifyOutcome> {
           seatNo: row.seat_no,
           orderNo: row.order_no,
           session,
+          // 0058：付款成功之後這條路的 onsite_unpaid 恆為 false；寫在這裡是讓兩條路同一個規則。
+          onsiteDue: row.onsite_unpaid ? row.order_total : null,
         },
         copy,
         lang,
@@ -500,6 +502,46 @@ export async function queueOrderPlacedNotifications(orderId: string): Promise<No
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         console.error(`[notify] 現場付款確認信排入失敗 order=${order.orderNo} ${message}`);
+      }
+    }
+
+    // ---- 1c. 0058：現場付款的每一位參加者，下單當下就寄報名成功信 ----------------
+    // 一般訂單的報名成功信在付款成功之後才寄（queueWithClaim 第 2 步）；現場付款的錢要等
+    // 活動當天，但人一定會來，所以現在就寄，信裡加「尚未付款，請於當天現場繳費 NT$x」。
+    // 名單用同一支 loadPaidRosterByOrder()（on_roster，0058 起包含現場付款未取消）；dedupe_key
+    // 與付款成功那條路相同（registration_ticket:<id>），店員標記已收款之後不會再寄一次。
+    if (isOnsite && notifyCustomer && sessionIds.length > 0) {
+      try {
+        const copy = await loadEmailCopy();
+        const roster = await loadPaidRosterByOrder(orderId);
+        const mails: RegistrationMailItem[] = [];
+        for (const row of roster) {
+          if (!row.has_email) continue;
+          const session = sessions.get(row.session_id);
+          if (!session) continue;
+          const mail = renderRegistrationTicketEmail(
+            {
+              participantName: row.name,
+              seatNo: row.seat_no,
+              orderNo: row.order_no,
+              session,
+              onsiteDue: row.onsite_unpaid ? row.order_total : null,
+            },
+            copy,
+            order.locale,
+          );
+          mails.push({
+            registrationId: row.registration_id,
+            dedupeKey: dedupeKeys.registrationTicket(row.registration_id),
+            subject: mail.subject,
+            text: mail.text,
+            html: mail.html,
+          });
+        }
+        queued += await enqueueRegistrationEmails(mails);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[notify] 現場付款報名成功信排入失敗 order=${order.orderNo} ${message}`);
       }
     }
 
@@ -933,6 +975,9 @@ export async function runSessionReminders(
               seatNo: row.seat_no,
               orderNo: row.order_no,
               session: brief,
+              // 0058：現場付款、還沒付錢的人也收提醒（loadPaidRoster 讀 on_roster），信裡多一句
+              // 「尚未付款，請於當天現場繳費 NT$x」。
+              onsiteDue: row.onsite_unpaid ? row.order_total : null,
             },
             copy,
             lang,

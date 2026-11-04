@@ -52,6 +52,9 @@ function formatTaipei(iso: string | null, withTime = true): string {
  * 順序就是現場點名的順序：先看是誰（座位、姓名），再看聯絡得上聯絡不上（電話、
  * Email），最後才是對帳用的（訂單、付款時間、注意事項）。
  */
+/** 0058：CSV 上「現場付款、還沒付錢」的標示（與後台名單頁同字）。 */
+export const ONSITE_UNPAID_CSV_LABEL = "未收款（現場付款）";
+
 export const ROSTER_CSV_COLUMNS: CsvColumn<RosterExportRow>[] = [
   { header: "座位", value: (row) => row.seat_no },
   // 姓名是使用者輸入 —— csvCell() 會把 = + - @ 開頭的值前置單引號擋掉公式執行。
@@ -62,7 +65,11 @@ export const ROSTER_CSV_COLUMNS: CsvColumn<RosterExportRow>[] = [
   { header: "Email", value: (row) => row.email ?? "" },
   // 訂單編號 IB-202600000001 會被 Excel 猜成運算式，同樣強制文字。
   { header: "訂單編號", value: (row) => row.order_no, forceText: true },
-  { header: "付款時間", value: (row) => formatTaipei(row.paid_at) },
+  // 0058：現場付款、還沒付錢的人也在簽到表上——付款時間那一欄標出來，現場才知道要收錢。
+  {
+    header: "付款時間",
+    value: (row) => (row.onsite_unpaid ? ONSITE_UNPAID_CSV_LABEL : formatTaipei(row.paid_at)),
+  },
   // 空白＝這一位沒有同意紀錄（0020 回填的舊訂單就是這樣）。不要寫成「否」——
   // 「沒有紀錄」與「按了不同意」是兩件事，而後者根本送不出訂單。
   { header: "注意事項同意時間", value: (row) => formatTaipei(row.notice_ack_at) },

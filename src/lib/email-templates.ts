@@ -125,7 +125,35 @@ export type RegistrationEmailInput = {
   seatNo: number;
   orderNo: string;
   session: SessionBrief;
+  /**
+   * 0058：現場付款、還沒付錢——當天要在現場繳的金額（訂單總額）。有值時信裡多一列
+   * 「尚未付款，請於當天現場繳費 NT$x」。不傳／null＝已付款，信與 0058 之前逐字相同。
+   */
+  onsiteDue?: number | null;
 };
+
+/** 0058：報名成功信／行前提醒信上的繳費提醒（現場付款、還沒付錢的人）。{amount} = NT$x。 */
+export const ONSITE_DUE_NOTE: Localized = {
+  zh: "尚未付款，請於當天現場繳費 {amount}",
+  en: "Not yet paid — please pay {amount} at the venue on the day",
+  ja: "お支払いはまだです。当日、会場にて {amount} をお支払いください",
+};
+
+/** 0058：報名信的列。onsiteDue 有值才多一列繳費提醒（緊接在訂單編號之後）。 */
+function registrationRows(input: RegistrationEmailInput, lang: Lang): Row[] {
+  const rows: Row[] = [
+    { label: pick(LABELS.attendee, lang), value: input.participantName },
+    { label: pick(LABELS.seatNo, lang), value: String(input.seatNo) },
+    { label: pick(LABELS.orderNo, lang), value: input.orderNo },
+  ];
+  if (typeof input.onsiteDue === "number") {
+    rows.push({
+      label: pick(LABELS.onsiteHow, lang),
+      value: fill(pick(ONSITE_DUE_NOTE, lang), { amount: formatMoney(input.onsiteDue) }),
+    });
+  }
+  return rows;
+}
 
 /**
  * 店家通知信上「這是誰的單」那一區（業主 2026-10 要求：一眼看出是誰的訂單）。
@@ -965,11 +993,7 @@ export function renderRegistrationTicketEmail(
   const { text, html } = layout({
     heading: fill(copyText(copy, "registration_ticket.heading", lang), vars),
     intro: fill(copyText(copy, "registration_ticket.intro", lang), vars),
-    rows: [
-      { label: pick(LABELS.attendee, lang), value: input.participantName },
-      { label: pick(LABELS.seatNo, lang), value: String(input.seatNo) },
-      { label: pick(LABELS.orderNo, lang), value: input.orderNo },
-    ],
+    rows: registrationRows(input, lang),
     blocks: [{ title: pick(LABELS.sessionTitle, lang), rows: sessionRows(input.session, lang) }],
     outro: copyText(copy, "registration_ticket.outro", lang),
     signature: copyText(copy, "common.signature", lang),
@@ -1001,11 +1025,7 @@ export function renderSessionReminderEmail(
   const { text, html } = layout({
     heading: fill(copyText(copy, "session_reminder.heading", lang), vars),
     intro: fill(copyText(copy, "session_reminder.intro", lang), vars),
-    rows: [
-      { label: pick(LABELS.attendee, lang), value: input.participantName },
-      { label: pick(LABELS.seatNo, lang), value: String(input.seatNo) },
-      { label: pick(LABELS.orderNo, lang), value: input.orderNo },
-    ],
+    rows: registrationRows(input, lang),
     blocks: [{ title: pick(LABELS.sessionTitle, lang), rows: sessionRows(input.session, lang) }],
     outro: copyText(copy, "session_reminder.outro", lang),
     signature: copyText(copy, "common.signature", lang),

@@ -417,7 +417,9 @@ assertMigrationDependencies(check, MIG_DIR, {
   // payment_method is distinct from 'onsite'，本體其餘逐字沿用 0050——這支的斷言照樣成立。
   // 0057 重審：只換 staff_permissions 的 CHECK 值域（多一個 event.onsite.collect），沒有碰訂單、
   // 名單、場次或庫存的任何表或函式。
-  reviewedThrough: "0057_staff_onsite_collect_permission.sql",
+  // 0058 重審：admin_event_roster 的 on_roster 多收「現場付款且未取消」、最後加 onsite_unpaid／
+  // order_total 兩欄；既有欄位與其他付款方式的語意不變——這支的斷言照樣成立。
+  reviewedThrough: "0058_roster_includes_onsite_unpaid.sql",
 });
 // 這一期不准動到既有的 0001–0020，所以它們也必須都還在。
 for (let n = 1; n <= 20; n += 1) {
@@ -1167,7 +1169,8 @@ check(
 );
 checkTrue(
   "countRegistrationsBySession 也讀 on_roster（不是自己再判斷一次付款狀態）",
-  /select\("session_id, on_roster"\)/.test(regRepoTs),
+  // 0058：多讀 view 的 onsite_unpaid（「已付款數」不算現場付款未收款），兩欄都是 view 上的定義。
+  /select\("session_id, on_roster(, onsite_unpaid)?"\)/.test(regRepoTs),
 );
 
 // ── 「誰在簽到表上」在整個 src/ 裡只定義一次 ──────────────────────────────

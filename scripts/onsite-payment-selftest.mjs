@@ -168,6 +168,11 @@ class ShimQuery {
     this.limitN = n;
     return this;
   }
+  range(from, to) {
+    this.offsetN = from;
+    this.limitN = to - from + 1;
+    return this;
+  }
   maybeSingle() {
     this.wantSingle = true;
     return this;
@@ -200,7 +205,8 @@ class ShimQuery {
     const order = this.orderBy.length ? ` order by ${this.orderBy.join(", ")}` : "";
     const limit =
       this.limitN !== null ? ` limit ${this.limitN}` : this.wantSingle ? " limit 2" : "";
-    return `select ${this.cols ?? "*"} from ${t}${where}${order}${limit}`;
+    const offset = this.offsetN ? ` offset ${this.offsetN}` : "";
+    return `select ${this.cols ?? "*"} from ${t}${where}${order}${limit}${offset}`;
   }
   async run() {
     if (!STATE.runSql) throw new Error("shim 還沒接上資料庫");
@@ -310,7 +316,7 @@ assertLedgerDeclarationsHonest(check, MIG_DIR);
 assertMigrationDependencies(check, MIG_DIR, {
   suite: "onsite-payment-selftest",
   dependsOn: ["orders_payments", "order_expiry", "event_registrations", "session_seats"],
-  reviewedThrough: "0056_onsite_payment.sql",
+  reviewedThrough: "0058_roster_includes_onsite_unpaid.sql",
 });
 
 // =============================================================================
@@ -749,6 +755,62 @@ console.log("\n[6b] 0057：門市人員只能標記「現場付款」的訂單")
 }
 
 // =============================================================================
+console.log("\n[6c] 0058：現場付款未收款的人在簽到表上、收得到報名信與提醒信");
+{
+  const sql0058 = stripSqlComments(
+    readFile(join(MIG_DIR, "0058_roster_includes_onsite_unpaid.sql")),
+  );
+  checkTrue(
+    "🔴 on_roster = 已付款 或（onsite 且未取消）",
+    /\(o\.payment_status = 'paid'\s*or \(o\.payment_method = 'onsite' and o\.status = 'pending'\)\) as on_roster/.test(
+      sql0058,
+    ),
+  );
+  checkTrue(
+    "新欄位 onsite_unpaid／order_total 加在最後面",
+    /as on_roster,\s*\(o\.payment_method = 'onsite'[\s\S]{0,120}as onsite_unpaid,\s*o\.total\s+as order_total\s*from public\.event_registrations r/.test(
+      sql0058,
+    ),
+  );
+  checkTrue(
+    "只 grant service_role",
+    /grant\s+select on public\.admin_event_roster to service_role;/.test(sql0058),
+  );
+  for (const lang of ["zh", "en", "ja"]) {
+    const base = { participantName: "甲", seatNo: 1, orderNo: "IB-1", session: SESSION_BRIEF };
+    const t = tpl.renderRegistrationTicketEmail({ ...base, onsiteDue: 1200 }, {}, lang);
+    const r = tpl.renderSessionReminderEmail({ ...base, onsiteDue: 1200 }, {}, lang);
+    const note = {
+      zh: "尚未付款，請於當天現場繳費 NT$1,200",
+      en: "Not yet paid",
+      ja: "お支払いはまだです",
+    }[lang];
+    checkTrue(
+      `${lang}：報名成功信有繳費提醒＋金額`,
+      t.text.includes(note) && t.text.includes("1,200"),
+    );
+    checkTrue(
+      `${lang}：行前提醒信有繳費提醒＋金額`,
+      r.text.includes(note) && r.text.includes("1,200"),
+    );
+    const paid = tpl.renderRegistrationTicketEmail(base, {}, lang);
+    checkFalse(`${lang}：已付款（不帶 onsiteDue）的信沒有這一句`, paid.text.includes(note));
+  }
+  const csvLib = await import(pathToFileURL(join(ROOT, "src/lib/admin/roster-csv.ts")).href);
+  const payCol = csvLib.ROSTER_CSV_COLUMNS.find((c) => c.header === "付款時間");
+  check(
+    "CSV：現場付款未收款 → 付款時間欄印「未收款（現場付款）」",
+    payCol.value({ onsite_unpaid: true, paid_at: null }),
+    "未收款（現場付款）",
+  );
+  checkTrue(
+    "CSV：已付款照印時間",
+    /2026/.test(payCol.value({ onsite_unpaid: false, paid_at: "2026-12-01T02:00:00Z" })),
+  );
+  check("名單頁標示文字", labels.ONSITE_UNPAID_LABEL, "未收款（現場付款）");
+}
+
+// =============================================================================
 // [7–10] 連線段
 // =============================================================================
 async function q(sql, returning = true) {
@@ -972,6 +1034,39 @@ if (!PG_URL) {
         null,
       );
     }
+    {
+      // 0058：報名成功信在下單當下就排了（每位參加者一封），信裡有繳費提醒。
+      const tickets = await must(
+        `select e.body_text bt from public.email_outbox e
+          where e.dedupe_key in (select 'registration_ticket:' || r.id from public.event_registrations r
+                                  where r.order_id = '${row.id}')`,
+      );
+      check("0058：兩位參加者各排了一封報名成功信", tickets.length, 2);
+      checkTrue(
+        "0058：報名成功信寫「尚未付款，請於當天現場繳費 NT$1,200」",
+        tickets.length === 2 &&
+          tickets.every((t) => t.bt.includes("尚未付款，請於當天現場繳費 NT$1,200")),
+      );
+      const v = await must(
+        `select on_roster, onsite_unpaid, order_total from public.admin_event_roster where order_id = '${row.id}'`,
+      );
+      checkTrue(
+        "0058：view 上這兩位 on_roster = true、onsite_unpaid = true",
+        v.length === 2 && v.every((x) => x.on_roster && x.onsite_unpaid),
+      );
+      const regs = await import(
+        pathToFileURL(join(ROOT, "src/server/repos/event-registrations.ts")).href
+      );
+      const exp = await regs.loadRosterExport(S1);
+      const mine = exp.rows.filter((r) => r.order_no === placed.orderNo);
+      check("0058：CSV 匯出包含這兩位", mine.length, 2);
+      checkTrue(
+        "   而且標 onsite_unpaid",
+        mine.length === 2 && mine.every((r) => r.onsite_unpaid === true),
+      );
+      const counts = await regs.countRegistrationsBySession();
+      check("0058：場次的「已付款數」不把現場付款未收款算進去", counts[S1]?.paid ?? 0, 0);
+    }
 
     console.log("\n[8b] 商品不行、免費票不受影響、對照組");
     {
@@ -1031,6 +1126,51 @@ if (!PG_URL) {
       STATE.gatewayCalls.length = 0;
       await orders.createOrder(payload("card", "card", [evItem(1, ["戊"])]));
       checkTrue("對照組：刷卡下單有碰金流模組", STATE.gatewayCalls.length > 0);
+    }
+
+    console.log("\n[8c] 0058：行前提醒信——現場付款未收款的人收得到，匯款未付款的人照舊收不到");
+    {
+      const SOON = "dddd0000-0000-4000-8000-000000000058";
+      await must(
+        `insert into public.event_sessions (id, product_id, title, location, starts_at, capacity, status)
+         values ('${SOON}','${EV}', ${LOC}, ${LOC}, now() + interval '20 hours', 10, 'open');`,
+        false,
+      );
+      const soonItem = (n) => ({
+        productId: EV,
+        quantity: 1,
+        sessionId: SOON,
+        participants: [person(n)],
+      });
+      const os = await orders.createOrder(payload("remind-onsite", "onsite", [soonItem("辛")]));
+      await orders.createOrder(payload("remind-transfer", "transfer", [soonItem("壬")]));
+      const rem = await notify.runSessionReminders();
+      checkTrue("提醒排程跑到這個場次", rem.sessions >= 1);
+      const rmails = await must(
+        `select r.name n, e.body_text bt from public.email_outbox e
+           join public.event_registrations r on e.dedupe_key = 'session_reminder:${SOON}:' || r.id`,
+      );
+      check(
+        "只有現場付款那一位收到提醒（匯款未付款的不包含）",
+        rmails.map((m) => m.n).join(","),
+        "辛",
+      );
+      checkTrue(
+        "提醒信有「尚未付款，請於當天現場繳費 NT$600」",
+        (rmails[0]?.bt ?? "").includes("尚未付款，請於當天現場繳費 NT$600"),
+      );
+      const regs2 = await import(
+        pathToFileURL(join(ROOT, "src/server/repos/event-registrations.ts")).href
+      );
+      check(
+        "匯款未付款的那一位不在 CSV 匯出（只有現場付款那張單）",
+        (await regs2.loadRosterExport(SOON)).rows.map((r) => r.order_no).join(","),
+        os.orderNo,
+      );
+      await must(
+        `delete from public.email_outbox where dedupe_key like 'session_reminder:${SOON}:%';`,
+        false,
+      );
     }
 
     console.log("\n[9] 🔴 expire_unpaid_orders：現場付款不被逾時取消");

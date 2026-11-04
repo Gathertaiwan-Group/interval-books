@@ -204,7 +204,9 @@ assertMigrationDependencies(check, MIG_DIR, {
   // payment_method is distinct from 'onsite'，本體其餘逐字沿用 0050——這支的斷言照樣成立。
   // 0057 重審：只換 staff_permissions 的 CHECK 值域（多一個 event.onsite.collect），沒有碰訂單、
   // 名單、場次或庫存的任何表或函式。
-  reviewedThrough: "0057_staff_onsite_collect_permission.sql",
+  // 0058 重審：admin_event_roster 的 on_roster 多收「現場付款且未取消」、最後加 onsite_unpaid／
+  // order_total 兩欄；既有欄位與其他付款方式的語意不變——這支的斷言照樣成立。
+  reviewedThrough: "0058_roster_includes_onsite_unpaid.sql",
 });
 
 // =============================================================================

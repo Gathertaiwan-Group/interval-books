@@ -413,7 +413,9 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 本體的場次段逐字沿用，seats_taken 一個字沒動）。本檔的斷言逐條重跑全綠，原樣成立。
   // 0056（現場付款）重審：CHECK 只多一個值 onsite、expire_unpaid_orders 候選條件只多一行
   // payment_method is distinct from 'onsite'，本體其餘逐字沿用 0050——這支的斷言照樣成立。
-  reviewedThrough: "0056_onsite_payment.sql",
+  // 0058 重審：admin_event_roster 的 on_roster 多收「現場付款且未取消」、最後加 onsite_unpaid／
+  // order_total 兩欄；既有欄位與其他付款方式的語意不變——這支的斷言照樣成立。
+  reviewedThrough: "0058_roster_includes_onsite_unpaid.sql",
 });
 for (const f of [
   "0004_commerce_products.sql",

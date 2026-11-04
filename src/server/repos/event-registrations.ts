@@ -82,7 +82,7 @@ import type { AdminOrderAttendee } from "@/lib/email-templates";
  * 從這裡讀；明文 email／phone 另外從 event_registrations 讀（見 listSessionRoster）。
  */
 const ROSTER_COLUMNS =
-  "registration_id, session_id, order_id, order_item_id, seat_no, name, email_masked, phone_masked, has_email, has_phone, notice_ack_at, created_at, order_no, payment_status, paid_at, on_roster";
+  "registration_id, session_id, order_id, order_item_id, seat_no, name, email_masked, phone_masked, has_email, has_phone, notice_ack_at, created_at, order_no, payment_status, paid_at, on_roster, onsite_unpaid, order_total";
 
 /** view 的一列（遮罩值）。只在這個檔案內部用；loadPaidRoster*() 回這個形狀。 */
 export type RosterViewRow = {
@@ -102,6 +102,10 @@ export type RosterViewRow = {
   payment_status: string;
   paid_at: string | null;
   on_roster: boolean;
+  /** 0058：現場付款、還沒付錢（但在簽到表上）。 */
+  onsite_unpaid: boolean;
+  /** 0058：所屬訂單的總額（信裡「請於當天現場繳費 NT$x」）。 */
+  order_total: number;
 };
 
 /** 名單頁看得到的一列。**email／phone 是明文**（業主 2026-10-25；2026-10-26 起不寫紀錄）。 */
@@ -124,8 +128,10 @@ export type RegistrationRosterRow = {
   order_no: string;
   payment_status: string;
   paid_at: string | null;
-  /** 「這一列算不算在簽到表上」的唯一定義（0021 §3）。 */
+  /** 「這一列算不算在簽到表上」的唯一定義（0021 §3；0058 起含現場付款未收款）。 */
   on_roster: boolean;
+  /** 0058：在簽到表上但還沒付錢（現場付款）。畫面標「未收款（現場付款）」。 */
+  onsite_unpaid: boolean;
   /**
    * 0056：所屬訂單的 payment_method、status 與 total（另一句從 orders 讀，view 不動）。
    * 名單頁用它標「現場付款・未收款」、並在那一列給「標記已收款」。讀不到時是 null／0，
@@ -147,6 +153,8 @@ export type RosterExportRow = {
   order_no: string;
   paid_at: string | null;
   created_at: string;
+  /** 0058：現場付款、還沒付錢。CSV 的「付款時間」那一欄印「未收款（現場付款）」。 */
+  onsite_unpaid: boolean;
 };
 
 /** loadRosterExport() 的整包回傳。 */
@@ -249,6 +257,7 @@ export async function listSessionRoster(sessionId: string): Promise<Registration
       payment_status: v.payment_status,
       paid_at: v.paid_at,
       on_roster: v.on_roster,
+      onsite_unpaid: v.onsite_unpaid === true,
       payment_method: oi?.payment_method ?? null,
       order_status: oi?.status ?? null,
       order_total: oi?.total ?? 0,
@@ -417,23 +426,25 @@ export async function countRegistrationsBySession(): Promise<
   // ⚠️ 整張 view 一次讀會被 PostgREST 的 db-max-rows（1000）靜默截斷（2026-11-03 審查）：
   //    依 registration_id 分段讀完。
   // readAllPages 的錯誤訊息只帶 code＋message（不帶 DETAIL 那一列客人資料）。
-  const rows: { session_id: string; on_roster: boolean }[] = await readAllPages(
-    (from, to) =>
-      supabaseAdmin()
-        .from("admin_event_roster")
-        .select("session_id, on_roster")
-        .order("registration_id", { ascending: true })
-        .range(from, to) as unknown as PromiseLike<{
-        data: { session_id: string; on_roster: boolean }[] | null;
-        error: { code?: string; message: string } | null;
-      }>,
-    { label: "[repo/event-registrations] count" },
-  );
+  const rows: { session_id: string; on_roster: boolean; onsite_unpaid: boolean }[] =
+    await readAllPages(
+      (from, to) =>
+        supabaseAdmin()
+          .from("admin_event_roster")
+          .select("session_id, on_roster, onsite_unpaid")
+          .order("registration_id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{
+          data: { session_id: string; on_roster: boolean; onsite_unpaid: boolean }[] | null;
+          error: { code?: string; message: string } | null;
+        }>,
+      { label: "[repo/event-registrations] count" },
+    );
   const counts: Record<string, { total: number; paid: number }> = {};
   for (const r of rows) {
     const entry = (counts[r.session_id] ??= { total: 0, paid: 0 });
     entry.total += 1;
-    if (r.on_roster) entry.paid += 1;
+    // 0058：on_roster 起包含「現場付款、還沒付錢」的人——「已付款」只數真的付了的。
+    if (r.on_roster && !r.onsite_unpaid) entry.paid += 1;
   }
   return counts;
 }
@@ -458,7 +469,9 @@ export async function loadRosterExport(sessionId: string): Promise<RosterExport>
       .maybeSingle(),
     db
       .from("admin_event_roster")
-      .select("registration_id, seat_no, notice_ack_at, order_no, paid_at, created_at")
+      .select(
+        "registration_id, seat_no, notice_ack_at, order_no, paid_at, created_at, onsite_unpaid",
+      )
       .eq("session_id", sessionId)
       .eq("on_roster", true)
       .order("created_at", { ascending: true })
@@ -505,6 +518,7 @@ export async function loadRosterExport(sessionId: string): Promise<RosterExport>
     order_no: string;
     paid_at: string | null;
     created_at: string;
+    onsite_unpaid: boolean | null;
   }[]) {
     // SQL 版是 inner join：event_registrations 沒有對應的列就不出現。
     const p = plain.get(v.registration_id);
@@ -519,6 +533,7 @@ export async function loadRosterExport(sessionId: string): Promise<RosterExport>
       order_no: v.order_no,
       paid_at: v.paid_at,
       created_at: v.created_at,
+      onsite_unpaid: v.onsite_unpaid === true,
     });
   }
 

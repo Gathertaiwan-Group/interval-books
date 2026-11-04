@@ -921,6 +921,14 @@ export const MIGRATION_LEDGER = Object.freeze([
     // inventory（CHECK 值域逐字沿用的 approve_* 那幾種權限名）。
     touches: ["admin_auth", "inventory"],
   },
+  {
+    file: "0058_roster_includes_onsite_unpaid.sql",
+    note: "現場付款未收款的人也在簽到表上：admin_event_roster 以 create or replace view 重建（欄位、順序、型別與 0021 相同，security_invoker = false 照舊），on_roster 改成 payment_status = 'paid' 或（payment_method = 'onsite' 且 status = 'pending'）；最後面加 onsite_unpaid（onsite、pending、未付）與 order_total。名單頁、CSV、提醒信（loadPaidRoster）、報名成功信（enqueue_registration_emails 的 join）全部讀這一欄，一起生效。comment on column ×3，重申只 grant service_role。沒有碰任何函式",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：roster_pii（admin_event_roster、
+    // on_roster）、event_registrations（from 子句）、orders_payments（join public.orders）、
+    // inventory（逐字沿用的 inv.mask_email／inv.mask_tail）。
+    touches: ["event_registrations", "inventory", "orders_payments", "roster_pii"],
+  },
 ]);
 
 /**
