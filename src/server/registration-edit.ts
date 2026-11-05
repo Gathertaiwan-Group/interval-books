@@ -9,9 +9,11 @@
  */
 import "@tanstack/react-start/server-only";
 import {
+  contactFormatErrors,
   contactRequiredError,
   diffParticipantContact,
   normalizeParticipantContact,
+  sameParticipantContact,
   type ParticipantContact,
   type ParticipantDiff,
 } from "@/lib/admin/registration-edit";
@@ -25,7 +27,11 @@ export type RegistrationEditPlan =
       after: ParticipantContact;
       changes: ParticipantDiff;
     }
-  | { ok: false; reason: "not_found" | "wrong_session" | "contact_required"; message: string };
+  | {
+      ok: false;
+      reason: "not_found" | "wrong_session" | "stale" | "invalid" | "contact_required";
+      message: string;
+    };
 
 export const REGISTRATION_EDIT_ERROR_TEXT = {
   not_found: "找不到這位參加者，可能已經被移除。請重新整理名單。",
@@ -36,10 +42,15 @@ export const REGISTRATION_EDIT_ERROR_TEXT = {
 /**
  * patch 只給要改的欄位（MCP）或三欄全給（後台）。email／phone 給空字串＝清空。
  * sessionId 有給就要對得上（防止拿 A 場次的頁面改到 B 場次的人）。
+ *
+ * expected＝呼叫端「看到的原值」（後台：打開 Dialog 時；MCP：預覽回傳的 expected）。有給就
+ * 先跟資料庫現值比，對不上＝別人在這之間改過 → stale，不會把別人改的欄位蓋回去。
+ * 寫入那一句另外再用資料庫原值當條件（repo 的樂觀鎖），擋「比對之後、寫入之前」的那一瞬間。
  */
 export async function planRegistrationEdit(input: {
   registrationId: string;
   sessionId?: string;
+  expected?: ParticipantContact;
   patch: { name?: string; email?: string; phone?: string };
 }): Promise<RegistrationEditPlan> {
   const { loadRegistrationForEdit } = await import("@/server/repos/event-registration-contacts");
@@ -54,11 +65,18 @@ export async function planRegistrationEdit(input: {
     };
   }
   const before = normalizeParticipantContact(reg);
+  if (input.expected && !sameParticipantContact(input.expected, before)) {
+    return { ok: false, reason: "stale", message: REGISTRATION_EDIT_ERROR_TEXT.stale };
+  }
   const after = normalizeParticipantContact({
     name: input.patch.name ?? before.name,
     email: input.patch.email !== undefined ? input.patch.email : before.email,
     phone: input.patch.phone !== undefined ? input.patch.phone : before.phone,
   });
+  // 格式只驗有改的欄位（舊資料不擋）。
+  const fmt = contactFormatErrors(before, after);
+  const fmtMsg = [fmt.email, fmt.phone].filter(Boolean).join("；");
+  if (fmtMsg) return { ok: false, reason: "invalid", message: fmtMsg };
   const contactErr = contactRequiredError(after, reg.order_source);
   if (contactErr) return { ok: false, reason: "contact_required", message: contactErr };
   return {
@@ -73,15 +91,26 @@ export async function planRegistrationEdit(input: {
 export type AdminEditResult =
   | { reason: "updated"; fields: string[]; audit: "recorded" | "log_only" }
   | { reason: "unchanged" }
-  | { reason: "not_found" | "wrong_session" | "contact_required" | "stale"; message: string };
+  | {
+      reason: "not_found" | "wrong_session" | "contact_required" | "stale" | "invalid";
+      message: string;
+    };
 
 export async function editRegistrationParticipantAsAdmin(
-  data: { registrationId: string; sessionId: string; name: string; email: string; phone: string },
+  data: {
+    registrationId: string;
+    sessionId: string;
+    expected: ParticipantContact;
+    name: string;
+    email: string;
+    phone: string;
+  },
   admin: { userId: string; email: string },
 ): Promise<AdminEditResult> {
   const plan = await planRegistrationEdit({
     registrationId: data.registrationId,
     sessionId: data.sessionId,
+    expected: data.expected,
     patch: { name: data.name, email: data.email, phone: data.phone },
   });
   if (!plan.ok) return { reason: plan.reason, message: plan.message };

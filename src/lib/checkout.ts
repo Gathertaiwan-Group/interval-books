@@ -431,6 +431,11 @@ export function checkoutErrorText(codeOrError: unknown, lang: Lang): string {
  * and waved through on the server.
  */
 const TW_MOBILE = /^09\d{8}$/;
+/**
+ * 前台結帳的 Email 規則（寬鬆：有 @、有點、沒有空白）。後台「編輯參加者」
+ * （src/lib/admin/registration-edit.ts）共用這一條，舊資料用前台規則存進來的就改得動。
+ */
+export const CHECKOUT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type Translate = (value: Localized) => string;
 
@@ -609,7 +614,7 @@ function refineParticipantContact(
       message: t(MSG.participantContact),
     });
   }
-  if (hasEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((value.email ?? "").trim())) {
+  if (hasEmail && !CHECKOUT_EMAIL_RE.test((value.email ?? "").trim())) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["email"],

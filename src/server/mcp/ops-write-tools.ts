@@ -366,6 +366,17 @@ export const OPS_WRITE_TOOL_INPUTS = {
         .uuid()
         .optional()
         .describe("場次 id（選填；有給就必須對得上，避免改到別場的人）"),
+      expected: z
+        .object({
+          name: z.string().max(1000),
+          email: z.string().max(1000).nullable(),
+          phone: z.string().max(1000).nullable(),
+        })
+        .optional()
+        .describe(
+          "預覽回傳的 expected（改前原值），dry_run=false 時必填：送出時資料庫現值跟它不同" +
+            "（別人在預覽之後改過）就拒絕，不會把別人改的值蓋回去",
+        ),
       name: z.string().max(200).optional().describe("新的姓名（換人時給）"),
       email: z.string().max(400).optional().describe("新的 Email；空字串＝清空"),
       phone: z
@@ -591,8 +602,8 @@ export const OPS_WRITE_TOOL_META: Record<
       "與後台名單頁「編輯」同一套規則：只改這一位參加者的姓名、Email、電話（換人＝改姓名與聯絡方式；" +
       "可替同行者補填聯絡資料）。訂單、付款狀態、金額、名額、order_id、session_id 都不會變動；" +
       "「注意事項」同意紀錄不能改。用 registration_id，或 order_no＋current_name 定位。" +
-      "不是電話報名的參加者，Email 與電話至少要留一項。dry_run=false 時 idempotency_key 必填" +
-      "（預覽會給一組）。稽核記改前改後的值。" +
+      "不是電話報名的參加者，Email 與電話至少要留一項。dry_run=false 時 idempotency_key 與 expected 必填" +
+      "（預覽會給，原樣帶回；預覽之後別人改過就會被拒）。稽核記改前改後的值。" +
       PREVIEW,
     annotations: WRITE,
   },
@@ -1468,6 +1479,11 @@ const IMPL: Handlers = {
 
   async update_registration_participant(args) {
     const tool = "update_registration_participant";
+    if (!args.dry_run && !args.expected) {
+      throw new McpInputError(
+        "dry_run=false 時 expected 必填：先用 dry_run=true 預覽，正式送出時把預覽回傳的 expected 原樣帶回來。",
+      );
+    }
     const { participantEmailSchema, participantNameSchema, participantPhoneSchema } =
       await import("@/lib/admin/registration-edit");
     const repo = await import("@/server/repos/event-registration-contacts");
@@ -1479,13 +1495,14 @@ const IMPL: Handlers = {
         await repo.findRegistrationsByOrderNoAndName(args.order_no ?? "", args.current_name ?? "")
       ).filter((r) => !args.session_id || r.session_id === args.session_id);
       if (found.length === 0) {
+        // 錯誤訊息不帶姓名：被拒的原因會進 mcp_audit_log 與伺服器 log（tools.ts auditRejected）。
         throw new McpInputError(
-          `訂單「${args.order_no}」裡找不到姓名是「${args.current_name}」的參加者。請用 get_session_roster 或 get_order 確認。`,
+          `訂單「${args.order_no}」裡找不到符合這個姓名的參加者。請用 get_session_roster 或 get_order 確認。`,
         );
       }
       if (found.length > 1) {
         throw new McpInputError(
-          `訂單「${args.order_no}」裡有 ${found.length} 位叫「${args.current_name}」，請改用 registration_id：` +
+          `訂單「${args.order_no}」裡有 ${found.length} 位同名的參加者，請改用 registration_id：` +
             found.map((r) => `${r.id}（第 ${r.seat_no} 位）`).join("、"),
         );
       }
@@ -1503,6 +1520,7 @@ const IMPL: Handlers = {
     const plan = await planRegistrationEdit({
       registrationId,
       sessionId: args.session_id,
+      expected: args.expected,
       patch,
     });
     if (!plan.ok) throw new McpInputError(plan.message);
@@ -1542,9 +1560,9 @@ const IMPL: Handlers = {
         "event_registration",
         reg.id,
         "update_participant",
-        { target, changes: plan.changes, untouched, idempotency_key: key },
+        { target, changes: plan.changes, untouched, expected: plan.before, idempotency_key: key },
         auditChanges,
-        `正式送出時請帶 idempotency_key="${key}"。`,
+        `正式送出時請帶 idempotency_key="${key}" 與上面的 expected（原樣帶回）。`,
       );
     }
 

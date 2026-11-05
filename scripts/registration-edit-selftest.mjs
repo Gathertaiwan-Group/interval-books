@@ -144,12 +144,35 @@ check("Email、電話可以留空", ok({ name: "王", email: "", phone: "" }).su
 check("姓名清洗後是空的 → 中文錯誤", msgs({ name: " \u0000 ", email: "", phone: "" }), [
   "name:姓名不能空白",
 ]);
-check("Email 格式錯 → 中文錯誤", msgs({ name: "王", email: "abc", phone: "" }), [
-  "email:Email 格式不正確",
-]);
-check("電話含英文字母 → 中文錯誤", msgs({ name: "王", email: "", phone: "09ab" }), [
-  "phone:電話只能填數字、空白與 + ( ) - #",
-]);
+const NONE = { name: "王", email: null, phone: null };
+check(
+  "Email 有改且格式錯 → 中文錯誤（與前台結帳同一條規則）",
+  LIB.contactFormatErrors(NONE, { name: "王", email: "abc", phone: null }),
+  { email: "Email 格式不正確" },
+);
+check(
+  "電話有改且含英文字母 → 中文錯誤",
+  LIB.contactFormatErrors(NONE, { name: "王", email: null, phone: "09ab" }),
+  { phone: "電話只能填數字、空白與 + ( ) - #" },
+);
+check(
+  "舊資料 Email（taro..yamada@docomo.ne.jp）沒改 → 不驗格式；改成這種前台收過的格式也接受",
+  [
+    LIB.contactFormatErrors(
+      { name: "王", email: "taro..yamada@docomo.ne.jp", phone: "abc" },
+      { name: "王大", email: "taro..yamada@docomo.ne.jp", phone: "abc" },
+    ),
+    LIB.contactFormatErrors(NONE, { name: "王", email: "taro..yamada@docomo.ne.jp", phone: null }),
+  ],
+  [{}, {}],
+);
+check(
+  "Email 規則就是前台結帳那一條（CHECKOUT_EMAIL_RE）",
+  /import \{ CHECKOUT_EMAIL_RE \} from "@\/lib\/checkout"/.test(
+    readFile(join(SRC, "lib/admin/registration-edit.ts")),
+  ) && /!CHECKOUT_EMAIL_RE\.test\(/.test(readFile(join(SRC, "lib/checkout.ts"))),
+  true,
+);
 check(
   "電話允許 +()-# 與空白",
   ok({ name: "王", email: "", phone: "+886 (9) 12-345#6" }).success,
@@ -170,6 +193,7 @@ check(
   LIB.updateRegistrationParticipantInput.safeParse({
     registrationId: "11111111-1111-4111-8111-111111111111",
     sessionId: "22222222-2222-4222-8222-222222222222",
+    expected: { name: "王", email: null, phone: null },
     name: "王",
     email: "",
     phone: "",
@@ -179,10 +203,22 @@ check(
   false,
 );
 check(
+  "server fn 輸入：沒帶 expected（開啟時的原值）→ 拒絕",
+  LIB.updateRegistrationParticipantInput.safeParse({
+    registrationId: "11111111-1111-4111-8111-111111111111",
+    sessionId: "22222222-2222-4222-8222-222222222222",
+    name: "王",
+    email: "",
+    phone: "",
+  }).success,
+  false,
+);
+check(
   "server fn 輸入：registrationId 不是 UUID → 拒絕",
   LIB.updateRegistrationParticipantInput.safeParse({
     registrationId: "abc",
     sessionId: "22222222-2222-4222-8222-222222222222",
+    expected: { name: "王", email: null, phone: null },
     name: "王",
     email: "",
     phone: "",
@@ -263,7 +299,18 @@ const BASE = {
     },
   ],
 };
-const edit = (data) => FLOW.editRegistrationParticipantAsAdmin({ sessionId: SESS, ...data }, ADMIN);
+// expected 預設＝目前資料庫裡的值（＝店員打開 Dialog 時看到的）；測並發時另外給。
+const currentOf = (id) => {
+  const r = tables.event_registrations.find((x) => x.id === id);
+  return r
+    ? { name: r.name, email: r.email, phone: r.phone }
+    : { name: "x", email: null, phone: null };
+};
+const edit = (data) =>
+  FLOW.editRegistrationParticipantAsAdmin(
+    { sessionId: SESS, expected: currentOf(data.registrationId), ...data },
+    ADMIN,
+  );
 const dataWrites = () => log.writes.filter((w) => w.table !== "mcp_audit_log");
 const auditWrites = () => log.writes.filter((w) => w.table === "mcp_audit_log");
 
@@ -389,6 +436,64 @@ resetDb(BASE);
     "姓名帶全形空白的舊資料也改得動（樂觀鎖用原值）",
     [r.reason, tables.event_registrations[0].name],
     ["updated", "王大明"],
+  );
+}
+
+resetDb(BASE);
+{
+  // 驗收 2026-11-05：A、B 同時開 Dialog（email=wang@），B 先把 email 改成 b@ 存檔，
+  // A 只改姓名後存檔 → 必須 stale，不能把 B 的 email 悄悄改回 wang@。
+  const openedByA = currentOf(REG_WEB);
+  const b = await edit({
+    registrationId: REG_WEB,
+    name: "王小明",
+    email: "b@example.com",
+    phone: "",
+  });
+  const a = await edit({
+    registrationId: REG_WEB,
+    expected: openedByA,
+    name: "王大明",
+    email: "wang@example.com",
+    phone: "",
+  });
+  const row = tables.event_registrations.find((x) => x.id === REG_WEB);
+  check(
+    "開 Dialog 後別人先改 → stale（中文）、不覆蓋、只有 B 那一筆稽核",
+    [
+      b.reason,
+      a.reason,
+      /重新整理/.test(a.message ?? ""),
+      row.name,
+      row.email,
+      auditWrites().length,
+    ],
+    ["updated", "stale", true, "王小明", "b@example.com", 1],
+  );
+}
+resetDb(BASE);
+{
+  // 驗收 2026-11-05：舊 Email 不符合嚴格規則，也不能擋住改姓名。
+  tables.event_registrations[0].email = "taro..yamada@docomo.ne.jp";
+  const r = await edit({
+    registrationId: REG_WEB,
+    name: "山田太郎",
+    email: "taro..yamada@docomo.ne.jp",
+    phone: "",
+  });
+  check(
+    "舊 Email（taro..yamada@…）只改姓名 → updated",
+    [r.reason, r.fields],
+    ["updated", ["name"]],
+  );
+}
+resetDb(BASE);
+{
+  const r = await edit({ registrationId: REG_WEB, name: "王小明", email: "abc", phone: "" });
+  check(
+    "Email 改成格式錯的 → invalid（中文）、不寫",
+    [r.reason, r.message, log.writes.length],
+    ["invalid", "Email 格式不正確", 0],
   );
 }
 

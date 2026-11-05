@@ -14,10 +14,12 @@
  *
  * ── 清洗與格式 ──────────────────────────────────────────────────────────────
  * 比照 src/lib/partnership.ts 的 line()：先 singleLine()（控制字元換空白、連續空白壓成一個、
- * trim），再驗長度與格式。長度量的是清洗後真正會存進去的值。
+ * trim），再驗長度。長度量的是清洗後真正會存進去的值。
  *   · 姓名：必填，最多 60 字（與電話報名 PARTICIPANT_NAME_MAX 相同）
- *   · Email：可留空；有填要是合法 Email，最多 254 字
- *   · 電話：可留空；只允許數字、空白與 + ( ) - #，最多 30 字
+ *   · Email：可留空，最多 254 字；格式用前台結帳同一條 CHECKOUT_EMAIL_RE
+ *   · 電話：可留空，最多 30 字；只允許數字、空白與 + ( ) - #
+ * Email／電話的**格式只在那一欄有改的時候驗**（contactFormatErrors）：舊資料是用前台規則
+ * 存進來的，不能因為它不符合這裡的規則，就讓店員連姓名都改不了（驗收 2026-11-05）。
  * 留空存成 null（與 0051 admin_update_phone_order_contacts 相同）。
  *
  * ── 聯絡方式至少一項 ────────────────────────────────────────────────────────
@@ -27,13 +29,12 @@
  */
 import { z } from "zod";
 import { singleLine } from "@/lib/partnership";
+import { CHECKOUT_EMAIL_RE } from "@/lib/checkout";
 
 export const PARTICIPANT_EDIT_LIMITS = { name: 60, email: 254, phone: 30 } as const;
 
 /** 與 partnership.ts 的 phone 同一條：數字、空白與 + ( ) - #。 */
 export const PARTICIPANT_PHONE_RE = /^[0-9+()\-#\s]*$/;
-
-const isEmail = (v: string) => z.string().email().safeParse(v).success;
 
 const line = (max: number, label: string) =>
   z
@@ -44,14 +45,12 @@ const line = (max: number, label: string) =>
 export const participantNameSchema = line(PARTICIPANT_EDIT_LIMITS.name, "姓名").pipe(
   z.string().min(1, "姓名不能空白"),
 );
-export const participantEmailSchema = line(PARTICIPANT_EDIT_LIMITS.email, "Email").refine(
-  (v) => v === "" || isEmail(v),
-  "Email 格式不正確",
-);
-export const participantPhoneSchema = line(PARTICIPANT_EDIT_LIMITS.phone, "電話").refine(
-  (v) => PARTICIPANT_PHONE_RE.test(v),
-  "電話只能填數字、空白與 + ( ) - #",
-);
+/** 只清洗與量長度；格式在 contactFormatErrors()（有改才驗）。 */
+export const participantEmailSchema = line(PARTICIPANT_EDIT_LIMITS.email, "Email");
+export const participantPhoneSchema = line(PARTICIPANT_EDIT_LIMITS.phone, "電話");
+
+export const EMAIL_FORMAT_MESSAGE = "Email 格式不正確";
+export const PHONE_FORMAT_MESSAGE = "電話只能填數字、空白與 + ( ) - #";
 
 /** 後台 Dialog 送出的完整內容（三欄都帶，空字串＝留空）。 */
 export const participantContactSchema = z.object({
@@ -60,11 +59,24 @@ export const participantContactSchema = z.object({
   phone: participantPhoneSchema,
 });
 
-/** server fn 的輸入：哪一位（registrationId＋所屬場次）＋三欄新值。 */
+/**
+ * 打開編輯時看到的原值（樂觀鎖）。伺服器拿它跟資料庫比，對不上＝別人先改過 → stale，
+ * 不會把別人剛改的欄位悄悄蓋回去（驗收 2026-11-05）。
+ */
+export const expectedContactSchema = z
+  .object({
+    name: z.string().max(1000),
+    email: z.string().max(1000).nullable(),
+    phone: z.string().max(1000).nullable(),
+  })
+  .strict();
+
+/** server fn 的輸入：哪一位（registrationId＋所屬場次）＋開啟時的原值＋三欄新值。 */
 export const updateRegistrationParticipantInput = z
   .object({
     registrationId: z.string().trim().uuid("參加者 id 格式不正確"),
     sessionId: z.string().trim().uuid("場次 id 格式不正確"),
+    expected: expectedContactSchema,
   })
   .merge(participantContactSchema)
   .strict();
@@ -100,6 +112,30 @@ export function diffParticipantContact(
   const out: ParticipantDiff = {};
   for (const k of PARTICIPANT_FIELDS) {
     if (b[k] !== a[k]) out[k] = { before: b[k], after: a[k] };
+  }
+  return out;
+}
+
+/** 兩份聯絡資料（正規化後）是不是一模一樣。 */
+export function sameParticipantContact(a: ParticipantContact, b: ParticipantContact): boolean {
+  return Object.keys(diffParticipantContact(a, b)).length === 0;
+}
+
+/**
+ * Email／電話的格式：**只驗有改的那一欄**。before＝原值、after＝要存的值（皆已正規化）。
+ */
+export function contactFormatErrors(
+  before: ParticipantContact,
+  after: ParticipantContact,
+): Partial<Record<"email" | "phone", string>> {
+  const b = normalizeParticipantContact(before);
+  const a = normalizeParticipantContact(after);
+  const out: Partial<Record<"email" | "phone", string>> = {};
+  if (a.email !== b.email && a.email !== null && !CHECKOUT_EMAIL_RE.test(a.email)) {
+    out.email = EMAIL_FORMAT_MESSAGE;
+  }
+  if (a.phone !== b.phone && a.phone !== null && !PARTICIPANT_PHONE_RE.test(a.phone)) {
+    out.phone = PHONE_FORMAT_MESSAGE;
   }
   return out;
 }

@@ -581,6 +581,7 @@ const CASES = {
     args: {
       registration_id: REG1,
       phone: "0922-333 444",
+      expected: { name: "王小明", email: null, phone: null },
       idempotency_key: "11111111-aaaa-4aaa-8aaa-aaaaaaaaaaa4",
     },
     expect: () => [log.rpc.length, dataWrites().map((w) => [w.table, w.op, w.payload])],
@@ -887,15 +888,26 @@ check(
   );
   check(
     "update_registration_participant 用 order_no＋current_name 定位、預覽給 idempotency_key",
-    [pv.dry_run, pv.target?.registration_id, typeof pv.idempotency_key, dataWrites().length],
-    [true, REG2, "string", 0],
+    [
+      pv.dry_run,
+      pv.target?.registration_id,
+      typeof pv.idempotency_key,
+      pv.expected,
+      dataWrites().length,
+    ],
+    [true, REG2, "string", { name: "林大同", email: null, phone: null }, 0],
   );
 }
 {
   resetDb(BASE_TABLES, BASE_RPC);
   const same = parseOut(
     await asOAuth(() =>
-      H.update_registration_participant({ registration_id: REG2, name: "林大同", dry_run: false }),
+      H.update_registration_participant({
+        registration_id: REG2,
+        name: "林大同",
+        expected: { name: "林大同", email: null, phone: null },
+        dry_run: false,
+      }),
     ),
   );
   check(
@@ -1067,6 +1079,7 @@ await expectError("update_registration_participant 電話含英文字母", () =>
   H.update_registration_participant({
     registration_id: REG1,
     phone: "09abc",
+    expected: { name: "王小明", email: null, phone: null },
     idempotency_key: U(1),
     dry_run: false,
   }),
@@ -1075,6 +1088,7 @@ await expectError("update_registration_participant Email 格式錯", () =>
   H.update_registration_participant({
     registration_id: REG1,
     email: "not-an-email",
+    expected: { name: "王小明", email: null, phone: null },
     idempotency_key: U(1),
     dry_run: false,
   }),
@@ -1083,6 +1097,7 @@ await expectError("update_registration_participant 姓名清成空白", () =>
   H.update_registration_participant({
     registration_id: REG1,
     name: " \u0000 ",
+    expected: { name: "王小明", email: null, phone: null },
     idempotency_key: U(1),
     dry_run: false,
   }),
@@ -1092,6 +1107,7 @@ await expectError("update_registration_participant 前台訂單把 Email 與電�
   return H.update_registration_participant({
     registration_id: REG1,
     email: "",
+    expected: { name: "王小明", email: "a@example.com", phone: null },
     idempotency_key: U(1),
     dry_run: false,
   });
@@ -1101,6 +1117,7 @@ await expectError("update_registration_participant 場次對不上", () =>
     registration_id: REG1,
     session_id: U(9),
     phone: "0911",
+    expected: { name: "王小明", email: null, phone: null },
     idempotency_key: U(1),
     dry_run: false,
   }),
@@ -1109,10 +1126,72 @@ await expectError("update_registration_participant 找不到", () =>
   H.update_registration_participant({
     registration_id: U(9),
     phone: "0911",
+    expected: { name: "王小明", email: null, phone: null },
     idempotency_key: U(1),
     dry_run: false,
   }),
 );
+{
+  const r = await expectError("update_registration_participant dry_run=false 沒帶 expected", () =>
+    H.update_registration_participant({
+      registration_id: REG1,
+      phone: "0911",
+      idempotency_key: U(1),
+      dry_run: false,
+    }),
+  );
+  check(
+    "沒帶 expected 的訊息講明要帶預覽的 expected",
+    r.content[0].text.includes("expected"),
+    true,
+  );
+}
+{
+  // 驗收 2026-11-05：預覽之後別人改了 → 送出時拒絕（stale），不把別人改的值蓋回去。
+  const r = await expectError(
+    "update_registration_participant 預覽後別人改過（expected 對不上）→ 拒絕",
+    () => {
+      tables.event_registrations[0].email = "someone@example.com";
+      return H.update_registration_participant({
+        registration_id: REG1,
+        name: "王大明",
+        expected: { name: "王小明", email: null, phone: null },
+        idempotency_key: U(1),
+        dry_run: false,
+      });
+    },
+  );
+  check("stale 訊息請重新整理／重新預覽", r.content[0].text.includes("剛被別人改過"), true);
+}
+{
+  const r = await expectError("update_registration_participant 用姓名定位找不到", () =>
+    H.update_registration_participant({
+      order_no: "B001",
+      current_name: "不存在的人",
+      phone: "0911",
+    }),
+  );
+  check(
+    "定位失敗的錯誤訊息不含姓名（會進稽核與 log）",
+    r.content[0].text.includes("不存在的人"),
+    false,
+  );
+}
+{
+  const r = await expectError("update_registration_participant 同名多位", () => {
+    tables.event_registrations.push({ ...tables.event_registrations[0], id: U(3), seat_no: 2 });
+    return H.update_registration_participant({
+      order_no: "B001",
+      current_name: "王小明",
+      phone: "0911",
+    });
+  });
+  check(
+    "同名多位：訊息列 registration_id、不含姓名",
+    [r.content[0].text.includes(U(3)), r.content[0].text.includes("王小明")],
+    [true, false],
+  );
+}
 await expectError("update_registration_participant 同時給兩種定位", () =>
   H.update_registration_participant({
     registration_id: REG1,

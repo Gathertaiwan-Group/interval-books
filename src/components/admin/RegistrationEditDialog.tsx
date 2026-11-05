@@ -5,6 +5,9 @@
  * 那件事由 server fn 保證（updateRegistrationParticipant，adminFnMiddleware），不是靠這個畫面。
  * 名單上的「注意事項」是同意紀錄的時間（notice_ack_at），不在這裡改。
  *
+ * 樂觀鎖：送出時帶「打開 Dialog 時看到的原值」（expected）。別人在這之間改過 → 伺服器回
+ * stale、顯示「請重新整理」，不會把別人改的欄位蓋回去。
+ *
  * 規則與 server 同一份 zod（src/lib/admin/registration-edit.ts），送出前先在瀏覽器驗一次，
  * 讓錯誤訊息是中文、而且就在欄位下面。儲存成功 → onSaved()（呼叫端 router.invalidate()）。
  */
@@ -22,6 +25,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  contactFormatErrors,
+  normalizeParticipantContact,
   PARTICIPANT_EDIT_LIMITS,
   participantContactSchema,
   type ParticipantField,
@@ -76,6 +81,16 @@ export function RegistrationEditDialog({ target, onClose, onSaved }: Props) {
       setErrors(next);
       return;
     }
+    // 開啟時的原值：Email／電話格式只驗有改的欄位（舊資料不擋），也一起送給伺服器當樂觀鎖。
+    const expected = { name: target.name, email: target.email, phone: target.phone };
+    const fmt = contactFormatErrors(
+      normalizeParticipantContact(expected),
+      normalizeParticipantContact(parsed.data),
+    );
+    if (fmt.email || fmt.phone) {
+      setErrors(fmt);
+      return;
+    }
     setErrors({});
     setSaving(true);
     try {
@@ -84,6 +99,7 @@ export function RegistrationEditDialog({ target, onClose, onSaved }: Props) {
         data: {
           registrationId: target.registration_id,
           sessionId: target.session_id,
+          expected,
           ...parsed.data,
         },
       });
