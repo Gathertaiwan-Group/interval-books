@@ -39,6 +39,8 @@
  * mcp_audit_log 的 changes 也會印進 server log。訂購人／參加者的姓名、電話、Email 不進稽核：
  * 聯絡資料只記「改了哪幾個欄位」（同 0051 order_contact_edit_log 的立場），報名移除只記
  * 姓名首字（同 0044 registration_removal_log）。
+ * 例外：update_registration_participant（業主 2026-11-05 要求記前後值）——前後值存進
+ * mcp_audit_log，但用 changes._log_redact 讓伺服器 log 只印欄位名（audit.ts）。
  *
  * repos 一律在 handler 裡 dynamic import（同 tools.ts／admin-read-tools.ts），這個模組載入時
  * 不碰 Supabase。
@@ -332,6 +334,57 @@ export const OPS_WRITE_TOOL_INPUTS = {
     dry_run: dryRunArg,
   }),
 
+  update_registration_participant: z
+    .object({
+      registration_id: z
+        .string()
+        .trim()
+        .uuid()
+        .optional()
+        .describe(
+          "參加者 registration_id（見 get_session_roster）。與 order_no＋current_name 二選一",
+        ),
+      order_no: z
+        .string()
+        .trim()
+        .min(1)
+        .max(40)
+        .optional()
+        .describe("訂單編號；沒有 registration_id 時，與 current_name 一起定位這位參加者"),
+      current_name: z
+        .string()
+        .trim()
+        .min(1)
+        .max(200)
+        .optional()
+        .describe(
+          "名單上目前的姓名（與 order_no 一起用；同一張單同名多位時請改給 registration_id）",
+        ),
+      session_id: z
+        .string()
+        .trim()
+        .uuid()
+        .optional()
+        .describe("場次 id（選填；有給就必須對得上，避免改到別場的人）"),
+      name: z.string().max(200).optional().describe("新的姓名（換人時給）"),
+      email: z.string().max(400).optional().describe("新的 Email；空字串＝清空"),
+      phone: z
+        .string()
+        .max(100)
+        .optional()
+        .describe("新的電話（數字、空白與 + ( ) - #）；空字串＝清空"),
+      idempotency_key: idempotencyKeyArg,
+      dry_run: dryRunArg,
+    })
+    .refine(
+      (v) => Boolean(v.registration_id) !== Boolean(v.order_no && v.current_name),
+      "registration_id 與（order_no＋current_name）要給其中一組",
+    )
+    .refine(
+      (v) => v.name !== undefined || v.email !== undefined || v.phone !== undefined,
+      "name、email、phone 至少給一個要改的欄位",
+    ),
+
   /* ---- 意願單、合作邀約 ---- */
   update_journey_wish: z
     .object({
@@ -531,6 +584,17 @@ export const OPS_WRITE_TOOL_META: Record<
       "留下移除紀錄。已付款的報名也可以移除，但**不會退款**（退款要另外處理）。" +
       PREVIEW,
     annotations: DESTRUCTIVE,
+  },
+  update_registration_participant: {
+    title: "修改一位報名者的姓名與聯絡方式",
+    description:
+      "與後台名單頁「編輯」同一套規則：只改這一位參加者的姓名、Email、電話（換人＝改姓名與聯絡方式；" +
+      "可替同行者補填聯絡資料）。訂單、付款狀態、金額、名額、order_id、session_id 都不會變動；" +
+      "「注意事項」同意紀錄不能改。用 registration_id，或 order_no＋current_name 定位。" +
+      "不是電話報名的參加者，Email 與電話至少要留一項。dry_run=false 時 idempotency_key 必填" +
+      "（預覽會給一組）。稽核記改前改後的值。" +
+      PREVIEW,
+    annotations: WRITE,
   },
   update_journey_wish: {
     title: "更新策旅意願單",
@@ -1399,6 +1463,131 @@ const IMPL: Handlers = {
       "delete",
       { removed: target, written: result.deleted, result, warning },
       { ...auditChanges, result: result.reason },
+    );
+  },
+
+  async update_registration_participant(args) {
+    const tool = "update_registration_participant";
+    const { participantEmailSchema, participantNameSchema, participantPhoneSchema } =
+      await import("@/lib/admin/registration-edit");
+    const repo = await import("@/server/repos/event-registration-contacts");
+
+    // 定位：registration_id，或 order_no＋目前姓名。
+    let registrationId = args.registration_id;
+    if (!registrationId) {
+      const found = (
+        await repo.findRegistrationsByOrderNoAndName(args.order_no ?? "", args.current_name ?? "")
+      ).filter((r) => !args.session_id || r.session_id === args.session_id);
+      if (found.length === 0) {
+        throw new McpInputError(
+          `訂單「${args.order_no}」裡找不到姓名是「${args.current_name}」的參加者。請用 get_session_roster 或 get_order 確認。`,
+        );
+      }
+      if (found.length > 1) {
+        throw new McpInputError(
+          `訂單「${args.order_no}」裡有 ${found.length} 位叫「${args.current_name}」，請改用 registration_id：` +
+            found.map((r) => `${r.id}（第 ${r.seat_no} 位）`).join("、"),
+        );
+      }
+      registrationId = found[0].id;
+    }
+
+    // 與後台同一份清洗與格式規則（singleLine、長度、Email、電話字元）。
+    const patch: { name?: string; email?: string; phone?: string } = {};
+    if (args.name !== undefined) patch.name = validateWith(participantNameSchema, args.name);
+    if (args.email !== undefined) patch.email = validateWith(participantEmailSchema, args.email);
+    if (args.phone !== undefined) patch.phone = validateWith(participantPhoneSchema, args.phone);
+
+    const { planRegistrationEdit, REGISTRATION_EDIT_ERROR_TEXT } =
+      await import("@/server/registration-edit");
+    const plan = await planRegistrationEdit({
+      registrationId,
+      sessionId: args.session_id,
+      patch,
+    });
+    if (!plan.ok) throw new McpInputError(plan.message);
+
+    const reg = plan.registration;
+    const target = {
+      registration_id: reg.id,
+      order_no: reg.order_no,
+      seat_no: reg.seat_no,
+      session_id: reg.session_id,
+      current: plan.before,
+    };
+    const fields = Object.keys(plan.changes);
+    if (fields.length === 0) {
+      return jsonText({
+        registration_id: reg.id,
+        dry_run: args.dry_run,
+        written: false,
+        message: "沒有任何欄位改變，不需要寫入。",
+      });
+    }
+    // 稽核記前後值（業主 2026-11-05）；_log_redact 讓伺服器 log 只印欄位名、不印值。
+    const auditChanges = {
+      registration_id: reg.id,
+      order_no: reg.order_no,
+      session_id: reg.session_id,
+      seat_no: reg.seat_no,
+      fields: plan.changes,
+      _log_redact: ["fields"],
+    };
+    const untouched = "訂單、付款狀態、金額、名額、order_id、session_id 都不會變動。";
+
+    if (args.dry_run) {
+      const key = args.idempotency_key ?? randomUUID();
+      return preview(
+        tool,
+        "event_registration",
+        reg.id,
+        "update_participant",
+        { target, changes: plan.changes, untouched, idempotency_key: key },
+        auditChanges,
+        `正式送出時請帶 idempotency_key="${key}"。`,
+      );
+    }
+
+    await claimIdempotencyKey(tool, args.idempotency_key);
+    const res = await commitOrAudit(
+      tool,
+      "event_registration",
+      reg.id,
+      "update_participant",
+      auditChanges,
+      () =>
+        repo.updateRegistrationContact({
+          registrationId: reg.id,
+          match: {
+            name: plan.registration.name,
+            email: plan.registration.email,
+            phone: plan.registration.phone,
+          },
+          after: plan.after,
+        }),
+    );
+    if (res !== "updated") {
+      await audit(
+        tool,
+        "event_registration",
+        reg.id,
+        "update_participant_failed",
+        { ...auditChanges, result: res },
+        false,
+      );
+      throw new McpInputError(
+        res === "stale"
+          ? `${REGISTRATION_EDIT_ERROR_TEXT.stale}這組 idempotency_key 已用掉，請重新預覽取得新的一組。`
+          : "Email 與電話至少要留一項（只有電話報名的同行者可以兩項都空）。",
+      );
+    }
+    return committed(
+      tool,
+      "event_registration",
+      reg.id,
+      "update_participant",
+      { written: true, target, changes: plan.changes, untouched },
+      { ...auditChanges, result: "updated" },
     );
   },
 

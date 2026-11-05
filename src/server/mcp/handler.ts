@@ -18,7 +18,7 @@ export const MCP_INSTRUCTIONS = `小時光風土誌書店（www.intervalbooks.tw
 查後台資料（唯讀，與 /admin 同一套查詢）：首頁待辦（get_admin_dashboard）；訂單（list_orders／get_order：明細、付款紀錄、發票號碼與狀態、聯絡資料修改紀錄）；報名（list_registrations 列場次與人數、get_session_roster 看某場名單）；策旅意願單（list_journey_wishes／get_journey_wish）；銷售（list_sales／get_sale、get_sales_summary 期間營收）；進銷存（list_inventory 含低庫存、list_stock_alerts 賣超告警、list_purchases／get_purchase 進貨、list_vendors／get_vendor 廠商）；推薦碼（list_referrers、get_referral_report 月報）；合作邀約（list_partnership_inquiries／get_partnership_inquiry）。list_* 預設 20 筆、上限 100，用 page 翻頁；細節用 get_*。名單與訂單含客人個資，只在回答使用者需要時引用。
 寫：新增／修改／刪除最新消息；新增活動（create_event）與策旅（create_journey），一次建好活動頁、售票商品、場次、票種（策旅另加卡片）；新增書或選物（create_shop_product，不設庫存）；修改活動與策旅的文案、封面、分類、講者、顯示日期；活動與策旅上架／下架（set_event_status，一個狀態：草稿／上架／下架，活動頁、票券商品、策旅卡片一起切換）；修改選物／書籍的文案、圖片、售價與上下架；修改刊物、講者、合作；修改頁面文案區塊的文字；上傳圖片（從網址、curl 直傳、ChatGPT 對話裡的圖、base64）。
 
-營運寫入（需「可寫入」連線，全部預設 dry_run=true）：訂單出貨／完成（update_order_fulfillment）、標記已收款（mark_order_paid）、電話報名（create_phone_order／update_phone_order_contacts）、移除報名（remove_registration，名額自動釋放）、意願單與合作邀約狀態、庫存異動／盤點／進貨、介面文字與網站設定（祕密與匯款欄位不開放）。
+營運寫入（需「可寫入」連線，全部預設 dry_run=true）：訂單出貨／完成（update_order_fulfillment）、標記已收款（mark_order_paid）、電話報名（create_phone_order／update_phone_order_contacts）、移除報名（remove_registration，名額自動釋放）、修改報名者姓名與聯絡方式（update_registration_participant，不動訂單／付款／名額）、意願單與合作邀約狀態、庫存異動／盤點／進貨、介面文字與網站設定（祕密與匯款欄位不開放）。
 對外動作：重寄訂單信（resend_order_email，預設只寄管理員；寄客人要 send_to_customer=true 並用第一次回傳的 confirm_token 再呼叫一次）、重新開立發票（reissue_invoice）、申請作廢發票（request_invoice_void，只在後台產生待辦，由人按「作廢發票」）。不退款、不直接作廢。
 報表：CSV 匯出（名單／訂單／營收，回 15 分鐘到期的下載連結）、熱銷排行、活動報名率、回購率。連線分「可寫入」（預設）與「唯讀」（管理員在後台 /admin/mcp-connections 降級）；唯讀連線呼叫寫入工具一律被拒（含預覽），含個資的 CSV 匯出也只開放可寫入連線。
 

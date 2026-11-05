@@ -22,7 +22,7 @@
  */
 import { useState } from "react";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -43,6 +43,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { RegistrationEditDialog } from "@/components/admin/RegistrationEditDialog";
 import type { listSessionRoster } from "@/lib/admin/fns/event-registrations";
 import { money, ONSITE_UNPAID_LABEL, showOnsiteUnpaid } from "@/lib/admin/order-labels";
 
@@ -59,6 +60,13 @@ type Props = {
   canMarkPaid?: boolean;
   /** 0056：標記已收款成功（或發現早就付過）之後。 */
   onMarkedPaid?: () => Promise<void>;
+  /**
+   * 2026-11-05：顯示「編輯」（改參加者姓名／Email／電話）。admin only，與「移除」同一層。
+   * 只控制畫面；擋人的是 updateRegistrationParticipant 的 adminFnMiddleware。
+   */
+  canEdit?: boolean;
+  /** 編輯儲存成功之後（呼叫端 router.invalidate()）。 */
+  onEdited?: () => Promise<void>;
 };
 
 /** 0056：這一列要不要標「現場付款・未收款」。 */
@@ -72,7 +80,15 @@ function rowOnsiteUnpaid(r: RosterRow): boolean {
   });
 }
 
-export function SessionRosterTable({ rows, onRemoved, canMarkPaid = false, onMarkedPaid }: Props) {
+export function SessionRosterTable({
+  rows,
+  onRemoved,
+  canMarkPaid = false,
+  onMarkedPaid,
+  canEdit = false,
+  onEdited,
+}: Props) {
+  const [editTarget, setEditTarget] = useState<RosterRow | null>(null);
   const [removeTarget, setRemoveTarget] = useState<RosterRow | null>(null);
   const [removing, setRemoving] = useState(false);
   const [payTarget, setPayTarget] = useState<RosterRow | null>(null);
@@ -144,7 +160,7 @@ export function SessionRosterTable({ rows, onRemoved, canMarkPaid = false, onMar
                 <TableHead>訂單</TableHead>
                 <TableHead className="w-32">付款</TableHead>
                 <TableHead className="w-24">注意事項</TableHead>
-                <TableHead className="w-24 text-right">操作</TableHead>
+                <TableHead className="w-32 text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -202,10 +218,21 @@ export function SessionRosterTable({ rows, onRemoved, canMarkPaid = false, onMar
                           標記已收款
                         </Button>
                       ) : null}
+                      {canEdit ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1.5 whitespace-nowrap"
+                          onClick={() => setEditTarget(r)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          編輯
+                        </Button>
+                      ) : null}
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="gap-1.5 text-destructive hover:text-destructive"
+                        className="gap-1.5 whitespace-nowrap text-destructive hover:text-destructive"
                         onClick={() => setRemoveTarget(r)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -219,6 +246,15 @@ export function SessionRosterTable({ rows, onRemoved, canMarkPaid = false, onMar
           </Table>
         </div>
       )}
+
+      {/* 2026-11-05：編輯參加者（姓名／Email／電話）。訂單、付款、名額不動。 */}
+      <RegistrationEditDialog
+        target={editTarget}
+        onClose={() => setEditTarget(null)}
+        onSaved={async () => {
+          await onEdited?.();
+        }}
+      />
 
       {/* 0056：現場付款標記已收款。整張訂單一次（同單的其他參加者一起變已付款）。 */}
       <AlertDialog open={payTarget !== null} onOpenChange={(open) => !open && setPayTarget(null)}>

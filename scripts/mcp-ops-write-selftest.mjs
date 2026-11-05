@@ -217,6 +217,7 @@ check("寫入工具清單", WRITES, [
   "update_order_fulfillment",
   "update_partnership_inquiry",
   "update_phone_order_contacts",
+  "update_registration_participant",
   "update_site_settings",
   "update_ui_string",
 ]);
@@ -576,6 +577,18 @@ const CASES = {
     expect: () => [log.rpc.map((r) => r.name), log.rpc[0]?.args],
     want: [["admin_delete_registration"], { p_registration_id: REG1, p_actor_id: ADMIN_ID }],
   },
+  update_registration_participant: {
+    args: {
+      registration_id: REG1,
+      phone: "0922-333 444",
+      idempotency_key: "11111111-aaaa-4aaa-8aaa-aaaaaaaaaaa4",
+    },
+    expect: () => [log.rpc.length, dataWrites().map((w) => [w.table, w.op, w.payload])],
+    want: [
+      0,
+      [["event_registrations", "update", { name: "王小明", email: null, phone: "0922-333 444" }]],
+    ],
+  },
   update_journey_wish: {
     args: { id: WISH1, status: "reviewed", admin_note: "已回覆" },
     expect: () => [
@@ -813,6 +826,85 @@ check(
   [false, false],
 );
 
+// update_registration_participant：稽核記前後值、伺服器 log 不印值、定位、只改三欄
+{
+  resetDb(BASE_TABLES, BASE_RPC);
+  const logged = [];
+  console.info = (line) => logged.push(String(line));
+  const r = parseOut(
+    await asOAuth(() =>
+      H.update_registration_participant({
+        ...CASES.update_registration_participant.args,
+        name: "  陳\u0007大文 ",
+        dry_run: false,
+      }),
+    ),
+  );
+  console.info = () => {};
+  const a = audits()[0];
+  check(
+    "update_registration_participant 稽核記前後值（姓名經 singleLine 清洗）",
+    [a?.action, a?.entity, a?.changes?.fields, "_log_redact" in (a?.changes ?? {})],
+    [
+      "update_participant",
+      "event_registration",
+      {
+        name: { before: "王小明", after: "陳 大文" },
+        phone: { before: null, after: "0922-333 444" },
+      },
+      false,
+    ],
+  );
+  check(
+    "update_registration_participant 伺服器 log 只印欄位名、不印值",
+    [
+      logged.some((l) => l.includes("王小明") || l.includes("0922-333 444")),
+      logged.some((l) => l.includes("redacted_keys")),
+    ],
+    [false, true],
+  );
+  check(
+    "update_registration_participant 回應說明不動訂單付款名額",
+    [r.written, typeof r.untouched === "string" && r.untouched.includes("付款")],
+    [true, true],
+  );
+  check(
+    "update_registration_participant 不碰 orders／event_sessions／event_session_plans",
+    dataWrites().filter((w) => w.table !== "event_registrations").length,
+    0,
+  );
+}
+{
+  resetDb(BASE_TABLES, BASE_RPC);
+  const pv = parseOut(
+    await asStatic(() =>
+      H.update_registration_participant({
+        order_no: "P900",
+        current_name: "林大同",
+        email: "lin@example.com",
+      }),
+    ),
+  );
+  check(
+    "update_registration_participant 用 order_no＋current_name 定位、預覽給 idempotency_key",
+    [pv.dry_run, pv.target?.registration_id, typeof pv.idempotency_key, dataWrites().length],
+    [true, REG2, "string", 0],
+  );
+}
+{
+  resetDb(BASE_TABLES, BASE_RPC);
+  const same = parseOut(
+    await asOAuth(() =>
+      H.update_registration_participant({ registration_id: REG2, name: "林大同", dry_run: false }),
+    ),
+  );
+  check(
+    "update_registration_participant 沒有變更 → 不寫、不佔 idempotency_key",
+    [same.written, log.writes.length],
+    [false, 0],
+  );
+}
+
 // 讀取工具
 console.log("\n讀取工具");
 resetDb(BASE_TABLES, BASE_RPC);
@@ -956,6 +1048,88 @@ await expectError("update_phone_order_contacts 參加者不在這張單", () =>
     participants: [{ id: REG1, name: "x" }],
     dry_run: false,
   }),
+);
+await expectError("update_registration_participant dry_run=false 沒帶 idempotency_key", () =>
+  H.update_registration_participant({ registration_id: REG1, phone: "0911", dry_run: false }),
+);
+await expectError("update_registration_participant 同一組 idempotency_key 第二次送出", () => {
+  tables.mcp_oauth_used_codes = [
+    {
+      jti: `idem:update_registration_participant:${CASES.update_registration_participant.args.idempotency_key}`,
+    },
+  ];
+  return H.update_registration_participant({
+    ...CASES.update_registration_participant.args,
+    dry_run: false,
+  });
+});
+await expectError("update_registration_participant 電話含英文字母", () =>
+  H.update_registration_participant({
+    registration_id: REG1,
+    phone: "09abc",
+    idempotency_key: U(1),
+    dry_run: false,
+  }),
+);
+await expectError("update_registration_participant Email 格式錯", () =>
+  H.update_registration_participant({
+    registration_id: REG1,
+    email: "not-an-email",
+    idempotency_key: U(1),
+    dry_run: false,
+  }),
+);
+await expectError("update_registration_participant 姓名清成空白", () =>
+  H.update_registration_participant({
+    registration_id: REG1,
+    name: " \u0000 ",
+    idempotency_key: U(1),
+    dry_run: false,
+  }),
+);
+await expectError("update_registration_participant 前台訂單把 Email 與電話都清空", () => {
+  tables.event_registrations[0].email = "a@example.com";
+  return H.update_registration_participant({
+    registration_id: REG1,
+    email: "",
+    idempotency_key: U(1),
+    dry_run: false,
+  });
+});
+await expectError("update_registration_participant 場次對不上", () =>
+  H.update_registration_participant({
+    registration_id: REG1,
+    session_id: U(9),
+    phone: "0911",
+    idempotency_key: U(1),
+    dry_run: false,
+  }),
+);
+await expectError("update_registration_participant 找不到", () =>
+  H.update_registration_participant({
+    registration_id: U(9),
+    phone: "0911",
+    idempotency_key: U(1),
+    dry_run: false,
+  }),
+);
+await expectError("update_registration_participant 同時給兩種定位", () =>
+  H.update_registration_participant({
+    registration_id: REG1,
+    order_no: "B001",
+    current_name: "王小明",
+    phone: "0911",
+  }),
+);
+await expectError(
+  "update_registration_participant 不收 order_id／payment_status（被當成沒給欄位）",
+  () =>
+    H.update_registration_participant({
+      registration_id: REG1,
+      order_id: ORDER_SHIP,
+      payment_status: "pending",
+      dry_run: false,
+    }),
 );
 await expectError("remove_registration 找不到", () =>
   H.remove_registration({ session_id: SESS1, registration_id: U(9), dry_run: false }),

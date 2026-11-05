@@ -585,6 +585,7 @@ const OPS_WRITE_EXPECTED = [
   "create_phone_order",
   "update_phone_order_contacts",
   "remove_registration",
+  "update_registration_participant",
   "update_journey_wish",
   "update_partnership_inquiry",
   "create_stock_adjustment",
@@ -1088,6 +1089,10 @@ console.log("\n[7] MCP 協定");
     remove_registration: {
       session_id: "00000000-0000-4000-8000-000000000001",
       registration_id: "00000000-0000-4000-8000-000000000001",
+    },
+    update_registration_participant: {
+      registration_id: "00000000-0000-4000-8000-000000000001",
+      phone: "0912345678",
     },
     resend_order_email: { order: "00000000-0000-4000-8000-000000000001", kind: "order_paid" },
     request_invoice_void: { order: "00000000-0000-4000-8000-000000000001", reason: "測試" },

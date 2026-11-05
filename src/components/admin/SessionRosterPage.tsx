@@ -37,6 +37,8 @@ type Props = {
   canCreatePhoneOrder?: boolean;
   /** 0057：能不能把現場付款的報名標記已收款（admin 或 event.onsite.collect）。只控制畫面。 */
   canCollectOnsite?: boolean;
+  /** 2026-11-05：顯示「編輯」參加者（admin only，與移除同一層）。只控制畫面。 */
+  canEditParticipant?: boolean;
 };
 
 export function SessionRosterPage({
@@ -47,6 +49,7 @@ export function SessionRosterPage({
   canReadRoster,
   canCreatePhoneOrder = false,
   canCollectOnsite = false,
+  canEditParticipant = false,
 }: Props) {
   const router = useRouter();
   const [exporting, setExporting] = useState(false);
@@ -176,6 +179,11 @@ export function SessionRosterPage({
           // 0057：admin 或有 event.onsite.collect 的門市人員（server 端 markOnsiteOrderPaidStaff 再驗）。
           canMarkPaid={canCollectOnsite}
           onMarkedPaid={async () => {
+            await router.invalidate();
+          }}
+          // 編輯參加者：admin only（server 端 updateRegistrationParticipant 掛 adminFnMiddleware）。
+          canEdit={canEditParticipant}
+          onEdited={async () => {
             await router.invalidate();
           }}
           // 移除成功後重跑 loader：名單與列表的報名數／名額一起更新。

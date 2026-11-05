@@ -48,8 +48,33 @@ export type McpAuditEntry = {
 
 export type McpAuditStatus = "recorded" | "log_only";
 
+/**
+ * changes 裡的保留鍵 `_log_redact: string[]`：列出的鍵照樣存進稽核表，但印到伺服器 log 時
+ * 只印「有哪些子鍵」（例如參加者姓名／電話的前後值只進表、不進 Vercel log）。
+ * 這個保留鍵本身不存進表。
+ */
+function splitLogRedaction(changes: unknown): { stored: unknown; logged: unknown } {
+  if (!changes || typeof changes !== "object" || Array.isArray(changes)) {
+    return { stored: changes, logged: changes };
+  }
+  const { _log_redact, ...rest } = changes as Record<string, unknown>;
+  if (!Array.isArray(_log_redact)) return { stored: changes, logged: changes };
+  const logged: Record<string, unknown> = { ...rest };
+  for (const k of _log_redact) {
+    if (typeof k !== "string" || !(k in logged)) continue;
+    const v = logged[k];
+    logged[k] =
+      v && typeof v === "object" && !Array.isArray(v)
+        ? { redacted_keys: Object.keys(v as object) }
+        : "[redacted]";
+  }
+  return { stored: rest, logged };
+}
+
 export async function writeMcpAudit(entry: McpAuditEntry): Promise<McpAuditStatus> {
   const actor = currentMcpActor();
+  const split = splitLogRedaction(entry.changes);
+  entry = { ...entry, changes: split.stored };
   const changes =
     actor && entry.changes && typeof entry.changes === "object" && !Array.isArray(entry.changes)
       ? { ...(entry.changes as Record<string, unknown>), _actor: actor }
@@ -75,7 +100,8 @@ export async function writeMcpAudit(entry: McpAuditEntry): Promise<McpAuditStatu
             : null,
   };
   try {
-    console.info(`[mcp-audit] ${JSON.stringify({ at: new Date().toISOString(), ...record })}`);
+    const logged = split.logged === split.stored ? record : { ...record, changes: split.logged };
+    console.info(`[mcp-audit] ${JSON.stringify({ at: new Date().toISOString(), ...logged })}`);
   } catch {
     /* changes 序列化不了也不能讓寫入路徑失敗 */
   }
