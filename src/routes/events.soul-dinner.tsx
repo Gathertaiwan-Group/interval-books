@@ -426,7 +426,6 @@ function Booking({
   return (
     <>
       <div className="space-y-1.5">
-        <p className="text-sm font-medium leading-none">場次</p>
         <SessionPicker
           sessions={product.sessions}
           showSeatsRemaining={product.showSeatsRemaining}
