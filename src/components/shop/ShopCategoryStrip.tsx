@@ -46,7 +46,7 @@ type Entry = {
 };
 
 const CARD_CLASS =
-  "group flex w-[6.5rem] shrink-0 snap-start flex-col md:w-auto focus-visible:outline-2 focus-visible:outline-offset-2";
+  "group flex w-[5.75rem] shrink-0 snap-start flex-col md:w-auto focus-visible:outline-2 focus-visible:outline-offset-2";
 
 export function ShopCategoryStrip({
   bookCount,
@@ -134,7 +134,7 @@ export function ShopCategoryStrip({
           decoding="async"
         />
       </span>
-      <span className="mt-2 block font-serif text-[0.95rem] leading-snug text-foreground group-hover:underline underline-offset-4">
+      <span className="mt-2 block font-serif text-[0.9rem] md:text-[0.95rem] leading-snug text-foreground group-hover:underline underline-offset-4">
         {entry.title}
       </span>
       <span className="mt-0.5 block text-[0.7rem] leading-snug text-muted-foreground line-clamp-2">
@@ -150,7 +150,7 @@ export function ShopCategoryStrip({
       aria-label={t(COPY.heading)}
     >
       <h2 className="eyebrow mb-3 md:mb-5">{t(COPY.heading)}</h2>
-      {/* 手機：橫向滑動＋snap，右邊露出半張提示還有更多；md 以上：一排五格。
+      {/* 手機：橫向滑動＋snap，卡寬 5.75rem 讓 375 寬露出約 3.4 張、390 寬約 3.5 張，提示還有更多；md 以上：一排五格。
           -mx/px 讓卡片可以滑到螢幕邊緣，不被 container 的內距切掉。 */}
       <ul className="-mx-6 flex snap-x snap-mandatory scroll-px-6 gap-3 overflow-x-auto px-6 pb-2 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-5 md:scroll-px-0 md:gap-6 md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden">
         {entries.map((entry) => (

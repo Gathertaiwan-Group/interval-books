@@ -6,6 +6,7 @@
  * shop.index.tsx 從 Route.useLoaderData() 取出後傳進來，這個檔案自己不讀資料庫。
  */
 import { Link } from "@tanstack/react-router";
+import { CoverImage } from "@/components/CoverImage";
 import { useState } from "react";
 import { PRODUCT_TYPE_LABELS } from "@/components/shop/labels";
 import { ShopCategoryStrip } from "@/components/shop/ShopCategoryStrip";
@@ -177,17 +178,18 @@ export function ProductsPanel({
                   params={{ slug: prod.slug }}
                   className="flex flex-1 flex-col"
                 >
-                  {/* 手機兩欄：書封是直的，用 3:4 才不會把封面切掉；桌機維持原本 4:3。 */}
-                  <div className="aspect-[3/4] md:aspect-[4/3] overflow-hidden bg-muted">
-                    <img
-                      src={imageFor(prod.imageKey, curatedImg)}
-                      alt={t(prod.title)}
-                      className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03] ${
-                        soldOut ? "opacity-50" : ""
-                      }`}
-                      loading="lazy"
-                    />
-                  </div>
+                  {/* 手機兩欄 3:4、桌機 4:3。商品幾乎都是地方刊物，封面上有字、比例不一（有橫式
+                      跨頁、正方形），所以跟首頁那一排一樣用 CoverImage：整張完整顯示，多出來
+                      的空白用同一張圖模糊補邊。直式書封在 3:4 框裡看起來與 cover 一樣。 */}
+                  <CoverImage
+                    src={imageFor(prod.imageKey, curatedImg)}
+                    alt={t(prod.title)}
+                    className="aspect-[3/4] md:aspect-[4/3]"
+                    imgClassName={`transition-transform duration-500 group-hover:scale-[1.03] ${
+                      soldOut ? "opacity-50" : ""
+                    }`}
+                    loading="lazy"
+                  />
                   <div className="flex flex-1 flex-col p-3 md:p-6">
                     <p className="eyebrow text-[0.65rem] md:text-sm tracking-widest">
                       {t(PRODUCT_TYPE_LABELS[prod.productType])}
