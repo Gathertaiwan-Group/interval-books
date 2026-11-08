@@ -56,7 +56,8 @@ import soulCss from "@/components/soul-dinner/soul-dinner.css?url";
  *
  * 與稿不同的地方（業主 2026-11-08 決定）：
  *   - 不賣「五場套票 NT$2,000」：站上一張票只對應一個場次，沒有跨場次的套票。第五場
- *     片名公布後再開放單場報名（屆時到後台加場次即可，這一頁的報名區自動出現）。
+ *     《聖境預言書》（2026-11-09 公布）在後台加好 12/22 的場次後，把 data.ts 的
+ *     bookable 改成 true，「即將開放報名」的字樣就會拿掉。
  *   - 不做「映後小客廳」留言區：電影子頁拿掉留言區，頁首的「登入」與 FAQ 那一題一併拿掉。
  *   - FAQ「送出表單就完成報名了嗎？」「第五場」「飲食限制」三題的答案改寫成站上實際的
  *     報名與付款方式（稿上是「預約登記、尚未付款」）。
@@ -81,6 +82,9 @@ const PAGE = {
 
 const TICKET_PRICE = 500;
 
+/** 第五場。後台加好 12/22 的場次之前，data.ts 裡的 bookable 是 false。 */
+const FIFTH = FILMS[FILMS.length - 1];
+
 const FAQ: readonly { q: string; a: string }[] = [
   {
     q: "這是交友或配對活動嗎？",
@@ -95,7 +99,10 @@ const FAQ: readonly { q: string; a: string }[] = [
     q: "晚餐是什麼時候？流程如何？",
     a: "活動時間為週二 19:30–21:30，晚餐時間與實際觀影流程待公布。",
   },
-  { q: "第五場是什麼電影？", a: "第五場片名待公布，片名確認後再開放報名。" },
+  {
+    q: "第五場是什麼電影？",
+    a: "第五場是《聖境預言書》（The Celestine Prophecy），改編自 1990 年代美國最暢銷的靈性小說。",
+  },
   { q: "有飲食限制怎麼辦？", a: "可在結帳頁的備註填寫飲食需求，我們會盡量協助安排。" },
 ];
 
@@ -248,7 +255,10 @@ function SoulDinner() {
                 NT${TICKET_PRICE.toLocaleString("en-US")}
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                含簡單輕食晚餐、電影賞析與交流。可選已公布的 4 場；第五場片名公布後開放報名。
+                含簡單輕食晚餐、電影賞析與交流。
+                {FIFTH.bookable
+                  ? "五場皆可單場預約。"
+                  : `五場皆可單場預約（第五場《${FIFTH.title}》即將開放報名）。`}
               </p>
             </div>
           </div>
@@ -438,7 +448,11 @@ function Booking({
             setQty(1);
           }}
         />
-        <p className="text-xs text-muted-foreground">第五場片名尚未公布，片名確認後再開放報名。</p>
+        {FIFTH.bookable ? null : (
+          <p className="text-xs text-muted-foreground">
+            第五場《{FIFTH.title}》（{FIFTH.date}）即將開放報名。
+          </p>
+        )}
       </div>
 
       {selectedSession && needsPlan && selectedSession.plans.length > 1 ? (

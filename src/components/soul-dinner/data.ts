@@ -26,9 +26,27 @@ export type Film = {
   episode: string | null;
   date: string;
   blurb: string;
-  /** 這一場目前能不能報名（第五場要等片名公布）。 */
+  /** 電影子頁的「影片簡介」，照業主提供的片單表（2026-11-09）。 */
+  intro: readonly IntroBlock[];
+  /** 這一場目前能不能報名（後台還沒有這一場的場次時為 false）。 */
   bookable: boolean;
 };
+
+/** 影片簡介的一段：lead 是醒目的引言，strong 是粗體副標，p 是內文，li 是條列。 */
+export type IntroBlock = { kind: "lead" | "strong" | "p" | "li"; text: string };
+
+const LIGHT_WALKER_INTRO: readonly IntroBlock[] = [
+  { kind: "lead", text: "一場靈界和人間光行者們的互動救援行動" },
+  { kind: "strong", text: "巴西靈性經典續作 · 探索轉世與守護的奧秘" },
+  {
+    kind: "p",
+    text: "當乘願而來的靈魂在人間的慾望與迷霧中迷失，來自靈界聖城的「光使者團隊」悄然降臨。",
+  },
+  {
+    kind: "p",
+    text: "在不可侵犯的自由意志法則下，他們將如何喚醒迷失的人們去憶起和執行當初立下的藍圖誓約？！",
+  },
+];
 
 export const FILMS: readonly Film[] = [
   {
@@ -38,6 +56,7 @@ export const FILMS: readonly Film[] = [
     episode: "第一集",
     date: "2026/11/24（二）",
     blurb: "從一段旅程的起點出發，看見自己一路走來的光。",
+    intro: LIGHT_WALKER_INTRO,
     bookable: true,
   },
   {
@@ -47,6 +66,7 @@ export const FILMS: readonly Film[] = [
     episode: "第二集",
     date: "2026/12/1（二）",
     blurb: "延續第一集的足跡，聊聊那些讓我們繼續前行的力量。",
+    intro: LIGHT_WALKER_INTRO,
     bookable: true,
   },
   {
@@ -56,6 +76,13 @@ export const FILMS: readonly Film[] = [
     episode: null,
     date: "2026/12/8（二）",
     blurb: "在日常裡練習覺察，重新感受生命本身的可能。",
+    intro: [
+      { kind: "lead", text: "被譽為重要性甚於\u201c祕密\u201d的心靈療癒片，" },
+      {
+        kind: "p",
+        text: "由美國知名心靈導師路易絲．賀所攝製的紀錄影片；<我願意改變> 一句簡潔有力的話，一個人心中所思考的，往往決定他的悲歡人生，甚至身體上的病痛，也和人的心理模式息息相關。所以，只要願意對自己的心靈做工，一切的疾病及煩惱都會因此消滅。",
+      },
+    ],
     bookable: true,
   },
   {
@@ -65,18 +92,40 @@ export const FILMS: readonly Film[] = [
     episode: null,
     date: "2026/12/15（二）",
     blurb: "談關係、談相遇，也談先成為自己的那份溫柔。",
+    intro: [
+      { kind: "li", text: "你/妳可曾遇見或渴望一位靈魂伴侶？天作之合？或曾遇見到許多靈魂伴侶？" },
+      {
+        kind: "li",
+        text: "由五段情感伴侶的故事組成; 探討伴侶之間的尋覓.勇氣.緣分&珍惜等主題.故事精簡而溫馨",
+      },
+      { kind: "p", text: "你準備好迎接靈魂伴侶了嗎?!...歡迎跟我們來探討感情伴侶之間的話題..." },
+    ],
     bookable: true,
   },
   {
-    slug: "film-5",
+    slug: "celestine-prophecy",
     n: 5,
-    title: "片名待公布",
+    title: "聖境預言書",
     episode: null,
     date: "2026/12/22（二）",
-    blurb: "最後一張飯桌，片單將於確認後公布。",
+    blurb: "1990 年代美國最暢銷的靈性小說搬上銀幕，跟著主角領受九個覺悟。",
+    intro: [
+      { kind: "lead", text: "*1990 年代美國最暢銷靈性小說搬上銀幕!!" },
+      {
+        kind: "p",
+        text: "~如果你正閱讀這個訊息，表示你已經察覺到人類意識的轉變~意識在你心中已經發酵!",
+      },
+      { kind: "li", text: "人生的機緣巧合、節骨眼冒出的人，會出其不意地把我們推到一個重要方向" },
+      { kind: "li", text: "隨著主角的冒險歷程，領受九個覺悟; 每個階段都蘊藏一個天機「覺悟」" },
+    ],
     bookable: false,
   },
 ];
+
+/** 第五場片名公布前的舊網址（/films/film-5），子頁會轉到新的網址。 */
+export const RENAMED_FILM_SLUGS: Readonly<Record<string, string>> = {
+  "film-5": "celestine-prophecy",
+};
 
 export function filmBySlug(slug: string): Film | null {
   return FILMS.find((f) => f.slug === slug) ?? null;

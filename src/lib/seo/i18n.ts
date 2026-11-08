@@ -137,7 +137,7 @@ export const ZH_ONLY_PATHS: readonly string[] = [
   "/events/soul-dinner/films/light-walker-2",
   "/events/soul-dinner/films/miracle-of-life",
   "/events/soul-dinner/films/soulmate",
-  "/events/soul-dinner/films/film-5",
+  "/events/soul-dinner/films/celestine-prophecy",
 ];
 
 export function isZhOnlyPath(pathname: string): boolean {

@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
 import { fetchEventVisibility } from "@/lib/cms";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
 import { fitDescription } from "@/lib/seo/core";
@@ -14,8 +14,10 @@ import {
   FONTS_HREF,
   HERO_KEY,
   HOSTS_LINE,
+  RENAMED_FILM_SLUGS,
   SCHEDULE,
   type Film,
+  type IntroBlock,
 } from "@/components/soul-dinner/data";
 import soulCss from "@/components/soul-dinner/soul-dinner.css?url";
 
@@ -24,7 +26,7 @@ import soulCss from "@/components/soul-dinner/soul-dinner.css?url";
  * （soul-movie.lovable.app/films/*），資料在 src/components/soul-dinner/data.ts。
  *
  * 稿上每一頁底下有「映後小客廳」（登入後留言的討論區）。業主決定站上不做留言區，
- * 這裡只保留電影資訊與「預約一張飯票」。
+ * 這裡只保留電影資訊、影片簡介（業主 2026-11-09 提供的片單表）與「預約一張飯票」。
  */
 
 /** 三語 meta 的共用部分（各片的標題在 head() 裡接上片名）。 */
@@ -66,6 +68,14 @@ function filmDescription(f: Film | null, base: Localized): Localized {
 export const Route = createFileRoute("/events/soul-dinner_/films/$film")({
   // 子頁跟著那一場活動：活動不是「上架」就 404（讀取失敗照常渲染）；片名不在清單裡也 404。
   loader: async ({ params }) => {
+    const renamed = RENAMED_FILM_SLUGS[params.film];
+    if (renamed) {
+      throw redirect({
+        to: "/events/soul-dinner/films/$film",
+        params: { film: renamed },
+        statusCode: 301,
+      });
+    }
     const film = filmBySlug(params.film);
     if (!film) throw notFound();
     const visibility = await fetchEventVisibility(EVENT_SLUG);
@@ -144,7 +154,13 @@ function FilmPage() {
           <dd>簡單輕食晚餐・電影賞析・交流</dd>
         </dl>
         <p className="mt-6 leading-8">{film.blurb}</p>
-        <div className="mt-6">
+        <section className="paper-card mt-8 p-5 sm:p-6" aria-labelledby="film-intro">
+          <h2 id="film-intro" className="text-lg text-primary">
+            影片簡介
+          </h2>
+          <Intro blocks={film.intro} />
+        </section>
+        <div className="mt-8">
           {film.bookable ? (
             <Link
               to={EVENT_PATH}
@@ -154,11 +170,58 @@ function FilmPage() {
               預約一張飯票
             </Link>
           ) : (
-            <p className="text-sm text-muted-foreground">片名確認後開放報名。</p>
+            <p className="text-sm text-muted-foreground">這一場即將開放報名。</p>
           )}
         </div>
       </main>
       <SoulFooter />
     </div>
   );
+}
+
+/** 影片簡介：照片單表的段落順序；連續的 li 收進同一個 <ul>。 */
+function Intro({ blocks }: { blocks: readonly IntroBlock[] }) {
+  const out: React.ReactNode[] = [];
+  let items: string[] = [];
+  const flush = () => {
+    if (items.length === 0) return;
+    out.push(
+      <ul key={`ul-${out.length}`} className="space-y-2">
+        {items.map((t) => (
+          <li key={t} className="flex gap-3 text-sm leading-7">
+            <span aria-hidden="true" className="mt-2.5 h-2 w-2 shrink-0 rounded-full bg-clay" />
+            <span>{t}</span>
+          </li>
+        ))}
+      </ul>,
+    );
+    items = [];
+  };
+  for (const b of blocks) {
+    if (b.kind === "li") {
+      items.push(b.text);
+      continue;
+    }
+    flush();
+    if (b.kind === "lead")
+      out.push(
+        <p key={b.text} className="font-medium text-clay">
+          {b.text}
+        </p>,
+      );
+    else if (b.kind === "strong")
+      out.push(
+        <p key={b.text} className="font-medium text-primary">
+          {b.text}
+        </p>,
+      );
+    else
+      out.push(
+        <p key={b.text} className="text-sm leading-7 text-foreground/85">
+          {b.text}
+        </p>,
+      );
+  }
+  flush();
+  return <div className="mt-4 space-y-3">{out}</div>;
 }

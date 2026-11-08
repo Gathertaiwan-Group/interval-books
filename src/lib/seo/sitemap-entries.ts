@@ -110,7 +110,7 @@ const LANDING_SUBPAGES = [
   "/events/soul-dinner/films/light-walker-2",
   "/events/soul-dinner/films/miracle-of-life",
   "/events/soul-dinner/films/soulmate",
-  "/events/soul-dinner/films/film-5",
+  "/events/soul-dinner/films/celestine-prophecy",
 ];
 
 /** 最新的那一個時間（讀不懂的略過）。全部都沒有 → null。 */
