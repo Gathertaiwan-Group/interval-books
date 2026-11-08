@@ -9,6 +9,7 @@ export const EVENT_PATH = "/events/soul-dinner";
 export const BRAND = "小時光｜靈魂飯桌";
 export const TAGLINE = "給靈魂一張飯票，也給相遇一個位置。";
 export const SCHEDULE = "週二 19:30–21:30";
+export const VENUE = "小時光書店（華山文創園區 紅磚六合院 西 7-3 館）";
 export const HOSTS_LINE = "光中心 周介偉老師、Alice老師";
 
 /** 原站載入的字重（Noto Sans TC 400/500、Noto Serif TC 500/600）。 */

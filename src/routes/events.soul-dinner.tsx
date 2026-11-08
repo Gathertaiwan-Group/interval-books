@@ -94,7 +94,7 @@ const FAQ: readonly { q: string; a: string }[] = [
     q: "送出表單就完成報名了嗎？",
     a: "選好場次與人數後會進入結帳頁，填寫聯絡資料並選擇付款方式；完成付款（匯款則於核對款項後）即保留座位，我們會以 Email 寄送報名確認。",
   },
-  { q: "活動地點在哪裡？", a: "地點待確認，確認後會通知已報名的朋友，並更新於本頁。" },
+  { q: "活動地點在哪裡？", a: "在小時光書店（台北華山文創園區 紅磚六合院 西 7-3 館）。" },
   {
     q: "晚餐是什麼時候？流程如何？",
     a: "活動時間為週二 19:30–21:30，晚餐時間與實際觀影流程待公布。",
@@ -229,7 +229,7 @@ function SoulDinner() {
               </li>
             ))}
           </ol>
-          <p className="mt-4 text-xs text-muted-foreground">所有日期皆為暫訂；地點待確認。</p>
+          <p className="mt-4 text-xs text-muted-foreground">所有日期皆為暫訂；地點在小時光書店。</p>
         </Section>
         <Section eyebrow="共同主講" title="兩位老師，陪你看見">
           <div className="grid gap-4 sm:grid-cols-2">

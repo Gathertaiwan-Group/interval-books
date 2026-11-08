@@ -16,6 +16,7 @@ import {
   HOSTS_LINE,
   RENAMED_FILM_SLUGS,
   SCHEDULE,
+  VENUE,
   type Film,
   type IntroBlock,
 } from "@/components/soul-dinner/data";
@@ -147,7 +148,7 @@ function FilmPage() {
           <dt className="text-muted-foreground">時間</dt>
           <dd>{SCHEDULE}（晚餐時間與觀影流程待公布）</dd>
           <dt className="text-muted-foreground">地點</dt>
-          <dd>待確認</dd>
+          <dd>{VENUE}</dd>
           <dt className="text-muted-foreground">主講</dt>
           <dd>{HOSTS_LINE}</dd>
           <dt className="text-muted-foreground">內容</dt>

@@ -35,7 +35,7 @@ export function SoulFooter() {
     <footer className="mt-24 border-t border-border/60 py-10 text-center text-xs leading-6 text-muted-foreground">
       <p className="font-serif tracking-widest text-primary">{BRAND}</p>
       <p>{TAGLINE}</p>
-      <p className="mt-2">所有日期皆為暫訂，地點確認後另行通知。</p>
+      <p className="mt-2">所有日期皆為暫訂。地點：小時光書店。</p>
     </footer>
   );
 }
