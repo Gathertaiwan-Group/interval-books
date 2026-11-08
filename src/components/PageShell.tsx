@@ -29,23 +29,39 @@ export function PageHeader({
   eyebrow,
   title,
   intro,
+  compact = false,
 }: {
   eyebrow: string;
   title: string;
   intro?: string;
+  /**
+   * 只影響手機（md 以下）：縮小上下留白與標題字級，讓列表頁的內容進得了首屏。
+   * md 以上與預設完全相同。目前只有 /shop 用（2026-11 手機版優化）。
+   */
+  compact?: boolean;
 }) {
   return (
-    <section className="container-editorial pt-16 md:pt-24 pb-12 md:pb-16">
+    <section
+      className={`container-editorial md:pt-24 md:pb-16 ${compact ? "pt-8 pb-6" : "pt-16 pb-12"}`}
+    >
       <p className="eyebrow text-2xl">{eyebrow}</p>
-      <h1 className="display mt-6 text-[2.75rem] leading-[1.12] md:text-6xl lg:text-7xl max-w-4xl">
+      <h1
+        className={`display md:mt-6 md:leading-[1.12] md:text-6xl lg:text-7xl max-w-4xl ${
+          compact ? "mt-3 text-[2rem] leading-[1.2]" : "mt-6 text-[2.75rem] leading-[1.12]"
+        }`}
+      >
         {title}
       </h1>
       {intro && (
-        <p className="mt-8 max-w-2xl text-base md:text-lg leading-[1.9] text-muted-foreground">
+        <p
+          className={`max-w-2xl md:mt-8 md:text-lg md:leading-[1.9] text-muted-foreground ${
+            compact ? "mt-3 text-sm leading-[1.8]" : "mt-8 text-base leading-[1.9]"
+          }`}
+        >
           {intro}
         </p>
       )}
-      <div className="rule mt-10" />
+      <div className={`rule md:mt-10 ${compact ? "mt-5" : "mt-10"}`} />
     </section>
   );
 }

@@ -239,15 +239,16 @@ function Shop() {
         eyebrow={eyebrowOf(page, "Shop", t(page?.eyebrowSuffix ?? PAGE.eyebrowSuffix))}
         title={t(p.title(PAGE.title))}
         intro={t(p.intro(PAGE.intro))}
+        compact
       />
 
       <nav
-        className="container-editorial pb-12 flex flex-wrap gap-x-8 gap-y-3 border-b border-border/60 text-sm"
+        className="container-editorial pb-4 md:pb-12 flex flex-wrap gap-x-8 gap-y-3 border-b border-border/60 text-sm"
         data-testid="shop-tabs"
         aria-label={t(p.block("tabs.label", PAGE.tabsLabel))}
       >
         {tabs.map((tabItem) => {
-          const className = `-mb-px border-b-2 pb-3 transition-colors ${
+          const className = `-mb-px border-b-2 pt-3 pb-3 md:pt-0 transition-colors ${
             active === tabItem.key
               ? "border-foreground text-foreground"
               : "border-transparent text-muted-foreground hover:text-foreground"
@@ -278,13 +279,19 @@ function Shop() {
         })}
       </nav>
 
-      <div className="pt-12" data-testid={`shop-panel-${active}`}>
+      <div className="pt-6 md:pt-12" data-testid={`shop-panel-${active}`}>
         {active === "publications" ? (
           <PublicationsPanel page={publicationsPage} list={publications} catalogue={catalogue} />
         ) : active === "curated" ? (
           <CuratedPanel page={curatedPage} curatedThemes={curatedThemes} catalogue={catalogue} />
         ) : (
-          <ProductsPanel page={page} catalogue={catalogue} heroAlt={t(p.title(PAGE.title))} />
+          <ProductsPanel
+            page={page}
+            catalogue={catalogue}
+            publications={publications}
+            curatedThemes={curatedThemes}
+            heroAlt={t(p.title(PAGE.title))}
+          />
         )}
       </div>
     </PageShell>

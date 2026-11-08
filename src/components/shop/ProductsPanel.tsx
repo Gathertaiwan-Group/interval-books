@@ -8,12 +8,14 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { PRODUCT_TYPE_LABELS } from "@/components/shop/labels";
+import { ShopCategoryStrip } from "@/components/shop/ShopCategoryStrip";
 import { PriceTag, StockBadge } from "@/components/shop/ShopBits";
 import { useT } from "@/i18n/LanguageContext";
 import type { Localized } from "@/i18n/types";
-import { pageText, type PageContent } from "@/lib/cms";
+import { pageText, type CuratedThemeEntry, type PageContent } from "@/lib/cms";
 import { CARD, CARD_HOVER } from "@/lib/feature-layout";
 import { imageFor } from "@/lib/images";
+import type { PublicationListResult } from "@/lib/publications";
 import { isSoldOut, remainingFor, SHOP_PRODUCT_TYPES, type ShopListCardResult } from "@/lib/shop";
 import { useSiteContent } from "@/lib/site-content";
 import curatedImg from "@/assets/curated-objects.jpg";
@@ -49,10 +51,16 @@ const LOW_STOCK_THRESHOLD = 5;
 export function ProductsPanel({
   page,
   catalogue,
+  publications,
+  curatedThemes,
   heroAlt,
 }: {
   page: PageContent | null;
   catalogue: ShopListCardResult;
+  /** 只拿來算品類入口上的「N 本」——清單本身在〈地方刊物〉分頁畫。 */
+  publications: PublicationListResult;
+  /** 只拿主題名稱給品類入口用——櫥窗本身在〈主理人的選品〉分頁畫。 */
+  curatedThemes: CuratedThemeEntry[];
   heroAlt: string;
 }) {
   const t = useT();
@@ -87,15 +95,24 @@ export function ProductsPanel({
 
   return (
     <>
-      <section className="container-editorial pb-12">
+      {/* 手機版不放這張大圖：它在 390 寬佔掉 ~410px，第一件商品要捲過一整個螢幕
+          才看得到。首屏改給下面的品類入口（2026-11 手機版優化）。 */}
+      <section className="container-editorial hidden pb-12 md:block">
         <div className="mx-auto w-4/5 aspect-[3/4] md:aspect-[16/10] overflow-hidden bg-muted">
           <img src={heroSrc} alt={heroAlt} className="h-full w-full object-cover" loading="lazy" />
         </div>
       </section>
 
+      <ShopCategoryStrip
+        bookCount={products.length}
+        bookCover={products[0] ? imageFor(products[0].imageKey, curatedImg) : curatedImg}
+        publicationCount={publications.publications.length}
+        curatedThemes={curatedThemes}
+      />
+
       {presentTypes.length > 1 && (
         <section
-          className="container-editorial pb-12 flex flex-wrap gap-3 text-xs tracking-widest"
+          className="container-editorial pb-8 md:pb-12 flex gap-2 overflow-x-auto [scrollbar-width:none] md:flex-wrap md:gap-3 text-xs tracking-widest"
           data-testid="product-type-filter"
         >
           {["all", ...presentTypes].map((f) => {
@@ -109,7 +126,7 @@ export function ProductsPanel({
                 key={f}
                 onClick={() => setFilter(f)}
                 aria-pressed={active}
-                className={`px-4 py-2 border transition-colors ${
+                className={`shrink-0 min-h-11 px-4 py-2 border transition-colors ${
                   active
                     ? "border-foreground bg-foreground text-primary-foreground"
                     : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
@@ -141,7 +158,8 @@ export function ProductsPanel({
         </section>
       ) : (
         <section
-          className="container-editorial pb-32 grid grid-cols-1 gap-6 sm:grid-cols-2 md:gap-8 lg:grid-cols-3"
+          id="product-grid"
+          className="container-editorial pb-24 md:pb-32 grid grid-cols-2 gap-x-3 gap-y-5 scroll-mt-28 md:gap-8 lg:grid-cols-3"
           data-testid="product-grid"
         >
           {list.map((prod) => {
@@ -159,7 +177,8 @@ export function ProductsPanel({
                   params={{ slug: prod.slug }}
                   className="flex flex-1 flex-col"
                 >
-                  <div className="aspect-[4/3] overflow-hidden bg-muted">
+                  {/* 手機兩欄：書封是直的，用 3:4 才不會把封面切掉；桌機維持原本 4:3。 */}
+                  <div className="aspect-[3/4] md:aspect-[4/3] overflow-hidden bg-muted">
                     <img
                       src={imageFor(prod.imageKey, curatedImg)}
                       alt={t(prod.title)}
@@ -169,21 +188,21 @@ export function ProductsPanel({
                       loading="lazy"
                     />
                   </div>
-                  <div className="flex flex-1 flex-col p-5 md:p-6">
-                    <p className="eyebrow text-sm tracking-widest">
+                  <div className="flex flex-1 flex-col p-3 md:p-6">
+                    <p className="eyebrow text-[0.65rem] md:text-sm tracking-widest">
                       {t(PRODUCT_TYPE_LABELS[prod.productType])}
                     </p>
-                    <h2 className="font-serif text-xl mt-3 leading-snug group-hover:underline underline-offset-4">
+                    <h2 className="font-serif text-base md:text-xl mt-1.5 md:mt-3 leading-snug line-clamp-2 md:line-clamp-none group-hover:underline underline-offset-4">
                       {t(prod.title)}
                     </h2>
-                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                    <p className="mt-1 md:mt-3 text-xs md:text-sm leading-relaxed text-muted-foreground line-clamp-2 md:line-clamp-none">
                       {t(prod.summary)}
                     </p>
                     {/* 價格與庫存標籤推到卡片底部：同一列的卡片底部對齊。 */}
-                    <div className="mt-auto pt-6">
+                    <div className="mt-auto pt-3 md:pt-6">
                       <PriceTag price={prod.price} compareAtPrice={prod.compareAtPrice} />
                       {(soldOut || low) && (
-                        <div className="mt-4">
+                        <div className="mt-2 md:mt-4">
                           {soldOut ? (
                             <StockBadge tone="alert">{t(ui.buttons.soldOut)}</StockBadge>
                           ) : isBooking ? (
