@@ -58,12 +58,15 @@ function filmTitle(f: Film | null, base: Localized): Localized {
   if (!f) return base;
   const ordinal = ["", "第一場", "第二場", "第三場", "第四場", "第五場"][f.n] ?? `第 ${f.n} 場`;
   const titleZh = f.episode ? fullTitle(f) : `${f.title}｜${ordinal}`;
-  return { ...base, zh: `${titleZh}｜小時光靈魂飯桌` };
+  return { ...base, zh: `${titleZh}｜心靈電影賞析・${f.date}｜小時光靈魂飯桌` };
 }
 
 function filmDescription(f: Film | null, base: Localized): Localized {
   if (!f) return base;
-  return { ...base, zh: `${f.date}（暫訂）${SCHEDULE}。${f.blurb}` };
+  return {
+    ...base,
+    zh: `《${fullTitle(f)}》電影賞析與共餐分享會，${f.date} 19:30–21:30，台北華山文創園區小時光書店，光中心周介偉老師與 Alice老師帶領。${f.blurb}單場飯票 NT$500，含輕食晚餐。`,
+  };
 }
 
 export const Route = createFileRoute("/events/soul-dinner_/films/$film")({

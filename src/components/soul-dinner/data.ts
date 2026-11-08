@@ -119,7 +119,7 @@ export const FILMS: readonly Film[] = [
       { kind: "li", text: "人生的機緣巧合、節骨眼冒出的人，會出其不意地把我們推到一個重要方向" },
       { kind: "li", text: "隨著主角的冒險歷程，領受九個覺悟; 每個階段都蘊藏一個天機「覺悟」" },
     ],
-    bookable: false,
+    bookable: true,
   },
 ];
 

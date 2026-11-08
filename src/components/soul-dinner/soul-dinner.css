@@ -30,6 +30,12 @@
   --border: oklch(88% 0.025 80);
   --input: oklch(86% 0.03 80);
   --ring: oklch(60% 0.09 255);
+  /*
+   * 可讀性（2026-11-09 業主要求手機版好讀）：稿上的說明、日期大量用 text-xs（12px）與
+   * text-sm（14px），在手機上偏小。只在這幾頁把兩級各放大一點，版面比例不變。
+   */
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
   --sd-serif: "Noto Serif TC", "Songti TC", serif;
   --sd-sans: "Noto Sans TC", "PingFang TC", sans-serif;
   --shadow-paper:

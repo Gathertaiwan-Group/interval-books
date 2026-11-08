@@ -69,14 +69,14 @@ import soulCss from "@/components/soul-dinner/soul-dinner.css?url";
 /** 三語 meta。⚠️ 必須是頂層靜態常數、每一句都是字面值——check-meta.mjs 靜態解析這個物件。 */
 const PAGE = {
   metaTitle: {
-    zh: "小時光｜靈魂飯桌｜給靈魂一張飯票，也給相遇一個位置",
-    en: "Interval Books｜Soul Dinner Table｜A meal ticket for the soul, a seat for meeting",
-    ja: "小時光｜魂の食卓｜魂に一枚の食事券を、出会いにひとつの席を",
+    zh: "靈魂飯桌｜週二電影共餐分享會・周介偉 × Alice｜台北華山 小時光書店",
+    en: "Soul Dinner Table｜Tuesday film & dinner gatherings with Chou Chieh-Wei and Alice｜Interval Books, Huashan, Taipei",
+    ja: "魂の食卓｜火曜の映画と食事の会・周介偉 × Alice｜台北・華山 小時光書店",
   },
   metaDescription: {
-    zh: "一起吃飯，看電影，遇見懂你的人。光中心周介偉老師與 Alice老師共同主講，週二晚間五場電影飯桌，開放預約報名。",
-    en: "Share a meal, watch a film, and meet people who understand you. Five Tuesday-evening film dinners co-hosted by Chou Chieh-Wei of Light Center and Alice. Booking now open.",
-    ja: "一緒に食べて、映画を観て、わかり合える人に出会う。光中心の周介偉先生と Alice 先生による、火曜夜の五回の映画の食卓。予約受付中。",
+    zh: "一起吃飯，看電影，遇見懂你的人。台北華山文創園區小時光書店，週二晚上 19:30 的心靈電影共餐分享會，光中心周介偉老師與 Alice老師帶領：光之行者、創造生命的奇蹟、靈魂伴侶、聖境預言書。單場飯票 NT$500，含輕食晚餐，開放報名。",
+    en: "Share a meal, watch a film, and meet people who understand you. Tuesday 19:30 film-and-dinner gatherings at Interval Books, Huashan 1914 Creative Park, Taipei, led by Chou Chieh-Wei of Light Center and Alice: Light Walker, Creating the Miracle of Life, Soulmate, The Celestine Prophecy. NT$500 per night including a light dinner.",
+    ja: "一緒に食べて、映画を観て、わかり合える人に出会う。台北・華山1914文化創意産業園区の小時光書店で、火曜19:30から開く映画と食事の会。光中心の周介偉先生と Alice 先生が案内します。上映作品：光の旅人、生命の奇跡を創る、ソウルメイト、聖なる予言。1回 NT$500（軽食付き）。",
   },
 };
 
