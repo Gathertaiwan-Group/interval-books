@@ -103,7 +103,15 @@ const STATIC_PAGES: Array<{
 ];
 
 /** 寫死在程式碼裡的著陸頁子頁（沒有自己的資料列 → 沒有 lastmod）。 */
-const LANDING_SUBPAGES = ["/events/kungtung/hosts/alice", "/events/kungtung/hosts/fan-yishun"];
+const LANDING_SUBPAGES = [
+  "/events/kungtung/hosts/alice",
+  "/events/kungtung/hosts/fan-yishun",
+  "/events/soul-dinner/films/light-walker-1",
+  "/events/soul-dinner/films/light-walker-2",
+  "/events/soul-dinner/films/miracle-of-life",
+  "/events/soul-dinner/films/soulmate",
+  "/events/soul-dinner/films/film-5",
+];
 
 /** 最新的那一個時間（讀不懂的略過）。全部都沒有 → null。 */
 export function latestOf(values: ReadonlyArray<Ts>): string | null {
@@ -228,7 +236,7 @@ export function buildSitemapEntries(src: SitemapSource, today = todayInTaipei())
   }
   // 0052：子頁跟著所屬活動——活動不是上架（不在 src.events 裡）就不列，與頁面本身的 404 一致。
   for (const path of LANDING_SUBPAGES) {
-    const parent = path.split("/hosts/")[0];
+    const parent = path.split(/\/(?:hosts|films)\//)[0];
     if (!eventLangs.has(parent)) continue;
     entries.push({ path, langs: langsFor(path, undefined) });
   }

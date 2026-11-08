@@ -64,6 +64,7 @@ export const STATIC_PUBLIC_PATHS: readonly string[] = [
   "/events/kungtung",
   "/events/kungtung/hosts/alice",
   "/events/kungtung/hosts/fan-yishun",
+  "/events/soul-dinner",
   "/events/sound-of-the-sea",
   "/journeys",
   "/news",

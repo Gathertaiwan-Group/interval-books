@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-11-02T14:13:44.973Z",
+  "generatedAt": "2026-11-08T09:42:38.026Z",
   "summary": {
-    "routesAudited": 31,
+    "routesAudited": 33,
     "redirectRoutes": 5,
     "redirectRouteList": [
       "/contact",
@@ -10,7 +10,7 @@
       "/news",
       "/visit"
     ],
-    "metaAudited": 26,
+    "metaAudited": 28,
     "languages": [
       "zh",
       "en",
@@ -32,7 +32,7 @@
         "ogTitle",
         "ogDescription"
       ],
-      "approxChecks": 312
+      "approxChecks": 336
     }
   },
   "routes": {
@@ -146,6 +146,18 @@
     },
     "/events.kungtung_.hosts.fan-yishun": {
       "file": "src/routes/events.kungtung_.hosts.fan-yishun.tsx",
+      "ok": true,
+      "redirect": false,
+      "issues": []
+    },
+    "/events.soul-dinner": {
+      "file": "src/routes/events.soul-dinner.tsx",
+      "ok": true,
+      "redirect": false,
+      "issues": []
+    },
+    "/events.soul-dinner_.films.$film": {
+      "file": "src/routes/events.soul-dinner_.films.$film.tsx",
       "ok": true,
       "redirect": false,
       "issues": []

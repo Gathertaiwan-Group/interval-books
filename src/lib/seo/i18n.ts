@@ -132,6 +132,12 @@ export const ZH_ONLY_PATHS: readonly string[] = [
   "/events/kungtung/hosts/fan-yishun",
   "/events/sound-of-the-sea",
   "/events/city-salon-0922",
+  "/events/soul-dinner",
+  "/events/soul-dinner/films/light-walker-1",
+  "/events/soul-dinner/films/light-walker-2",
+  "/events/soul-dinner/films/miracle-of-life",
+  "/events/soul-dinner/films/soulmate",
+  "/events/soul-dinner/films/film-5",
 ];
 
 export function isZhOnlyPath(pathname: string): boolean {

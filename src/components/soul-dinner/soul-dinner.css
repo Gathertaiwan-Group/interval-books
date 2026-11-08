@@ -1,0 +1,120 @@
+/*
+ * 《小時光｜靈魂飯桌》（/events/soul-dinner 與 /events/soul-dinner/films/*）專用樣式。
+ *
+ * 色票、紙卡、墨線、背景暈染照業主的 Lovable 稿（soul-movie.lovable.app）styles.css。
+ * 全部掛在 .sd-root 底下，只影響這幾頁；稿上的 text-clay／bg-clay 直接沿用全站的
+ * clay 色名，所以在這裡把 --clay 換成稿上的值，gold 與 clay-foreground 全站沒有，用
+ * sd- 前綴的 class 補上。
+ *
+ * 全站 styles.css 的規則都在 @layer 裡，這支檔案不分層，同一個屬性以這裡為準。
+ */
+.sd-root {
+  --radius: 0.75rem;
+  --background: oklch(97.2% 0.014 85);
+  --foreground: oklch(27% 0.035 255);
+  --card: oklch(98.5% 0.01 85);
+  --card-foreground: oklch(27% 0.035 255);
+  --popover: oklch(98.5% 0.01 85);
+  --popover-foreground: oklch(27% 0.035 255);
+  --primary: oklch(35% 0.07 255);
+  --primary-foreground: oklch(97.5% 0.012 85);
+  --secondary: oklch(93% 0.025 75);
+  --secondary-foreground: oklch(30% 0.04 255);
+  --muted: oklch(94% 0.018 80);
+  --muted-foreground: oklch(50% 0.03 255);
+  --accent: oklch(90% 0.04 55);
+  --accent-foreground: oklch(38% 0.08 40);
+  --clay: oklch(60% 0.11 45);
+  --clay-foreground: oklch(98% 0.01 85);
+  --gold: oklch(76% 0.09 80);
+  --border: oklch(88% 0.025 80);
+  --input: oklch(86% 0.03 80);
+  --ring: oklch(60% 0.09 255);
+  --sd-serif: "Noto Serif TC", "Songti TC", serif;
+  --sd-sans: "Noto Sans TC", "PingFang TC", sans-serif;
+  --shadow-paper:
+    0 1px 0 color-mix(in oklab, var(--foreground) 4%, transparent),
+    0 12px 32px -18px color-mix(in oklab, var(--primary) 30%, transparent);
+
+  min-height: 100vh;
+  background-color: var(--background);
+  background-image:
+    radial-gradient(
+      ellipse at 20% 0%,
+      color-mix(in oklab, var(--primary) 10%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse at 90% 30%,
+      color-mix(in oklab, var(--clay) 10%, transparent),
+      transparent 55%
+    );
+  background-attachment: fixed;
+  color: var(--foreground);
+  font-family: var(--sd-sans);
+  line-height: 1.8;
+  letter-spacing: normal;
+  -webkit-font-smoothing: auto;
+}
+
+.sd-root h1,
+.sd-root h2,
+.sd-root h3,
+.sd-root h4 {
+  font-family: var(--sd-serif);
+  font-weight: inherit;
+  letter-spacing: 0.04em;
+}
+
+.sd-root .font-serif {
+  font-family: var(--sd-serif);
+}
+
+.sd-root .paper-card {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-paper);
+}
+
+.sd-root .ink-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--primary) 35%, transparent),
+    transparent
+  );
+}
+
+.sd-root .sd-text-gold {
+  color: var(--gold);
+}
+
+.sd-root .sd-ring-gold {
+  box-shadow:
+    0 0 0 1px var(--gold),
+    var(--shadow-paper);
+}
+
+.sd-root .sd-bg-gold-25 {
+  background-color: color-mix(in oklab, var(--gold) 25%, transparent);
+}
+
+.sd-root .sd-avatar {
+  background-image: linear-gradient(
+    to bottom right,
+    var(--accent),
+    var(--secondary),
+    color-mix(in oklab, var(--gold) 50%, transparent)
+  );
+}
+
+.sd-root .sd-btn-clay {
+  background-color: var(--clay);
+  color: var(--clay-foreground);
+}
+
+.sd-root .sd-btn-clay:hover {
+  background-color: color-mix(in oklab, var(--clay) 90%, transparent);
+}

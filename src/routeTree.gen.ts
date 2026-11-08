@@ -35,6 +35,7 @@ import { Route as EventsIndexRouteImport } from './routes/events.index'
 import { Route as EventsSlugRouteImport } from './routes/events.$slug'
 import { Route as EventsCitySalon0922RouteImport } from './routes/events.city-salon-0922'
 import { Route as EventsKungtungRouteImport } from './routes/events.kungtung'
+import { Route as EventsSoulDinnerRouteImport } from './routes/events.soul-dinner'
 import { Route as EventsSoundOfTheSeaRouteImport } from './routes/events.sound-of-the-sea'
 import { Route as NewsSplatRouteImport } from './routes/news.$'
 import { Route as OauthAuthorizeRouteImport } from './routes/oauth/authorize'
@@ -110,6 +111,7 @@ import { Route as AdminShellSalesSaleIdRouteImport } from './routes/admin/_shell
 import { Route as AdminShellStaffIdRouteImport } from './routes/admin/_shell.staff_.$id'
 import { Route as EventsKungtungHostsAliceRouteImport } from './routes/events.kungtung_.hosts.alice'
 import { Route as EventsKungtungHostsFanYishunRouteImport } from './routes/events.kungtung_.hosts.fan-yishun'
+import { Route as EventsSoulDinnerFilmsFilmRouteImport } from './routes/events.soul-dinner_.films.$film'
 import { Route as AdminShellInventoryCombosIdIndexRouteImport } from './routes/admin/_shell.inventory-combos_.$id.index'
 import { Route as AdminShellInventoryCombosIdEditRouteImport } from './routes/admin/_shell.inventory-combos_.$id.edit'
 import { Route as AdminShellInventoryProductsIdIndexRouteImport } from './routes/admin/_shell.inventory-products_.$id.index'
@@ -252,6 +254,11 @@ const EventsCitySalon0922Route = EventsCitySalon0922RouteImport.update({
 const EventsKungtungRoute = EventsKungtungRouteImport.update({
   id: '/events/kungtung',
   path: '/events/kungtung',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsSoulDinnerRoute = EventsSoulDinnerRouteImport.update({
+  id: '/events/soul-dinner',
+  path: '/events/soul-dinner',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EventsSoundOfTheSeaRoute = EventsSoundOfTheSeaRouteImport.update({
@@ -656,6 +663,12 @@ const EventsKungtungHostsFanYishunRoute =
     path: '/events/kungtung/hosts/fan-yishun',
     getParentRoute: () => rootRouteImport,
   } as any)
+const EventsSoulDinnerFilmsFilmRoute =
+  EventsSoulDinnerFilmsFilmRouteImport.update({
+    id: '/events/soul-dinner_/films/$film',
+    path: '/events/soul-dinner/films/$film',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AdminShellInventoryCombosIdIndexRoute =
   AdminShellInventoryCombosIdIndexRouteImport.update({
     id: '/',
@@ -760,6 +773,7 @@ export interface FileRoutesByFullPath {
   '/events/$slug': typeof EventsSlugRoute
   '/events/city-salon-0922': typeof EventsCitySalon0922Route
   '/events/kungtung': typeof EventsKungtungRoute
+  '/events/soul-dinner': typeof EventsSoulDinnerRoute
   '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
   '/news/$': typeof NewsSplatRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
@@ -837,6 +851,7 @@ export interface FileRoutesByFullPath {
   '/admin/staff/$id': typeof AdminShellStaffIdRoute
   '/events/kungtung/hosts/alice': typeof EventsKungtungHostsAliceRoute
   '/events/kungtung/hosts/fan-yishun': typeof EventsKungtungHostsFanYishunRoute
+  '/events/soul-dinner/films/$film': typeof EventsSoulDinnerFilmsFilmRoute
   '/admin/inventory-combos/$id/edit': typeof AdminShellInventoryCombosIdEditRoute
   '/admin/inventory-products/$id/edit': typeof AdminShellInventoryProductsIdEditRoute
   '/admin/inventory-vendors/$id/edit': typeof AdminShellInventoryVendorsIdEditRoute
@@ -875,6 +890,7 @@ export interface FileRoutesByTo {
   '/events/$slug': typeof EventsSlugRoute
   '/events/city-salon-0922': typeof EventsCitySalon0922Route
   '/events/kungtung': typeof EventsKungtungRoute
+  '/events/soul-dinner': typeof EventsSoulDinnerRoute
   '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
   '/news/$': typeof NewsSplatRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
@@ -947,6 +963,7 @@ export interface FileRoutesByTo {
   '/admin/staff/$id': typeof AdminShellStaffIdRoute
   '/events/kungtung/hosts/alice': typeof EventsKungtungHostsAliceRoute
   '/events/kungtung/hosts/fan-yishun': typeof EventsKungtungHostsFanYishunRoute
+  '/events/soul-dinner/films/$film': typeof EventsSoulDinnerFilmsFilmRoute
   '/admin/inventory-combos/$id/edit': typeof AdminShellInventoryCombosIdEditRoute
   '/admin/inventory-products/$id/edit': typeof AdminShellInventoryProductsIdEditRoute
   '/admin/inventory-vendors/$id/edit': typeof AdminShellInventoryVendorsIdEditRoute
@@ -987,6 +1004,7 @@ export interface FileRoutesById {
   '/events/$slug': typeof EventsSlugRoute
   '/events/city-salon-0922': typeof EventsCitySalon0922Route
   '/events/kungtung': typeof EventsKungtungRoute
+  '/events/soul-dinner': typeof EventsSoulDinnerRoute
   '/events/sound-of-the-sea': typeof EventsSoundOfTheSeaRoute
   '/news/$': typeof NewsSplatRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
@@ -1064,6 +1082,7 @@ export interface FileRoutesById {
   '/admin/_shell/staff_/$id': typeof AdminShellStaffIdRoute
   '/events/kungtung_/hosts/alice': typeof EventsKungtungHostsAliceRoute
   '/events/kungtung_/hosts/fan-yishun': typeof EventsKungtungHostsFanYishunRoute
+  '/events/soul-dinner_/films/$film': typeof EventsSoulDinnerFilmsFilmRoute
   '/admin/_shell/inventory-combos_/$id/edit': typeof AdminShellInventoryCombosIdEditRoute
   '/admin/_shell/inventory-products_/$id/edit': typeof AdminShellInventoryProductsIdEditRoute
   '/admin/_shell/inventory-vendors_/$id/edit': typeof AdminShellInventoryVendorsIdEditRoute
@@ -1105,6 +1124,7 @@ export interface FileRouteTypes {
     | '/events/$slug'
     | '/events/city-salon-0922'
     | '/events/kungtung'
+    | '/events/soul-dinner'
     | '/events/sound-of-the-sea'
     | '/news/$'
     | '/oauth/authorize'
@@ -1182,6 +1202,7 @@ export interface FileRouteTypes {
     | '/admin/staff/$id'
     | '/events/kungtung/hosts/alice'
     | '/events/kungtung/hosts/fan-yishun'
+    | '/events/soul-dinner/films/$film'
     | '/admin/inventory-combos/$id/edit'
     | '/admin/inventory-products/$id/edit'
     | '/admin/inventory-vendors/$id/edit'
@@ -1220,6 +1241,7 @@ export interface FileRouteTypes {
     | '/events/$slug'
     | '/events/city-salon-0922'
     | '/events/kungtung'
+    | '/events/soul-dinner'
     | '/events/sound-of-the-sea'
     | '/news/$'
     | '/oauth/authorize'
@@ -1292,6 +1314,7 @@ export interface FileRouteTypes {
     | '/admin/staff/$id'
     | '/events/kungtung/hosts/alice'
     | '/events/kungtung/hosts/fan-yishun'
+    | '/events/soul-dinner/films/$film'
     | '/admin/inventory-combos/$id/edit'
     | '/admin/inventory-products/$id/edit'
     | '/admin/inventory-vendors/$id/edit'
@@ -1331,6 +1354,7 @@ export interface FileRouteTypes {
     | '/events/$slug'
     | '/events/city-salon-0922'
     | '/events/kungtung'
+    | '/events/soul-dinner'
     | '/events/sound-of-the-sea'
     | '/news/$'
     | '/oauth/authorize'
@@ -1408,6 +1432,7 @@ export interface FileRouteTypes {
     | '/admin/_shell/staff_/$id'
     | '/events/kungtung_/hosts/alice'
     | '/events/kungtung_/hosts/fan-yishun'
+    | '/events/soul-dinner_/films/$film'
     | '/admin/_shell/inventory-combos_/$id/edit'
     | '/admin/_shell/inventory-products_/$id/edit'
     | '/admin/_shell/inventory-vendors_/$id/edit'
@@ -1448,6 +1473,7 @@ export interface RootRouteChildren {
   EventsSlugRoute: typeof EventsSlugRoute
   EventsCitySalon0922Route: typeof EventsCitySalon0922Route
   EventsKungtungRoute: typeof EventsKungtungRoute
+  EventsSoulDinnerRoute: typeof EventsSoulDinnerRoute
   EventsSoundOfTheSeaRoute: typeof EventsSoundOfTheSeaRoute
   OauthAuthorizeRoute: typeof OauthAuthorizeRoute
   PublicationsSlugRoute: typeof PublicationsSlugRoute
@@ -1461,6 +1487,7 @@ export interface RootRouteChildren {
   ShopIndexRoute: typeof ShopIndexRoute
   EventsKungtungHostsAliceRoute: typeof EventsKungtungHostsAliceRoute
   EventsKungtungHostsFanYishunRoute: typeof EventsKungtungHostsFanYishunRoute
+  EventsSoulDinnerFilmsFilmRoute: typeof EventsSoulDinnerFilmsFilmRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1645,6 +1672,13 @@ declare module '@tanstack/react-router' {
       path: '/events/kungtung'
       fullPath: '/events/kungtung'
       preLoaderRoute: typeof EventsKungtungRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/soul-dinner': {
+      id: '/events/soul-dinner'
+      path: '/events/soul-dinner'
+      fullPath: '/events/soul-dinner'
+      preLoaderRoute: typeof EventsSoulDinnerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/events/sound-of-the-sea': {
@@ -2172,6 +2206,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EventsKungtungHostsFanYishunRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/events/soul-dinner_/films/$film': {
+      id: '/events/soul-dinner_/films/$film'
+      path: '/events/soul-dinner/films/$film'
+      fullPath: '/events/soul-dinner/films/$film'
+      preLoaderRoute: typeof EventsSoulDinnerFilmsFilmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/_shell/inventory-combos_/$id/': {
       id: '/admin/_shell/inventory-combos_/$id/'
       path: '/'
@@ -2551,6 +2592,7 @@ const rootRouteChildren: RootRouteChildren = {
   EventsSlugRoute: EventsSlugRoute,
   EventsCitySalon0922Route: EventsCitySalon0922Route,
   EventsKungtungRoute: EventsKungtungRoute,
+  EventsSoulDinnerRoute: EventsSoulDinnerRoute,
   EventsSoundOfTheSeaRoute: EventsSoundOfTheSeaRoute,
   OauthAuthorizeRoute: OauthAuthorizeRoute,
   PublicationsSlugRoute: PublicationsSlugRoute,
@@ -2564,6 +2606,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShopIndexRoute: ShopIndexRoute,
   EventsKungtungHostsAliceRoute: EventsKungtungHostsAliceRoute,
   EventsKungtungHostsFanYishunRoute: EventsKungtungHostsFanYishunRoute,
+  EventsSoulDinnerFilmsFilmRoute: EventsSoulDinnerFilmsFilmRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
