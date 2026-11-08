@@ -17,6 +17,7 @@
  */
 import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
+import { findIdsByNoteBarcode, normalizeScannedCode } from "@/lib/admin/note-barcode";
 
 /** 0016 的 inv_admin_products。與 inv_pos_products 不同，這一支含待審／停用／租借。 */
 export type AdminProductRow = {
@@ -150,9 +151,15 @@ export async function listAdminProducts(
     if (safe) {
       // 來源只搜 name 與 issue_number。條碼搜不到是店員每天都會撞到的事
       // （手上拿著書、掃不出來、想用條碼查），所以這裡多加三個欄位。
+      // 約 723 筆的條碼只寫在備註（「條碼: 636864」），barcode 欄是空的。關鍵字長得像條碼
+      // （純英數）時，另外用備註比對一次，命中的 id 併進同一個 or()。備註比對是**整碼相等**
+      // （見 lib/admin/note-barcode.ts），不會因為部分數字而多跑出一堆列。
+      const noteIds = normalizeScannedCode(safe) ? await findInvProductIdsByNoteBarcode(safe) : [];
+      const noteClause = noteIds.length ? `,inv_product_id.in.(${noteIds.join(",")})` : "";
       query = query.or(
         `name.ilike.%${safe}%,issue_number.ilike.%${safe}%,barcode.ilike.%${safe}%,` +
-          `series.ilike.%${safe}%,publisher.ilike.%${safe}%`,
+          `series.ilike.%${safe}%,publisher.ilike.%${safe}%` +
+          noteClause,
       );
     }
   }
@@ -160,6 +167,27 @@ export async function listAdminProducts(
   const { data, error, count } = await query;
   if (error) throw new Error(`[repo/inv-products] 商品清單讀取失敗：${error.message}`);
   return { rows: (data ?? []) as unknown as AdminProductRow[], total: count ?? 0 };
+}
+
+/**
+ * 條碼寫在備註裡（「條碼: 636864」）的商品 id。全部商品都看（含停用／待審／租借），由呼叫端
+ * 自己再套範圍 —— 櫃檯那一支會再過 inv_pos_products，所以賣不動的不會被掃進購物車。
+ *
+ * 兩段式：資料庫 ILIKE 粗篩（碼已轉義 \ % _）→ 程式端整碼相等精篩。輸入不是純英數 → 空陣列、不打資料庫。
+ * 排序固定（name, inv_product_id），多筆命中時每次回來的第一筆都一樣。
+ */
+export async function findInvProductIdsByNoteBarcode(code: string): Promise<string[]> {
+  return findIdsByNoteBarcode(code, async (pattern, limit) => {
+    const { data, error } = await supabaseAdmin()
+      .from("inv_admin_products")
+      .select("inv_product_id, notes")
+      .ilike("notes", pattern)
+      .order("name", { ascending: true })
+      .order("inv_product_id", { ascending: true })
+      .limit(limit);
+    if (error) throw new Error(`[repo/inv-products] 備註條碼查詢失敗：${error.message}`);
+    return (data ?? []) as { inv_product_id: string; notes: string | null }[];
+  });
 }
 
 /** 一件商品。編輯與詳細頁用，不走清單那一份分頁快取。 */

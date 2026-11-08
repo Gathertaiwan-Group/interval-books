@@ -386,8 +386,9 @@ console.log("\n[5] 瘦身");
     checkTrue(`櫃檯商品清單仍帶 ${c}`, cols.split(/,\s*/).includes(c));
   }
   checkTrue(
-    "listPosProducts 與條碼查詢用同一份欄位",
-    (sales.match(/\.select\(POS_PRODUCT_COLUMNS\)/g) ?? []).length === 2,
+    // 3 處：listPosProducts、條碼查詢的 barcode 欄那一段、備註條碼那一段（2026-11-08）。
+    "listPosProducts 與條碼查詢（barcode 欄＋備註兩段）用同一份欄位",
+    (sales.match(/\.select\(POS_PRODUCT_COLUMNS\)/g) ?? []).length === 3,
   );
 
   const combos = code("src/lib/admin/fns/inv-combos.ts");

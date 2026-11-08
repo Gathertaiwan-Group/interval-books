@@ -14,6 +14,7 @@
 import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
 import { readAllPages } from "@/server/repos/read-all-pages";
+import { findInvProductIdsByNoteBarcode } from "@/server/repos/inv-products";
 
 /**
  * 櫃檯賣得動的品項。available 已經是**銷售單位**，前端不要再乘 pack_size。
@@ -183,15 +184,40 @@ export async function listComboPickerProducts(): Promise<ComboPickerProduct[]> {
  * 有人剛在進銷存那邊建了新品項，店員不該為此重整頁面。
  */
 export async function findPosProductByBarcode(barcode: string): Promise<PosProduct | null> {
+  const code = barcode.trim();
+  if (!code) return null;
+
+  // 1. barcode 欄精確比對（eq 不是萬用字元比對，任何字元都安全）。
   const { data, error } = await supabaseAdmin()
     .from("inv_pos_products")
     .select(POS_PRODUCT_COLUMNS)
-    .eq("barcode", barcode)
+    .eq("barcode", code)
     .limit(1)
     .maybeSingle();
 
   if (error) throw new Error(`[repo/inv-sales] 條碼查詢失敗：${error.message}`);
-  return (data as unknown as PosProduct | null) ?? null;
+  if (data) return data as unknown as PosProduct;
+
+  // 2. 備註裡的條碼（舊系統 QuickSaleScanner 的第二段比對）。正式庫約 723 筆的條碼只在這裡。
+  //    inv_pos_products 沒有 notes 欄（0014），所以先在 inv_admin_products 找出 id，再回到
+  //    inv_pos_products 取櫃檯欄位 —— 賣不動的（停用／待審／租借）自然會被這一步濾掉。
+  //    非純英數的輸入在 findInvProductIdsByNoteBarcode 裡直接回空，不會組成 ILIKE。
+  const ids = await findInvProductIdsByNoteBarcode(code);
+  if (ids.length === 0) return null;
+
+  const { data: rows, error: e2 } = await supabaseAdmin()
+    .from("inv_pos_products")
+    .select(POS_PRODUCT_COLUMNS)
+    .in("inv_product_id", ids);
+  if (e2) throw new Error(`[repo/inv-sales] 備註條碼查詢失敗：${e2.message}`);
+
+  // 多筆命中時與 barcode 那一段一樣只回一筆；取 ids 的順序（name, id）讓每次都是同一筆。
+  const list = (rows ?? []) as unknown as PosProduct[];
+  for (const id of ids) {
+    const hit = list.find((r) => r.inv_product_id === id);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 export async function listPosPaymentMethods(): Promise<PosPaymentMethod[]> {
