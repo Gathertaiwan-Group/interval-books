@@ -22,8 +22,8 @@ import { buildCalendarIcs, type CalendarInput } from "@/lib/calendar-ics";
 
 export const CALENDAR_CACHE = "public, max-age=0, s-maxage=900, stale-while-revalidate=3600";
 
-/** site_settings 讀不到時的最後退路（華山小時光風土誌書店）。 */
-const FALLBACK_STORE_ADDRESS = "小時光風土誌書店";
+/** site_settings 讀不到時的最後退路（華山小時光書店）。 */
+const FALLBACK_STORE_ADDRESS = "小時光書店";
 
 export async function collectCalendarInput(now: Date = new Date()): Promise<CalendarInput> {
   const [events, products, sessions, plans, journeys, settings] = await Promise.all([

@@ -53,9 +53,9 @@ import exhibitionImg from "@/assets/exhibition-corner.jpg";
 /** Fallback copy — used when pages/'partnership' has no row (currently: always). */
 const PAGE = {
   metaTitle: {
-    zh: "異業合作 Partnership｜小時光風土誌書店",
+    zh: "異業合作 Partnership｜小時光書店",
     en: "Partnership｜Interval Books",
-    ja: "協働・コラボレーションのご相談｜小時光 風土誌書店",
+    ja: "協働・コラボレーションのご相談｜小時光書店",
   },
   metaDescription: {
     zh: "想在華山辦活動、展覽、選物寄賣、品牌聯名、企業包場或講座工作坊？這一頁說明六種合作形式、從填表到執行的流程、過去的合作案例與常見問題。留下你的想法，我們 3 個工作天內回覆。",
@@ -280,7 +280,7 @@ const LABEL: Record<string, Localized> = {
   consentA: { zh: "我已閱讀並同意", en: "I have read and agree to the", ja: "" },
   consentLink: { zh: "隱私權政策", en: "privacy policy", ja: "プライバシーポリシー" },
   consentB: {
-    zh: "，同意小時光風土誌書店使用以上資料與我聯繫合作事宜。",
+    zh: "，同意小時光書店使用以上資料與我聯繫合作事宜。",
     en: ", and agree that Interval Books may use these details to contact me about this inquiry.",
     ja: "に同意し、本件のご連絡に上記情報を利用することを承諾します。",
   },

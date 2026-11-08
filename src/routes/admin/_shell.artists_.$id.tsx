@@ -26,8 +26,8 @@ export const Route = createFileRoute("/admin/_shell/artists_/$id")({
     meta: [
       {
         title: loaderData?.artist
-          ? `編輯講者：${loaderData.artist.name}｜小時光風土誌書店後台`
-          : "講者｜小時光風土誌書店後台",
+          ? `編輯講者：${loaderData.artist.name}｜小時光書店後台`
+          : "講者｜小時光書店後台",
       },
     ],
   }),

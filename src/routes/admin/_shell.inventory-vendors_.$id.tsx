@@ -25,8 +25,8 @@ export const Route = createFileRoute("/admin/_shell/inventory-vendors_/$id")({
     meta: [
       {
         title: loaderData?.data?.row
-          ? `${loaderData.data.row.name}｜廠商｜小時光風土誌書店後台`
-          : "廠商｜小時光風土誌書店後台",
+          ? `${loaderData.data.row.name}｜廠商｜小時光書店後台`
+          : "廠商｜小時光書店後台",
       },
     ],
   }),

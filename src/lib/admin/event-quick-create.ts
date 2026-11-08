@@ -97,13 +97,13 @@ export type QuickCreateInput = {
  * ------------------------------------------------------------------ */
 
 /**
- * 預設地點的三語。2026-11 品牌統一改成「小時光風土誌書店」（舊場次如《海的聲音》仍寫「小時光書店（…）」，
+ * 預設地點的三語。店名「小時光書店」（11-02～11-08 間建立的場次可能寫「小時光風土誌書店（…）」，
  * 不影響：isStoreLocation() 以「小時光」判斷，兩種寫法都認得）。
  */
 export const DEFAULT_LOCATION: Localized = {
-  zh: "小時光風土誌書店（華山文創園區 紅磚六合院 西 7-3 館）",
+  zh: "小時光書店（華山文創園區 紅磚六合院 西 7-3 館）",
   en: "Interval Books, Red Brick Six Halls West 7-3, Huashan 1914 Creative Park, Taipei",
-  ja: "小時光 風土誌書店（華山1914文化創意産業園区 赤レンガ六合院 西7-3館）",
+  ja: "小時光書店（華山1914文化創意産業園区 赤レンガ六合院 西7-3館）",
 };
 
 export const DEFAULT_CAPACITY = 30;

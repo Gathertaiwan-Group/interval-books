@@ -12,9 +12,9 @@ import { useSiteContent } from "@/lib/site-content";
 /** Fallback copy — used only when the Supabase read fails. */
 const PAGE = {
   metaTitle: {
-    zh: "策展與合作 Curation｜小時光風土誌書店",
+    zh: "策展與合作 Curation｜小時光書店",
     en: "Curation & Collaboration｜Interval Books",
-    ja: "キュレーションと協働｜小時光 風土誌書店",
+    ja: "キュレーションと協働｜小時光書店",
   },
   metaDescription: {
     zh: "策展不只是擺放，是讓人、物、空間彼此看見。我們為節慶設計療癒藝術節現場、為旅宿與咖啡館策劃選書選物、做書與茶器的主題展售，也替品牌設計閱讀活動與企業接待。合作歡迎來信。",

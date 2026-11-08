@@ -178,7 +178,7 @@ console.log("\n[2] loader：一支 fn、授權與原本相同");
     );
   }
   for (const f of [LAYOUT, NEW])
-    checkTrue(`${f}：head() 標題含「小時光風土誌書店後台」`, /小時光風土誌書店後台/.test(src(f)));
+    checkTrue(`${f}：head() 標題含「小時光書店後台」`, /小時光書店後台/.test(src(f)));
   checkTrue(
     "找不到場次 → AdminDetailNotFound",
     /AdminDetailNotFound/.test(src(ROSTER)) && /AdminDetailNotFound/.test(src(EDIT)),

@@ -52,7 +52,7 @@ export const Route = createFileRoute("/admin/_shell/inventory-combos")({
     const { getInventoryCombosPageData } = await import("@/lib/admin/fns/inv-combos");
     return await getInventoryCombosPageData({ data: DEFAULT_FILTER });
   },
-  head: () => ({ meta: [{ title: "套餐｜小時光風土誌書店後台" }] }),
+  head: () => ({ meta: [{ title: "套餐｜小時光書店後台" }] }),
   component: InventoryCombosPage,
 });
 

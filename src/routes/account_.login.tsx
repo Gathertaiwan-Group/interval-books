@@ -41,14 +41,14 @@ type LoginValues = z.infer<typeof loginSchema>;
 
 const META = {
   title: {
-    zh: "會員登入｜小時光風土誌書店",
+    zh: "會員登入｜小時光書店",
     en: "Sign In｜Interval Books",
-    ja: "ログイン｜小時光 風土誌書店",
+    ja: "ログイン｜小時光書店",
   },
   description: {
-    zh: "登入小時光風土誌書店會員帳號，查看你的訂單與活動報名紀錄。",
+    zh: "登入小時光書店會員帳號，查看你的訂單與活動報名紀錄。",
     en: "Sign in to your Interval Books account to view your orders and event registrations.",
-    ja: "小時光 風土誌書店の会員アカウントにログインし、ご注文とイベント申込みをご確認いただけます。",
+    ja: "小時光書店の会員アカウントにログインし、ご注文とイベント申込みをご確認いただけます。",
   },
 };
 
@@ -95,7 +95,7 @@ function AccountLoginPage() {
           <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-muted">
             <UserRound className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
           </div>
-          <p className="text-sm text-muted-foreground">小時光風土誌書店 Interval Books</p>
+          <p className="text-sm text-muted-foreground">小時光書店 Interval Books</p>
           <h1 className="text-xl font-medium">會員登入</h1>
         </div>
 

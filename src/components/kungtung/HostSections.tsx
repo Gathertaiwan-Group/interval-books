@@ -519,10 +519,10 @@ export function AliceHeader() {
           Alice 劉柳樺
           <span className="kt-host-role">｜文化策旅人</span>
         </h1>
-        <p className="kt-host-signature">小時光風土誌書店主理人 × 馥自然人文空間策旅主理人</p>
+        <p className="kt-host-signature">小時光書店主理人 × 馥自然人文空間策旅主理人</p>
         <p className="kt-host-introduction">把文化帶進生活，把相遇變成值得珍藏的記憶。</p>
         <p className="kt-body-copy">
-          從台北華山的小時光風土誌書店，到台東山海間的馥自然，Alice
+          從台北華山的小時光書店，到台東山海間的馥自然，Alice
           始終相信，文化不只存在於書本與展覽之中，也存在於一席餐桌、建築、音樂，以及人與人真誠相遇的時刻。
         </p>
       </div>
@@ -536,7 +536,7 @@ export function AliceSection1() {
       <h2 className="kt-host-page-heading">經歷</h2>
       <div className="kt-host-roles">
         <article>
-          <h3>小時光風土誌書店｜主理人・策展人</h3>
+          <h3>小時光書店｜主理人・策展人</h3>
           <p>
             位於台北華山 1914
             文化創意產業園區。從一櫃書、一張長桌開始，慢慢有了陶藝家的器物、地方夥伴的選物，以及每月一場的讀書會。
@@ -582,7 +582,7 @@ export function AliceSection3() {
       <ul className="kt-host-media-list">
         <li>
           <a href="https://www.intervalbooks.tw/about" target="_blank" rel="noopener noreferrer">
-            <span className="kt-host-media-source">小時光風土誌書店 Interval Books</span>
+            <span className="kt-host-media-source">小時光書店 Interval Books</span>
             <span className="kt-host-media-title">關於小時光</span>
             <svg
               xmlns="http://www.w3.org/2000/svg"

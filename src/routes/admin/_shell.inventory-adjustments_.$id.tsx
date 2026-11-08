@@ -46,8 +46,8 @@ export const Route = createFileRoute("/admin/_shell/inventory-adjustments_/$id")
     meta: [
       {
         title: loaderData?.adjustment
-          ? `異動單 ${loaderData.adjustment.adjustment_number ?? "（無單號）"}｜小時光風土誌書店後台`
-          : "在庫異動｜小時光風土誌書店後台",
+          ? `異動單 ${loaderData.adjustment.adjustment_number ?? "（無單號）"}｜小時光書店後台`
+          : "在庫異動｜小時光書店後台",
       },
     ],
   }),

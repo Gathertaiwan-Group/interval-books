@@ -16,7 +16,7 @@ export const Route = createFileRoute("/admin/_shell/inventory-purchases_/new")({
     const { options } = await getInventoryPurchaseFormPageData({ data: { purchaseId: null } });
     return { options };
   },
-  head: () => ({ meta: [{ title: "新增進貨｜小時光風土誌書店後台" }] }),
+  head: () => ({ meta: [{ title: "新增進貨｜小時光書店後台" }] }),
   component: PurchaseNewPage,
 });
 

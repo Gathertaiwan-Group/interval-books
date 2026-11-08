@@ -53,7 +53,7 @@ export const Route = createFileRoute("/admin/_shell/phones")({
     return { phones };
   },
   head: () => ({
-    meta: [{ title: "聯絡電話｜小時光風土誌書店後台" }],
+    meta: [{ title: "聯絡電話｜小時光書店後台" }],
   }),
   component: AdminPhonesPage,
 });

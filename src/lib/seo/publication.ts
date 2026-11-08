@@ -108,8 +108,8 @@ export function publisherShort(publisher: string): string {
 const TITLE_LIMIT: Record<Lang, number> = { zh: 40, ja: 40, en: 70 };
 
 /**
- * 「東北風｜基隆・八斗子漁村文物館｜地方刊物｜小時光風土誌書店」。
- * 太長 → 「東北風｜基隆｜地方刊物｜小時光風土誌書店」（刊名本身再長也不截——那是要被搜到的字）。
+ * 「東北風｜基隆・八斗子漁村文物館｜地方刊物｜小時光書店」。
+ * 太長 → 「東北風｜基隆｜地方刊物｜小時光書店」（刊名本身再長也不截——那是要被搜到的字）。
  */
 export function publicationTitle(entry: PublicationSeoInput): Localized {
   const region = publicationRegionLabel(entry);
@@ -177,8 +177,8 @@ export function publicationFiller(entry: PublicationSeoInput): Localized {
     if (lang === "en")
       return `Kept at Interval Books to browse in store: a local publication from ${where}${who ? `, made by ${who}` : ""}${issues ? ` (${issues})` : ""}.`;
     if (lang === "ja")
-      return `小時光 風土誌書店の店頭で閲覧できる、${where}の地域の刊行物${who ? `。発行は${who}` : ""}${issues ? `（${issues}）` : ""}。`;
-    return `收藏在小時光風土誌書店、可到店翻閱的${where}地方刊物${who ? `，由${who}製作` : ""}${issues ? `，店內有 ${issues}` : ""}。`;
+      return `小時光書店の店頭で閲覧できる、${where}の地域の刊行物${who ? `。発行は${who}` : ""}${issues ? `（${issues}）` : ""}。`;
+    return `收藏在小時光書店、可到店翻閱的${where}地方刊物${who ? `，由${who}製作` : ""}${issues ? `，店內有 ${issues}` : ""}。`;
   };
   return { zh: build("zh"), en: build("en"), ja: build("ja") };
 }

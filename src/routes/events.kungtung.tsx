@@ -85,9 +85,9 @@ import kungtungCss from "@/components/kungtung/kungtung.css?url";
 /** 三語 meta。⚠️ 必須是頂層靜態常數、每一句都是字面值——check-meta.mjs 靜態解析這個物件。 */
 const PAGE = {
   metaTitle: {
-    zh: "范毅舜公東教堂文化之旅｜台東三天兩夜｜小時光風土誌書店",
+    zh: "范毅舜公東教堂文化之旅｜台東三天兩夜｜小時光書店",
     en: "Nicholas Fan's Kung Tung Chapel Cultural Journey｜Taitung, 3 Days 2 Nights｜Interval Books",
-    ja: "范毅舜と巡る公東教会文化の旅｜台東2泊3日｜小時光 風土誌書店",
+    ja: "范毅舜と巡る公東教会文化の旅｜台東2泊3日｜小時光書店",
   },
   metaDescription: {
     zh: "2026.12.04–12.06｜台東・三天兩夜。跟著范毅舜讀懂一座教堂，跟著 Alice 感受一種生活。范毅舜親自導覽公東教堂、入住 INNTERVAL 馥自然人文空間。旅程費用 NT$19,800／人起。",

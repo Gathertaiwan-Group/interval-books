@@ -87,7 +87,7 @@ export function renderPartnershipEmail(
     "",
     "──",
     hint,
-    "這封信由小時光風土誌書店官網的異業合作表單自動寄出。",
+    "這封信由小時光書店官網的異業合作表單自動寄出。",
   ].join("\n");
 
   const tr = (r: Row) =>
@@ -106,7 +106,7 @@ export function renderPartnershipEmail(
     `<p style="font-size:14px;line-height:1.8;margin:0;white-space:pre-wrap;word-break:break-word">${escapeHtml(v.message)}</p>` +
     `</div>` +
     `<p style="font-size:12px;line-height:1.7;color:#8a8175;margin:24px 0 0;padding-top:12px;border-top:1px solid #e7e1d8">` +
-    `${escapeHtml(hint)}<br>這封信由小時光風土誌書店官網的異業合作表單自動寄出。</p>` +
+    `${escapeHtml(hint)}<br>這封信由小時光書店官網的異業合作表單自動寄出。</p>` +
     `</div>`;
 
   return { subject, text, html };

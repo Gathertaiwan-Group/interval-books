@@ -39,9 +39,9 @@ import curatedImg from "@/assets/curated-objects.jpg";
 /** Fallback copy — used only when the Supabase read fails. */
 const PAGE = {
   metaTitle: {
-    zh: "選物 Shop｜小時光風土誌書店",
+    zh: "選物 Shop｜小時光書店",
     en: "Selection｜Interval Books",
-    ja: "セレクト｜小時光 風土誌書店",
+    ja: "セレクト｜小時光書店",
   },
   metaDescription: {
     zh: "在線上帶走一本地方刊物：從基隆的東北風到新北的緬甸街，每一本都標上製作單位、價格與剩餘數量，可宅配或超商取貨。旁邊的分頁還有完整的地方刊物展，與主理人的選品櫥窗。",
@@ -70,9 +70,9 @@ const PAGE = {
    * （'publications'／'curated'）以後台的為準，這裡是退路。
    */
   publicationsMetaTitle: {
-    zh: "地方刊物 Local Publications｜小時光風土誌書店",
+    zh: "地方刊物 Local Publications｜小時光書店",
     en: "Local Publications｜Interval Books",
-    ja: "地域の刊行物｜小時光 風土誌書店",
+    ja: "地域の刊行物｜小時光書店",
   },
   publicationsMetaDescription: {
     zh: "一個地方，怎麼被自己的人寫下來：從基隆的漁村到日本的山間小鎮，台灣與日本的地方刊物依地區排在同一張桌上。每一本附上製作單位與集數，部分可線上購買，其餘歡迎到店翻閱。",
@@ -80,9 +80,9 @@ const PAGE = {
     ja: "土地が、そこに暮らす人の手で書き残される。基隆の漁村から日本の山あいの町まで、台湾と日本の地域誌を地域別に紹介。発行元と号数つきで、一部はオンラインでも購入できます。",
   },
   curatedMetaTitle: {
-    zh: "主理人的選品 Curated｜小時光風土誌書店",
+    zh: "主理人的選品 Curated｜小時光書店",
     en: "The Owner's Curated Window｜Interval Books",
-    ja: "店主の選品｜小時光 風土誌書店",
+    ja: "店主の選品｜小時光書店",
   },
   curatedMetaDescription: {
     zh: "主理人的選品不是商品清單，而是三個主題櫥窗：地方風土（桂花蜜、東海岸海鹽、阿里山烏龍）、器物與陶（粗陶茶碗、白瓷小皿）、茶與日常（焙茶包、海鹽可可）。想帶走，歡迎到店或用 Email、LINE 詢問。",

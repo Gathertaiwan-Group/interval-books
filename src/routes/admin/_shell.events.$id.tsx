@@ -356,10 +356,7 @@ export const Route = createFileRoute("/admin/_shell/events/$id")({
   head: ({ params }) => ({
     meta: [
       {
-        title:
-          params.id === NEW_EVENT_ID
-            ? "新增活動｜小時光風土誌書店後台"
-            : "編輯活動｜小時光風土誌書店後台",
+        title: params.id === NEW_EVENT_ID ? "新增活動｜小時光書店後台" : "編輯活動｜小時光書店後台",
       },
     ],
   }),

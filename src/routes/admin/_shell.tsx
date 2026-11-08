@@ -319,7 +319,7 @@ function AdminShell() {
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader className="px-3 py-3">
-          <p className="text-sm font-medium leading-tight">小時光風土誌書店</p>
+          <p className="text-sm font-medium leading-tight">小時光書店</p>
           <p className="text-xs leading-tight text-muted-foreground">管理後台</p>
         </SidebarHeader>
         <SidebarContent>

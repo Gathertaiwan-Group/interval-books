@@ -48,14 +48,14 @@ type RegisterValues = z.infer<typeof registerSchema>;
 
 const META = {
   title: {
-    zh: "註冊會員｜小時光風土誌書店",
+    zh: "註冊會員｜小時光書店",
     en: "Create Account｜Interval Books",
-    ja: "新規登録｜小時光 風土誌書店",
+    ja: "新規登録｜小時光書店",
   },
   description: {
-    zh: "註冊小時光風土誌書店會員帳號，訂單與活動報名都能隨時回來查詢。",
+    zh: "註冊小時光書店會員帳號，訂單與活動報名都能隨時回來查詢。",
     en: "Create an Interval Books account so you can always find your way back to your orders and event registrations.",
-    ja: "小時光 風土誌書店の会員登録。ご注文やイベント申込みをいつでもご確認いただけます。",
+    ja: "小時光書店の会員登録。ご注文やイベント申込みをいつでもご確認いただけます。",
   },
 };
 
@@ -121,7 +121,7 @@ function AccountRegisterPage() {
           <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-muted">
             <UserRoundPlus className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
           </div>
-          <p className="text-sm text-muted-foreground">小時光風土誌書店 Interval Books</p>
+          <p className="text-sm text-muted-foreground">小時光書店 Interval Books</p>
           <h1 className="text-xl font-medium">註冊會員</h1>
         </div>
 

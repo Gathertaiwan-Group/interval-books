@@ -153,7 +153,7 @@ console.log("\n[2] route：一頁一支 fn、詳情→編輯不重抓");
     /readAdminPeek<\w+>\("combo", id\)/.test(layout),
   );
   checkTrue("layout 的 component 是 Outlet", /component: Outlet/.test(layout));
-  checkTrue("layout 的 head 給標題", /｜套餐｜小時光風土誌書店後台/.test(layout));
+  checkTrue("layout 的 head 給標題", /｜套餐｜小時光書店後台/.test(layout));
 
   for (const f of [INDEX, EDIT]) {
     const src = stripComments(read(f));
@@ -178,7 +178,7 @@ console.log("\n[2] route：一頁一支 fn、詳情→編輯不重抓");
   check("新增頁 loader 只叫一支 fn：listComboFormOptions", loaderCalls(neu), [
     "listComboFormOptions",
   ]);
-  checkTrue("新增頁 head 給標題", /新增套餐｜小時光風土誌書店後台/.test(neu));
+  checkTrue("新增頁 head 給標題", /新增套餐｜小時光書店後台/.test(neu));
   checkTrue("新增頁存檔後 replace 到詳情", /replace: true/.test(neu));
 
   const index = stripComments(read(INDEX));

@@ -59,7 +59,7 @@ export const Route = createFileRoute("/admin/_shell/journeys")({
     return { ...(await getAdminJourneysPageData()), now: Date.now() };
   },
   head: () => ({
-    meta: [{ title: "策旅｜小時光風土誌書店後台" }],
+    meta: [{ title: "策旅｜小時光書店後台" }],
   }),
   component: AdminJourneysPage,
 });

@@ -31,8 +31,8 @@ export const Route = createFileRoute("/admin/_shell/referrals_/$id")({
     meta: [
       {
         title: loaderData?.referrer
-          ? `編輯推廣者：${loaderData.referrer.name}｜小時光風土誌書店後台`
-          : "推廣與分潤｜小時光風土誌書店後台",
+          ? `編輯推廣者：${loaderData.referrer.name}｜小時光書店後台`
+          : "推廣與分潤｜小時光書店後台",
       },
     ],
   }),

@@ -28,9 +28,9 @@ import eventImg from "@/assets/event-reading.jpg";
 /** Fallback copy — used only when the Supabase read fails. */
 const PAGE = {
   metaTitle: {
-    zh: "活動 Events｜小時光風土誌書店",
+    zh: "活動 Events｜小時光書店",
     en: "Events｜Interval Books",
-    ja: "イベント｜小時光 風土誌書店",
+    ja: "イベント｜小時光書店",
   },
   metaDescription: {
     zh: "在書店裡一起讀：讀書會、繪本分享會、陶作閱讀課與城市思享沙龍。這一頁整理正在報名與已結束的活動，附上日期與簡介，點進去就是每一場活動的專屬頁面與報名方式。",

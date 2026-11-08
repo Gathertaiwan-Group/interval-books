@@ -101,7 +101,7 @@ const SHORT = {
 // =============================================================================
 console.log("\n[1] title：「刊名｜地區・出版單位｜地方刊物｜店名」，太長就拿掉出版單位");
 const t1 = pub.publicationTitle(TW001);
-check("tw-001 中文 title", t1.zh, "東北風｜基隆・八斗子漁村文物館｜地方刊物｜小時光風土誌書店");
+check("tw-001 中文 title", t1.zh, "東北風｜基隆・八斗子漁村文物館｜地方刊物｜小時光書店");
 checkTrue("中文 title ≤ 40 字", core.charLength(t1.zh) <= 40);
 checkTrue("英文 title ≤ 70 字元", t1.en.length <= 70);
 const longEn = {
@@ -117,19 +117,19 @@ checkTrue(
   "英文 title 以刊名開頭、以 Interval Books 結尾",
   /^Dongbeifeng｜.*Interval Books$/.test(t1.en),
 );
-check("日文 title 用日文品牌", t1.ja.endsWith("小時光 風土誌書店"), true);
+check("日文 title 用日文品牌", t1.ja.endsWith("小時光書店"), true);
 const longPub = {
   ...TW001,
   publisher: L(
-    "某某某某某某某某某某某某某某某某某某某某協會",
+    "某某某某某某某某某某某某某某某某某某某某某某某某某協會",
     "X",
-    "某某某某某某某某某某某某某某某某某某某某協會",
+    "某某某某某某某某某某某某某某某某某某某某某某某某某協會",
   ),
 };
 check(
   "出版單位太長 → 只留地區",
   pub.publicationTitle(longPub).zh,
-  "東北風｜基隆｜地方刊物｜小時光風土誌書店",
+  "東北風｜基隆｜地方刊物｜小時光書店",
 );
 check(
   "publisherShort 取最後一段",

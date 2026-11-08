@@ -146,7 +146,7 @@ console.log("\n[1] loader 只叫一支 fn，授權不放寬");
   );
 
   for (const f of [LAYOUT, NEW]) {
-    checkTrue(`${f}：head 標題「…｜小時光風土誌書店後台」`, /｜小時光風土誌書店後台/.test(read(f)));
+    checkTrue(`${f}：head 標題「…｜小時光書店後台」`, /｜小時光書店後台/.test(read(f)));
   }
 }
 

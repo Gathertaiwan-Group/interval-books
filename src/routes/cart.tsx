@@ -15,14 +15,14 @@ import curatedImg from "@/assets/curated-objects.jpg";
 
 const PAGE = {
   metaTitle: {
-    zh: "購物車 Cart｜小時光風土誌書店",
+    zh: "購物車 Cart｜小時光書店",
     en: "Cart｜Interval Books",
-    ja: "カート｜小時光 風土誌書店",
+    ja: "カート｜小時光書店",
   },
   metaDescription: {
-    zh: "查看你在小時光風土誌書店挑選的書籍與選物，調整數量或移除品項。",
+    zh: "查看你在小時光書店挑選的書籍與選物，調整數量或移除品項。",
     en: "Review the books and objects you have picked at Interval Books, and adjust or remove them.",
-    ja: "小時光 風土誌書店で選んだ書籍やセレクト品を確認し、数量の変更や削除ができます。",
+    ja: "小時光書店で選んだ書籍やセレクト品を確認し、数量の変更や削除ができます。",
   },
   eyebrowSuffix: { zh: "購物車", en: "Cart", ja: "カート" },
   title: { zh: "你挑好的", en: "What you have chosen", ja: "お選びのもの" },

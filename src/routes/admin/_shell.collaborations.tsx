@@ -42,7 +42,7 @@ export const Route = createFileRoute("/admin/_shell/collaborations")({
     return { collaborations };
   },
   head: () => ({
-    meta: [{ title: "合作｜小時光風土誌書店後台" }],
+    meta: [{ title: "合作｜小時光書店後台" }],
   }),
   component: AdminCollaborationsPage,
 });

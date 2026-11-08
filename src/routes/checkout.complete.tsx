@@ -44,14 +44,14 @@ import { formatTaipeiDateTime } from "@/lib/taipei-time";
 
 const PAGE = {
   metaTitle: {
-    zh: "訂單完成｜小時光風土誌書店",
+    zh: "訂單完成｜小時光書店",
     en: "Order complete｜Interval Books",
-    ja: "ご注文完了｜小時光 風土誌書店",
+    ja: "ご注文完了｜小時光書店",
   },
   metaDescription: {
-    zh: "你的小時光風土誌書店訂單已經成立，這裡是訂單編號與明細。",
+    zh: "你的小時光書店訂單已經成立，這裡是訂單編號與明細。",
     en: "Your Interval Books order has been created. Here is the order number and what is in it.",
-    ja: "小時光 風土誌書店のご注文が成立しました。ご注文番号と内容はこちらです。",
+    ja: "小時光書店のご注文が成立しました。ご注文番号と内容はこちらです。",
   },
   eyebrowSuffix: { zh: "訂單完成", en: "Order complete", ja: "ご注文完了" },
   title: { zh: "訂單已成立", en: "Your order is in", ja: "ご注文を承りました" },

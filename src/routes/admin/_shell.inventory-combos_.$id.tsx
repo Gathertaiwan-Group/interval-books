@@ -26,8 +26,8 @@ export const Route = createFileRoute("/admin/_shell/inventory-combos_/$id")({
     meta: [
       {
         title: loaderData?.data?.set
-          ? `${loaderData.data.set.name}｜套餐｜小時光風土誌書店後台`
-          : "套餐｜小時光風土誌書店後台",
+          ? `${loaderData.data.set.name}｜套餐｜小時光書店後台`
+          : "套餐｜小時光書店後台",
       },
     ],
   }),

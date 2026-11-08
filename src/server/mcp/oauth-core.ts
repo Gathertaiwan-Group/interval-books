@@ -206,7 +206,7 @@ export function protectedResourceMetadata(base: string) {
     authorization_servers: [base],
     scopes_supported: [OAUTH_SCOPE],
     bearer_methods_supported: ["header"],
-    resource_name: "小時光風土誌書店後台 MCP",
+    resource_name: "小時光書店後台 MCP",
   };
 }
 

@@ -139,7 +139,7 @@ export const Route = createFileRoute("/admin/_shell/products")({
     return await getAdminProductsPageData();
   },
   head: () => ({
-    meta: [{ title: "商品｜小時光風土誌書店後台" }],
+    meta: [{ title: "商品｜小時光書店後台" }],
   }),
   component: AdminProductsPage,
 });

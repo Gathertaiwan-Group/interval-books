@@ -13,7 +13,7 @@ export const Route = createFileRoute("/admin/_shell/inventory-combos_/new")({
     const { listComboFormOptions } = await import("@/lib/admin/fns/inv-combos");
     return { options: await listComboFormOptions() };
   },
-  head: () => ({ meta: [{ title: "新增套餐｜小時光風土誌書店後台" }] }),
+  head: () => ({ meta: [{ title: "新增套餐｜小時光書店後台" }] }),
   component: ComboSetNewPage,
 });
 

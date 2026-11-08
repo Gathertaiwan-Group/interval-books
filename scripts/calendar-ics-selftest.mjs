@@ -337,7 +337,7 @@ checkTrue(
   );
   checkTrue(
     "X-WR-CALNAME",
-    ics.includes("X-WR-CALNAME:小時光風土誌書店 活動") || ics.includes("X-WR-CALNAME:"),
+    ics.includes("X-WR-CALNAME:小時光書店 活動") || ics.includes("X-WR-CALNAME:"),
   );
   checkTrue("X-WR-TIMEZONE", ics.includes("X-WR-TIMEZONE:Asia/Taipei\r\n"));
   check(

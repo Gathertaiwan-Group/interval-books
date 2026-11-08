@@ -18,7 +18,7 @@ export const Route = createFileRoute("/admin/_shell/products_/product/new")({
     const { getNewGoodsPageData } = await import("@/lib/admin/fns/products");
     return await getNewGoodsPageData();
   },
-  head: () => ({ meta: [{ title: "新增商品｜小時光風土誌書店後台" }] }),
+  head: () => ({ meta: [{ title: "新增商品｜小時光書店後台" }] }),
   component: NewGoodsPage,
 });
 

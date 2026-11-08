@@ -110,7 +110,7 @@ function VendorShell() {
             <div className="leading-tight">
               <p className="text-sm font-medium">{vendor.name || "廠商入口"}</p>
               <p className="text-xs text-muted-foreground">
-                小時光風土誌書店{vendor.code ? `・${vendor.code}` : ""}
+                小時光書店{vendor.code ? `・${vendor.code}` : ""}
               </p>
             </div>
           </div>

@@ -28,7 +28,7 @@ export const Route = createFileRoute("/oauth/authorize")({
   },
   head: () => ({
     meta: [
-      { title: "授權 Claude 存取｜小時光風土誌書店後台" },
+      { title: "授權 Claude 存取｜小時光書店後台" },
       { name: "robots", content: "noindex, nofollow" },
     ],
     styles: backOfficeTypeScaleStyles(),
@@ -40,7 +40,7 @@ function Frame({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">
       <div className="w-full max-w-md space-y-5 rounded-lg border border-border bg-background p-8 shadow-sm">
-        <p className="text-center text-sm text-muted-foreground">小時光風土誌書店 Interval Books</p>
+        <p className="text-center text-sm text-muted-foreground">小時光書店 Interval Books</p>
         {children}
       </div>
     </div>

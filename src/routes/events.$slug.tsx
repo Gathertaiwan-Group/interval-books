@@ -78,14 +78,14 @@ import { useSiteContent } from "@/lib/site-content";
  */
 const PAGE = {
   metaTitle: {
-    zh: "活動｜小時光風土誌書店",
+    zh: "活動｜小時光書店",
     en: "Event｜Interval Books",
-    ja: "イベント｜小時光 風土誌書店",
+    ja: "イベント｜小時光書店",
   },
   metaDescription: {
-    zh: "小時光風土誌書店的一場活動：時間、場次與報名方式。",
+    zh: "小時光書店的一場活動：時間、場次與報名方式。",
     en: "An event at Interval Books — when it happens, which sittings are open, and how to join.",
-    ja: "小時光 風土誌書店の催しについて。日程、開催回、お申し込み方法をご案内します。",
+    ja: "小時光書店の催しについて。日程、開催回、お申し込み方法をご案内します。",
   },
   back: { zh: "回到活動", en: "Back to events", ja: "イベント一覧へ" },
   aboutThis: { zh: "關於這場活動", en: "About this event", ja: "この催しについて" },
@@ -204,7 +204,7 @@ export const Route = createFileRoute("/events/$slug")({
     // 校正成現在並在下一個場次開始時推進。與 /checkout 的 loader 同一個做法（a61488a）。
     return { event, unavailable, categories, booking, now: Date.now() };
   },
-  // SEO（2026-11 健檢）：title「{活動名}｜{日期}｜小時光風土誌書店」、描述取摘要＋內文、
+  // SEO（2026-11 健檢）：title「{活動名}｜{日期}｜小時光書店」、描述取摘要＋內文、
   // 分享圖用活動封面、JSON-LD 輸出 Event（日期地點價格來自售票商品的場次）與麵包屑。
   // 組裝邏輯在 src/lib/seo/pages.ts#eventSeo，元件裡的 useDocumentMeta 用同一支。
   head: ({ loaderData, matches, match }) => {

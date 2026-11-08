@@ -60,7 +60,7 @@ export const Route = createFileRoute("/admin/_shell/sales")({
     ]);
     return { initial, paymentMethods };
   },
-  head: () => ({ meta: [{ title: "銷售紀錄｜小時光風土誌書店後台" }] }),
+  head: () => ({ meta: [{ title: "銷售紀錄｜小時光書店後台" }] }),
   component: SalesPage,
 });
 

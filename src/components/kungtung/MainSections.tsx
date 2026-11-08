@@ -176,7 +176,7 @@ export function Hero({ bookingClosed }: { bookingClosed: boolean }) {
       </div>
       <div className="kt-hero-folio">
         <span aria-hidden="true">TAITUNG / CULTURE & LIFE</span>
-        <span className="kt-hero-credit">策劃單位：小時光風土誌書店</span>
+        <span className="kt-hero-credit">策劃單位：小時光書店</span>
       </div>
     </section>
   );
@@ -489,14 +489,14 @@ export function Hosts() {
               <h3 id="alice-name" className="kt-alice-name">
                 Alice 劉柳樺
               </h3>
-              <p className="kt-alice-subtitle">小時光風土誌書店主理人 × 馥自然人文空間策旅主理人</p>
+              <p className="kt-alice-subtitle">小時光書店主理人 × 馥自然人文空間策旅主理人</p>
               <blockquote className="kt-alice-quote">
                 把文化帶進生活，
                 <br />
                 把相遇變成值得珍藏的記憶。
               </blockquote>
               <p className="kt-alice-text">
-                從台北華山的小時光風土誌書店，到台東山海間的馥自然，Alice
+                從台北華山的小時光書店，到台東山海間的馥自然，Alice
                 始終相信，文化不只存在於書本與展覽之中，也存在於一席餐桌、建築、音樂，以及人與人真誠相遇的時刻。
               </p>
               <p className="kt-alice-text">

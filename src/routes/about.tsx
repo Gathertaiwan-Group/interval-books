@@ -71,9 +71,9 @@ export const Route = createFileRoute("/about")({
 /** Fallback copy — used only when the Supabase read fails. */
 const PAGE = {
   metaTitle: {
-    zh: "關於小時光 About｜小時光風土誌書店",
+    zh: "關於小時光 About｜小時光書店",
     en: "About｜Interval Books",
-    ja: "小時光について｜小時光 風土誌書店",
+    ja: "小時光について｜小時光書店",
   },
   metaDescription: {
     zh: "小時光的故事：從一櫃書、一張長桌開始，慢慢有了陶藝家的器物、地方夥伴的選物與每月一場讀書會。這一頁介紹我們做的三件事——風土誌策展、活動與讀書會、策旅與合作共創，也附上紅磚六合院的交通方式與營業時間。",
@@ -93,9 +93,9 @@ const PAGE = {
     ja: "華山の、しずかな小さき時間",
   },
   intro: {
-    zh: "我們是在華山的小時光風土誌書店，聽得到鳥鳴，聞得到茶香與書香，感受得到人情的溫度與連結。",
+    zh: "我們是在華山的小時光書店，聽得到鳥鳴，聞得到茶香與書香，感受得到人情的溫度與連結。",
     en: "We are Interval Books, tucked inside Huashan — birdsong, the scent of tea and paper, and the warmth of small encounters.",
-    ja: "華山の小時光 風土誌書店です。鳥のさえずり、茶と本の香り、ひとのぬくもりが交わる場。",
+    ja: "華山の小時光書店です。鳥のさえずり、茶と本の香り、ひとのぬくもりが交わる場。",
   },
   story: {
     zh: "從一櫃書、一張長桌開始，我們慢慢有了陶藝家的器物、地方夥伴的選物、與每月一場讀書會。書店並不大，但它是我們對於「閱讀」的長時間練習——讓書頁與生活，能彼此呼吸。",

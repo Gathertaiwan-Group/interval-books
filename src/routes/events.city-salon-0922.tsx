@@ -52,14 +52,14 @@ import { fetchActiveProductForEventSlug, type ShopProduct } from "@/lib/shop";
 /** 三語 meta。⚠️ 必須是頂層靜態常數、每一句都是字面值——check-meta.mjs 靜態解析這個物件。 */
 const PAGE = {
   metaTitle: {
-    zh: "城市思享沙龍 #01｜台東，不只是遠方｜小時光風土誌書店",
+    zh: "城市思享沙龍 #01｜台東，不只是遠方｜小時光書店",
     en: "City Think Salon #01｜Taitung Is Not Just a Distant Place｜Interval Books",
-    ja: "都市サロン #01｜台東は、遠い場所であるだけではない｜小時光 風土誌書店",
+    ja: "都市サロン #01｜台東は、遠い場所であるだけではない｜小時光書店",
   },
   metaDescription: {
-    zh: "城市思享沙龍「空間的文藝復興」：2026.9.22 在小時光風土誌書店，商業地產協會理事長蔡明璋、藝術家賴純純與主理人 Alice，從閒置資產、地方創生談到台東的商業生活方式。15 席限定邀請制。",
+    zh: "城市思享沙龍「空間的文藝復興」：2026.9.22 在小時光書店，商業地產協會理事長蔡明璋、藝術家賴純純與主理人 Alice，從閒置資產、地方創生談到台東的商業生活方式。15 席限定邀請制。",
     en: "22 Sep 2026 at Interval Books. Art, regional regeneration and a new way of living with commerce — an invitation-only salon limited to 15 seats.",
-    ja: "2026年9月22日、小時光 風土誌書店にて。アート、地域創生、そして新しい商いの暮らし方——15席限定の招待制サロン。",
+    ja: "2026年9月22日、小時光書店にて。アート、地域創生、そして新しい商いの暮らし方——15席限定の招待制サロン。",
   },
 };
 
@@ -70,7 +70,7 @@ const PAGE = {
  * 弄壞的事——講者確定了、議程調整了，只要動這個物件。
  */
 const SALON = {
-  cohosts: "小時光風土誌書店 Interval Books ✕ 中華民國購物中心暨商業地產協會",
+  cohosts: "小時光書店 Interval Books ✕ 中華民國購物中心暨商業地產協會",
   badge: "城市思享沙龍 CITY THINK SALON #01｜10月台東參訪前導沙龍",
   headline: "台東，不只是遠方",
   subheadline: "藝術、地方創生與一種新的商業生活方式",
@@ -79,7 +79,7 @@ const SALON = {
   meta: [
     { icon: CalendarDays, label: "日　期", value: "2026.9.22（二）" },
     { icon: Clock, label: "時　間", value: "13:30 – 15:30", note: "13:00 入場交流" },
-    { icon: MapPin, label: "地　點", value: "小時光風土誌書店" },
+    { icon: MapPin, label: "地　點", value: "小時光書店" },
     {
       icon: Map,
       label: "地　址",
@@ -118,7 +118,7 @@ const SALON = {
     {
       role: "主持人",
       name: "Alice",
-      title: "小時光風土誌書店 主理人 / 策展人",
+      title: "小時光書店 主理人 / 策展人",
       view: "從藝術、土地、生活方式看台東——藝術如何進入生活",
       pending: false,
     },
@@ -800,7 +800,7 @@ function Venue() {
         </div>
         <div>
           <p className="eyebrow text-2xl text-muted-foreground">地點</p>
-          <p className="mt-4 text-sm leading-relaxed">小時光風土誌書店</p>
+          <p className="mt-4 text-sm leading-relaxed">小時光書店</p>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{SALON.address}</p>
         </div>
         <div>

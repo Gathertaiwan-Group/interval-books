@@ -276,13 +276,13 @@ export const FALLBACK_SITE_CONTENT: SiteContent = {
   social: { ...SOCIAL },
   map: { ...MAP },
   meta: {
-    siteName: "小時光風土誌書店 Interval Books",
-    author: "小時光風土誌書店 Interval Books",
+    siteName: "小時光書店 Interval Books",
+    author: "小時光書店 Interval Books",
     twitterCard: "summary_large_image",
     ogType: "website",
-    defaultTitle: "小時光風土誌書店 Interval Books｜華山的地方刊物與風土選書",
+    defaultTitle: "小時光書店 Interval Books｜華山的風土誌選書與地方刊物",
     defaultDescription:
-      "我們是在華山的小時光風土誌書店，聽得到鳥鳴，聞得到茶香與書香，感受得到人情的溫度與連結。",
+      "我們是在華山的小時光書店，聽得到鳥鳴，聞得到茶香與書香，感受得到人情的溫度與連結。",
   },
 };
 

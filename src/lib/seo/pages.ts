@@ -181,8 +181,8 @@ export function eventFiller(event: {
     if (lang === "en")
       return `An Interval Books event: ${name}${date ? `, ${date}` : ""}${who ? `, with ${who}` : ""}.`;
     if (lang === "ja")
-      return `小時光 風土誌書店のイベント「${name}」${date ? `（${date}）` : ""}${who ? `、${who}` : ""}。`;
-    return `小時光風土誌書店的活動「${name}」${date ? `，${date}` : ""}${who ? `，分享人${who}` : ""}。`;
+      return `小時光書店のイベント「${name}」${date ? `（${date}）` : ""}${who ? `、${who}` : ""}。`;
+    return `小時光書店的活動「${name}」${date ? `，${date}` : ""}${who ? `，分享人${who}` : ""}。`;
   };
   return { zh: build("zh"), en: build("en"), ja: build("ja") };
 }
@@ -197,8 +197,8 @@ export function productFiller(
     const name = product.title[lang] || product.title.zh;
     const cat = category[lang] || category.zh;
     if (lang === "en") return `${cat} at Interval Books: ${name}, ${price}.`;
-    if (lang === "ja") return `小時光 風土誌書店の${cat}「${name}」、${price}。`;
-    return `小時光風土誌書店的${cat}「${name}」，售價 ${price}。`;
+    if (lang === "ja") return `小時光書店の${cat}「${name}」、${price}。`;
+    return `小時光書店的${cat}「${name}」，售價 ${price}。`;
   };
   return { zh: build("zh"), en: build("en"), ja: build("ja") };
 }

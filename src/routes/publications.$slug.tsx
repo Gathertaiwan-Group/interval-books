@@ -50,14 +50,14 @@ import exhibitionImg from "@/assets/exhibition-corner.jpg";
  */
 const PAGE = {
   metaTitle: {
-    zh: "地方刊物｜小時光風土誌書店",
+    zh: "地方刊物｜小時光書店",
     en: "Local Publications｜Interval Books",
-    ja: "地域の刊行物｜小時光 風土誌書店",
+    ja: "地域の刊行物｜小時光書店",
   },
   metaDescription: {
-    zh: "小時光風土誌書店典藏的台灣與日本地方刊物：一個地方怎麼被自己的人寫下來。部分可線上選購，其餘歡迎到店翻閱。",
+    zh: "小時光書店典藏的台灣與日本地方刊物：一個地方怎麼被自己的人寫下來。部分可線上選購，其餘歡迎到店翻閱。",
     en: "Local publications from Taiwan and Japan kept at Interval Books — how a place gets written down by its own people. Some titles can be ordered online; the rest are in the store to read.",
-    ja: "小時光 風土誌書店が所蔵する台湾と日本の地域の刊行物。その土地の人がその土地を書いた記録です。一部はオンラインで購入でき、その他は店頭でご覧いただけます。",
+    ja: "小時光書店が所蔵する台湾と日本の地域の刊行物。その土地の人がその土地を書いた記録です。一部はオンラインで購入でき、その他は店頭でご覧いただけます。",
   },
   home: { zh: "首頁", en: "Home", ja: "ホーム" },
   breadcrumb: { zh: "麵包屑", en: "Breadcrumb", ja: "パンくずリスト" },

@@ -19,7 +19,7 @@
 import { journeyEventMatcher } from "./journey-events.ts";
 
 export const CALENDAR_PATH = "/calendar.ics";
-export const CALENDAR_NAME = "小時光風土誌書店 活動";
+export const CALENDAR_NAME = "小時光書店 活動";
 export const JOURNEY_PREFIX = "策旅｜";
 export const UID_DOMAIN = "intervalbooks.tw";
 export const SITE_ORIGIN = "https://www.intervalbooks.tw";

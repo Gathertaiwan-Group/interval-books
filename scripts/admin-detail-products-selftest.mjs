@@ -132,7 +132,7 @@ console.log("\n[2] loader 一支 fn、授權與原本的存檔 fn 相同");
     const d = decl("products", fn);
     check(`🔴 ${fn}：GET`, d?.method, "GET");
     check(`🔴 ${fn}：middleware 與 ${original} 一字不差`, d?.mw, ORIGINAL[original]?.mw);
-    checkTrue(`${route}：head() 給標題`, /head:[\s\S]{0,300}小時光風土誌書店後台/.test(src));
+    checkTrue(`${route}：head() 給標題`, /head:[\s\S]{0,300}小時光書店後台/.test(src));
   }
 
   // 每一支 fn 都先掛 middleware（新加的不可以漏）。

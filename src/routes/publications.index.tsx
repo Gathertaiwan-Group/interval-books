@@ -33,9 +33,9 @@ import exhibitionImg from "@/assets/exhibition-corner.jpg";
 /** 後備文案 —— pages/'publications' 那一列讀不到時才用（後台改的是那一列）。 */
 const PAGE = {
   metaTitle: {
-    zh: "地方刊物 Local Publications｜小時光風土誌書店",
+    zh: "地方刊物 Local Publications｜小時光書店",
     en: "Local Publications｜Interval Books",
-    ja: "地域の刊行物｜小時光 風土誌書店",
+    ja: "地域の刊行物｜小時光書店",
   },
   metaDescription: {
     zh: "一個地方，怎麼被自己的人寫下來：從基隆的漁村到日本的山間小鎮，台灣與日本的地方刊物依地區排在同一張桌上。每一本附上製作單位與集數，部分可線上購買，其餘歡迎到店翻閱。",

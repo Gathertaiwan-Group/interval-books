@@ -24,14 +24,14 @@ import kungtungCss from "@/components/kungtung/kungtung.css?url";
 /** 三語 meta。⚠️ 必須是頂層靜態常數、每一句都是字面值——check-meta.mjs 靜態解析這個物件。 */
 const PAGE = {
   metaTitle: {
-    zh: "Alice 劉柳樺｜文化策旅人｜公東教堂文化之旅｜小時光風土誌書店",
+    zh: "Alice 劉柳樺｜文化策旅人｜公東教堂文化之旅｜小時光書店",
     en: "Alice Liu — Journey Curator｜Kung Tung Chapel Journey｜Interval Books",
-    ja: "Alice 劉柳樺｜文化の旅のキュレーター｜公東教会文化の旅｜小時光 風土誌書店",
+    ja: "Alice 劉柳樺｜文化の旅のキュレーター｜公東教会文化の旅｜小時光書店",
   },
   metaDescription: {
-    zh: "Alice 劉柳樺，小時光風土誌書店主理人、台東馥自然人文空間策旅主理人。從華山的一櫃書到台東山海間的餐桌，她策劃書展、讀書會與風土旅程，這次邀攝影作家范毅舜一起帶路公東教堂三天兩夜。",
+    zh: "Alice 劉柳樺，小時光書店主理人、台東馥自然人文空間策旅主理人。從華山的一櫃書到台東山海間的餐桌，她策劃書展、讀書會與風土旅程，這次邀攝影作家范毅舜一起帶路公東教堂三天兩夜。",
     en: "Alice Liu, founder of Interval Books and journey curator at INNTERVAL Fu Nature & Humanities Space: her work and curation.",
-    ja: "小時光 風土誌書店の店主であり、馥自然人文空間の旅のキュレーター、Alice 劉柳樺の経歴と企画。",
+    ja: "小時光書店の店主であり、馥自然人文空間の旅のキュレーター、Alice 劉柳樺の経歴と企画。",
   },
 };
 

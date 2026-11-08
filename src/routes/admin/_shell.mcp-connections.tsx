@@ -42,7 +42,7 @@ export const Route = createFileRoute("/admin/_shell/mcp-connections")({
     const { listMcpConnections } = await import("@/lib/admin/fns/mcp-connections");
     return { grants: await listMcpConnections() };
   },
-  head: () => ({ meta: [{ title: "Claude 連線授權｜小時光風土誌書店後台" }] }),
+  head: () => ({ meta: [{ title: "Claude 連線授權｜小時光書店後台" }] }),
   component: McpConnectionsPage,
 });
 

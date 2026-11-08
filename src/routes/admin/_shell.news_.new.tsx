@@ -15,7 +15,7 @@ export const Route = createFileRoute("/admin/_shell/news_/new")({
     const { listNews } = await import("@/lib/admin/fns/news");
     return { nextSortOrder: newFirstSortOrder(await listNews()) };
   },
-  head: () => ({ meta: [{ title: "新增消息｜小時光風土誌書店後台" }] }),
+  head: () => ({ meta: [{ title: "新增消息｜小時光書店後台" }] }),
   component: NewsNewPage,
 });
 

@@ -30,9 +30,9 @@ import { linkedEventFor, newestEndedFirst, splitJourneys } from "@/lib/past-shel
 /** Fallback copy — used only when the Supabase read fails. */
 const PAGE_META = {
   title: {
-    zh: "小時光風土誌書店 Interval Books｜華山的地方刊物與風土選書",
+    zh: "小時光書店 Interval Books｜華山的風土誌選書與地方刊物",
     en: "Interval Books｜A bookstore of place in Huashan, Taipei",
-    ja: "小時光 風土誌書店 Interval Books｜華山で地域誌と出会う書店",
+    ja: "小時光書店 Interval Books｜華山で地域誌と出会う書店",
   },
   /**
    * 首頁的搜尋結果描述（2026-11 SEO 健檢 M2）。
@@ -42,9 +42,9 @@ const PAGE_META = {
    * fitDescription() 會偵測）時才用。
    */
   description: {
-    zh: "從一份地方刊物，讀懂一片土地。小時光風土誌書店在台北華山文創園區紅磚六合院，以土地為線索選書，典藏台灣與日本的地方刊物，舉辦讀書會、講座與工作坊，也帶你走進台灣各地的文化策旅。",
+    zh: "從一份地方刊物，讀懂一片土地。小時光書店位在台北華山文創園區紅磚六合院，是一間以風土誌選書的書店，典藏台灣與日本的地方刊物，舉辦讀書會、講座與工作坊，也帶你走進台灣各地的文化策旅。",
     en: "Read a place through its local publications. Interval Books at Huashan 1914, Taipei: books chosen by the land, zines from Taiwan and Japan, talks and journeys.",
-    ja: "一冊の地域誌から、ひとつの土地を読む。台北・華山1914文化創意産業園区の小時光 風土誌書店は、土地を手がかりに本を選び、台湾と日本の地域の刊行物を所蔵。読書会やトーク、台湾各地への旅も企画しています。",
+    ja: "一冊の地域誌から、ひとつの土地を読む。台北・華山1914文化創意産業園区の小時光書店は、風土誌を軸に本を選ぶ書店。台湾と日本の地域の刊行物を所蔵し、読書会やトーク、台湾各地への旅も企画しています。",
   },
 };
 
@@ -54,7 +54,7 @@ const HERO = {
     en: "Interval Books  ／  Est.",
     ja: "Interval Books  ／  Est.",
   },
-  titleMain: { zh: "小時光風土誌書店", en: "Interval Books", ja: "小時光 風土誌書店" },
+  titleMain: { zh: "小時光書店", en: "Interval Books", ja: "小時光書店" },
   titleSub: {
     zh: "留一點時間給真正重要的事",
     en: "Save a little time for what truly matters.",
@@ -84,9 +84,9 @@ const HOME = {
     ja: "華山1914・紅煉瓦六合院 西7-3館",
   },
   brandLine: {
-    zh: "小時光風土誌書店",
+    zh: "小時光書店",
     en: "Interval Books — a bookstore of place",
-    ja: "小時光 風土誌書店",
+    ja: "小時光書店",
   },
   headline: {
     zh: "從一份地方刊物，\n讀懂一片土地。",
@@ -95,9 +95,9 @@ const HOME = {
   },
   /** 首屏說明句（業主 11/2 指定精簡、只提台灣）。若有 {n} 會換成刊物份數。 */
   lede: {
-    zh: "華山紅磚六合院裡的風土誌書店。以土地為線索選書，典藏台灣各地的地方刊物。",
+    zh: "華山紅磚六合院裡，一間以風土誌選書的書店。以土地為線索，典藏台灣各地的地方刊物。",
     en: "A bookstore of place in Huashan’s Red Brick Courtyard — books chosen by the land they come from, and an archive of local publications from across Taiwan.",
-    ja: "華山・紅煉瓦六合院の風土誌書店。土地を手がかりに本を選び、台湾各地の地域刊行物を所蔵しています。",
+    ja: "華山・紅煉瓦六合院にある、風土誌を軸に本を選ぶ書店。土地を手がかりに、台湾各地の地域刊行物を所蔵しています。",
   },
   countFallback: { zh: "逾百", en: "over 100", ja: "百以上の" },
   ctaPrimary: {
@@ -172,9 +172,9 @@ const HOME = {
   },
   goCta: { zh: "看策旅", en: "See journeys", ja: "旅を見る" },
   imgReadAlt: {
-    zh: "小時光風土誌書店店內，紅磚牆下的書架與平台",
+    zh: "小時光書店店內，紅磚牆下的書架與平台",
     en: "Inside Interval Books: shelves and tables under red brick walls",
-    ja: "小時光 風土誌書店の店内。紅煉瓦の壁の下の書棚と平台",
+    ja: "小時光書店の店内。紅煉瓦の壁の下の書棚と平台",
   },
   imgGatherAlt: {
     zh: "兩位讀者在書店裡一起翻讀一本書",

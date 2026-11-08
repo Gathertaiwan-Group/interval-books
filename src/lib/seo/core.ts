@@ -266,17 +266,17 @@ export function robotsTxt(): string {
 // =============================================================================
 
 /**
- * 結構化資料（JSON-LD）用的店名。2026-11 起品牌統一為「小時光風土誌書店」；舊名「小時光書店」
- * 是 Google 商家檔案上的名稱，放在 alternateName 讓搜尋引擎對得起來。不讀 site_settings 的
+ * 結構化資料（JSON-LD）用的店名「小時光書店」（也是 Google 商家檔案上的名稱）。2026-11-02 曾改名
+ * 「小時光風土誌書店」，11-08 業主改回：「風土誌」不放店名、改寫進介紹敘述。英文名放 alternateName。不讀 site_settings 的
  * meta_site_name（那是 og:site_name 用的顯示字串，後台可改）。
  */
-export const STORE_NAME = "小時光風土誌書店";
-export const STORE_ALTERNATE_NAMES = ["小時光書店", "Interval Books"];
+export const STORE_NAME = "小時光書店";
+export const STORE_ALTERNATE_NAMES = ["Interval Books"];
 
 export const BRAND = {
-  zh: "小時光風土誌書店",
+  zh: "小時光書店",
   en: "Interval Books",
-  ja: "小時光 風土誌書店",
+  ja: "小時光書店",
 } as const satisfies Localized;
 
 /** 「＿＿＿」「___」這類還沒填的佔位符。 */
@@ -365,7 +365,7 @@ export function joinTitle(...parts: Array<string | null | undefined>): string {
 }
 
 /**
- * 三語 title 模板：「{名稱}｜{其他段落}｜小時光風土誌書店」（英文版品牌是 Interval Books）。
+ * 三語 title 模板：「{名稱}｜{其他段落}｜小時光書店」（英文版品牌是 Interval Books）。
  * 名稱先去掉外來品牌後綴（見 stripForeignBrandSuffix）。
  */
 export function seoTitle(name: Localized, ...middle: Array<Localized | string | null>): Localized {
@@ -673,7 +673,7 @@ export function storePostalAddress(store: StoreAddress): JsonLd {
   };
 }
 
-/** 場次地點是不是書店本身（後台填的是「華山小時光風土誌書店…」「小時光書店（華山…）」）。 */
+/** 場次地點是不是書店本身（後台填的是「華山小時光書店…」「小時光書店（華山…）」）。 */
 export function isStoreLocation(location: string): boolean {
   return /小時光|Interval Books/i.test(location);
 }

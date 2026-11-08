@@ -19,7 +19,7 @@ export const Route = createFileRoute("/admin/_shell/journeys_/new")({
     return { categories, artists };
   },
   head: () => ({
-    meta: [{ title: "新增策旅｜小時光風土誌書店後台" }],
+    meta: [{ title: "新增策旅｜小時光書店後台" }],
   }),
   component: AdminJourneyNewPage,
 });

@@ -18,9 +18,9 @@ import journeyImg from "@/assets/journey-mist.jpg";
 /** Fallback copy — used only when the Supabase read fails. */
 const PAGE = {
   metaTitle: {
-    zh: "策旅 Journeys｜小時光風土誌書店",
+    zh: "策旅 Journeys｜小時光書店",
     en: "Journeys｜Interval Books",
-    ja: "旅｜小時光 風土誌書店",
+    ja: "旅｜小時光書店",
   },
   metaDescription: {
     zh: "讓土地成為書的延伸：跟著書與作者，走到故事發生的地方。這一頁彙整小時光的文化策旅，像是范毅舜帶路的台東公東教堂三天兩夜、池上秋收山海旅行，每一趟都有自己的行程頁，也歡迎地方夥伴來信共創。",

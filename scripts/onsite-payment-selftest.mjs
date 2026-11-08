@@ -539,7 +539,7 @@ checkTrue(
 console.log("\n[5] 確認信（中／英／日）與店家通知信");
 const SESSION_BRIEF = {
   title: { zh: "布苔球手作課", en: "Moss ball workshop", ja: "苔玉ワークショップ" },
-  location: { zh: "小時光風土誌書店", en: "Interval Books", ja: "小時光書店" },
+  location: { zh: "小時光書店", en: "Interval Books", ja: "小時光書店" },
   startsAt: "2026-12-20T06:00:00.000Z",
   endsAt: "2026-12-20T08:00:00.000Z",
 };
@@ -1106,7 +1106,7 @@ if (!PG_URL) {
       insert into public.products (id, slug, product_type, title, summary, description, price, status, stock, requires_shipping)
       values ('${BOOK}','${BOOK}','book', ${LOC}, ${LOC}, ${LOC}, 300, 'active', 5, false);
       insert into public.event_sessions (id, product_id, title, location, starts_at, ends_at, capacity, status)
-      values ('${S1}','${EV}', ${LOC}, '{"zh":"小時光風土誌書店","en":"Interval Books","ja":"小時光書店"}'::jsonb,
+      values ('${S1}','${EV}', ${LOC}, '{"zh":"小時光書店","en":"Interval Books","ja":"小時光書店"}'::jsonb,
               now() + interval '40 days', now() + interval '40 days 2 hours', 10, 'open'),
              ('${S2}','${FREE}', ${LOC}, ${LOC}, now() + interval '41 days', null, 10, 'open');
     `,
@@ -1191,7 +1191,7 @@ if (!PG_URL) {
         (cust?.s ?? "").includes("請於活動當天至現場繳費"),
       );
       checkTrue("客人信：金額 NT$1,200", (cust?.bt ?? "").includes("1,200"));
-      checkTrue("客人信：地點", (cust?.bt ?? "").includes("小時光風土誌書店"));
+      checkTrue("客人信：地點", (cust?.bt ?? "").includes("小時光書店"));
       checkFalse("🔴 客人信：沒有匯款帳號", /戶名|帳號|匯款/.test(cust?.bt ?? ""));
       checkFalse(
         "沒有排匯款資訊信（remittance:）",
@@ -1216,7 +1216,7 @@ if (!PG_URL) {
       );
       check("確認頁：沒有匯款資訊", conf?.remittance, null);
       check("確認頁：onsite 區塊帶 1 場", conf?.onsite?.sessions?.length, 1);
-      check("確認頁：場次地點", conf?.onsite?.sessions?.[0]?.location?.zh, "小時光風土誌書店");
+      check("確認頁：場次地點", conf?.onsite?.sessions?.[0]?.location?.zh, "小時光書店");
       check(
         "reissuePayment：onsite 回 null",
         await orders.reissuePayment(placed.publicToken),

@@ -57,14 +57,14 @@ import laiChunchun from "@/assets/sound-of-the-sea/lai-chunchun.jpg";
 /** 三語 meta。⚠️ 必須是頂層靜態常數、每一句都是字面值——check-meta.mjs 靜態解析這個物件。 */
 const PAGE = {
   metaTitle: {
-    zh: "胡海音《海的聲音》手作繪本分享會｜小時光風土誌書店",
+    zh: "胡海音《海的聲音》手作繪本分享會｜小時光書店",
     en: "Hu Hai-Yin: The Voice of the Sea — Handmade Picture Book Talk｜Interval Books",
-    ja: "胡海音『海の聲』手作り絵本トーク｜小時光 風土誌書店",
+    ja: "胡海音『海の聲』手作り絵本トーク｜小時光書店",
   },
   metaDescription: {
-    zh: "2026/11/6（五）14:00–16:00，於小時光風土誌書店。聽胡海音老師分享手作繪本《海的聲音》，在生命的聲音裡，練習傾聽與對話。下午茶入場 NT$300。",
+    zh: "2026/11/6（五）14:00–16:00，於小時光書店。聽胡海音老師分享手作繪本《海的聲音》，在生命的聲音裡，練習傾聽與對話。下午茶入場 NT$300。",
     en: "Fri 6 Nov 2026, 14:00–16:00 at Interval Books. Hu Hai-Yin shares her handmade picture book The Voice of the Sea — on listening and dialogue. Admission NT$300 with afternoon tea.",
-    ja: "2026年11月6日（金）14:00–16:00、小時光 風土誌書店にて。胡海音先生が手作り絵本『海の聲』を語ります。アフタヌーンティー付き入場 NT$300。",
+    ja: "2026年11月6日（金）14:00–16:00、小時光書店にて。胡海音先生が手作り絵本『海の聲』を語ります。アフタヌーンティー付き入場 NT$300。",
   },
 };
 
@@ -217,7 +217,7 @@ function SoundOfTheSea() {
       <Past />
       <Registration now={now} bookingClosed={bookingClosed} />
       <footer className="py-10 text-center text-sm text-muted-foreground">
-        <p className={`${SERIF} text-primary`}>小時光風土誌書店</p>
+        <p className={`${SERIF} text-primary`}>小時光書店</p>
         <p className="mt-2">胡海音《海的聲音》手作繪本分享會</p>
       </footer>
       <BottomBar bookingClosed={bookingClosed} />
@@ -246,7 +246,7 @@ function TopBar({ bookingClosed }: { bookingClosed: boolean }) {
     <header className="absolute inset-x-0 top-0 z-20">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
         <Link to="/" className={`${SERIF} text-lg tracking-widest text-primary`}>
-          小時光風土誌書店
+          小時光書店
         </Link>
         <nav className="hidden gap-8 text-sm text-foreground/80 sm:flex">
           <a href="#teacher" className="hover:text-primary">
@@ -302,7 +302,7 @@ function Hero({ bookingClosed }: { bookingClosed: boolean }) {
           </p>
           <div className="mt-8 space-y-1 text-sm text-foreground/75">
             <p>2026.11.6（五）14:00–16:00</p>
-            <p>小時光風土誌書店｜下午茶入場 NT$300</p>
+            <p>小時光書店｜下午茶入場 NT$300</p>
           </div>
           <a
             href="#register"
@@ -394,7 +394,7 @@ function PictureBook() {
             </div>
             <p>記錄歲月走過的痕跡，也留下對生命的凝視。</p>
             <p>
-              在小時光風土誌書店，我們期待透過胡海音老師的分享，讓閱讀不只是知識的獲得，更成為生命之間溫柔而真實的交流。
+              在小時光書店，我們期待透過胡海音老師的分享，讓閱讀不只是知識的獲得，更成為生命之間溫柔而真實的交流。
             </p>
             <p className={`${SERIF} text-lg text-primary`}>因為每一段生命，都值得被聽見。</p>
           </div>
@@ -457,7 +457,7 @@ function EventInfo() {
           rows={[
             { label: "日期", value: "2026 年 11 月 6 日（星期五）" },
             { label: "時間", value: "14:00 – 16:00" },
-            { label: "地點", value: "小時光風土誌書店（華山文創園區 紅磚六合院 西 7-3 館）" },
+            { label: "地點", value: "小時光書店（華山文創園區 紅磚六合院 西 7-3 館）" },
             { label: "入場", value: "每人 NT$300（含下午茶）" },
             {
               label: "加購",
@@ -491,11 +491,11 @@ function About() {
   return (
     <section id="about" className="scroll-mt-10 py-20 sm:py-28">
       <div className="mx-auto max-w-6xl px-5">
-        <SectionHead eyebrow="THE BOOKSTORE" title="關於小時光風土誌書店" />
+        <SectionHead eyebrow="THE BOOKSTORE" title="關於小時光書店" />
         <div className="grid items-start gap-10 md:grid-cols-[3fr_2fr] md:gap-16">
           <div className="space-y-5 leading-loose text-foreground/85">
             <p className={`${SERIF} text-lg text-primary/90`}>
-              我們是在華山的小時光風土誌書店，聽得到鳥鳴，聞得到茶香與書香，感受得到人情的溫度與連結。
+              我們是在華山的小時光書店，聽得到鳥鳴，聞得到茶香與書香，感受得到人情的溫度與連結。
             </p>
             <p>
               從一櫃書、一張長桌開始，我們慢慢有了陶藝家的器物、地方夥伴的選物，與每月一場讀書會。書店並不大，但它是我們對於「閱讀」的長時間練習——讓書頁與生活，能彼此呼吸。
@@ -521,7 +521,7 @@ function About() {
             {/* 稿上這裡是「書店空間照片／圖片待替換」的佔位框，換成站上既有的書店實景。 */}
             <img
               src={bookstoreInterior}
-              alt="小時光風土誌書店空間"
+              alt="小時光書店空間"
               loading="lazy"
               className={`aspect-[4/3] w-full rounded-lg object-cover ${SOFT}`}
             />

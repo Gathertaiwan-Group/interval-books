@@ -230,9 +230,9 @@ check(
     { zh: "地方刊物", en: "Local Publications", ja: "地域の刊行物" },
   ),
   {
-    zh: "東北風｜地方刊物｜小時光風土誌書店",
+    zh: "東北風｜地方刊物｜小時光書店",
     en: "Dongbeifeng｜Local Publications｜Interval Books",
-    ja: "東北風｜地域の刊行物｜小時光 風土誌書店",
+    ja: "東北風｜地域の刊行物｜小時光書店",
   },
 );
 check(
@@ -241,7 +241,7 @@ check(
     { zh: "2026 台東池上秋收山海旅行 | 馥自然人文空間", en: "Chishang", ja: "池上" },
     "2026.9.5~2026.10.23",
   ).zh,
-  "2026 台東池上秋收山海旅行｜2026.9.5~2026.10.23｜小時光風土誌書店",
+  "2026 台東池上秋收山海旅行｜2026.9.5~2026.10.23｜小時光書店",
 );
 
 console.log("\n[5] JSON-LD");
@@ -483,7 +483,7 @@ console.log("\n[8] 2026-11 SEO 驗收：多場次、已結束、PostalAddress、
   const storeAddr = { address: "華山文創園區．紅磚六合院 西7-3館", city: "台北市中正區" };
   check(
     "書店場次 → site_settings 的地址",
-    postalAddressFor("華山小時光風土誌書店（台北市中正區八德路一段 1 號）", storeAddr),
+    postalAddressFor("華山小時光書店（台北市中正區八德路一段 1 號）", storeAddr),
     {
       "@type": "PostalAddress",
       streetAddress: "華山文創園區．紅磚六合院 西7-3館",

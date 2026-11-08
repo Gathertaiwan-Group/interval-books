@@ -25,8 +25,8 @@ export const Route = createFileRoute("/admin/_shell/news_/$id")({
     meta: [
       {
         title: loaderData?.news
-          ? `編輯消息：${loaderData.news.title.zh}｜小時光風土誌書店後台`
-          : "最新消息｜小時光風土誌書店後台",
+          ? `編輯消息：${loaderData.news.title.zh}｜小時光書店後台`
+          : "最新消息｜小時光書店後台",
       },
     ],
   }),

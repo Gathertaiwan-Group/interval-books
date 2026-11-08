@@ -40,7 +40,7 @@ export const Route = createFileRoute("/vendor/pending")({
     return { email: result.email };
   },
   head: () => ({
-    meta: [{ title: "帳號尚未開通｜小時光風土誌書店廠商入口" }],
+    meta: [{ title: "帳號尚未開通｜小時光書店廠商入口" }],
     styles: backOfficeTypeScaleStyles(),
   }),
   component: VendorPendingPage,
@@ -74,7 +74,7 @@ function VendorPendingPage() {
           </p>
         </div>
         <p className="rounded-md bg-muted/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-          請聯絡小時光風土誌書店，告訴他們你的登入帳號是{" "}
+          請聯絡小時光書店，告訴他們你的登入帳號是{" "}
           <span className="font-medium text-foreground">{email}</span>，
           請書店確認廠商入口權限是否已開通。
         </p>

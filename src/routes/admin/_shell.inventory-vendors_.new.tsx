@@ -14,7 +14,7 @@ export const Route = createFileRoute("/admin/_shell/inventory-vendors_/new")({
     const { listVendorFormOptions } = await import("@/lib/admin/fns/inv-vendors");
     return { options: await listVendorFormOptions() };
   },
-  head: () => ({ meta: [{ title: "新增廠商｜小時光風土誌書店後台" }] }),
+  head: () => ({ meta: [{ title: "新增廠商｜小時光書店後台" }] }),
   component: VendorNewPage,
 });
 

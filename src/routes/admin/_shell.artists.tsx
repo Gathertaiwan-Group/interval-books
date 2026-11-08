@@ -70,7 +70,7 @@ export const Route = createFileRoute("/admin/_shell/artists")({
     return { artists, eventCounts };
   },
   head: () => ({
-    meta: [{ title: "講者｜小時光風土誌書店後台" }],
+    meta: [{ title: "講者｜小時光書店後台" }],
   }),
   component: AdminArtistsPage,
 });
