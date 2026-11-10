@@ -230,7 +230,10 @@ check(
 const homeRoute = readFile("src/routes/index.tsx");
 check(
   "首頁精選策旅用同一個 splitJourneys（不另寫判準）",
-  homeRoute.includes("splitJourneys(journeys, journeyEvents).open.slice(0, 3)"),
+  // 2026-11-10：先依下一場次由近到遠排序再取前三（src/lib/upcoming-order.ts）。
+  /sortByNextStart\(\s*splitJourneys\(journeys, journeyEvents\)\.open,[\s\S]*?\)\.slice\(0, 3\)/.test(
+    homeRoute,
+  ),
   true,
 );
 check(

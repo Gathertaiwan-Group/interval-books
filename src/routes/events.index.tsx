@@ -49,6 +49,7 @@ import { JourneyCard } from "@/components/events/JourneyCard";
 import { PrivateBookingBadge } from "@/components/ListingBits";
 import { cardRail, RAIL_HINT } from "@/lib/card-rail";
 import { splitAtComma } from "@/lib/title-break";
+import { nextStartBySlug, sortByNextStart } from "@/lib/upcoming-order";
 import eventImg from "@/assets/event-reading.jpg";
 import journeyImg from "@/assets/journey-mist.jpg";
 
@@ -329,11 +330,24 @@ function Events() {
 
   // 🔴 已結束的活動不放進主體，只在最下方「過往」區。辦過的活動留在站上是為了讓人看得到
   //    我們辦過什麼，不是為了讓人以為還能報名。
-  const eventList = wantEvents ? events.filter((e) => !isEventPast(e)) : [];
+  // 由近到遠：下一個尚未結束的場次開始時間（月曆資料，含包場場次）；沒有場次時間的排最後。
+  // 規則見 src/lib/upcoming-order.ts（2026-11-10 業主：「活動都是先顯示日期最近的」）。
+  const nextStarts = nextStartBySlug(calendar.entries);
+  const eventList = wantEvents
+    ? sortByNextStart(
+        events.filter((e) => !isEventPast(e)),
+        (e) => nextStarts.get(e.slug),
+      )
+    : [];
   // 策旅的「已結束」＝卡片指著的那場活動已結束（判準見 src/lib/past-shelf.ts，與首頁同一支）。
   // 過往區可以展開看全部，所以 limit 給到整份清單的長度。
   const split = splitJourneys(allJourneys, journeyEvents, allJourneys.length);
-  const journeyList = wantJourneys ? split.open : [];
+  const journeyList = wantJourneys
+    ? sortByNextStart(split.open, (j) => {
+        const linked = linkedEventFor(j.externalUrl, journeyEvents);
+        return linked ? nextStarts.get(linked.slug) : undefined;
+      })
+    : [];
   const nothing = eventList.length === 0 && journeyList.length === 0;
   // 「全部」時兩段各有小標；只看一種時不需要。
   const sectioned = type === undefined;

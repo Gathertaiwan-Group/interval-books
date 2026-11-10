@@ -436,6 +436,81 @@ console.log("\n[5] 活動分類移除（2026-11-10 業主：「活動分類功�
   checkTrue("路由表沒有 /events/category 之類的分類頁", !/fullPath: '\/events\/categor/.test(tree));
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+console.log(
+  "\n[6] 近期排序：下一個尚未結束的場次由近到遠（2026-11-10 業主：「活動都是先顯示日期最近的」）",
+);
+{
+  const { nextStartBySlug, sortByNextStart } = await import(
+    pathToFileURL(join(ROOT, "src/lib/upcoming-order.ts")).href
+  );
+  const T = (s) => Date.parse(s);
+  const entries = [
+    // 植生布：單場 11/28
+    { key: "s-moss", slug: "moss", sortMs: T("2026-11-28T07:00:00Z"), ended: false },
+    // 靈魂飯桌：多場次，第一集 11/24，之後每週；11/10 那場已結束不算
+    { key: "s-soul-0", slug: "soul", sortMs: T("2026-11-10T11:30:00Z"), ended: true },
+    { key: "s-soul-1", slug: "soul", sortMs: T("2026-11-24T11:30:00Z"), ended: false },
+    { key: "s-soul-2", slug: "soul", sortMs: T("2026-12-01T11:30:00Z"), ended: false },
+    // 木柵茶：包場，場次時間由 private-booking server fn 補進月曆資料
+    { key: "s-tea", slug: "tea", sortMs: T("2026-11-17T07:30:00Z"), ended: false },
+    // 只有活動日期、沒有場次：不算場次時間
+    { key: "event:nodate", slug: "nodate", sortMs: T("2026-11-12T00:00:00Z"), ended: false },
+    // 進行中的跨日場次（開始時間已過、還沒結束）：算，排最前面
+    { key: "s-trip", slug: "trip", sortMs: T("2026-11-09T01:00:00Z"), ended: false },
+  ];
+  const next = nextStartBySlug(entries);
+  check("多場次取最近一場未結束的", next.get("soul"), T("2026-11-24T11:30:00Z"));
+  check("沒有場次時間 → 不在表裡", next.has("nodate"), false);
+  check("包場一樣有時間", next.get("tea"), T("2026-11-17T07:30:00Z"));
+  const order = sortByNextStart(
+    [
+      { slug: "moss" },
+      { slug: "nodate" },
+      { slug: "soul" },
+      { slug: "tea" },
+      { slug: "ext" },
+      { slug: "trip" },
+    ],
+    (e) => next.get(e.slug),
+  ).map((e) => e.slug);
+  check("由近到遠；沒有時間的排最後且維持原順序", order, [
+    "trip",
+    "tea",
+    "soul",
+    "moss",
+    "nodate",
+    "ext",
+  ]);
+  check(
+    "全部沒有時間 → 原順序（月曆讀不到時不壞）",
+    sortByNextStart(["a", "b", "c"], () => undefined),
+    ["a", "b", "c"],
+  );
+  const homeSrc = strip(readFile("src/routes/index.tsx"));
+  checkTrue(
+    "首頁活動：先排序再取前三",
+    /sortByNextStart\(\s*events\.filter\(\(e\) => !isEventPast\(e\)\),[\s\S]*?\)\.slice\(0, 3\)/.test(
+      homeSrc,
+    ),
+  );
+  checkTrue(
+    "首頁時間來源＝月曆資料（含包場）",
+    homeSrc.includes("nextStartBySlug(calendar.entries)") &&
+      homeSrc.includes("fetchCalendarEntries(Date.now())"),
+  );
+  const evSrc = strip(readFile("src/routes/events.index.tsx"));
+  checkTrue(
+    "/events 活動列依下一場次排序",
+    /sortByNextStart\(\s*events\.filter\(\(e\) => !isEventPast\(e\)\)/.test(evSrc),
+  );
+  checkTrue("/events 策旅列依下一場次排序", evSrc.includes("sortByNextStart(split.open,"));
+  checkTrue(
+    "/events 過往區仍是最近結束的在前（newestEndedFirst）",
+    evSrc.includes("newestEndedFirst(events, events.length)"),
+  );
+}
+
 console.log("\n────────────────────────────────────────────────────");
 console.log(`##SELFTEST## file=${SELF} pass=${pass} fail=${fail}`);
 if (fail === 0) {

@@ -29,6 +29,8 @@ import { fitDescription } from "@/lib/seo/core";
 import { pageHead } from "@/lib/seo/head";
 import { pageRowTranslation } from "@/lib/seo/pages";
 import { linkedEventFor, newestEndedFirst, splitJourneys } from "@/lib/past-shelf";
+import { fetchCalendarEntries } from "@/lib/events-calendar-data";
+import { nextStartBySlug, sortByNextStart } from "@/lib/upcoming-order";
 
 /** Fallback copy — used only when the Supabase read fails. */
 const PAGE_META = {
@@ -270,16 +272,22 @@ export const Route = createFileRoute("/")({
     // archive：「地方刊物典藏」區塊的份數與幾張封面（2026-11 改版，只聚合後的數字進 payload）。
     // listing：活動／策旅卡片上的票價與「額滿／最後 N 位」（見 src/lib/home-listing.ts），
     // 讀不到就是空物件，卡片只是不印那一行。
-    const [page, events, journeys, journeyEvents, shelf, archive, listing] = await Promise.all([
-      fetchPage("index"),
-      fetchEvents(),
-      fetchJourneys(),
-      fetchJourneyEventDates(),
-      fetchHomeShelfProducts(4),
-      fetchPublicationsTeaser(),
-      fetchListingFacts(),
-    ]);
-    return { page, events, journeys, journeyEvents, shelf, archive, listing };
+    // calendar：每場活動「下一個尚未結束的場次」開始時間，近期活動與策旅由近到遠排
+    // （2026-11-10 業主：「活動都是先顯示日期最近的」；規則見 src/lib/upcoming-order.ts）。
+    // 與 /events 月曆同一支（含包場場次）；只把算好的 slug → 時間放進 payload，不帶整份條目。
+    const [page, events, journeys, journeyEvents, shelf, archive, listing, calendar] =
+      await Promise.all([
+        fetchPage("index"),
+        fetchEvents(),
+        fetchJourneys(),
+        fetchJourneyEventDates(),
+        fetchHomeShelfProducts(4),
+        fetchPublicationsTeaser(),
+        fetchListingFacts(),
+        fetchCalendarEntries(Date.now()),
+      ]);
+    const nextStarts = Object.fromEntries(nextStartBySlug(calendar.entries));
+    return { page, events, journeys, journeyEvents, shelf, archive, listing, nextStarts };
   },
   head: ({ loaderData, matches, match }) => {
     const p = pageText(loaderData?.page ?? null);
@@ -304,7 +312,8 @@ export const Route = createFileRoute("/")({
 function Index() {
   const t = useT();
   const localizeHref = useLocalizeHref();
-  const { page, events, journeys, journeyEvents, shelf, archive, listing } = Route.useLoaderData();
+  const { page, events, journeys, journeyEvents, shelf, archive, listing, nextStarts } =
+    Route.useLoaderData();
   const shelfProducts = shelf.products;
 
   // 策旅與活動用同一種卡片、同一套版面規則（見 featureLayout），所以這裡也
@@ -314,14 +323,22 @@ function Index() {
   // 與 /events 的策旅一模一樣：splitJourneys()（src/lib/past-shelf.ts）＝卡片指著的那場活動
   // 最後一個場次已結束（台北時間）。結束的只出現在下方「回顧」與 /events 的過往卡片區。
   // 今天的日期在每次 render 時才取（splitJourneys 的預設參數），不是 build 時寫死。
-  const featuredJourneys = splitJourneys(journeys, journeyEvents).open.slice(0, 3);
+  // 由近到遠（下一個尚未結束的場次），先排序再取前三（src/lib/upcoming-order.ts）。
+  const featuredJourneys = sortByNextStart(
+    splitJourneys(journeys, journeyEvents).open,
+    (j) => nextStarts[linkedEventFor(j.externalUrl, journeyEvents)?.slug ?? ""],
+  ).slice(0, 3);
   const endedJourneys = splitJourneys(journeys, journeyEvents).ended.slice(0, 2);
   // 🔴 一趟策旅在資料上是**兩列**（events 負責內頁與報名、journeys 負責策旅區卡片）。
   //    fetchEvents() 已經在資料層把**所有**策旅的那一列濾掉（見 src/lib/journey-events.ts），
   //    所以這裡的 events 只有一般活動，同一趟旅程不會在首頁出現兩次。
   // 首頁不放已結束的活動 —— 「近期活動」印一場去年辦完的講座沒有意義。
   // 已結束的活動只出現在下方「回顧」（最近結束的幾場）與 /events 的「已結束」那一格。
-  const featuredEvents = events.filter((e) => !isEventPast(e)).slice(0, 3);
+  // 由近到遠（下一個尚未結束的場次；包場一樣算；沒有場次時間的排最後），先排序再取前三。
+  const featuredEvents = sortByNextStart(
+    events.filter((e) => !isEventPast(e)),
+    (e) => nextStarts[e.slug],
+  ).slice(0, 3);
   const pastEvents = newestEndedFirst(events, 6 - endedJourneys.length);
   const eventsLayout = featureLayout(featuredEvents.length);
   const journeysLayout = featureLayout(featuredJourneys.length);
