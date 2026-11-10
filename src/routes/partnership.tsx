@@ -351,7 +351,7 @@ function Partnership() {
       <div className="container-editorial -mt-4 pb-16">
         <a
           href="#partnership-form"
-          className="inline-block border border-foreground bg-foreground px-6 py-3 text-xs tracking-widest text-primary-foreground transition-opacity hover:opacity-90"
+          className="inline-block border border-foreground bg-foreground px-6 py-3 text-sm tracking-widest text-primary-foreground transition-opacity hover:opacity-90"
         >
           {t(p.block("ctaForm", PAGE.ctaForm))}
         </a>
@@ -389,7 +389,7 @@ function Partnership() {
           {types.map((row, i) => (
             <article key={i} className={CARD}>
               <div className="flex flex-1 flex-col p-6">
-                <p className="text-[0.65rem] tracking-widest text-muted-foreground">
+                <p className="text-xs tracking-widest text-muted-foreground">
                   {String(i + 1).padStart(2, "0")}
                 </p>
                 <h3 className="display mt-3 text-2xl leading-snug">{t(row.label)}</h3>
@@ -582,7 +582,7 @@ function PartnershipForm({ lang, copy }: { lang: Lang; copy: ReturnType<typeof p
             setSent(false);
             setToken(null);
           }}
-          className="mt-8 border border-foreground px-6 py-3 text-xs tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
+          className="mt-8 border border-foreground px-6 py-3 text-sm tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
         >
           {tx(copy.block("successAgain", PAGE.successAgain))}
         </button>
@@ -841,7 +841,7 @@ function PartnershipForm({ lang, copy }: { lang: Lang; copy: ReturnType<typeof p
         <button
           type="submit"
           disabled={submitting || token === null}
-          className="border border-foreground bg-foreground px-10 py-3.5 text-xs tracking-widest text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="border border-foreground bg-foreground px-10 py-3.5 text-sm tracking-widest text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? tx(LABEL.submitting) : tx(LABEL.submit)}
         </button>

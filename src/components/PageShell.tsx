@@ -41,14 +41,16 @@ export function PageHeader({
    */
   compact?: boolean;
 }) {
+  // 字級（2026-11 字級改版）：h1 手機 36px（compact 32px）、桌機 48 → 56px。
+  // 原本手機 44px，十來個字的中文標題在 390 寬會斷成三行；桌機 72px 對中文襯線字也過大。
   return (
     <section
       className={`container-editorial md:pt-24 md:pb-16 ${compact ? "pt-8 pb-6" : "pt-16 pb-12"}`}
     >
       <p className="eyebrow text-2xl">{eyebrow}</p>
       <h1
-        className={`display md:mt-6 md:leading-[1.12] md:text-6xl lg:text-7xl max-w-4xl ${
-          compact ? "mt-3 text-[2rem] leading-[1.2]" : "mt-6 text-[2.75rem] leading-[1.12]"
+        className={`display md:mt-6 md:leading-[1.15] md:text-5xl lg:text-[3.5rem] max-w-4xl ${
+          compact ? "mt-3 text-[2rem] leading-[1.2]" : "mt-5 text-[2.25rem] leading-[1.2]"
         }`}
       >
         {title}

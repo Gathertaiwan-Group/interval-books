@@ -40,6 +40,39 @@
   --font-sans: "Inter", "Noto Sans TC", system-ui, sans-serif;
 }
 
+/**
+ * 全站字級（2026-11 字級改版，依 Lighthouse legible-font-sizes、WCAG 1.4.4／1.4.12、
+ * Apple HIG〔最小 11pt〕與繁中內文慣例〔16px 以上、行高 1.7–1.9〕）。
+ *
+ * 直接改 Tailwind 的字級變數，所有 text-xs / text-sm / leading-relaxed 一次生效，不用逐頁改：
+ *   text-xs   12 → 13px（說明小字、日期、tag；全站最低字級）
+ *   text-sm   14 → 15px（手機；桌機維持 14px）——卡片摘要、列表說明這一類「第二層內文」
+ *   行高      xs 1.6、sm 1.7、base 1.75；leading-relaxed 1.625 → 1.8（中文段落）
+ * 例外只剩頁首 logo 底下的「Interval Books」與購物車數字小圓標（11px，屬標誌／圖示）。
+ * 後台（/admin、/vendor）用 .type-dense 還原 Tailwind 預設，密度不變。
+ */
+@theme {
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.6;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.7;
+  --text-base--line-height: 1.75;
+  --leading-relaxed: 1.8;
+}
+@media (min-width: 48rem) {
+  :root {
+    --text-sm: 0.875rem;
+  }
+}
+.type-dense {
+  --text-xs: 0.75rem;
+  --text-xs--line-height: calc(1 / 0.75);
+  --text-sm: 0.875rem;
+  --text-sm--line-height: calc(1.25 / 0.875);
+  --text-base--line-height: 1.5;
+  --leading-relaxed: 1.625;
+}
+
 :root {
   --radius: 0.25rem;
 
@@ -201,11 +234,12 @@
     }
   }
 
+  /* 段落小標。2026-11：0.7rem／0.32em → 0.8125rem／0.2em——11px 加大字距的中文（「選單」「逛逛店裡的選物」）在手機上太細碎。 */
   .eyebrow {
     font-family: var(--font-sans);
-    font-size: 0.7rem;
+    font-size: 0.8125rem;
     font-weight: 500;
-    letter-spacing: 0.32em;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--clay);
   }
@@ -239,7 +273,7 @@
     gap: 0.75rem;
     min-height: 3rem;
     padding: 0.8rem 1.6rem;
-    font-size: 0.9rem;
+    font-size: 0.9375rem;
     letter-spacing: 0.12em;
     border: 1px solid var(--ink);
     transition:
@@ -339,19 +373,21 @@
 /**
  * 段落標籤的字級（2026-11 改版）。
  *
- * 前台多數頁面把 eyebrow 寫成 `eyebrow text-2xl`：1.5rem 的全大寫＋0.32em 字距，跟底下的
+ * 前台多數頁面把 eyebrow 寫成 `eyebrow text-2xl`（報名區 legend 等寫 `eyebrow text-xl`，一併收）：1.5rem 的全大寫＋0.32em 字距，跟底下的
  * 標題差不多大，層級打平了（首頁「本月精選」與「精選活動」幾乎一樣大）。這裡把那個組合統一
  * 收成一個中間字級，比標題小、比內文醒目——各頁不用一頁一頁改 class。
  * 放在 utilities 層、用兩個 class 的權重，才蓋得過 Tailwind 的 text-2xl。
  */
 @layer utilities {
-  .eyebrow.text-2xl {
-    font-size: 0.95rem;
+  .eyebrow.text-2xl,
+  .eyebrow.text-xl {
+    font-size: 0.9375rem;
     line-height: 1.5;
-    letter-spacing: 0.24em;
+    letter-spacing: 0.2em;
   }
   @media (min-width: 768px) {
-    .eyebrow.text-2xl {
+    .eyebrow.text-2xl,
+    .eyebrow.text-xl {
       font-size: 1.05rem;
     }
   }

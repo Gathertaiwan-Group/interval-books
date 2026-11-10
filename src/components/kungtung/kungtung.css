@@ -1,7 +1,9 @@
 /* 范毅舜公東教堂文化之旅 — 從業主的 Lovable 參考站 styles.css 逐條搬來的自訂樣式。
  * 由 scratchpad 工具自動轉換：選擇器一律加上 .kt-root 前綴，自訂 class 改名為 kt-*，
  * 避免跟全站的 .eyebrow 等 class 撞名。Tailwind 工具類別（text-xs、rounded-md…）不改名，
- * 由站上的 Tailwind 產生。⚠️ 只在 /events/kungtung 底下的頁面載入。 */
+ * 由站上的 Tailwind 產生。⚠️ 只在 /events/kungtung 底下的頁面載入。
+ * 2026-11 字級改版：原本 8–11px 的小字一律拉到 11px（folio、圖說、logo 小字）或 12px（其餘），
+ * 對齊全站「最低 12px、標誌類 11px」。 */
 
 @layer base {
   /* 原站的 :root 色票與字體，只套在這一頁的外框上（不動全站 token）。 */
@@ -86,7 +88,7 @@
 .kt-root .kt-eyebrow {
   color: var(--primary);
   margin-bottom: 22px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 .kt-root .kt-section-title {
@@ -213,7 +215,7 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 16px;
-  font-size: 10px;
+  font-size: 11px;
   display: flex;
   position: absolute;
   bottom: 25px;
@@ -394,7 +396,7 @@
 }
 .kt-root .kt-moments-grid p {
   margin-top: 22px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .kt-root .kt-moments-grid h3 {
   margin: 12px 0;
@@ -851,7 +853,7 @@
   color: var(--muted-foreground);
   grid-column: 1/-1;
   margin-bottom: 2px;
-  font-size: 10px;
+  font-size: 12px;
 }
 .kt-root .kt-mobile-reserve {
   display: none;
@@ -912,7 +914,7 @@
   }
   .kt-root .kt-eyebrow {
     margin-bottom: 18px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .kt-root .kt-site-header {
     height: 66px;
@@ -927,14 +929,14 @@
     height: 28px;
   }
   .kt-root .kt-brand-mark .text-xs {
-    font-size: 9px;
+    font-size: 11px;
   }
   .kt-root .kt-site-header nav {
     gap: 0;
   }
   .kt-root .kt-site-header nav a {
     padding-inline: 8px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .kt-root .kt-site-header nav a[href="\#story"] {
     display: none;
@@ -951,7 +953,7 @@
   }
   .kt-root .kt-hero-date {
     margin-bottom: 19px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .kt-root .kt-hero-name {
     margin-bottom: 20px;
@@ -974,7 +976,7 @@
     height: 56px;
   }
   .kt-root .kt-hero-author .text-xs {
-    font-size: 10px;
+    font-size: 12px;
   }
   .kt-root .kt-hero-actions {
     flex-direction: column;
@@ -993,14 +995,14 @@
   }
   .kt-root .kt-hero-folio {
     padding-top: 10px;
-    font-size: 8px;
+    font-size: 11px;
     bottom: 18px;
     left: 20px;
     right: 20px;
   }
   .kt-root .kt-hero-credit {
     letter-spacing: 0.05em;
-    font-size: 10px;
+    font-size: 11px;
   }
   .kt-root .kt-story-heading {
     grid-template-columns: 1fr;
@@ -1087,7 +1089,7 @@
     font-size: 28px;
   }
   .kt-root .kt-alice-placeholder > span:last-child {
-    font-size: 8px;
+    font-size: 11px;
   }
   .kt-root .kt-moments-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -1214,7 +1216,7 @@
     display: block;
   }
   .kt-root .kt-mobile-reserve span {
-    font-size: 10px;
+    font-size: 12px;
   }
   .kt-root .kt-mobile-reserve .kt-journey-button {
     gap: 10px;
@@ -1284,7 +1286,7 @@
 }
 .kt-root .kt-alice-portrait-fallback small {
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: 12px;
 }
 .kt-root .kt-alice-feature-copy {
   max-width: 520px;
@@ -1298,7 +1300,7 @@
 .kt-root .kt-host-eyebrow-en {
   letter-spacing: 0.3em;
   color: var(--accent-foreground);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 .kt-root .kt-host-eyebrow-zh {

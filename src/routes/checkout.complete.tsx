@@ -385,7 +385,7 @@ function CheckoutComplete() {
             <p className="text-sm text-muted-foreground">{t(PAGE.notFound)}</p>
             <Link
               to="/shop"
-              className="mt-8 inline-block border border-foreground px-5 py-3 text-xs tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
+              className="mt-8 inline-block border border-foreground px-5 py-3 text-sm tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
             >
               {t(ui.buttons.continueShopping)}
             </Link>
@@ -656,7 +656,7 @@ function CheckoutComplete() {
 
         <Link
           to="/shop"
-          className="mt-10 inline-block border border-foreground px-5 py-3 text-xs tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
+          className="mt-10 inline-block border border-foreground px-5 py-3 text-sm tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
         >
           {t(ui.buttons.continueShopping)}
         </Link>

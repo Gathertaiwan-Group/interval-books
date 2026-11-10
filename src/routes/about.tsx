@@ -367,7 +367,7 @@ function About() {
           {workList.map((w, i) => (
             <article key={i} className={`${CARD} ${workLayout.card}`}>
               <div className={`flex flex-1 flex-col p-6 ${workLayout.body}`}>
-                <p className="text-[0.65rem] tracking-widest text-muted-foreground">
+                <p className="text-xs tracking-widest text-muted-foreground">
                   {String(i + 1).padStart(2, "0")}
                 </p>
                 <h3 className={`display mt-3 text-2xl leading-snug ${workLayout.title}`}>
@@ -422,7 +422,7 @@ function About() {
           </div>
           <Link
             to="/partnership"
-            className="self-start md:self-center shrink-0 border border-foreground bg-foreground text-primary-foreground px-6 py-3 text-xs tracking-widest hover:opacity-90 transition-opacity"
+            className="self-start md:self-center shrink-0 border border-foreground bg-foreground text-primary-foreground px-6 py-3 text-sm tracking-widest hover:opacity-90 transition-opacity"
           >
             {t(p.block("partnerCta", PAGE.partnerCta))}
           </Link>

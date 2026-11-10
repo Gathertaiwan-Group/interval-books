@@ -511,7 +511,7 @@ function EventDetail() {
                       href={cta.href}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-block border border-foreground px-6 py-3 text-xs tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
+                      className="inline-block border border-foreground px-6 py-3 text-sm tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
                     >
                       {t(ui.buttons.toEvent)}
                     </a>
@@ -642,7 +642,7 @@ function RegistrationPanel({
                 <Link
                   to="/checkout"
                   search={directCheckoutSearch(product, selectedSession, qty, selectedPlan)}
-                  className="inline-block border border-foreground px-6 py-3 text-xs tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
+                  className="inline-block border border-foreground px-6 py-3 text-sm tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
                 >
                   {t(PAGE.registerCta)}
                 </Link>
@@ -650,7 +650,7 @@ function RegistrationPanel({
                 <button
                   type="button"
                   disabled
-                  className="inline-block cursor-not-allowed border border-border px-6 py-3 text-xs tracking-widest text-muted-foreground"
+                  className="inline-block cursor-not-allowed border border-border px-6 py-3 text-sm tracking-widest text-muted-foreground"
                 >
                   {t(PAGE.registerCta)}
                 </button>

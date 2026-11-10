@@ -126,9 +126,7 @@ function Badge({ children, tone }: { children: string; tone: "clay" | "ink" | "m
         ? "border-foreground text-foreground"
         : "border-border text-muted-foreground";
   return (
-    <span
-      className={`inline-block border px-1.5 py-px text-[11px] leading-4 tracking-widest ${cls}`}
-    >
+    <span className={`inline-block border px-1.5 py-px text-xs leading-4 tracking-widest ${cls}`}>
       {children}
     </span>
   );
@@ -297,7 +295,7 @@ function MonthTable({
                       {Number(day.date.slice(8))}
                     </span>
                     {isToday ? (
-                      <span className="text-[11px] tracking-widest text-muted-foreground">
+                      <span className="text-xs tracking-widest text-muted-foreground">
                         {t(COPY.today)}
                       </span>
                     ) : null}
@@ -396,7 +394,7 @@ function Agenda({
               }`}
               aria-hidden="true"
             >
-              <span className="text-[11px] tracking-widest opacity-70">
+              <span className="text-xs tracking-widest opacity-70">
                 {lang === "en" ? EN_MONTH_ABBR[m - 1] : `${m}月`}
               </span>
               <span className="text-2xl font-light leading-none tabular-nums">{d}</span>

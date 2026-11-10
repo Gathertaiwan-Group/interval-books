@@ -309,7 +309,7 @@ function AdminShell() {
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider className="type-dense">
       <Sidebar collapsible="icon">
         <SidebarHeader className="px-3 py-3">
           <p className="text-sm font-medium leading-tight">小時光書店</p>

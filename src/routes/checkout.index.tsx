@@ -908,13 +908,13 @@ function Checkout() {
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
                 to="/events"
-                className="inline-block border border-foreground px-5 py-3 text-xs tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
+                className="inline-block border border-foreground px-5 py-3 text-sm tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
               >
                 {t(PAGE.backToEvents)}
               </Link>
               <Link
                 to="/shop"
-                className="inline-block border border-border px-5 py-3 text-xs tracking-widest text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                className="inline-block border border-border px-5 py-3 text-sm tracking-widest text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
               >
                 {t(ui.buttons.continueShopping)}
               </Link>
@@ -945,7 +945,7 @@ function Checkout() {
             )}
             <Link
               to="/shop"
-              className="mt-8 inline-block border border-foreground px-5 py-3 text-xs tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
+              className="mt-8 inline-block border border-foreground px-5 py-3 text-sm tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
             >
               {t(ui.buttons.continueShopping)}
             </Link>
@@ -1646,14 +1646,14 @@ function Checkout() {
               <Link
                 to="/shop/$slug"
                 params={{ slug: direct.line.slug }}
-                className="mt-7 inline-block border border-foreground px-5 py-3 text-xs tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
+                className="mt-7 inline-block border border-foreground px-5 py-3 text-sm tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
               >
                 {t(PAGE.backToItem)}
               </Link>
             ) : (
               <Link
                 to="/cart"
-                className="mt-7 inline-block border border-foreground px-5 py-3 text-xs tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
+                className="mt-7 inline-block border border-foreground px-5 py-3 text-sm tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
               >
                 {t(PAGE.backToCart)}
               </Link>

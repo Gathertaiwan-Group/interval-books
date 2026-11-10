@@ -109,7 +109,7 @@ export function HomeProductShelf({ products }: { products: ShopProductCard[] }) 
                 <button
                   type="button"
                   onClick={() => add(product)}
-                  className="w-full min-h-11 border border-foreground/70 px-3 py-2.5 text-xs tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2"
+                  className="w-full min-h-11 border border-foreground/70 px-3 py-2.5 text-sm tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
                   {t(ui.buttons.addToCart)}
                   <span className="sr-only">（{title}）</span>

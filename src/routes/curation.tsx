@@ -116,7 +116,7 @@ function Curation() {
           {collaborations.map((c, i) => (
             <article key={c.id} className={`${CARD} ${layout.card}`}>
               <div className={`flex flex-1 flex-col p-6 ${layout.body}`}>
-                <p className="text-[0.65rem] tracking-widest text-muted-foreground">
+                <p className="text-xs tracking-widest text-muted-foreground">
                   {String(i + 1).padStart(2, "0")}
                 </p>
                 <h2 className={`display mt-3 text-2xl leading-snug ${layout.title}`}>
@@ -140,14 +140,14 @@ function Curation() {
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <Link
               to="/partnership"
-              className="inline-block border border-foreground bg-foreground px-6 py-3 text-xs tracking-widest text-primary-foreground hover:opacity-90 transition-opacity"
+              className="inline-block border border-foreground bg-foreground px-6 py-3 text-sm tracking-widest text-primary-foreground hover:opacity-90 transition-opacity"
               data-testid="curation-partnership-cta"
             >
               {t(p.block("partnershipCta", PAGE.partnershipCta))}
             </Link>
             <a
               href={`mailto:${contactEmail}`}
-              className="inline-block border border-foreground px-6 py-3 text-xs tracking-widest hover:bg-foreground hover:text-primary-foreground transition-colors"
+              className="inline-block border border-foreground px-6 py-3 text-sm tracking-widest hover:bg-foreground hover:text-primary-foreground transition-colors"
             >
               {contactEmail}
             </a>

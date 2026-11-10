@@ -102,7 +102,7 @@ function VendorShell() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/20">
+    <div className="type-dense min-h-screen bg-muted/20">
       <header className="border-b border-border bg-background">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
           <div className="flex items-center gap-2">

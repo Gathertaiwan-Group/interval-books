@@ -309,7 +309,7 @@ export function EventEndedNotice({
           <button
             type="button"
             disabled
-            className="inline-block cursor-not-allowed border border-border px-6 py-3 text-xs tracking-widest text-muted-foreground"
+            className="inline-block cursor-not-allowed border border-border px-6 py-3 text-sm tracking-widest text-muted-foreground"
           >
             {t(COPY.eventEnded)}
           </button>

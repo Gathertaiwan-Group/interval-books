@@ -64,7 +64,9 @@ export function SiteHeader() {
         <div className="container-editorial flex items-center justify-between py-4 gap-6">
           <Link to="/" className="flex flex-col leading-tight">
             <span className="font-serif text-[1.35rem] tracking-tight">{t(ui.brand)}</span>
-            <span className="eyebrow mt-1 text-[0.6rem]">{t(ui.brandSub)}</span>
+            <span className="eyebrow mt-1 text-[0.6875rem] tracking-[0.24em]">
+              {t(ui.brandSub)}
+            </span>
           </Link>
 
           <nav className="hidden lg:flex items-center gap-7 text-[0.875rem] tracking-[0.06em] text-foreground/75">
@@ -241,7 +243,7 @@ function MobileDrawer({
         }`}
       >
         <div className="flex items-center justify-between border-b border-border/60 py-3 pl-6 pr-3">
-          <h2 id={titleId} className="eyebrow text-[0.7rem]">
+          <h2 id={titleId} className="eyebrow">
             {t(MENU_TITLE)}
           </h2>
           <button
@@ -281,7 +283,7 @@ function MobileDrawer({
             <ShoppingBag className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
             <span>{t(ui.nav.cart)}</span>
             {cartCount > 0 && (
-              <span className="ml-auto min-w-6 rounded-full bg-foreground px-2 text-center text-[0.7rem] leading-6 text-primary-foreground tabular-nums">
+              <span className="ml-auto min-w-6 rounded-full bg-foreground px-2 text-center text-xs leading-6 text-primary-foreground tabular-nums">
                 {cartCount}
               </span>
             )}
@@ -294,7 +296,7 @@ function MobileDrawer({
 
         {/* 底部：營業時間、社群、語言。 */}
         <div className="mt-auto border-t border-border/60 px-6 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-          <p className="flex items-center gap-2.5 text-[0.8rem] text-muted-foreground">
+          <p className="flex items-center gap-2.5 text-sm text-muted-foreground">
             <Clock className="h-4 w-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />
             <span>{hours}</span>
           </p>
@@ -323,7 +325,7 @@ function MobileDrawer({
                   target="_blank"
                   rel="noreferrer"
                   title="LINE"
-                  className="flex h-11 min-w-11 items-center justify-center text-[0.7rem] font-medium tracking-wide text-foreground/70 transition-colors hover:text-foreground"
+                  className="flex h-11 min-w-11 items-center justify-center text-xs font-medium tracking-wide text-foreground/75 transition-colors hover:text-foreground"
                 >
                   LINE
                 </a>
@@ -358,7 +360,7 @@ function CartLink({ label }: { label: string }) {
     >
       <ShoppingBag className="h-5 w-5" aria-hidden="true" />
       {count > 0 && (
-        <span className="absolute right-0.5 top-0.5 min-w-4 rounded-full bg-foreground px-1 text-center text-[0.6rem] leading-4 text-primary-foreground tabular-nums">
+        <span className="absolute right-0.5 top-0.5 min-w-4 rounded-full bg-foreground px-1 text-center text-[0.6875rem] leading-4 text-primary-foreground tabular-nums">
           {count}
         </span>
       )}
@@ -448,13 +450,13 @@ function LangText() {
 }
 
 const SEGMENT_BASE =
-  "relative inline-flex h-10 w-11 items-center justify-center text-[0.75rem] leading-none tracking-[0.08em] transition-colors focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground";
+  "relative inline-flex h-10 w-11 items-center justify-center text-xs leading-none tracking-[0.08em] transition-colors focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground";
 const SEGMENT_ON = "bg-foreground text-primary-foreground";
 const SEGMENT_OFF = "text-foreground/70 hover:bg-foreground/[0.06] hover:text-foreground";
 const TEXT_BASE =
-  "inline-flex h-10 min-w-10 items-center justify-center px-1 text-[0.8rem] tracking-[0.06em] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-foreground";
+  "inline-flex h-10 min-w-10 items-center justify-center px-1 text-sm tracking-[0.06em] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-foreground";
 const TEXT_ON = "text-foreground font-medium underline underline-offset-4 decoration-1";
-const TEXT_OFF = "text-foreground/60 hover:text-foreground";
+const TEXT_OFF = "text-foreground/75 hover:text-foreground";
 
 function LangSwitch({
   code,

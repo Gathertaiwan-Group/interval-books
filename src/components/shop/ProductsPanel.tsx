@@ -191,7 +191,7 @@ export function ProductsPanel({
                     loading="lazy"
                   />
                   <div className="flex flex-1 flex-col p-3 md:p-6">
-                    <p className="eyebrow text-[0.65rem] md:text-sm tracking-widest">
+                    <p className="eyebrow text-xs md:text-sm tracking-widest">
                       {t(PRODUCT_TYPE_LABELS[prod.productType])}
                     </p>
                     <h2 className="font-serif text-base md:text-xl mt-1.5 md:mt-3 leading-snug line-clamp-2 md:line-clamp-none group-hover:underline underline-offset-4">

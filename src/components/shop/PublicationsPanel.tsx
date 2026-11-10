@@ -432,7 +432,7 @@ function PublicationCard({
                   onClick={handleAdd}
                   disabled={soldOut}
                   data-testid="add-to-cart"
-                  className="border border-foreground bg-foreground px-5 py-2.5 text-xs tracking-widest text-primary-foreground transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-muted-foreground disabled:opacity-100"
+                  className="border border-foreground bg-foreground px-5 py-2.5 text-sm tracking-widest text-primary-foreground transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-muted-foreground disabled:opacity-100"
                 >
                   {soldOut ? soldOutLabel : addToCartLabel}
                 </button>

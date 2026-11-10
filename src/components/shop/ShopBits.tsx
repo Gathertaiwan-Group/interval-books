@@ -108,7 +108,7 @@ export function StockBadge({
 }) {
   return (
     <span
-      className={`inline-block border px-3 py-1 text-[0.7rem] tracking-widest ${
+      className={`inline-block border px-3 py-1 text-xs tracking-widest ${
         tone === "alert" ? "border-clay text-clay" : "border-border text-muted-foreground"
       }`}
     >

@@ -373,7 +373,7 @@ function ProductDetail() {
                 type="button"
                 onClick={handleAdd}
                 disabled={!readyToBook}
-                className="border border-foreground px-6 py-3 text-xs tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                className="border border-foreground px-6 py-3 text-sm tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground disabled:cursor-not-allowed disabled:opacity-30"
               >
                 {t(ui.buttons.addToCart)}
               </button>

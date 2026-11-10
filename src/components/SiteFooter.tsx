@@ -40,7 +40,7 @@ export function SiteFooter() {
           - 地址＋時間各一行加 icon；聯繫改成一排 44px 圓形 icon 按鈕
           - 只放市話（phones 的第一支，label "Tel"）；手機不在 footer 顯示 */}
       <div className="container-editorial py-12 md:py-16 grid gap-8 md:grid-cols-2 md:gap-16">
-        <p className="text-[0.8rem] leading-[1.9] text-muted-foreground max-w-sm">
+        <p className="text-sm leading-[1.9] text-muted-foreground max-w-sm">
           {t(ui.footer.aboutBlurb ?? site.shortDesc)}
         </p>
 
@@ -118,7 +118,7 @@ export function SiteFooter() {
                 target="_blank"
                 rel="noreferrer"
                 title="LINE"
-                className={`${ICON_BTN} text-[0.6rem] font-medium tracking-wide`}
+                className={`${ICON_BTN} text-[0.6875rem] font-medium tracking-wide`}
               >
                 LINE
               </a>

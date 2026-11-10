@@ -87,7 +87,7 @@ function PastCard({ item, badge }: { item: PastShelfItem; badge: string }) {
           {item.category ? (
             <p className="eyebrow text-xs tracking-widest">{item.category}</p>
           ) : null}
-          <span className="border border-border px-2 py-0.5 text-[11px] tracking-widest text-muted-foreground">
+          <span className="border border-border px-2 py-0.5 text-xs tracking-widest text-muted-foreground">
             {badge}
           </span>
           {item.privateBooking ? <PrivateBookingBadge /> : null}

@@ -154,7 +154,7 @@ function Cart() {
             <p className="text-sm text-muted-foreground">{t(PAGE.empty)}</p>
             <Link
               to="/shop"
-              className="mt-8 inline-block border border-foreground px-5 py-3 text-xs tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
+              className="mt-8 inline-block border border-foreground px-5 py-3 text-sm tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
             >
               {t(ui.buttons.continueShopping)}
             </Link>
@@ -229,7 +229,7 @@ function Cart() {
                             label={t(PAGE.quantity)}
                           />
                           {atLimit && (
-                            <span className="text-[0.7rem] tracking-widest text-clay">
+                            <span className="text-xs tracking-widest text-clay">
                               {t(PAGE.atLimit)}
                             </span>
                           )}
@@ -241,7 +241,7 @@ function Cart() {
                       <button
                         type="button"
                         onClick={() => handleRemove(line)}
-                        className="inline-flex items-center gap-2 text-[0.7rem] tracking-widest text-muted-foreground transition-colors hover:text-foreground"
+                        className="inline-flex items-center gap-2 text-xs tracking-widest text-muted-foreground transition-colors hover:text-foreground"
                       >
                         <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                         {t(ui.buttons.remove)}
@@ -293,7 +293,7 @@ function Cart() {
 
               <Link
                 to="/shop"
-                className="mt-7 inline-block border border-foreground px-5 py-3 text-xs tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
+                className="mt-7 inline-block border border-foreground px-5 py-3 text-sm tracking-widest transition-colors hover:bg-foreground hover:text-primary-foreground"
               >
                 {t(ui.buttons.continueShopping)}
               </Link>
