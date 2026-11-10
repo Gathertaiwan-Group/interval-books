@@ -45,9 +45,9 @@ const PAGE_META = {
    * fitDescription() 會偵測）時才用。
    */
   description: {
-    zh: "從一份地方刊物，讀懂一片土地。小時光書店位在台北華山文創園區紅磚六合院，是一間以風土誌選書的書店，典藏台灣與日本的地方刊物，舉辦讀書會、講座與工作坊，也帶你走進台灣各地的文化策旅。",
-    en: "Read a place through its local publications. Interval Books at Huashan 1914, Taipei: books chosen by the land, zines from Taiwan and Japan, talks and journeys.",
-    ja: "一冊の地域誌から、ひとつの土地を読む。台北・華山1914文化創意産業園区の小時光書店は、風土誌を軸に本を選ぶ書店。台湾と日本の地域の刊行物を所蔵し、読書会やトーク、台湾各地への旅も企画しています。",
+    zh: "從一份地方刊物，讀懂一片土地。小時光書店位在台北華山文創園區紅磚六合院，是一間以風土誌選書的書店，典藏台灣各地的地方刊物，舉辦讀書會、講座與工作坊，也帶你走進各地的文化策旅。",
+    en: "Read a place through its local publications. Interval Books at Huashan 1914: books chosen by the land, local magazines from across Taiwan, talks and journeys.",
+    ja: "一冊の地域誌から、ひとつの土地を読む。台北・華山1914文化創意産業園区の小時光書店は、風土誌を軸に本を選ぶ書店。台湾各地の地域誌を所蔵し、読書会やトーク、各地への旅も企画しています。",
   },
 };
 
@@ -206,9 +206,9 @@ const HOME = {
     ja: "その土地の人が、その土地を書く。",
   },
   archiveBody: {
-    zh: "從基隆的漁村、花蓮的溪流，到日本山形的小鎮，這些刊物多半不是為了賣而做的，是為了留下來。大部分只在店裡展示，歡迎來翻。",
-    en: "From a Keelung fishing village and a Hualien river to a small town in Yamagata, most of these were not made to be sold — they were made to remain. Most are on display in the store only; come and leaf through them.",
-    ja: "基隆の漁村、花蓮の川、山形の小さな町。その多くは売るためではなく、遺すためにつくられました。ほとんどは店頭展示のみ。どうぞ手に取ってご覧ください。",
+    zh: "從基隆的漁村到花蓮的溪流，這些刊物多半不是為了賣而做的，是為了留下來。大部分只在店裡展示，歡迎來翻。",
+    en: "From a Keelung fishing village to a Hualien river, most of these were not made to be sold — they were made to remain. Most are on display in the store only; come and leaf through them.",
+    ja: "基隆の漁村から花蓮の川まで。その多くは売るためではなく、遺すためにつくられました。ほとんどは店頭展示のみ。どうぞ手に取ってご覧ください。",
   },
   archiveCta: { zh: "翻閱刊物目錄", en: "Browse the archive", ja: "所蔵リストを見る" },
   archiveCoverLabel: {

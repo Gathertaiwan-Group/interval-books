@@ -62,9 +62,9 @@ const COPY = {
     ja: "その土地の人が、その土地を書く",
   },
   intro: {
-    zh: "從基隆的漁村到日本的山間小鎮，126 本地方刊物擺在同一張桌子上。它們大多不是為了賣而做的，是為了留下來。",
-    en: "From a fishing village in Keelung to a mountain town in Japan, 126 local publications share one table. Most were not made to be sold — they were made to remain.",
-    ja: "基隆の漁村から日本の山あいの町まで、126冊の地域刊行物がひとつの机に並びます。その多くは売るためではなく、遺すためにつくられました。",
+    zh: "從基隆的漁村到花蓮的溪流，126 本地方刊物擺在同一張桌子上。它們大多不是為了賣而做的，是為了留下來。",
+    en: "From a fishing village in Keelung to a river in Hualien, 126 local publications share one table. Most were not made to be sold — they were made to remain.",
+    ja: "基隆の漁村から花蓮の川まで、126冊の地域刊行物がひとつの机に並びます。その多くは売るためではなく、遺すためにつくられました。",
   },
   filterAll: { zh: "全部", en: "All", ja: "すべて" },
   regionLabel: { zh: "地區", en: "Region", ja: "地域" },

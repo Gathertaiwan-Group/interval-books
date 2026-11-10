@@ -75,9 +75,9 @@ const PAGE = {
     ja: "地域の刊行物｜小時光書店",
   },
   publicationsMetaDescription: {
-    zh: "一個地方，怎麼被自己的人寫下來：從基隆的漁村到日本的山間小鎮，台灣與日本的地方刊物依地區排在同一張桌上。每一本附上製作單位與集數，部分可線上購買，其餘歡迎到店翻閱。",
-    en: "How a place is written by its own people: local publications from Keelung's fishing villages to Japan's mountain towns, by region. Some can be bought online.",
-    ja: "土地が、そこに暮らす人の手で書き残される。基隆の漁村から日本の山あいの町まで、台湾と日本の地域誌を地域別に紹介。発行元と号数つきで、一部はオンラインでも購入できます。",
+    zh: "一個地方，怎麼被自己的人寫下來：從基隆的漁村到花蓮的溪流，台灣各地的地方刊物依地區排在同一張桌上。每一本附上製作單位與集數，部分可線上購買，其餘歡迎到店翻閱。",
+    en: "How a place is written by its own people: local magazines from across Taiwan, from Keelung's fishing villages to Hualien's rivers. Some can be bought online.",
+    ja: "土地が、そこに暮らす人の手で書き残される。基隆の漁村から花蓮の川まで、台湾各地の地域誌を地域別に紹介。発行元と号数つきで、一部はオンラインでも購入できます。",
   },
   curatedMetaTitle: {
     zh: "主理人的選品 Curated｜小時光書店",
