@@ -5,13 +5,15 @@
  * lastmod 一律是**這一頁內容真正的更新時間**：組成這一頁的那幾張表的 updated_at
  * 取最新的一筆（每張表都有 *_set_updated_at 觸發器維護）。
  *
- *   · 固定頁：pages ＋ page_blocks ＋ page_list_items（該頁的 slug）；/events、首頁另外
- *     算進 events，/journeys 算進 journeys，/shop?tab=curated 算進 curated_*。
+ *   · 固定頁：pages ＋ page_blocks ＋ page_list_items（該頁的 slug）；首頁另外算進 events，
+ *     /events（2026-11-10 起「活動與策旅」合併頁）算進 events 與 journeys 兩張表、以及
+ *     pages/'journeys' 的區塊（策旅文案搬到這一頁），/shop?tab=curated 算進 curated_*。
+ *   · /journeys 不列（2026-11-10 起 301 到 /events?type=journey）。
  *   · 活動頁：events 列 ＋ 售票商品 ＋ 場次 ＋ 票種。報名區印的日期、地點、票價、
  *     尚餘名額都來自後三者——只看 events.updated_at 會漏掉「改了票價」這種更新。
  *   · **已結束的活動**：保留在 sitemap，lastmod 用最後一個場次的結束時間（沒有場次就用
  *     iso_date 當天）。「已結束」與 /events「已結束」分頁同一條規則（isEventEnded）。
- *   · 策旅卡片指著的站內頁：卡片在 /journeys 上，journeys.updated_at 不是那一頁的內容，
+ *   · 策旅卡片指著的站內頁：卡片在 /events 上，journeys.updated_at 不是那一頁的內容，
  *     所以這一筆不帶 lastmod（那一頁自己的那筆會帶）。
  *   · 沒有資料列的頁（寫死在程式碼裡的著陸頁子頁）：不輸出 lastmod。
  *   · 地方刊物（2026-11 M4）：/publications ＝ 所有刊物＋刊物商品的最新一筆；
@@ -90,16 +92,15 @@ const STATIC_PAGES: Array<{
   path: string;
   /** 第一個是這一頁自己的 pages 列（翻譯判斷看它）；其餘只算 lastmod。 */
   pageSlugs: string[];
-  extra?: "events" | "journeys" | "curated";
+  extra?: ReadonlyArray<"events" | "journeys" | "curated">;
 }> = [
-  { path: "/", pageSlugs: ["index"], extra: "events" },
-  { path: "/events", pageSlugs: ["events"], extra: "events" },
-  { path: "/journeys", pageSlugs: ["journeys"], extra: "journeys" },
+  { path: "/", pageSlugs: ["index"], extra: ["events"] },
+  { path: "/events", pageSlugs: ["events", "journeys"], extra: ["events", "journeys"] },
   { path: "/about", pageSlugs: ["about", "visit"] },
   { path: "/curation", pageSlugs: ["curation"] },
   { path: "/partnership", pageSlugs: ["partnership"] },
   { path: "/privacy", pageSlugs: ["privacy"] },
-  { path: "/shop?tab=curated", pageSlugs: ["curated"], extra: "curated" },
+  { path: "/shop?tab=curated", pageSlugs: ["curated"], extra: ["curated"] },
 ];
 
 /** 寫死在程式碼裡的著陸頁子頁（沒有自己的資料列 → 沒有 lastmod）。 */
@@ -184,7 +185,7 @@ export function buildSitemapEntries(src: SitemapSource, today = todayInTaipei())
       path: s.path,
       lastmod: latestOf([
         ...s.pageSlugs.flatMap((slug) => pageUpdated.get(slug) ?? []),
-        ...(s.extra ? extras[s.extra] : []),
+        ...(s.extra ?? []).flatMap((k) => extras[k]),
       ]),
       langs: staticLangs(s.pageSlugs[0]),
     });

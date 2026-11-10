@@ -1,5 +1,5 @@
 /**
- * 「過往活動」（/events）與「過往策旅」（/journeys）共用的卡片區。
+ * 「過往活動」「過往策旅」（2026-11-10 起都在 /events「活動與策旅」）與首頁回顧共用的卡片區。
  *
  * 版型照首頁 HomeProductShelf：手機橫向滑（一張佔 76%，看得到下一張的邊 ≈ 1.3 張），
  * sm 起兩張半，md 起改格線（md 兩欄／lg 三欄／xl 四欄）。-mx-6 px-6 對齊
@@ -24,7 +24,10 @@ export type PastShelfLink =
 export type PastShelfItem = {
   key: string;
   title: string;
-  /** 卡片 eyebrow（活動分類／策旅天數與主題）。 */
+  /**
+   * 卡片 eyebrow（策旅的天數與主題）。空字串就不印 —— 活動卡片從 2026-11-10 起不印分類
+   * （業主：「活動分類功能都拿掉」）。
+   */
   category: string;
   /** 顯示用日期 —— 原樣印出（display_date 是自由文字），不做任何日期格式化。 */
   date: string;
@@ -78,7 +81,9 @@ function PastCard({ item, badge }: { item: PastShelfItem; badge: string }) {
       ) : null}
       <div className="flex flex-1 flex-col p-5">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="eyebrow text-xs tracking-widest">{item.category}</p>
+          {item.category ? (
+            <p className="eyebrow text-xs tracking-widest">{item.category}</p>
+          ) : null}
           <span className="border border-border px-2 py-0.5 text-[11px] tracking-widest text-muted-foreground">
             {badge}
           </span>

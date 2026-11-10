@@ -193,7 +193,8 @@ check("指不到活動 → 沒有封面 key（用意象圖）", linkedEventFor("
 
 // ── 靜態 ────────────────────────────────────────────────────────────────
 const eventsIndex = readFile("src/routes/events.index.tsx");
-const journeysRoute = readFile("src/routes/journeys.tsx");
+// 2026-11-10：/journeys 併入 /events，策旅卡片在 src/components/events/JourneyCard.tsx。
+const journeyCard = readFile("src/components/events/JourneyCard.tsx");
 const shelf = readFile("src/components/PastShelf.tsx");
 const cms = readFile("src/lib/cms.ts");
 check("/events 用 PastShelf", eventsIndex.includes("<PastShelf"), true);
@@ -205,8 +206,11 @@ check(
 check(
   // 2026-11 月曆檢視多了第四支 fetchCalendarEntries()（場次時間，見 events-calendar-selftest）；
   // 過往活動區本身仍然沒有多查——它用的是同一份 events。
-  "/events loader 沒有為過往活動多查（page/events/categories ＋ 月曆一支）",
-  /Promise\.all\(\[\s*fetchPage\("events"\),\s*fetchEvents\(\),\s*fetchEventCategories\(\),\s*fetchCalendarEntries\(loadedAt\),\s*\]\)/.test(
+  // 2026-11-10 /journeys 併入：多了策旅卡片要的 fetchJourneys／fetchJourneyEventDates／
+  // fetchListingFacts，pages 改一次讀 events＋journeys 兩列。仍然全部在同一個 Promise.all。
+  // 2026-11-10 業主「活動分類功能都拿掉」：不再查 fetchEventCategories()。
+  "/events loader 全部平行（pages／events／月曆／策旅三支）",
+  /Promise\.all\(\[\s*fetchPages\(\["events", "journeys"\]\),\s*fetchEvents\(\),\s*fetchCalendarEntries\(loadedAt\),\s*fetchJourneys\(\),\s*fetchJourneyEventDates\(\),\s*fetchListingFacts\(\),\s*\]\)/.test(
     eventsIndex,
   ),
   true,
@@ -216,7 +220,11 @@ check(
   eventsIndex.includes("setFilter(PAST_FILTER);"),
   true,
 );
-check("/journeys 用 PastShelf", journeysRoute.includes("<PastShelf"), true);
+check(
+  "/events 的過往策旅用同一個 splitJourneys（不另寫判準）",
+  eventsIndex.includes("splitJourneys(allJourneys, journeyEvents, allJourneys.length)"),
+  true,
+);
 const homeRoute = readFile("src/routes/index.tsx");
 check(
   "首頁精選策旅用同一個 splitJourneys（不另寫判準）",
@@ -234,21 +242,17 @@ check(
   /^const [^=]*=\s*splitJourneys/m.test(homeRoute),
   false,
 );
-for (const [rel, src] of [
-  ["首頁", homeRoute],
-  ["/journeys", journeysRoute],
-]) {
-  check(
-    `${rel} 策旅卡封面走指著的活動 image_key`,
-    /imageFor\(\s*linkedEventFor\(j\.externalUrl, journeyEvents\)\?\.imageKey,\s*journeyImg,?\s*\)/.test(
-      src,
-    ),
-    true,
-  );
-}
 check(
-  "/journeys 在同一個 Promise.all 查活動日期",
-  /Promise\.all\(\[[^\]]*fetchJourneyEventDates\(\)/.test(journeysRoute),
+  "首頁 策旅卡封面走指著的活動 image_key",
+  /imageFor\(\s*linkedEventFor\(j\.externalUrl, journeyEvents\)\?\.imageKey,\s*journeyImg,?\s*\)/.test(
+    homeRoute,
+  ),
+  true,
+);
+check(
+  "/events 策旅卡封面走指著的活動 image_key（linkedEventFor → JourneyCard）",
+  eventsIndex.includes("linkedEventFor(j.externalUrl, journeyEvents)") &&
+    journeyCard.includes("imageFor(linked?.imageKey, journeyImg)"),
   true,
 );
 check(

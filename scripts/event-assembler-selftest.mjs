@@ -887,11 +887,12 @@ walkAst(assemblerAst.program, (n) => {
     to: jsxAttrString(n, "to"),
   });
 });
-check("剛好五個 MirrorNote", mirrorNotes.length, 5);
+// 2026-11-10：「活動分類」那一塊隨分類欄位一起拿掉（業主：「活動分類功能都拿掉」），剩四塊。
+check("剛好四個 MirrorNote", mirrorNotes.length, 4);
 check(
-  "五塊分別是：講者／活動分類／活動地點／報名名單／這場活動的商品",
+  "四塊分別是：講者／活動地點／報名名單／這場活動的商品",
   mirrorNotes.map((m) => m.label).sort(),
-  ["這場活動的商品", "報名名單", "活動分類", "活動地點", "講者"].sort(),
+  ["這場活動的商品", "報名名單", "活動地點", "講者"].sort(),
 );
 check(
   "🔴 只有「這場活動的商品」是方向相反的那一塊",
@@ -900,7 +901,6 @@ check(
 );
 for (const [label, to] of [
   ["講者", "/admin/artists"],
-  ["活動分類", "/admin/categories"],
   ["報名名單", "/admin/registrations"],
   ["這場活動的商品", "/admin/products"],
 ]) {
@@ -1100,7 +1100,6 @@ for (const f of [
   "description",
   "display_date",
   "iso_date",
-  "category",
   "speaker_id",
   "image_key",
   "external_url",
@@ -1118,6 +1117,13 @@ for (const f of [
 }
 // 0052：分散的開關一個都不准回來——is_published 是 status 的衍生值、票券商品的狀態跟著活動
 // （products_pull_listing_status trigger 會把這裡填的值蓋掉，一個改了沒用的欄位比沒有更糟）。
+// 2026-11-10 業主：「活動分類功能都拿掉」—— 分類欄位不再顯示（值沿用 defaultValues 送出，
+// events.category 仍是必填外鍵，資料表不動）。
+checkFalse("組裝器不再顯示 category 欄位", fieldNames.has("category"));
+checkTrue(
+  "表單 defaultValues 仍帶這一列原本的 category（不然存檔會被 zod 擋）",
+  /category: row\?\.category \?\? ""/.test(assemblerSrc),
+);
 for (const retired of ["is_published", "product.status"]) {
   checkFalse(`🔴 組裝器沒有 ${retired}（0052 起只剩一個「狀態」）`, fieldNames.has(retired));
 }

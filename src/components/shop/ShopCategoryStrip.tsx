@@ -42,7 +42,9 @@ type Entry = {
   sub: string;
   img: string;
   /** 書刊那一格捲到下方清單；其他連到各自的頁面。 */
-  to: "#product-grid" | "/publications" | "/shop" | "/events" | "/journeys";
+  to: "#product-grid" | "/publications" | "/shop" | "/events";
+  /** /events 的類型篩選（2026-11-10 /journeys 併入 /events?type=journey）。 */
+  type?: "event" | "journey";
 };
 
 const CARD_CLASS =
@@ -102,13 +104,15 @@ export function ShopCategoryStrip({
       sub: t(COPY.eventsSub),
       img: eventThumb,
       to: "/events",
+      type: "event",
     },
     {
       key: "journeys",
       title: t(COPY.journeys),
       sub: t(COPY.journeysSub),
       img: journeyThumb,
-      to: "/journeys",
+      to: "/events",
+      type: "journey",
     },
   ];
 
@@ -173,7 +177,12 @@ export function ShopCategoryStrip({
                 {body(entry)}
               </Link>
             ) : (
-              <Link to={entry.to} className={CARD_CLASS} data-testid={`shop-category-${entry.key}`}>
+              <Link
+                to={entry.to}
+                search={entry.to === "/events" ? { type: entry.type } : undefined}
+                className={CARD_CLASS}
+                data-testid={`shop-category-${entry.key}`}
+              >
                 {body(entry)}
               </Link>
             )}

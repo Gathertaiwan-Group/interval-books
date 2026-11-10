@@ -118,13 +118,11 @@ import {
 } from "@/lib/admin/schemas";
 import type { getEventById, listEventProducts, listSessionsForEvent } from "@/lib/admin/fns/events";
 import type { listEventBlocks } from "@/lib/admin/fns/event-blocks";
-import type { listEventCategories } from "@/lib/admin/fns/event-categories";
 import type { listArtistOptions } from "@/lib/admin/fns/artists";
 import type { Localized } from "@/i18n/types";
 
 type EventRow = NonNullable<Awaited<ReturnType<typeof getEventById>>>;
 type EventProductRow = Awaited<ReturnType<typeof listEventProducts>>[string];
-type EventCategoryRow = Awaited<ReturnType<typeof listEventCategories>>[number];
 type ArtistOption = Awaited<ReturnType<typeof listArtistOptions>>[number];
 type SessionBrief = Awaited<ReturnType<typeof listSessionsForEvent>>[number];
 type BlockRow = Awaited<ReturnType<typeof listEventBlocks>>[number];
@@ -774,43 +772,9 @@ function AdminEventAssemblerPage() {
             )}
           />
 
-          <FormField
-            control={form.control}
-            name="category"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>分類</FormLabel>
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="請選擇分類" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {categories.map((c: EventCategoryRow) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.label.zh}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <MirrorNote
-            label="活動分類"
-            source="活動分類"
-            to="/admin/categories"
-            hint={
-              categories.length === 0
-                ? "目前一個分類都沒有 —— 要先去新增至少一個，這場活動才存得起來。"
-                : undefined
-            }
-          >
-            共 {categories.length} 個分類可選。分類與活動之間有資料庫關聯，不能自由輸入。
-          </MirrorNote>
-
+          {/* 分類（2026-11-10 業主：「活動分類功能都拿掉」）：不再顯示、不再讓人改。events.category
+              仍是 not null 外鍵（資料表這次不動），表單沿用這一列原本的值送出 —— react-hook-form
+              沒有註冊的欄位照樣從 defaultValues 帶進 onSubmit（本檔沒有 shouldUnregister）。 */}
           <FormField
             control={form.control}
             name="speaker_id"

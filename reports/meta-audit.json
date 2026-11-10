@@ -1,16 +1,17 @@
 {
-  "generatedAt": "2026-11-08T09:42:38.026Z",
+  "generatedAt": "2026-11-10T12:25:20.299Z",
   "summary": {
     "routesAudited": 33,
-    "redirectRoutes": 5,
+    "redirectRoutes": 6,
     "redirectRouteList": [
       "/contact",
       "/curated",
+      "/journeys",
       "/news.$",
       "/news",
       "/visit"
     ],
-    "metaAudited": 28,
+    "metaAudited": 27,
     "languages": [
       "zh",
       "en",
@@ -32,7 +33,7 @@
         "ogTitle",
         "ogDescription"
       ],
-      "approxChecks": 336
+      "approxChecks": 324
     }
   },
   "routes": {
@@ -177,7 +178,7 @@
     "/journeys": {
       "file": "src/routes/journeys.tsx",
       "ok": true,
-      "redirect": false,
+      "redirect": true,
       "issues": []
     },
     "/news.$": {

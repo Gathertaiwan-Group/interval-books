@@ -33,7 +33,6 @@ import {
   Sparkles,
   TruckIcon,
   Settings,
-  Tags,
   Tent,
   TriangleAlert,
   Type,
@@ -223,7 +222,8 @@ const NAV_GROUPS = [
       // /partnership 表單的收件匣（0042）。staff: false，真正擋人的是
       // src/lib/admin/fns/partnerships.ts 的 adminFnMiddleware。
       { to: "/admin/partnerships", label: "異業合作", icon: Inbox, staff: false },
-      { to: "/admin/categories", label: "活動分類", icon: Tags, staff: false },
+      // 「活動分類」（/admin/categories）2026-11-10 從導覽拿掉（業主：「活動分類功能都拿掉」）。
+      // 頁面本身留著、直接打網址還進得去：events.category 仍是必填外鍵，萬一要補一個分類還有地方。
     ],
   },
   {

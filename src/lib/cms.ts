@@ -733,7 +733,7 @@ export function eyebrowOf(page: PageContent | null, prefix: string, suffix: stri
  * /events 列表與首頁「精選活動」用的活動清單 —— **已經拿掉策旅**。
  *
  * 🔴 策旅的報名掛在一場活動上（events 一列＋journeys 一張卡片連過去），所以 events 表
- *    裡混著策旅。它們只該出現在 /journeys 與首頁策旅區；判準與理由見
+ *    裡混著策旅。它們只該出現在策旅卡片（/events 的策旅段、首頁策旅區）；判準與理由見
  *    src/lib/journey-events.ts。在資料層濾掉（不是在某一頁 filter），兩個呼叫端
  *    因此不會一個記得、一個忘記。/events/<slug> 詳情頁走 fetchEventBySlug，不受影響。
  */
@@ -788,12 +788,12 @@ async function fetchAllEventRows(): Promise<EventEntry[]> {
 }
 
 /**
- * /journeys「過往策旅」用：每場活動判斷「已結束」與畫卡片所需的最少欄位。
+ * /events 與首頁的策旅卡片用：每場活動判斷「已結束」與畫卡片所需的最少欄位。
  *
  * journeys 表沒有日期，一趟策旅的日期與場次在它指向的那一列 events 上（見
  * src/lib/journey-events.ts、src/lib/past-shelf.ts）。只 select 用得到的欄位，
  * 場次結束日與 fetchEvents() 同一支 attachLastSessionDates()（同一條「已結束」規則）。
- * 讀取失敗 → 空陣列：沒有任何策旅會被判成已結束，/journeys 退回原本的樣子。
+ * 讀取失敗 → 空陣列：沒有任何策旅會被判成已結束，策旅卡片退回原本的樣子。
  */
 export type JourneyEventDateRow = {
   slug: string;

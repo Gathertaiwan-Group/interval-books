@@ -1,217 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { PageShell, PageHeader } from "@/components/PageShell";
-import { CoverImage } from "@/components/CoverImage";
-import { PastShelf } from "@/components/PastShelf";
-import { linkedEventFor, splitJourneys } from "@/lib/past-shelf";
-import { useLocalizeHref, useT } from "@/i18n/LanguageContext";
-import { useDocumentMeta } from "@/i18n/useDocumentMeta";
-import { fitDescription } from "@/lib/seo/core";
-import { pageHead } from "@/lib/seo/head";
-import { pageRowTranslation } from "@/lib/seo/pages";
-import { fetchJourneyEventDates, fetchJourneys, fetchPage, pageText, eyebrowOf } from "@/lib/cms";
-import { CARD, CARD_HOVER, featureLayout } from "@/lib/feature-layout";
-import { useSiteContent } from "@/lib/site-content";
-import { imageFor } from "@/lib/images";
-import { journeyLinkProps } from "@/lib/journey-link";
-import journeyImg from "@/assets/journey-mist.jpg";
-
-/** Fallback copy — used only when the Supabase read fails. */
-const PAGE = {
-  metaTitle: {
-    zh: "策旅 Journeys｜小時光書店",
-    en: "Journeys｜Interval Books",
-    ja: "旅｜小時光書店",
-  },
-  metaDescription: {
-    zh: "讓土地成為書的延伸：跟著書與作者，走到故事發生的地方。這一頁彙整小時光的文化策旅，像是范毅舜帶路的台東公東教堂三天兩夜、池上秋收山海旅行，每一趟都有自己的行程頁，也歡迎地方夥伴來信共創。",
-    en: "Cultural journeys that carry books out to the land — like three days at Taitung's Kung Tung Chapel with photographer Nicholas Fan. Each trip has its own page.",
-    ja: "本を土地へと延ばす文化の旅。写真家・范毅舜さんと巡る台東・公東教会の2泊3日や池上の秋の旅など、それぞれの旅の専用ページへご案内します。地域のパートナーとの共創も歓迎。",
-  },
-  eyebrowSuffix: { zh: "策旅", en: "策旅", ja: "策旅" },
-  title: {
-    zh: "讓土地，成為書的延伸",
-    en: "Let the land be the book's extension",
-    ja: "土地を、本の延長に",
-  },
-  intro: {
-    zh: "每一趟策旅皆有獨立網站，本頁僅做彙整導流。請點選感興趣的旅程，前往該旅程的專屬頁面。",
-    en: "Each journey has its own dedicated site. Choose one to read further.",
-    ja: "各「旅」には専用サイトがあります。気になる旅へお進みください。",
-  },
-  coCreateEyebrow: { zh: "Co-create", en: "Co-create", ja: "Co-create" },
-  collab: { zh: "策旅合作共創", en: "Journey co-creation", ja: "旅の共創" },
-  collabBody: {
-    zh: "若您是地方夥伴、職人、旅宿或品牌，歡迎與我們共創一段屬於風土的策旅。請以 Email 聯繫。",
-    en: "If you're a local partner, maker, hotel, or brand, we'd love to co-create a journey rooted in place. Reach us by email.",
-    ja: "地域のパートナー、作り手、宿、ブランドの方へ。風土に根ざした旅をともに育てましょう。メールでご連絡ください。",
-  },
-  // 「過往策旅」卡片區（2026-10-28 店長：「策旅的部分也是」）。與 /events 的「過往活動」
-  // 同一個元件（src/components/PastShelf.tsx）。策旅沒有「已結束」分頁，所以沒有「查看全部」。
-  pastEyebrow: { zh: "PAST JOURNEYS", en: "PAST JOURNEYS", ja: "PAST JOURNEYS" },
-  pastTitle: { zh: "過往策旅", en: "Past journeys", ja: "これまでの旅" },
-  pastBadge: { zh: "已結束", en: "Ended", ja: "終了" },
-  emptyOpen: {
-    zh: "目前沒有開放報名的策旅。新的旅程公布前，歡迎先看看我們走過的地方。",
-    en: "No journeys are open for registration right now. In the meantime, take a look at where we have been.",
-    ja: "現在受付中の旅はありません。これまでの旅をご覧ください。",
-  },
-};
+/**
+ * /journeys —— 只剩轉址（2026-11-10）。
+ *
+ * 「活動」與「策旅」兩個列表頁合併成 /events「活動與策旅」：策旅卡片（日期區間、天數、
+ * 票價、封面）、過往策旅與「策旅合作共創」都搬進 src/routes/events.index.tsx，用
+ * ?type=journey 篩選。這個網址留一個 301 —— 它散在社群貼文、名片與搜尋結果裡，刪掉就是 404。
+ * /en/journeys、/ja/journeys 由 router 的 lang rewrite 轉到 /en/events?type=journey 等
+ * （與 /visit → /about 同一套，見 src/routes/visit.tsx）。
+ *
+ * 策旅的詳情頁一直都在 /events/<slug>（例：/events/kungtung），/journeys 本身從來沒有子路由，
+ * 所以這支轉址不影響任何一趟策旅的頁面與報名。
+ *
+ * pages/'journeys' 那一列的 CMS 文案（空狀態、過往策旅標題、合作共創）照樣由 /events 讀取。
+ *
+ * 沒有 component，也沒有 useDocumentMeta —— 與 src/routes/visit.tsx 相同。
+ */
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/journeys")({
-  loader: async () => {
-    const [page, journeys, journeyEvents] = await Promise.all([
-      fetchPage("journeys"),
-      fetchJourneys(),
-      fetchJourneyEventDates(),
-    ]);
-    return { page, journeys, journeyEvents };
+  beforeLoad: () => {
+    throw redirect({ to: "/events", search: { type: "journey" }, statusCode: 301 });
   },
-  head: ({ loaderData, matches, match }) => {
-    const p = pageText(loaderData?.page ?? null);
-    return {
-      ...pageHead(
-        { matches, match },
-        {
-          translation: pageRowTranslation(loaderData?.page ?? null),
-          title: p.metaTitle(PAGE.metaTitle),
-          description: fitDescription(p.metaDescription(PAGE.metaDescription)),
-          ogTitle: p.ogTitle(PAGE.title),
-          image: imageFor(loaderData?.page?.ogImageKey, journeyImg),
-          type: "website",
-        },
-      ),
-    };
-  },
-  component: Journeys,
 });
-
-function Journeys() {
-  const t = useT();
-  const localizeHref = useLocalizeHref();
-  const { page, journeys: allJourneys, journeyEvents } = Route.useLoaderData();
-  const p = pageText(page);
-  const { ui, contactEmail } = useSiteContent();
-  // 「已結束」＝卡片指著的那場活動已結束（判準見 src/lib/past-shelf.ts）。上面的列表只放
-  // 還沒結束的；結束的移到下面「過往策旅」。指不到活動的策旅一律留在上面。
-  const { open: journeys, ended } = splitJourneys(allJourneys, journeyEvents);
-  const layout = featureLayout(journeys.length);
-
-  useDocumentMeta({
-    title: p.metaTitle(PAGE.metaTitle),
-    description: fitDescription(p.metaDescription(PAGE.metaDescription)),
-    ogTitle: p.ogTitle(PAGE.title),
-    ogImage: imageFor(page?.ogImageKey, journeyImg),
-  });
-  return (
-    <PageShell>
-      <PageHeader
-        eyebrow={eyebrowOf(page, "Journeys", t(page?.eyebrowSuffix ?? PAGE.eyebrowSuffix))}
-        title={t(p.title(PAGE.title))}
-        intro={t(p.intro(PAGE.intro))}
-      />
-
-      {journeys.length === 0 ? (
-        <section className="container-editorial pb-24">
-          <div className="border border-border p-8 md:p-10">
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {t(p.block("emptyOpen", PAGE.emptyOpen))}
-            </p>
-          </div>
-        </section>
-      ) : (
-        <section className={`container-editorial pb-24 ${layout.grid}`}>
-          {journeys.map((j) => {
-            // 與首頁「精選策旅」同一種卡片：有連結就整張卡可點，還沒設連結的策旅
-            // 仍然看得到卡片，只是不可點（不要讓它消失）。
-            const link = journeyLinkProps(j.externalUrl, localizeHref);
-            const body = (
-              <>
-                {/* journeys 表沒有 image_key；封面用卡片指著的那場活動的 events.image_key
-                  （與首頁精選、下方過往策旅同一個來源），指不到或沒設圖才用固定意象圖。
-                  alt 用策旅名稱（2026-11 SEO 健檢 M6：圖片搜尋與無障礙都需要語意）。 */}
-                <CoverImage
-                  src={imageFor(linkedEventFor(j.externalUrl, journeyEvents)?.imageKey, journeyImg)}
-                  alt={t(j.title)}
-                  loading="lazy"
-                  className={`aspect-[4/3] ${layout.image}`}
-                  imgClassName="transition-transform duration-500 group-hover:scale-[1.03]"
-                />
-                <div className={`flex flex-1 flex-col p-6 ${layout.body}`}>
-                  <p className="eyebrow text-sm tracking-widest">
-                    {t(j.days)} ／ {t(j.theme)}
-                  </p>
-                  <h2
-                    className={`display mt-3 text-2xl leading-snug whitespace-pre-line ${layout.title}`}
-                  >
-                    {t(j.title)}
-                  </h2>
-                  <p
-                    className={`mt-4 text-sm leading-relaxed text-foreground/75 flex-1 ${layout.summary}`}
-                  >
-                    {t(j.summary)}
-                  </p>
-                  {link ? (
-                    <span className="mt-6 inline-block self-start tracking-widest text-clay group-hover:underline text-base">
-                      {t(ui.buttons.toJourney)} →
-                    </span>
-                  ) : null}
-                </div>
-              </>
-            );
-            return link ? (
-              <a key={j.id} {...link} className={`${CARD} ${layout.card} ${CARD_HOVER}`}>
-                {body}
-              </a>
-            ) : (
-              <article key={j.id} className={`${CARD} ${layout.card}`}>
-                {body}
-              </article>
-            );
-          })}
-        </section>
-      )}
-
-      <PastShelf
-        testId="journeys-past-shelf"
-        eyebrow={t(p.block("pastEyebrow", PAGE.pastEyebrow))}
-        title={t(p.block("pastTitle", PAGE.pastTitle))}
-        badge={t(p.block("pastBadge", PAGE.pastBadge))}
-        items={ended.map(({ journey: j, event: e }) => {
-          const link = journeyLinkProps(j.externalUrl, localizeHref);
-          return {
-            key: j.id,
-            title: t(j.title),
-            category: `${t(j.days)} ／ ${t(j.theme)}`,
-            date: e.date,
-            image: e.imageKey ? imageFor(e.imageKey, journeyImg) : journeyImg,
-            link: link ? { kind: "href" as const, ...link } : null,
-          };
-        })}
-      />
-
-      <section className="container-editorial pb-32">
-        <div className="border-t border-border pt-16 grid md:grid-cols-2 gap-10">
-          <div>
-            <p className="eyebrow text-2xl">
-              {t(p.block("coCreateEyebrow", PAGE.coCreateEyebrow))}
-            </p>
-            <h2 className="display mt-4 text-3xl md:text-4xl">
-              {t(p.block("collab", PAGE.collab))}
-            </h2>
-          </div>
-          <div>
-            <p className="text-base leading-relaxed text-foreground/80">
-              {t(p.block("collabBody", PAGE.collabBody))}
-            </p>
-            <a
-              href={`mailto:${contactEmail}`}
-              className="mt-6 inline-block border border-foreground px-6 py-3 tracking-widest hover:bg-foreground hover:text-primary-foreground transition-colors text-base"
-            >
-              {contactEmail}
-            </a>
-          </div>
-        </div>
-      </section>
-    </PageShell>
-  );
-}

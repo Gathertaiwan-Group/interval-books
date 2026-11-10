@@ -12,9 +12,9 @@ import { useSiteContent } from "@/lib/site-content";
 import { isEventPast } from "@/lib/event-status";
 import { CARD, CARD_HOVER, featureLayout } from "@/lib/feature-layout";
 import { imageFor, srcSetFor } from "@/lib/images";
-import { eventProductSlug, fetchHomeShelfProducts, formatPrice } from "@/lib/shop";
-import { fetchListingFacts, type ListingFacts } from "@/lib/home-listing";
-import { CalendarDays } from "lucide-react";
+import { eventProductSlug, fetchHomeShelfProducts } from "@/lib/shop";
+import { fetchListingFacts } from "@/lib/home-listing";
+import { ListingBadge, ListingDate, ListingFooter } from "@/components/ListingBits";
 import { fetchPublicationsTeaser } from "@/lib/publications";
 import heroImg from "@/assets/hero-mountain.jpg";
 import storefrontImg from "@/assets/storefront.jpg";
@@ -187,9 +187,6 @@ const HOME = {
     en: "{n} in total — swipe for more",
     ja: "全{n}件・横にスワイプ",
   },
-  listingFree: { zh: "免費", en: "Free", ja: "無料" },
-  listingSoldOut: { zh: "已額滿", en: "Sold out", ja: "満席" },
-  listingFewLeft: { zh: "最後 {n} 位", en: "{n} left", ja: "残り{n}席" },
 
   archiveKicker: {
     zh: "地方刊物典藏",
@@ -268,7 +265,7 @@ export const Route = createFileRoute("/")({
   loader: async () => {
     // shelf：「主理人的選品」那一排商品卡，跟其他讀取平行，不多一段等待。
     // journeyEvents：策旅卡片指著的那幾列 events（日期＋最晚場次＋封面），用來判斷
-    // 「已結束」與決定卡片封面——與 /journeys 同一支查詢、同一套判準。
+    // 「已結束」與決定卡片封面——與 /events 策旅卡同一支查詢、同一套判準。
     // archive：「地方刊物典藏」區塊的份數與幾張封面（2026-11 改版，只聚合後的數字進 payload）。
     // listing：活動／策旅卡片上的票價與「額滿／最後 N 位」（見 src/lib/home-listing.ts），
     // 讀不到就是空物件，卡片只是不印那一行。
@@ -313,8 +310,8 @@ function Index() {
   // 取到三筆，而不是像以前那樣只挑一筆做成橫幅。
   //
   // 已結束的策旅不放精選（2026-10-29 業主：池上那趟 10 月就辦完了還掛在首頁）。判準
-  // 與 /journeys 一模一樣：splitJourneys()（src/lib/past-shelf.ts）＝卡片指著的那場活動
-  // 最後一個場次已結束（台北時間）。結束的只出現在下方「回顧」與 /journeys 的「過往策旅」。
+  // 與 /events 的策旅一模一樣：splitJourneys()（src/lib/past-shelf.ts）＝卡片指著的那場活動
+  // 最後一個場次已結束（台北時間）。結束的只出現在下方「回顧」與 /events 的過往卡片區。
   // 今天的日期在每次 render 時才取（splitJourneys 的預設參數），不是 build 時寫死。
   const featuredJourneys = splitJourneys(journeys, journeyEvents).open.slice(0, 3);
   const endedJourneys = splitJourneys(journeys, journeyEvents).ended.slice(0, 2);
@@ -353,6 +350,7 @@ function Index() {
       img: bookstoreImg,
       alt: t(HOME.imgReadAlt),
       to: "/shop" as const,
+      type: undefined,
     },
     {
       key: "gather",
@@ -364,6 +362,8 @@ function Index() {
       img: eventReadingImg,
       alt: t(HOME.imgGatherAlt),
       to: "/events" as const,
+      // 2026-11-10 /events 與 /journeys 合併：「聚」落在只看活動的篩選，「行」落在只看策旅。
+      type: "event" as const,
     },
     {
       key: "go",
@@ -374,7 +374,8 @@ function Index() {
       cta: t(p.block("home.goCta", HOME.goCta)),
       img: journeyImg,
       alt: t(HOME.imgGoAlt),
-      to: "/journeys" as const,
+      to: "/events" as const,
+      type: "journey" as const,
     },
   ];
 
@@ -506,7 +507,7 @@ function Index() {
             <>
               <SubHeader
                 label={t(p.block("home.upcomingEventsLabel", HOME.upcomingEventsLabel))}
-                link={{ to: "/events", label: t(ui.buttons.viewAll) }}
+                link={{ type: "event", label: t(ui.buttons.viewAll) }}
               />
               {/* ⚠️ 這裡連的是**站內**的 /events/$slug，不是 e.externalUrl。
                   0001 的種子資料把 externalUrl 填成 https://example.com/event-N，首頁曾經
@@ -536,8 +537,9 @@ function Index() {
                       />
                     ) : null}
                     <div className={`flex flex-1 flex-col p-5 md:p-7 ${eventsLayout.body}`}>
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="text-xs tracking-[0.18em] text-clay">{e.category}</p>
+                      {/* 分類字 2026-11-10 拿掉（業主：「活動分類功能都拿掉」）；只剩報名狀態小標，
+                          平常不印、整行不佔高度。 */}
+                      <div className="flex items-start justify-end gap-3 empty:hidden">
                         <ListingBadge facts={listing[eventProductSlug(e.slug)]} />
                       </div>
                       <h3
@@ -571,7 +573,7 @@ function Index() {
             <>
               <SubHeader
                 label={t(p.block("home.upcomingJourneysLabel", HOME.upcomingJourneysLabel))}
-                link={{ to: "/journeys", label: t(ui.buttons.viewAll) }}
+                link={{ type: "journey", label: t(ui.buttons.viewAll) }}
               />
               <div
                 data-home-journeys
@@ -655,7 +657,11 @@ function Index() {
         <ul className="mt-14 grid gap-12 md:grid-cols-3 md:gap-8 lg:gap-12">
           {pillars.map((pl) => (
             <li key={pl.key}>
-              <Link to={pl.to} className="group block">
+              <Link
+                to={pl.to}
+                search={pl.to === "/events" ? { type: pl.type } : undefined}
+                className="group block"
+              >
                 <div className="aspect-[5/4] overflow-hidden bg-muted">
                   <img
                     src={pl.img}
@@ -848,7 +854,7 @@ function Index() {
           ...pastEvents.map((e) => ({
             key: `e-${e.id}`,
             title: t(e.title),
-            category: e.category,
+            category: "",
             date: e.date,
             image: e.imageKey ? imageFor(e.imageKey, storefrontImg) : null,
             link: { kind: "event" as const, slug: e.slug },
@@ -975,76 +981,19 @@ function RailHint({ count }: { count: number }) {
   );
 }
 
-/** 卡片上的日期：用正文色＋圖示，不再是一行淺灰小字。內容是 display_date（自由文字）。 */
-function ListingDate({ children }: { children: ReactNode }) {
-  return (
-    <p className="mt-3 flex items-start gap-2 text-sm font-medium text-foreground/90 [font-variant-numeric:lining-nums]">
-      <CalendarDays className="mt-[0.15em] h-4 w-4 shrink-0 text-clay" aria-hidden="true" />
-      <span>{children}</span>
-    </p>
-  );
-}
-
-/** 報名狀態小標（「已額滿」／「最後 N 位」），放在卡片頂端分類那一行的右邊。平常不印。 */
-function ListingBadge({ facts }: { facts: ListingFacts | undefined }) {
-  const t = useT();
-  if (!facts) return null;
-  if (facts.soldOut) {
-    return (
-      <span className="-my-1 shrink-0 border border-border px-2 py-0.5 text-xs tracking-[0.1em] text-muted-foreground">
-        {t(HOME.listingSoldOut)}
-      </span>
-    );
-  }
-  if (facts.fewLeft === null) return null;
-  return (
-    <span className="-my-1 shrink-0 border border-clay/40 px-2 py-0.5 text-xs tracking-[0.1em] text-clay">
-      {fill(t(HOME.listingFewLeft), { n: facts.fewLeft })}
-    </span>
-  );
-}
-
-/**
- * 卡片底部一列：左邊票價，右邊「查看 →」。整張卡本來就是連結，這一列只是讓人一眼看到
- * 價格與下一步。facts 讀不到時只剩右邊的箭頭；cta 為 null（策旅沒設連結）時只剩左邊。
- * 兩邊都沒有就整列不畫。
- */
-function ListingFooter({ facts, cta }: { facts: ListingFacts | undefined; cta: string | null }) {
-  const t = useT();
-  if (!facts && !cta) return null;
-  return (
-    <div className="mt-5 flex min-h-11 items-center justify-between gap-3 border-t border-border/70 pt-3 md:mt-6 md:pt-4">
-      {facts ? (
-        <span className="text-base font-medium text-foreground [font-variant-numeric:lining-nums]">
-          {facts.price > 0 ? formatPrice(facts.price) : t(HOME.listingFree)}
-        </span>
-      ) : (
-        <span />
-      )}
-      {cta ? (
-        <span className="link-arrow shrink-0 text-sm">
-          {cta}
-          <span className="arrow" aria-hidden="true">
-            →
-          </span>
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 function SubHeader({
   label,
   link,
 }: {
   label: string;
-  link: { to: "/events" | "/journeys"; label: string };
+  /** 「查看全部」落在 /events 合併頁的哪一種篩選（2026-11-10 /journeys 併入 /events）。 */
+  link: { type: "event" | "journey"; label: string };
 }) {
   return (
     <div className="mt-10 mb-5 flex items-center justify-between gap-6 border-b border-border pb-2 md:mt-14 md:mb-6 md:pb-3">
       <p className="font-serif text-xl md:text-2xl">{label}</p>
       {/* min-h-11：手機點擊區至少 44px（文字本身只有 20px 高）。 */}
-      <Link to={link.to} className="link-arrow min-h-11 text-sm">
+      <Link to="/events" search={{ type: link.type }} className="link-arrow min-h-11 text-sm">
         {link.label}
         <span className="arrow" aria-hidden="true">
           →

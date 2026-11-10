@@ -8,7 +8,7 @@ import { QuantityStepper } from "@/components/shop/ShopBits";
 import { useLang, useT } from "@/i18n/LanguageContext";
 import type { Localized } from "@/i18n/types";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
-import { fetchEventBySlug, fetchEventCategories, findEventSlugIgnoringCase } from "@/lib/cms";
+import { fetchEventBySlug, findEventSlugIgnoringCase } from "@/lib/cms";
 import {
   directAnySeatsLeft,
   directBookingClosed,
@@ -87,7 +87,7 @@ const PAGE = {
     en: "An event at Interval Books — when it happens, which sittings are open, and how to join.",
     ja: "小時光書店の催しについて。日程、開催回、お申し込み方法をご案内します。",
   },
-  back: { zh: "回到活動", en: "Back to events", ja: "イベント一覧へ" },
+  back: { zh: "回到活動與策旅", en: "Back to events & journeys", ja: "イベント・旅の一覧へ" },
   aboutThis: { zh: "關於這場活動", en: "About this event", ja: "この催しについて" },
   registration: { zh: "報名", en: "Registration", ja: "お申し込み" },
   quantity: { zh: "報名人數", en: "How many places", ja: "お申し込み人数" },
@@ -169,10 +169,8 @@ function metaOr(value: Localized | undefined, fallback: Localized): Localized {
 
 export const Route = createFileRoute("/events/$slug")({
   loader: async ({ params }) => {
-    const [{ event, unavailable }, categories] = await Promise.all([
-      fetchEventBySlug(params.slug),
-      fetchEventCategories(),
-    ]);
+    // 活動分類（2026-11-10 業主：「活動分類功能都拿掉」）不再印在頁首，所以也不再查 event_categories。
+    const { event, unavailable } = await fetchEventBySlug(params.slug);
     // 這一行是這一頁最容易做錯的地方：只有「真的查不到」才 404。讀取失敗時
     // unavailable 為 true，於是這裡**不**丟 notFound()，改由元件渲染頁殼 ——
     // 不能因為資料庫眨一下眼，就告訴搜尋引擎這場活動不存在。
@@ -202,7 +200,7 @@ export const Route = createFileRoute("/events/$slug")({
     // 「場次開始了沒」的判斷時間點（isSessionClosedForBooking 的 now）。跟著 loader 資料
     // 序列化，SSR 與第一次 hydrate 用同一個值（不會 #418）；掛載後由 useBookingNow()
     // 校正成現在並在下一個場次開始時推進。與 /checkout 的 loader 同一個做法（a61488a）。
-    return { event, unavailable, categories, booking, now: Date.now() };
+    return { event, unavailable, booking, now: Date.now() };
   },
   // SEO（2026-11 健檢）：title「{活動名}｜{日期}｜小時光書店」、描述取摘要＋內文、
   // 分享圖用活動封面、JSON-LD 輸出 Event（日期地點價格來自售票商品的場次）與麵包屑。
@@ -286,7 +284,7 @@ function EventDetail() {
   // 清單區塊取出來的是字串陣列，而 t() 只吃 Localized 字串，所以這裡要拿 lang
   // 自己選語系（規則與 t() 一致：當前語系沒東西就退回 zh）。
   const { t, lang } = useLang();
-  const { event, unavailable, categories, booking, now: loadedAt } = Route.useLoaderData();
+  const { event, unavailable, booking, now: loadedAt } = Route.useLoaderData();
   const site = useSiteContent();
   // 在任何 early return 之前（hook 規則）。
   const now = useBookingNow(loadedAt, booking.product?.sessions ?? []);
@@ -318,14 +316,6 @@ function EventDetail() {
     );
   }
 
-  // 分類標籤查不到就退回 category 本身 —— events.category 的 id 就是中文字面值
-  // （見 0001 的 event_categories 註解），所以退回去印出來仍然是讀得懂的字。
-  const categoryLabel: Localized = categories.find((c) => c.id === event.category)?.label ?? {
-    zh: event.category,
-    en: event.category,
-    ja: event.category,
-  };
-
   const cta = registrationCta(event.registrationType, event.externalUrl, booking);
   // 最後一個場次結束了（與 /events「已結束」分頁同一條規則）→ 報名區只列場次與票價、
   // 不顯示「尚餘名額」、不能報名（2026-11 SEO 驗收 #2）。
@@ -342,10 +332,7 @@ function EventDetail() {
       </section>
 
       <section className="container-editorial pb-12 pt-8">
-        <p className="eyebrow text-2xl">{t(categoryLabel)}</p>
-        <h1 className="display mt-4 text-4xl md:text-6xl leading-tight max-w-4xl">
-          {t(event.title)}
-        </h1>
+        <h1 className="display text-4xl md:text-6xl leading-tight max-w-4xl">{t(event.title)}</h1>
         <p className="mt-6 text-sm tracking-widest text-muted-foreground">{event.date}</p>
         <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground">
           {t(event.summary)}

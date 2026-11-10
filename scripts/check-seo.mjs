@@ -218,7 +218,6 @@ const PAGES = [
     canonical: `${ORIGIN}/events/kungtung/hosts/alice`,
     ld: ["BreadcrumbList"],
   },
-  { path: "/journeys", canonical: `${ORIGIN}/journeys`, ld: ["Organization"] },
   { path: "/shop", canonical: `${ORIGIN}/shop`, ld: ["Organization"] },
   // 2026-11 M4：地方刊物有自己的總覽頁與每一本的頁。/shop?tab=publications、/shop/pub-*
   // 的 canonical 改指向刊物頁，改在 checkPublications() 檢查（它們的 og:url ≠ 自己的網址）。
@@ -593,7 +592,6 @@ const LANG_PAGES = [
   "/",
   "/events",
   "/events/InntervalChishang.1023",
-  "/journeys",
   "/shop",
   "/publications",
   "/publications/tw-001",
@@ -750,6 +748,10 @@ async function checkLanguageVersions() {
     ["/en/news", [301], "/en"],
     ["/ja/news/whatever", [301], "/ja"],
     ["/en/visit", [301], "/en/about"],
+    // 2026-11-10：/journeys 併入 /events「活動與策旅」。
+    ["/journeys", [301], "/events?type=journey"],
+    ["/en/journeys", [301], "/en/events?type=journey"],
+    ["/ja/journeys", [301], "/ja/events?type=journey"],
     ["/en/events/inntervalchishang.1023", [301], "/en/events/InntervalChishang.1023"],
     ["/ja/shop/PUB-TW-001", [301], "/ja/shop/pub-tw-001"],
   ]) {

@@ -426,7 +426,9 @@ check("kungtung（中文限定）→ 只有中文", langsAt("/events/kungtung")[
 check("策旅卡片沿用活動頁的語言", langsAt("/events/ok")[1], ["zh", "en", "ja"]);
 check("主理人子頁只有中文", langsAt("/events/kungtung/hosts/alice")[0], ["zh"]);
 check("商品：日文本文空、標題有翻 → 不可（本文全缺）", langsAt("/shop/p1")[0], ["zh", "en"]);
-check("沒給翻譯資料的頁（/journeys）→ 三語", langsAt("/journeys")[0], ["zh", "en", "ja"]);
+// 2026-11-10：/journeys 併入 /events（301），sitemap 不再列；「沒給翻譯資料 → 三語」改用 /curation 守。
+check("沒給翻譯資料的頁（/curation）→ 三語", langsAt("/curation")[0], ["zh", "en", "ja"]);
+check("/journeys 不在 sitemap（已 301 到 /events?type=journey）", langsAt("/journeys"), []);
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log("\n[7] router rewrite（真的 @tanstack/react-router）");
@@ -560,7 +562,10 @@ const routesDir = join(ROOT, "src/routes");
 const publicRoutes = readdirSync(routesDir).filter(
   (f) =>
     f.endsWith(".tsx") &&
-    !/^(__root|account|cart|checkout|auth|news|visit|contact|curated|publications)/.test(f),
+    // journeys：2026-11-10 起只剩 301 → /events?type=journey（與 visit／contact 同類）。
+    !/^(__root|account|cart|checkout|auth|news|visit|contact|curated|publications|journeys)/.test(
+      f,
+    ),
 );
 checkTrue(`公開頁路由檔數量（${publicRoutes.length}）`, publicRoutes.length >= 15);
 for (const f of publicRoutes) {

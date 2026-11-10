@@ -69,7 +69,7 @@ export function ProductsPanel({
   const { ui } = useSiteContent();
   const heroSrc = imageFor(page?.ogImageKey, curatedImg);
 
-  // 活動與策旅不在 /shop 的商品清單出現 —— 它們各自有 /events 與 /journeys 當
+  // 活動與策旅不在 /shop 的商品清單出現 —— 它們有 /events「活動與策旅」當
   // 入口，在這裡再列一次，同一場活動就有兩個長得不一樣的門。
   //
   // 🔴 過濾放在這裡，而不是在 shop.index.tsx 傳進來之前先濾掉：loader 讀到的

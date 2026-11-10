@@ -1,6 +1,6 @@
 /**
- * 策旅卡片「前往策旅」連結的 href/target 規則——首頁精選（index.tsx）與 /journeys
- * 列表（journeys.tsx）共用，兩處必須一致。
+ * 策旅卡片「前往策旅」連結的 href/target 規則——首頁精選（index.tsx）與 /events 的策旅卡（components/events/JourneyCard.tsx）
+ * 共用，兩處必須一致。
  *
  * `external_url` 一欄同時承載兩種策旅（見 admin/schemas.ts 的 registrationFields）：
  *   - 站內報名的策旅存相對路徑（如 `/events/xxx`）→ 同分頁導航，不開新視窗

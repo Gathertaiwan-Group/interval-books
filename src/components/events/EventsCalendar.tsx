@@ -17,6 +17,7 @@
  */
 import { Link } from "@tanstack/react-router";
 import { useLang, useT } from "@/i18n/LanguageContext";
+import type { EventsType } from "@/lib/events-type";
 import {
   agendaGroups,
   dayLabel,
@@ -126,7 +127,15 @@ function Badge({ children, tone }: { children: string; tone: "clay" | "ink" | "m
   );
 }
 
-function MonthNav({ month, currentMonth }: { month: string; currentMonth: string }) {
+function MonthNav({
+  month,
+  currentMonth,
+  type,
+}: {
+  month: string;
+  currentMonth: string;
+  type: EventsType | undefined;
+}) {
   const t = useT();
   const { lang } = useLang();
   const btn =
@@ -139,7 +148,7 @@ function MonthNav({ month, currentMonth }: { month: string; currentMonth: string
       <nav aria-label={t(COPY.caption)} className="flex items-center gap-2">
         <Link
           to="/events"
-          search={{ view: "calendar", month: shiftMonth(month, -1) }}
+          search={{ view: "calendar", month: shiftMonth(month, -1), type }}
           resetScroll={false}
           className={btn}
           aria-label={t(COPY.prev)}
@@ -150,7 +159,7 @@ function MonthNav({ month, currentMonth }: { month: string; currentMonth: string
         </Link>
         <Link
           to="/events"
-          search={{ view: "calendar", month: currentMonth }}
+          search={{ view: "calendar", month: currentMonth, type }}
           resetScroll={false}
           className={`${btn} ${month === currentMonth ? "text-muted-foreground" : ""}`}
           aria-current={month === currentMonth ? "date" : undefined}
@@ -160,7 +169,7 @@ function MonthNav({ month, currentMonth }: { month: string; currentMonth: string
         </Link>
         <Link
           to="/events"
-          search={{ view: "calendar", month: shiftMonth(month, 1) }}
+          search={{ view: "calendar", month: shiftMonth(month, 1), type }}
           resetScroll={false}
           className={btn}
           aria-label={t(COPY.next)}
@@ -174,7 +183,15 @@ function MonthNav({ month, currentMonth }: { month: string; currentMonth: string
   );
 }
 
-function EmptyMonth({ entries, month }: { entries: CalendarEntry[]; month: string }) {
+function EmptyMonth({
+  entries,
+  month,
+  type,
+}: {
+  entries: CalendarEntry[];
+  month: string;
+  type: EventsType | undefined;
+}) {
   const t = useT();
   const { lang } = useLang();
   const next = nearestMonthWithEntries(entries, month, 1);
@@ -189,7 +206,7 @@ function EmptyMonth({ entries, month }: { entries: CalendarEntry[]; month: strin
           {next ? (
             <Link
               to="/events"
-              search={{ view: "calendar", month: next }}
+              search={{ view: "calendar", month: next, type }}
               resetScroll={false}
               className={link}
             >
@@ -199,7 +216,7 @@ function EmptyMonth({ entries, month }: { entries: CalendarEntry[]; month: strin
           {prev ? (
             <Link
               to="/events"
-              search={{ view: "calendar", month: prev }}
+              search={{ view: "calendar", month: prev, type }}
               resetScroll={false}
               className={link}
             >
@@ -429,6 +446,7 @@ export function EventsCalendar({
   currentMonth,
   today,
   unavailable,
+  type,
 }: {
   entries: CalendarEntry[];
   /** 正在看的月份 "YYYY-MM"。 */
@@ -438,12 +456,17 @@ export function EventsCalendar({
   /** 台北的今天（loader 時間）"YYYY-MM-DD"。 */
   today: string;
   unavailable: boolean;
+  /**
+   * /events 的類型篩選（?type=）。entries 已經由呼叫端篩過；這裡只負責讓換月、「本月」、
+   * 「跳到下一個有場次的月份」這幾個連結把 type 帶著走，不會一換月就回到「全部」。
+   */
+  type?: EventsType;
 }) {
   const t = useT();
   const has = monthHasEntries(entries, month);
   return (
     <div data-testid="events-calendar">
-      <MonthNav month={month} currentMonth={currentMonth} />
+      <MonthNav month={month} currentMonth={currentMonth} type={type} />
       {unavailable ? (
         <div className="border border-border p-6 md:p-8">
           <p className="text-sm leading-relaxed text-muted-foreground">{t(COPY.unavailable)}</p>
@@ -454,7 +477,7 @@ export function EventsCalendar({
             <MonthTable entries={entries} month={month} today={today} />
             {has ? null : (
               <div className="mt-6">
-                <EmptyMonth entries={entries} month={month} />
+                <EmptyMonth entries={entries} month={month} type={type} />
               </div>
             )}
           </div>
@@ -462,7 +485,7 @@ export function EventsCalendar({
             {has ? (
               <Agenda entries={entries} month={month} today={today} />
             ) : (
-              <EmptyMonth entries={entries} month={month} />
+              <EmptyMonth entries={entries} month={month} type={type} />
             )}
           </div>
         </>

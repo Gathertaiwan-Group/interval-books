@@ -43,8 +43,9 @@ export type SeoBundle = {
 type LocalCrumb = { name: Localized; path: string };
 
 const HOME: LocalCrumb = { name: { zh: "首頁", en: "Home", ja: "ホーム" }, path: "/" };
+// 2026-11-10 起 /events 是「活動與策旅」合併頁，麵包屑跟著頁名。
 const EVENTS: LocalCrumb = {
-  name: { zh: "活動", en: "Events", ja: "イベント" },
+  name: { zh: "活動與策旅", en: "Events & Journeys", ja: "イベント・旅" },
   path: "/events",
 };
 const SHOP: LocalCrumb = { name: { zh: "選物", en: "Shop", ja: "ショップ" }, path: "/shop" };

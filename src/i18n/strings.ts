@@ -43,6 +43,10 @@ export const UI = {
     // ── 異業合作頁（2026-10-26）—— 新 key，理由同上。不進主導覽列，只在 footer、
     //    /about 與 /curation 出現。
     partnership: { zh: "異業合作", en: "Partnership", ja: "協働のご相談" },
+
+    // ── 活動與策旅合併（2026-11-10）—— /events 與 /journeys 兩個列表頁併成一頁，導覽列
+    //    「活動」「策旅」兩格合成這一格。新 key，理由同上（不改寫 events / journeys 的值）。
+    eventsJourneys: { zh: "活動與策旅", en: "Events & Journeys", ja: "イベント・旅" },
   },
 
   footer: {

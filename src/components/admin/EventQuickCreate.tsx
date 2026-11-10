@@ -192,6 +192,13 @@ function parseNumber(raw: string): number {
  * 本體
  * ------------------------------------------------------------------ */
 
+/** 隱藏的分類欄位要帶的值（見 EventQuickCreate 裡的說明）。一個分類都沒有 → 空字串（存檔會被擋）。 */
+function defaultCategoryId(categories: CategoryOption[], isJourney: boolean): string {
+  const journeyCat = categories.find((c) => c.id.includes("策旅"));
+  if (isJourney) return journeyCat?.id ?? categories[0]?.id ?? "";
+  return categories.find((c) => !c.id.includes("策旅"))?.id ?? categories[0]?.id ?? "";
+}
+
 export function EventQuickCreate({
   kind = "event",
   categories,
@@ -204,10 +211,15 @@ export function EventQuickCreate({
   const router = useRouter();
   const copy = COPY[kind];
   const isJourney = kind === "journey";
-  /** 策旅預設選名稱帶「策旅」的那個分類（正式庫是「策旅說明會」），找不到就留空讓人選。 */
+  /**
+   * 分類（2026-11-10 業主：「活動分類功能都拿掉」）—— 表單上不再讓人選，也不在前台任何地方顯示。
+   * 但 events.category 仍是 not null、外鍵到 event_categories（0001；這次不動資料表），所以
+   * 存檔時還是得帶一個有效的 id：策旅帶名稱含「策旅」的那個（正式庫是「策旅說明會」，策旅卡片
+   * 沒填主題時會拿它當主題），一般活動帶第一個不是策旅的分類。
+   */
   const initial = (): QuickCreateInput => ({
     ...initialQuickCreate(kind),
-    category: isJourney ? (categories.find((c) => c.id.includes("策旅"))?.id ?? "") : "",
+    category: defaultCategoryId(categories, isJourney),
   });
   const [values, setValues] = useState<QuickCreateInput>(initial);
   const [errors, setErrors] = useState<QuickCreateErrors>({});
@@ -407,26 +419,6 @@ export function EventQuickCreate({
         ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            label="分類"
-            required
-            error={errors.category}
-            hint={categories.length === 0 ? "還沒有任何分類，請先到「活動分類」新增。" : undefined}
-          >
-            <Select value={values.category} onValueChange={(v) => set("category", v)}>
-              <SelectTrigger aria-label="分類">
-                <SelectValue placeholder="請選擇分類" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.label.zh}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-
           <Field label="主講人（選填）" hint="講者資料在「講者」頁維護；不選就不顯示講者介紹。">
             <Select
               value={values.speaker_id ?? NO_SPEAKER}
@@ -791,7 +783,11 @@ export function EventQuickCreate({
       {/* ── 送出 ─────────────────────────────────────────────────── */}
       <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-background/95 px-6 py-3 backdrop-blur">
         <p className="text-sm text-muted-foreground">
-          {values.publish ? "建立後直接上架" : "建立後存成草稿"}
+          {categories.length === 0
+            ? "資料庫裡一個活動分類都沒有（events.category 必填），暫時無法建立，請聯絡工程師。"
+            : values.publish
+              ? "建立後直接上架"
+              : "建立後存成草稿"}
         </p>
         <Button
           type="button"

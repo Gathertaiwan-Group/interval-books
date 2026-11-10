@@ -191,7 +191,9 @@ check("固定頁：page_blocks 的更新算進去（/privacy 10/22 改過內文�
   "2026-10-22T08:31:18Z",
 ]);
 check("/about 取 about＋visit 最新", lm("/about"), ["2026-08-09T09:22:17Z"]);
-check("/events 列表算進活動列", lm("/events"), ["2026-11-01T04:23:48Z"]);
+// 2026-11-10 /journeys 併入 /events：策旅卡片（journeys.updated_at）也算進 /events 的 lastmod。
+check("/events 列表算進活動列與策旅卡片", lm("/events"), ["2026-12-31T00:00:00Z"]);
+check("/journeys 不再列進 sitemap（301 到 /events?type=journey）", lm("/journeys"), []);
 check("/shop?tab=curated 算進 curated_*", lm("/shop?tab=curated"), ["2026-08-09T07:25:46Z"]);
 check(
   "策旅卡片那一筆不帶 lastmod（journeys.updated_at 不是那一頁的內容）",

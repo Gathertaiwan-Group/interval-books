@@ -228,6 +228,8 @@ const FILES = {
   // 才能跟 /publications/$slug 並存而不變成它的 layout）。
   publications: "src/routes/publications.index.tsx",
   curated: "src/routes/curated.tsx",
+  // 2026-11-10：/journeys 併入 /events「活動與策旅」，只剩 301 → /events?type=journey。
+  journeys: "src/routes/journeys.tsx",
   productsPanel: "src/components/shop/ProductsPanel.tsx",
   publicationsPanel: "src/components/shop/PublicationsPanel.tsx",
   curatedPanel: "src/components/shop/CuratedPanel.tsx",
@@ -241,7 +243,7 @@ for (const [key, rel] of Object.entries(FILES)) {
   src[key] = readFile(join(ROOT, rel));
 }
 // 轉址頁刻意很短（只有檔頭註解 + 一個 beforeLoad），門檻分開設。
-const MIN_LEN = { visit: 300, contact: 300, curated: 300 };
+const MIN_LEN = { visit: 300, contact: 300, curated: 300, journeys: 300 };
 for (const key of Object.keys(FILES)) {
   const min = MIN_LEN[key] ?? 1200;
   checkTrue(`${FILES[key]} 長度 > ${min}`, src[key].length > min);
@@ -254,7 +256,7 @@ for (const key of Object.keys(FILES)) {
 // =============================================================================
 // [1] 導覽列剛好五格
 // =============================================================================
-console.log("\n[1] SiteHeader —— 五格，順序與目標正確");
+console.log("\n[1] SiteHeader —— 四格，順序與目標正確");
 
 const navArray = topLevelInit(ast.header, "NAV");
 checkTrue("SiteHeader 裡找得到 NAV 陣列", navArray?.type === "ArrayExpression");
@@ -267,19 +269,19 @@ const navEntries = (navArray?.elements ?? []).map((el) => {
   return { to: strOf(propValue(obj, "to")), label: memberPath(inner) };
 });
 
-check("NAV 剛好 5 格", navEntries.length, 5);
+// 2026-11-10：「活動」「策旅」合成一格「活動與策旅」（/events），五格 → 四格。
+check("NAV 剛好 4 格", navEntries.length, 4);
 check("NAV 的順序、網址與字串 key 全部正確", navEntries, [
   { to: "/", label: "ui.nav.home" },
   { to: "/shop", label: "ui.nav.select" },
-  { to: "/events", label: "ui.nav.events" },
-  { to: "/journeys", label: "ui.nav.journeys" },
+  { to: "/events", label: "ui.nav.eventsJourneys" },
   { to: "/about", label: "ui.nav.aboutStore" },
 ]);
 
 // 被收掉的四個網址不可以還留在導覽列裡。
 // 走 AST 的 `to:` 值，不是 includes() —— 這個檔案的註解裡就寫著這四個字串。
 const navTargets = new Set(navEntries.map((e) => e.to));
-for (const gone of ["/visit", "/contact", "/publications", "/curated"]) {
+for (const gone of ["/visit", "/contact", "/publications", "/curated", "/journeys"]) {
   checkFalse(`NAV 不再指向 ${gone}`, navTargets.has(gone));
 }
 
@@ -294,11 +296,17 @@ check("SiteHeader 只用這幾個 nav key", sorted(headerNavKeys), [
   "aboutStore",
   "account",
   "cart",
-  "events",
+  "eventsJourneys",
   "home",
-  "journeys",
   "select",
 ]);
+// 與 about / shop 同一條理由：用新 key，ui_strings 的舊列蓋不到。
+checkTrue(
+  "strings.ts 有 nav.eventsJourneys 三語",
+  /eventsJourneys: \{ zh: "活動與策旅", en: "Events & Journeys", ja: "イベント・旅" \}/.test(
+    src.strings,
+  ),
+);
 // 為什麼特別釘住 about / shop：seed.sql 在正式庫塞了 ('nav','about')，
 // cms.ts 的 buildUi() 會讓資料庫那一列覆蓋掉 strings.ts。用回舊 key，
 // 畫面就會變回「關於」，而且改的人看不出原因。
@@ -317,6 +325,7 @@ const REDIRECTS = [
   { key: "visit", route: "/visit", to: "/about", tab: null },
   { key: "contact", route: "/contact", to: "/about", tab: null },
   { key: "curated", route: "/curated", to: "/shop", tab: "curated" },
+  { key: "journeys", route: "/journeys", to: "/events", tab: null, type: "journey" },
 ];
 
 for (const r of REDIRECTS) {
@@ -346,6 +355,8 @@ for (const r of REDIRECTS) {
   );
   const searchTab = strOf(propValue(propValue(arg, "search"), "tab"));
   check(`${r.route} 落在 ${r.tab ?? "（無 tab）"} 分頁`, searchTab, r.tab);
+  const searchType = strOf(propValue(propValue(arg, "search"), "type"));
+  check(`${r.route} 落在 ${r.type ?? "（無 type）"} 篩選`, searchType, r.type ?? null);
 }
 
 {
@@ -371,9 +382,11 @@ check("meta 稽核 0 個問題", metaReport.summary.totalIssues, 0);
 // 44b4933（業主：「把網站最新消息的功能移除」）把 /news 與 /news/$ 改成 301 轉首頁，
 // 所以從四條變成六條；那一支 commit 沒同步這裡，main 的 Tests 因此紅了一次。
 // 2026-11 M4：/publications 變回真的頁面，剩五條。
-check("meta 報告認定的轉址路由就是這五條", [...metaReport.summary.redirectRouteList].sort(), [
+// 2026-11-10：/journeys 併入 /events，變成第六條轉址路由。
+check("meta 報告認定的轉址路由就是這六條", [...metaReport.summary.redirectRouteList].sort(), [
   "/contact",
   "/curated",
+  "/journeys",
   "/news",
   "/news.$",
   "/visit",

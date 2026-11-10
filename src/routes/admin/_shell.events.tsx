@@ -3,7 +3,6 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -76,7 +75,8 @@ const REGISTRATION_TYPE_LABEL: Record<"external" | "internal", string> = {
 };
 
 function AdminEventsPage() {
-  const { events, categories, artists, products, now } = Route.useLoaderData();
+  // 分類欄（2026-11-10 業主：「活動分類功能都拿掉」）已從列表移除；loader 仍回傳 categories（不動 fn）。
+  const { events, artists, products, now } = Route.useLoaderData();
   const filter = parseListingFilter(Route.useSearch().status);
   const navigate = Route.useNavigate();
   const router = useRouter();
@@ -104,10 +104,6 @@ function AdminEventsPage() {
 
   if (!isListView) {
     return <Outlet />;
-  }
-
-  function categoryLabel(id: string): string {
-    return categories.find((c) => c.id === id)?.label.zh ?? id;
   }
 
   const counts = countByStatus(events);
@@ -151,7 +147,6 @@ function AdminEventsPage() {
             <TableRow>
               <TableHead className="w-16">排序</TableHead>
               <TableHead>標題</TableHead>
-              <TableHead>分類</TableHead>
               <TableHead>主講人</TableHead>
               <TableHead>顯示日期</TableHead>
               <TableHead>報名方式</TableHead>
@@ -164,7 +159,7 @@ function AdminEventsPage() {
           <TableBody>
             {shown.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                   {events.length === 0
                     ? "尚無資料，點右上角「新增活動」開始。"
                     : "這個狀態下沒有活動。"}
@@ -175,9 +170,6 @@ function AdminEventsPage() {
                 <TableRow key={e.id}>
                   <TableCell className="text-muted-foreground">{e.sort_order}</TableCell>
                   <TableCell className="max-w-sm truncate font-medium">{e.title.zh}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{categoryLabel(e.category)}</Badge>
-                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     {speakerLabel(e.speaker_id)}
                   </TableCell>
