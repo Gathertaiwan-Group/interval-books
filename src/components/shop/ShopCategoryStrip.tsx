@@ -141,7 +141,7 @@ export function ShopCategoryStrip({
       <span className="mt-2 block font-serif text-[0.9rem] md:text-[0.95rem] leading-snug text-foreground group-hover:underline underline-offset-4">
         {entry.title}
       </span>
-      <span className="mt-0.5 block text-xs leading-snug text-muted-foreground line-clamp-2">
+      <span className="mt-0.5 block text-[0.75rem] leading-snug text-muted-foreground line-clamp-2">
         {entry.sub}
       </span>
     </>
