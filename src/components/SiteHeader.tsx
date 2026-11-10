@@ -88,9 +88,10 @@ export function SiteHeader() {
             <CartLink label={t(ui.nav.cart)} />
           </nav>
 
-          <div className="flex items-center gap-1 lg:hidden">
-            <AccountLink label={t(ui.nav.account)} />
-            <CartLink label={t(ui.nav.cart)} />
+          {/* 手機：只留購物車＋漢堡鈕（2026-11-11 業主：帳號 icon 多餘）。帳號的手機入口在
+              抽屜裡的「我的帳號」。兩顆都 44px，中間 8px，店名那一側不被擠。 */}
+          <div className="flex shrink-0 items-center gap-2 lg:hidden">
+            <CartLink label={t(ui.nav.cart)} size="h-11 w-11" />
             <button
               ref={menuButtonRef}
               type="button"
@@ -347,7 +348,14 @@ function MobileDrawer({
  * hence "0 until the effect has read storage", which is the same discipline
  * every cart-reading component in Realreal follows.
  */
-function CartLink({ label }: { label: string }) {
+function CartLink({
+  label,
+  size = "ml-2 h-10 w-10",
+}: {
+  label: string;
+  /** 桌機沿用原本的 40px＋左距；手機頁首傳 44px（點擊區 ≥44px）。 */
+  size?: string;
+}) {
   const hydrated = useCartHydrated();
   const storedCount = useCartCount();
   const count = hydrated ? storedCount : 0;
@@ -356,7 +364,7 @@ function CartLink({ label }: { label: string }) {
     <Link
       to="/cart"
       aria-label={count > 0 ? `${label} (${count})` : label}
-      className="relative ml-2 flex h-10 w-10 items-center justify-center text-foreground/80 transition-colors hover:text-foreground"
+      className={`relative flex ${size} items-center justify-center text-foreground/80 transition-colors hover:text-foreground`}
     >
       <ShoppingBag className="h-5 w-5" aria-hidden="true" />
       {count > 0 && (

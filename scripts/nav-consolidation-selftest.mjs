@@ -317,6 +317,15 @@ checkFalse("SiteHeader 沒有用回 ui.nav.shop", headerNavKeys.has("shop"));
 // 改版時不小心拿掉其中一條，鍵盤／報讀器使用者就會被關在選單外或選單裡。
 console.log("\n[1b] 手機選單抽屜 —— modal dialog 的必要條件");
 const hdr = src.header;
+// 2026-11-11 業主：手機頁首右上只留購物車＋漢堡鈕，帳號入口只在抽屜裡。
+const mobileBar = hdr.match(/<div className="[^"]*lg:hidden">([\s\S]*?)<\/div>/)?.[1] ?? "";
+checkTrue("手機頁首列找得到（lg:hidden 那一排）", mobileBar.includes("<CartLink"));
+checkFalse("手機頁首列沒有帳號 icon（AccountLink）", mobileBar.includes("<AccountLink"));
+checkTrue(
+  "手機頁首的購物車點擊區 44px",
+  /<CartLink label=\{t\(ui\.nav\.cart\)\} size="h-11 w-11" \/>/.test(mobileBar),
+);
+checkTrue("抽屜裡仍有「我的帳號」", /<Link to="\/account" onClick=\{onClose\}/.test(hdr));
 checkTrue("漢堡鈕有 aria-controls 指向抽屜", /aria-controls="mobile-drawer"/.test(hdr));
 checkTrue("漢堡鈕有 aria-expanded", /aria-expanded=\{open\}/.test(hdr));
 checkTrue(
