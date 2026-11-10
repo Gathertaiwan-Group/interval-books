@@ -313,6 +313,24 @@ checkTrue(
 checkFalse("SiteHeader 沒有用回 ui.nav.about（會被資料庫覆蓋）", headerNavKeys.has("about"));
 checkFalse("SiteHeader 沒有用回 ui.nav.shop", headerNavKeys.has("shop"));
 
+// [1b] 手機選單 = 右側抽屜（2026-11-10）。依 W3C APG Dialog (Modal) 的必要條件釘住，
+// 改版時不小心拿掉其中一條，鍵盤／報讀器使用者就會被關在選單外或選單裡。
+console.log("\n[1b] 手機選單抽屜 —— modal dialog 的必要條件");
+const hdr = src.header;
+checkTrue("漢堡鈕有 aria-controls 指向抽屜", /aria-controls="mobile-drawer"/.test(hdr));
+checkTrue("漢堡鈕有 aria-expanded", /aria-expanded=\{open\}/.test(hdr));
+checkTrue(
+  '抽屜是 role="dialog" aria-modal="true"，有 aria-labelledby',
+  /id="mobile-drawer"\s+role="dialog"\s+aria-modal="true"\s+aria-labelledby=/.test(hdr),
+);
+checkTrue("Esc 關閉", /e\.key === "Escape"/.test(hdr));
+checkTrue("Tab 焦點鎖在抽屜內", /e\.key !== "Tab"/.test(hdr));
+checkTrue("關閉後焦點回到漢堡鈕", /returnFocusTo\.current\?\.focus\(/.test(hdr));
+checkTrue("開啟時鎖住頁面捲動", /document\.body\.style\.overflow = "hidden"/.test(hdr));
+checkTrue("prefers-reduced-motion 不做動畫", /motion-reduce:transition-none/.test(hdr));
+checkTrue("轉到桌機寬度時關閉", /matchMedia\(DESKTOP_MQ\)/.test(hdr));
+checkFalse("不再是「在頁首下方往下展開」（{open && …} 的舊寫法）", /\{open && \(/.test(hdr));
+
 // =============================================================================
 // [2] 四個舊網址 = 真的轉址路由
 // =============================================================================

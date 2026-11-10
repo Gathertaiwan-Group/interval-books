@@ -2,20 +2,14 @@ import { Link } from "@tanstack/react-router";
 import { Clock, Facebook, Instagram, Mail, Map as MapIcon, MapPin, Phone } from "lucide-react";
 import { useLang } from "@/i18n/LanguageContext";
 import { useSiteContent } from "@/lib/site-content";
+import { DAILY, dailyHours } from "@/lib/daily-hours";
 
 // 44px 圓形 icon 按鈕（點擊區 ≥44px）。
 const ICON_BTN =
   "inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/70 transition-colors hover:border-foreground hover:text-foreground";
 
-// footer 專用的兩個小字串（三語）。只在這個元件用，不進 CMS。
-const DAILY = { zh: "每日", en: "Daily", ja: "毎日" };
+// footer 專用的小字串（三語），不進 CMS。「每日」與抽屜共用，在 lib/daily-hours.ts。
 const CALL = { zh: "致電", en: "Call", ja: "電話" };
-
-/** 「週一至週日 11:00 – 19:00」→「每日 11:00–19:00」。抓不到時間區間就原樣顯示（CMS 可能改成別的寫法）。 */
-function dailyHours(hours: string, daily: string): string {
-  const m = hours.match(/(\d{1,2}:\d{2})\s*[–—~-]\s*(\d{1,2}:\d{2})/);
-  return m ? `${daily} ${m[1]}–${m[2]}` : hours;
-}
 
 export function SiteFooter() {
   const { t, lang } = useLang();
