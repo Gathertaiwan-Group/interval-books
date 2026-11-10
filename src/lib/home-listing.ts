@@ -26,7 +26,32 @@ export type ListingFacts = {
    * 也只剩 LOW_SEATS_THRESHOLD 以下時才有值，其他情況 null（不印）。
    */
   fewLeft: number | null;
+  /**
+   * 包場，不開放報名（src/lib/private-booking.ts）。true 時卡片只標「包場」，不印票價、
+   * 不印「已額滿／最後 N 位」。由 listingFactsForCard() 依活動的旗標蓋上去。
+   */
+  privateBooking?: boolean;
 };
+
+/** 包場活動的卡片：沒有票價、沒有名額狀態，只有「包場」。 */
+export const PRIVATE_BOOKING_FACTS: ListingFacts = {
+  price: 0,
+  soldOut: false,
+  fewLeft: null,
+  privateBooking: true,
+};
+
+/**
+ * 卡片要用的 facts：活動是包場 → 一律 PRIVATE_BOOKING_FACTS（蓋過商品讀到的票價與名額）；
+ * 否則照 fetchListingFacts() 的結果。
+ */
+export function listingFactsForCard(
+  event: { privateBooking?: boolean } | null | undefined,
+  facts: ListingFacts | undefined,
+): ListingFacts | undefined {
+  if (event?.privateBooking) return PRIVATE_BOOKING_FACTS;
+  return facts;
+}
 
 type SessionRow = {
   starts_at?: unknown;

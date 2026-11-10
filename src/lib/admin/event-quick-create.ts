@@ -669,17 +669,17 @@ export type QuickJourneyCardPayload = {
 export function buildJourneyCard(
   v: QuickCreateInput,
   event: QuickEventPayload,
-  opts: { sortOrder: number; translations: Translations; categoryLabel: Localized | null },
+  opts: { sortOrder: number; translations: Translations },
 ): QuickJourneyCardPayload {
+  // 主題留空就是空的（2026-11-10 業主）：不再拿分類名稱補——分類在前台已經拿掉，補上去的
+  // 分類名會變成卡片上一個沒人填過的「主題」。前台遇到空主題只印天數（journeyKicker）。
   const theme = v.theme.trim();
   return {
     title: event.title,
     summary: event.summary,
     description: event.description,
     days: deriveJourneyDays(v.sessions),
-    theme: theme
-      ? localizedOf(theme, opts.translations)
-      : (opts.categoryLabel ?? localizedOf(v.category.trim(), opts.translations)),
+    theme: theme ? localizedOf(theme, opts.translations) : { zh: "", en: "", ja: "" },
     external_url: v.mode === "external" ? v.external_url.trim() : `/events/${event.slug}`,
     registration_type: event.registration_type,
     payment_enabled: event.payment_enabled,

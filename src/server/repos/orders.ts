@@ -145,6 +145,7 @@ import { computeReferralDiscount, resolveReferralCode } from "@/lib/referral";
 import { findReferrerForCheckout } from "@/server/repos/referrals";
 import { isSessionClosedForBooking } from "@/lib/event-status";
 import { ticketSellable } from "@/lib/listing-status";
+import { sellableEventStatus } from "@/lib/private-booking";
 
 /** Columns checkout needs from public.products. Price is re-read, never trusted. */
 const PRODUCT_COLUMNS =
@@ -383,11 +384,13 @@ async function priceLines(
   if (eventIds.length > 0) {
     const { data: eventRows, error: eventError } = await supabaseAdmin()
       .from("events")
-      .select("id, status")
+      .select("id, status, notes")
       .in("id", eventIds);
     if (eventError) throw new CheckoutError("order_failed");
-    for (const e of (eventRows ?? []) as { id: string; status: string }[]) {
-      eventStatusById.set(e.id, e.status);
+    // 包場（src/lib/private-booking.ts）：旗標在 notes 上，sellableEventStatus() 把它換成一個
+    // 不是 live 的狀態 → ticketSellable() 拒絕。與場次 closed（reserve_session_seat）是兩道門。
+    for (const e of (eventRows ?? []) as { id: string; status: string; notes?: unknown }[]) {
+      eventStatusById.set(e.id, sellableEventStatus(e.status, e.notes));
     }
   }
 

@@ -25,6 +25,7 @@ import { supabaseAdmin } from "@/server/supabase-admin";
 import { EVENT_LIST_FIELDS } from "@/lib/event-blocks";
 import type { Localized, LocalizedList } from "@/i18n/types";
 import type { BookingSession, ListingStatus } from "@/lib/listing-status";
+import { isPrivateBooking, withPrivateBooking } from "@/lib/private-booking";
 
 /**
  * ⚠️ **部署順序（第二次）：0027 要先套上 live DB，才能推這一行。** 底下多出來的七個
@@ -159,6 +160,11 @@ export type EventUpsertInput = {
    *    public.events 的固定欄位，刻意不碰它們（見那一支的檔頭）。
    */
   lists?: Partial<Record<EventListField, LocalizedList>>;
+  /**
+   * 包場，不開放報名（src/lib/private-booking.ts）。存在 events.notes 的保留 key 上，
+   * 所以**只有 upsertEventWithProduct() 寫得進去**。省略＝不動（送了 notes 也會保留舊旗標）。
+   */
+  private_booking?: boolean;
 };
 
 /** 0027 的七個清單欄位的欄位名。唯一的名單在 src/lib/event-blocks.ts。 */
@@ -312,6 +318,32 @@ export async function upsertEventWithProduct(
 ): Promise<{ event: EventRow; product: EventProductRow | null }> {
   const id = input.id && input.id.trim() ? input.id : randomUUID();
 
+  // 包場旗標住在 events.notes 上（理由見 src/lib/private-booking.ts）。
+  //   · 有給 private_booking 或有給 notes → 這一次要寫 notes，組出「清單＋旗標」。
+  //   · 兩者缺一 → 讀回舊的 notes 補上缺的那一半：改注意事項不會洗掉包場，
+  //     切換包場也不會清掉注意事項。
+  //   · 兩者都沒給 → notes 整個 key 不放，SQL 那邊沿用舊值（旗標一起保留）。
+  let notesPayload: ReturnType<typeof withPrivateBooking> | undefined;
+  const notesInput = input.lists?.notes;
+  if (input.private_booking !== undefined || notesInput !== undefined) {
+    let prevNotes: unknown = null;
+    if ((input.private_booking === undefined || notesInput === undefined) && input.id) {
+      const { data: prev, error: prevError } = await supabaseAdmin()
+        .from("events")
+        .select("notes")
+        .eq("id", id)
+        .maybeSingle();
+      if (prevError) {
+        throw new Error(`[repo/events] 讀取舊的注意事項失敗：${prevError.message}`);
+      }
+      prevNotes = (prev as { notes?: unknown } | null)?.notes ?? null;
+    }
+    notesPayload = withPrivateBooking(
+      notesInput ?? prevNotes,
+      input.private_booking ?? isPrivateBooking(prevNotes),
+    );
+  }
+
   const payload = {
     event: {
       id,
@@ -353,6 +385,7 @@ export async function upsertEventWithProduct(
           input.lists?.[f],
         ]),
       ),
+      ...(notesPayload === undefined ? {} : { notes: notesPayload }),
     },
     product: product
       ? {

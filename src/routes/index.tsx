@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { journeyKicker } from "@/lib/journey-events";
 import type { ReactNode } from "react";
 import { PageShell } from "@/components/PageShell";
 import { CoverImage } from "@/components/CoverImage";
@@ -13,7 +14,7 @@ import { isEventPast } from "@/lib/event-status";
 import { CARD, CARD_HOVER, featureLayout } from "@/lib/feature-layout";
 import { imageFor, srcSetFor } from "@/lib/images";
 import { eventProductSlug, fetchHomeShelfProducts } from "@/lib/shop";
-import { fetchListingFacts } from "@/lib/home-listing";
+import { fetchListingFacts, listingFactsForCard } from "@/lib/home-listing";
 import { ListingBadge, ListingDate, ListingFooter } from "@/components/ListingBits";
 import { fetchPublicationsTeaser } from "@/lib/publications";
 import heroImg from "@/assets/hero-mountain.jpg";
@@ -540,7 +541,9 @@ function Index() {
                       {/* 分類字 2026-11-10 拿掉（業主：「活動分類功能都拿掉」）；只剩報名狀態小標，
                           平常不印、整行不佔高度。 */}
                       <div className="flex items-start justify-end gap-3 empty:hidden">
-                        <ListingBadge facts={listing[eventProductSlug(e.slug)]} />
+                        <ListingBadge
+                          facts={listingFactsForCard(e, listing[eventProductSlug(e.slug)])}
+                        />
                       </div>
                       <h3
                         className={`display mt-2 text-xl leading-snug md:mt-3 md:text-2xl ${eventsLayout.title}`}
@@ -557,7 +560,7 @@ function Index() {
                       </p>
                       <div aria-hidden="true" className={`flex-1 ${eventsLayout.summary}`} />
                       <ListingFooter
-                        facts={listing[eventProductSlug(e.slug)]}
+                        facts={listingFactsForCard(e, listing[eventProductSlug(e.slug)])}
                         cta={t(ui.buttons.viewEvent)}
                       />
                     </div>
@@ -603,10 +606,17 @@ function Index() {
                       <div className={`flex flex-1 flex-col p-5 md:p-7 ${journeysLayout.body}`}>
                         <div className="flex items-start justify-between gap-3">
                           <p className="text-xs tracking-[0.18em] text-clay">
-                            {t(j.days)} ／ {t(j.theme)}
+                            {journeyKicker(t(j.days), t(j.theme))}
                           </p>
                           <ListingBadge
-                            facts={linked ? listing[eventProductSlug(linked.slug)] : undefined}
+                            facts={
+                              linked
+                                ? listingFactsForCard(
+                                    linked,
+                                    listing[eventProductSlug(linked.slug)],
+                                  )
+                                : undefined
+                            }
                           />
                         </div>
                         <h3
@@ -622,7 +632,11 @@ function Index() {
                         </p>
                         <div aria-hidden="true" className={`flex-1 ${journeysLayout.summary}`} />
                         <ListingFooter
-                          facts={linked ? listing[eventProductSlug(linked.slug)] : undefined}
+                          facts={
+                            linked
+                              ? listingFactsForCard(linked, listing[eventProductSlug(linked.slug)])
+                              : undefined
+                          }
                           cta={link ? t(ui.buttons.toJourney) : null}
                         />
                       </div>
@@ -798,7 +812,7 @@ function Index() {
             return {
               key: `j-${j.id}`,
               title: t(j.title),
-              category: `${t(j.days)} ／ ${t(j.theme)}`,
+              category: journeyKicker(t(j.days), t(j.theme)),
               date: e.date,
               // 首頁上方「行」已經用了那張固定意象圖，這裡沒有封面就不放圖，避免同一張照片重複出現。
               image: e.imageKey ? imageFor(e.imageKey, journeyImg) : null,

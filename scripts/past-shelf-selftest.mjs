@@ -258,7 +258,7 @@ check(
 check(
   "fetchJourneyEventDates 只 select 需要的欄位",
   // 0052：多一個 eq is_published（只看上架中的活動），select 的欄位不變。
-  cms.includes('select("events", "slug,external_url,display_date,iso_date,image_key", {'),
+  cms.includes('select("events", "slug,external_url,display_date,iso_date,image_key,notes", {'),
   true,
 );
 check("PastShelf 用 CoverImage", shelf.includes("<CoverImage"), true);

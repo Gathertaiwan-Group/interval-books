@@ -113,3 +113,15 @@ export function linkedEventIdFor(
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id.localeCompare(b.id));
   return hits[0]?.id ?? null;
 }
+
+/**
+ * 策旅卡片頂端那一行「天數 ／ 主題」。主題留空（2026-11-10 起一頁新增不再拿分類名稱補）
+ * 就只印天數，不留一個孤零零的「／」。
+ */
+export function journeyKicker(days: string, theme: string): string {
+  const d = days.trim();
+  const th = theme.trim();
+  if (!th) return d;
+  if (!d) return th;
+  return `${d} ／ ${th}`;
+}

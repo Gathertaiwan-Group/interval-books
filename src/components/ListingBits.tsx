@@ -10,6 +10,7 @@ import { CalendarDays } from "lucide-react";
 import { useT } from "@/i18n/LanguageContext";
 import type { ListingFacts } from "@/lib/home-listing";
 import { formatPrice } from "@/lib/shop";
+import { PRIVATE_BOOKING_COPY } from "@/lib/private-booking";
 
 const LISTING_COPY = {
   free: { zh: "免費", en: "Free", ja: "無料" },
@@ -35,6 +36,8 @@ export function ListingDate({ children }: { children: ReactNode }) {
 export function ListingBadge({ facts }: { facts: ListingFacts | undefined }) {
   const t = useT();
   if (!facts) return null;
+  // 包場優先：不是「額滿」也不是「報名中」，是根本不開放報名。
+  if (facts.privateBooking) return <PrivateBookingBadge />;
   if (facts.soldOut) {
     return (
       <span className="-my-1 shrink-0 border border-border px-2 py-0.5 text-xs tracking-[0.1em] text-muted-foreground">
@@ -46,6 +49,19 @@ export function ListingBadge({ facts }: { facts: ListingFacts | undefined }) {
   return (
     <span className="-my-1 shrink-0 border border-clay/40 px-2 py-0.5 text-xs tracking-[0.1em] text-clay">
       {fill(t(LISTING_COPY.fewLeft), { n: facts.fewLeft })}
+    </span>
+  );
+}
+
+/** 「包場」小標。卡片（首頁、/events）與活動頁共用同一個樣子。 */
+export function PrivateBookingBadge() {
+  const t = useT();
+  return (
+    <span
+      className="-my-1 shrink-0 border border-foreground/40 px-2 py-0.5 text-xs tracking-[0.1em] text-foreground/80"
+      data-private-booking="true"
+    >
+      {t(PRIVATE_BOOKING_COPY.badge)}
     </span>
   );
 }
@@ -63,12 +79,14 @@ export function ListingFooter({
   cta: string | null;
 }) {
   const t = useT();
-  if (!facts && !cta) return null;
+  // 包場：不印票價（左邊留空）。
+  const priced = facts && !facts.privateBooking ? facts : undefined;
+  if (!priced && !cta) return null;
   return (
     <div className="mt-5 flex min-h-11 items-center justify-between gap-3 border-t border-border/70 pt-3 md:mt-6 md:pt-4">
-      {facts ? (
+      {priced ? (
         <span className="text-base font-medium text-foreground [font-variant-numeric:lining-nums]">
-          {facts.price > 0 ? formatPrice(facts.price) : t(LISTING_COPY.free)}
+          {priced.price > 0 ? formatPrice(priced.price) : t(LISTING_COPY.free)}
         </span>
       ) : (
         <span />

@@ -21,6 +21,7 @@ import { latestSessionEndDate } from "@/lib/event-status";
 import { taipeiToday } from "@/lib/taipei-time";
 import { eventProductSlug } from "@/lib/shop";
 import { caseInsensitiveMatch, exactIlikePattern } from "@/lib/seo/core";
+import { isPrivateBooking } from "@/lib/private-booking";
 import {
   UI,
   SITE_INFO,
@@ -141,6 +142,11 @@ export type EventEntry = {
   date: string;
   category: string;
   externalUrl: string;
+  /**
+   * 包場，不開放報名（src/lib/private-booking.ts：events.notes 上的保留 key）。
+   * true＝卡片標「包場」、不印票價與名額，活動頁沒有報名入口。沒讀 notes 的來源一律 undefined。
+   */
+  privateBooking?: boolean;
 };
 
 export type EventCategoryEntry = { id: string; label: Localized };
@@ -751,7 +757,7 @@ export async function fetchEvents(): Promise<EventEntry[]> {
 async function fetchAllEventRows(): Promise<EventEntry[]> {
   const rows = await select(
     "events",
-    "id,slug,title,summary,description,display_date,iso_date,category,external_url,image_key,sort_order",
+    "id,slug,title,summary,description,display_date,iso_date,category,external_url,image_key,sort_order,notes",
     // 0052：只列上架中的活動（is_published 是 events.status='live' 的衍生值）。RLS 也擋，
     //       這裡明寫條件，不靠 RLS 當唯一防線（與 sitemap 同一個做法）。
     { order: "sort_order", eq: ["is_published", true] },
@@ -780,6 +786,7 @@ async function fetchAllEventRows(): Promise<EventEntry[]> {
       imageKey: nullableStr(r.image_key),
       isoDate: nullableStr(r.iso_date),
       lastSessionDate: null,
+      privateBooking: isPrivateBooking(r.notes),
     });
   }
   // 0052：只有「讀取失敗」才退回內建資料；讀到的列都不完整就是沒有可顯示的活動。
@@ -802,10 +809,12 @@ export type JourneyEventDateRow = {
   isoDate: string | null;
   imageKey: string | null;
   lastSessionDate: string | null;
+  /** 包場（events.notes 的保留 key）。 */
+  privateBooking?: boolean;
 };
 
 export async function fetchJourneyEventDates(): Promise<JourneyEventDateRow[]> {
-  const rows = await select("events", "slug,external_url,display_date,iso_date,image_key", {
+  const rows = await select("events", "slug,external_url,display_date,iso_date,image_key,notes", {
     eq: ["is_published", true],
   });
   if (!rows || !rows.length) return [];
@@ -817,6 +826,7 @@ export async function fetchJourneyEventDates(): Promise<JourneyEventDateRow[]> {
       isoDate: nullableStr(r.iso_date),
       imageKey: nullableStr(r.image_key),
       lastSessionDate: null,
+      privateBooking: isPrivateBooking(r.notes),
     }))
     .filter((r) => r.slug);
   return await attachLastSessionDates(mapped);
@@ -1009,6 +1019,8 @@ export async function fetchEventBySlug(slug: string): Promise<EventDetailResult>
         // 報名區要不要關、JSON-LD 的 availability（2026-11 SEO 驗收，見 isEventEnded）。
         isoDate: nullableStr(r.iso_date),
         lastSessionDate: null,
+        // 包場：旗標在 notes 的保留 key 上（readEventLists 只取三個語言陣列，不會把它印出來）。
+        privateBooking: isPrivateBooking(r.notes),
         registrationType: r.registration_type === "internal" ? "internal" : "external",
         galleryKeys,
         speaker,

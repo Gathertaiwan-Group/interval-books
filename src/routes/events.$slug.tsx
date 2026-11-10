@@ -21,6 +21,9 @@ import { useBookingNow } from "@/hooks/use-booking-now";
 import { EVENT_LIST_FIELDS } from "@/lib/event-blocks";
 import { imageFor } from "@/lib/images";
 import { fetchActiveProductForEventSlug, type ShopProduct } from "@/lib/shop";
+import type { PrivateSessionTime } from "@/lib/private-booking";
+import { PrivateBookingPanel } from "@/components/shop/PrivateBookingPanel";
+import { fetchPrivateSessionTimes } from "@/lib/private-booking-fns";
 import { langFromMatches, pageHead } from "@/lib/seo/head";
 import {
   contentTranslation,
@@ -193,14 +196,23 @@ export const Route = createFileRoute("/events/$slug")({
     //    兩者今天一定相等（DB 就是這樣查到這一列的），但拿回傳的那一列當權威，
     //    這一行就不會因為之後多了一層網址正規化（大小寫、尾斜線、舊網址轉址）而
     //    安靜地查錯東西。
-    const booking = event
-      ? await fetchActiveProductForEventSlug(event.slug)
-      : { product: null, unavailable: false };
+    //
+    // 包場（src/lib/private-booking.ts）：場次維持 closed、anon 讀不到，時間另由 server fn
+    // 讀回來（只回包場活動、只有時間與地點），與商品查詢平行。
+    const [booking, privateTimes] = await Promise.all([
+      event
+        ? fetchActiveProductForEventSlug(event.slug)
+        : Promise.resolve({ product: null, unavailable: false }),
+      event?.privateBooking ? fetchPrivateSessionTimes([event.slug]) : Promise.resolve({}),
+    ]);
+    const privateSessions: PrivateSessionTime[] = event?.privateBooking
+      ? ((privateTimes as Record<string, PrivateSessionTime[]>)[event.slug] ?? [])
+      : [];
 
     // 「場次開始了沒」的判斷時間點（isSessionClosedForBooking 的 now）。跟著 loader 資料
     // 序列化，SSR 與第一次 hydrate 用同一個值（不會 #418）；掛載後由 useBookingNow()
     // 校正成現在並在下一個場次開始時推進。與 /checkout 的 loader 同一個做法（a61488a）。
-    return { event, unavailable, booking, now: Date.now() };
+    return { event, unavailable, booking, privateSessions, now: Date.now() };
   },
   // SEO（2026-11 健檢）：title「{活動名}｜{日期}｜小時光書店」、描述取摘要＋內文、
   // 分享圖用活動封面、JSON-LD 輸出 Event（日期地點價格來自售票商品的場次）與麵包屑。
@@ -284,7 +296,7 @@ function EventDetail() {
   // 清單區塊取出來的是字串陣列，而 t() 只吃 Localized 字串，所以這裡要拿 lang
   // 自己選語系（規則與 t() 一致：當前語系沒東西就退回 zh）。
   const { t, lang } = useLang();
-  const { event, unavailable, booking, now: loadedAt } = Route.useLoaderData();
+  const { event, unavailable, booking, privateSessions, now: loadedAt } = Route.useLoaderData();
   const site = useSiteContent();
   // 在任何 early return 之前（hook 規則）。
   const now = useBookingNow(loadedAt, booking.product?.sessions ?? []);
@@ -463,7 +475,16 @@ function EventDetail() {
 
       <section className="container-editorial pb-32">
         <div className="grid gap-12 border-t border-border pt-12 md:grid-cols-2 md:gap-16">
-          {ended && booking.product ? (
+          {event.privateBooking ? (
+            // 包場：場次時間照列（標「包場」、不印票價與名額），報名區只有一句話。
+            // 🔴 這一支不畫 SessionPicker／PlanPicker／QuantityStepper，也沒有任何 /checkout 連結。
+            <PrivateBookingPanel
+              sessions={privateSessions}
+              ended={ended}
+              now={now}
+              heading={t(PAGE.registration)}
+            />
+          ) : ended && booking.product ? (
             <EventEndedNotice
               product={booking.product}
               heading={t(PAGE.registration)}

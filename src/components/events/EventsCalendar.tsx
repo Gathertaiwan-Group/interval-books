@@ -33,12 +33,15 @@ import {
   type CalendarEntry,
   type DayItem,
 } from "@/lib/events-calendar";
+import { PRIVATE_BOOKING_COPY } from "@/lib/private-booking";
 
 const COPY = {
   prev: { zh: "上個月", en: "Previous month", ja: "前の月" },
   next: { zh: "下個月", en: "Next month", ja: "次の月" },
   thisMonth: { zh: "本月", en: "This month", ja: "今月" },
   full: { zh: "額滿", en: "Full", ja: "満席" },
+  // 包場（src/lib/private-booking.ts）：與活動頁、卡片同一份字。
+  privateBooking: PRIVATE_BOOKING_COPY.badge,
   ended: { zh: "已結束", en: "Ended", ja: "終了" },
   journey: { zh: "策旅", en: "Journey", ja: "旅" },
   allDay: { zh: "全天", en: "All day", ja: "終日" },
@@ -84,6 +87,7 @@ function fill(s: string, n: number) {
 function statusWords(entry: CalendarEntry, t: (l: Record<Lang, string>) => string): string[] {
   const words: string[] = [];
   if (entry.kind === "journey") words.push(t(COPY.journey));
+  if (entry.privateBooking) words.push(t(COPY.privateBooking));
   if (entry.ended) words.push(t(COPY.ended));
   else if (entry.full) words.push(t(COPY.full));
   return words;
@@ -340,6 +344,9 @@ function GridItem({ item, date }: { item: DayItem; date: string }) {
         {entry.kind === "journey" && !continued ? (
           <Badge tone="clay">{t(COPY.journey)}</Badge>
         ) : null}
+        {entry.privateBooking && !continued ? (
+          <Badge tone="ink">{t(COPY.privateBooking)}</Badge>
+        ) : null}
         {!entry.ended && entry.full && !continued ? <Badge tone="ink">{t(COPY.full)}</Badge> : null}
       </span>
       <span className="mt-0.5 line-clamp-2 break-words">
@@ -420,6 +427,9 @@ function Agenda({
                         <span className="mt-2 flex flex-wrap gap-1.5">
                           {entry.kind === "journey" ? (
                             <Badge tone="clay">{t(COPY.journey)}</Badge>
+                          ) : null}
+                          {entry.privateBooking ? (
+                            <Badge tone="ink">{t(COPY.privateBooking)}</Badge>
                           ) : null}
                           {entry.ended ? (
                             <Badge tone="muted">{t(COPY.ended)}</Badge>

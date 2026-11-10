@@ -40,6 +40,7 @@ import type { Localized } from "@/i18n/types";
 import { formatPrice, remainingForSession, type ShopProduct, type ShopSession } from "@/lib/shop";
 import { SEATS_LEFT_LABEL } from "@/components/shop/labels";
 import { isSessionClosedForBooking } from "@/lib/event-status";
+import { PRIVATE_BOOKING_COPY } from "@/lib/private-booking";
 
 const COPY: Record<
   | "chooseSession"
@@ -188,6 +189,7 @@ export function SessionList({
   showSeatsRemaining,
   basePrice = null,
   ended = false,
+  privateBooking = false,
   now,
 }: {
   sessions: ShopSession[];
@@ -205,6 +207,11 @@ export function SessionList({
   basePrice?: number | null;
   /** 活動已結束：每一場標「已結束」，不印「尚餘名額」／「已額滿」。 */
   ended?: boolean;
+  /**
+   * 包場，不開放報名（src/lib/private-booking.ts）：每一場標「包場」，不印名額、不印「已額滿」。
+   * 呼叫端也不要傳 basePrice——包場不印票價。
+   */
+  privateBooking?: boolean;
 }) {
   const t = useT();
 
@@ -224,11 +231,13 @@ export function SessionList({
             const closed = ended || (now !== null && isSessionClosedForBooking(session, now));
             const note = closed
               ? t(COPY.sessionEnded)
-              : left <= 0
-                ? t(COPY.sessionFull)
-                : showSeatsRemaining
-                  ? `${t(SEATS_LEFT_LABEL)} ${left}`
-                  : null;
+              : privateBooking
+                ? t(PRIVATE_BOOKING_COPY.badge)
+                : left <= 0
+                  ? t(COPY.sessionFull)
+                  : showSeatsRemaining
+                    ? `${t(SEATS_LEFT_LABEL)} ${left}`
+                    : null;
             const prices: Array<{ key: string; label: string | null; price: number }> =
               (session.plans ?? []).length > 0
                 ? session.plans.map((p) => ({ key: p.id, label: t(p.title), price: p.price }))
@@ -240,6 +249,7 @@ export function SessionList({
                 key={session.id}
                 className="border border-border p-4"
                 data-session-closed={closed ? "true" : undefined}
+                data-private-booking={privateBooking ? "true" : undefined}
               >
                 <span className="block text-sm">{t(session.title)}</span>
                 <span className="mt-1 block text-xs text-muted-foreground">

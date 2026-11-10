@@ -319,6 +319,11 @@ export const eventSchema = z.object({
    * 🔴 這一欄只管「還剩幾位」那一句。**「已額滿」不受它影響**，那是「你報不了名」。
    */
   show_seats_remaining: z.boolean(),
+  /**
+   * 包場，不開放報名（src/lib/private-booking.ts）。存在 events.notes 的保留 key 上，只有
+   * upsertEventWithProduct()（RPC）寫得進去。省略＝不動。
+   */
+  private_booking: z.boolean().optional(),
 });
 export type EventFormValues = z.infer<typeof eventSchema>;
 
@@ -456,7 +461,17 @@ export const journeySchema = z.object({
   summary: localizedSchema,
   description: localizedSchema,
   days: localizedSchema,
-  theme: localizedSchema,
+  /**
+   * 主題可以整組留空（2026-11-10：一頁新增不再拿分類名稱補，留空的卡片前台只印天數）。
+   * 有填就三語都要填——與 localizedSchema 同一條規則。
+   */
+  theme: z
+    .object({ zh: z.string().trim(), en: z.string().trim(), ja: z.string().trim() })
+    .refine(
+      (v) =>
+        (v.zh === "" && v.en === "" && v.ja === "") || (v.zh !== "" && v.en !== "" && v.ja !== ""),
+      "主題可以整組留空；有填就要三語都填",
+    ),
   ...registrationFields,
 });
 export type JourneyFormValues = z.infer<typeof journeySchema>;

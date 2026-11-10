@@ -9,6 +9,7 @@
  * 還沒設連結的策旅仍然看得到卡片，只是不可點 —— 不要讓它消失。
  */
 import { CoverImage } from "@/components/CoverImage";
+import { journeyKicker } from "@/lib/journey-events";
 import { ListingBadge, ListingDate, ListingFooter } from "@/components/ListingBits";
 import { useLocalizeHref, useT } from "@/i18n/LanguageContext";
 import type { Localized } from "@/i18n/types";
@@ -60,9 +61,7 @@ export function JourneyCard({
       />
       <div className={`flex flex-1 flex-col p-6 ${layout.body}`}>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <p className="eyebrow text-sm tracking-widest">
-            {t(j.days)} ／ {t(j.theme)}
-          </p>
+          <p className="eyebrow text-sm tracking-widest">{journeyKicker(t(j.days), t(j.theme))}</p>
           {pastBadge ? (
             <span className="border border-border px-2 py-0.5 text-xs tracking-widest text-muted-foreground">
               {pastBadge}

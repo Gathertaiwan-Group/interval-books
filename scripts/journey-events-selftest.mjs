@@ -170,7 +170,6 @@ for (const [mode, extra] of [
   const card = qc.buildJourneyCard(input, plan.event, {
     sortOrder: 2,
     translations: new Map(),
-    categoryLabel: null,
   });
   const created = { slug: plan.event.slug, externalUrl: plan.event.external_url };
   const listed = excludeJourneyEvents(

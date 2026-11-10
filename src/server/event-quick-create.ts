@@ -138,7 +138,6 @@ export async function prepareEventQuick(
 
   const { listEvents, listTakenEventSlugs } = await import("@/server/repos/events");
   const { listJourneys } = await import("@/server/repos/journeys");
-  const { getEventCategoryById } = await import("@/server/repos/event-categories");
   const isJourney = input.kind === "journey";
 
   const base = opts.slug ?? slugBaseFor(input.sessions, todayInTaipei());
@@ -156,14 +155,11 @@ export async function prepareEventQuick(
     translations: translated.map,
   });
 
-  // 策旅卡片：排在目前最後一張後面；主題留空就用分類名稱（分類本來就有三語）。
+  // 策旅卡片：排在目前最後一張後面；主題留空就留空（不拿分類名稱補，前台只印天數）。
   const journeyCard = isJourney
     ? buildJourneyCard(input, plan.event, {
         sortOrder: (await listJourneys()).reduce((max, j) => Math.max(max, j.sort_order), 0) + 1,
         translations: translated.map,
-        categoryLabel: input.theme.trim()
-          ? null
-          : ((await getEventCategoryById(input.category))?.label ?? null),
       })
     : null;
 

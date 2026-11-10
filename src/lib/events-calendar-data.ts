@@ -21,6 +21,8 @@
  */
 import { supabase } from "@/lib/supabase";
 import { remainingForSession, type ShopSession } from "@/lib/shop";
+import { isPrivateBooking } from "@/lib/private-booking";
+import { fetchPrivateSessionTimes } from "@/lib/private-booking-fns";
 import {
   buildCalendarEntries,
   type CalLocalized,
@@ -54,7 +56,7 @@ export async function fetchCalendarEntries(nowMs: number): Promise<CalendarData>
     const [eventsRes, journeysRes, productsRes] = await Promise.all([
       db
         .from("events")
-        .select("slug,title,external_url,iso_date")
+        .select("slug,title,external_url,iso_date,notes")
         .eq("is_published", true)
         .order("sort_order", { ascending: true }),
       db.from("journeys").select("external_url").eq("is_published", true),
@@ -79,6 +81,7 @@ export async function fetchCalendarEntries(nowMs: number): Promise<CalendarData>
         title,
         externalUrl: str(r.external_url),
         isoDate: str(r.iso_date) || null,
+        privateBooking: isPrivateBooking(r.notes),
       });
     }
 
@@ -115,6 +118,28 @@ export async function fetchCalendarEntries(nowMs: number): Promise<CalendarData>
           endsAt: shopSession.endsAt,
           full: remainingForSession(shopSession) <= 0,
         });
+      }
+    }
+
+    // 包場：場次維持 closed（anon 讀不到），時間另由 server fn 用 service role 讀回來
+    // （只回包場活動、只有時間與地點）。沒有包場活動就不多這一趟。
+    const privateSlugs = events.filter((e) => e.privateBooking).map((e) => e.slug);
+    if (privateSlugs.length > 0) {
+      const times = await fetchPrivateSessionTimes(privateSlugs);
+      const seen = new Set(sessions.map((s) => s.id));
+      for (const [slug, list] of Object.entries(times)) {
+        for (const s of list) {
+          if (seen.has(s.id)) continue;
+          sessions.push({
+            id: s.id,
+            productSlug: `event-${slug}`,
+            title: s.title,
+            location: s.location,
+            startsAt: s.startsAt,
+            endsAt: s.endsAt,
+            full: false,
+          });
+        }
       }
     }
 

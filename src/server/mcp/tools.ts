@@ -384,6 +384,8 @@ const EVENT_FIELDS = [
   "speaker_id",
   "image_key",
   "status",
+  // 包場（src/lib/private-booking.ts）：存在 events.notes 的保留 key 上，這裡是讀出來的布林值。
+  "private_booking",
 ] as const;
 
 const JOURNEY_LOCALIZED = ["title", "summary", "description", "days", "theme"] as const;
@@ -525,6 +527,12 @@ export const TOOL_INPUTS = {
       .optional()
       .describe(
         "上架狀態（選填）。與文案同一個交易寫入，票券商品與策旅卡片會一起跟著。只想改狀態請用 set_event_status。",
+      ),
+    private_booking: z
+      .boolean()
+      .optional()
+      .describe(
+        "包場，不開放報名。true＝活動照常公開、場次時間照列並標「包場」，報名區只顯示「本場為包場活動，不開放對外報名。」，沒有報名／購買入口，結帳也會拒絕；false＝恢復一般活動。場次的開放／關閉仍在後台設定（包場請維持關閉）。",
       ),
     is_published: retiredPublishedArg,
     dry_run: dryRunArg,
@@ -1002,6 +1010,7 @@ export function registerContentTools(server: McpServer): void {
       description:
         "修改活動的文案（名稱、摘要、介紹）、封面、分類、講者、顯示日期，也可以順便改上架狀態 status。" +
         "走後台同一支 admin_upsert_event_with_session（一個交易）：名稱／摘要／封面會同步到票券商品；帶 status 時票券商品與策旅卡片的上下架一起跟著，票價不會被動到。" +
+        "也可以用 private_booking 設定「包場，不開放報名」。" +
         `不能改代稱、報名方式、票價、場次。只想上架／下架請用 set_event_status。${WRITE_NOTE}`,
       annotations: WRITE,
     },
@@ -1015,8 +1024,11 @@ export function registerContentTools(server: McpServer): void {
           "is_published 已停用：活動改成單一上架狀態。請改用 set_event_status（status=live 上架／archived 下架／draft 草稿），或在 update_event 帶 status。",
         );
       }
-      const row = await getEventById(args.id);
-      if (!row) notFound("活動", args.id);
+      const found = await getEventById(args.id);
+      if (!found) notFound("活動", args.id);
+      const { isPrivateBooking } = await import("@/lib/private-booking");
+      // 包場旗標住在 notes 上；差異與驗證用一個讀出來的布林值，寫入交給 repo 合併回 notes。
+      const row = { ...found, private_booking: isPrivateBooking(found.notes) };
 
       if (args.category !== undefined) {
         const { listEventCategories } = await import("@/server/repos/event-categories");
@@ -1041,7 +1053,14 @@ export function registerContentTools(server: McpServer): void {
         patch,
         {
           localized: EVENT_LOCALIZED,
-          plain: ["display_date", "category", "speaker_id", "image_key", "status"],
+          plain: [
+            "display_date",
+            "category",
+            "speaker_id",
+            "image_key",
+            "status",
+            "private_booking",
+          ],
         },
       );
       const valid = validate<import("@/lib/admin/schemas").EventFormValues>(eventSchema, next);
@@ -1059,19 +1078,25 @@ export function registerContentTools(server: McpServer): void {
         commit: async () => {
           // product: null ＝這一次不動商品的價格；lists: {} ＝七個清單欄位不動。
           // status 有改才送（0052：省略＝不動），票券商品與策旅卡片由 trigger 在同一個交易跟著。
-          const { status, ...rest } = valid;
+          // private_booking 同理：有帶才送（repo 會讀回舊的注意事項、只換旗標）。
+          const { status, private_booking, ...rest } = valid;
           const saved = await upsertEventWithProduct(
             {
               ...rest,
               id: row.id,
               lists: {},
               ...(args.status !== undefined ? { status } : {}),
+              ...(args.private_booking !== undefined ? { private_booking } : {}),
             },
             null,
           );
+          const savedRow = {
+            ...saved.event,
+            private_booking: isPrivateBooking(saved.event.notes),
+          };
           return {
             id: saved.event.id,
-            row: pickFields(saved.event as unknown as Record<string, unknown>, [
+            row: pickFields(savedRow as unknown as Record<string, unknown>, [
               "id",
               "slug",
               ...EVENT_FIELDS,

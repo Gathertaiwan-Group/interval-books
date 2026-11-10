@@ -171,8 +171,10 @@ export type CalendarEntry = {
   sortMs: number;
   /** 已結束（結束時間──沒填就是開始時間──已過）。 */
   ended: boolean;
-  /** 已額滿（呼叫端用 remainingForSession() 算好傳進來）。 */
+  /** 已額滿（呼叫端用 remainingForSession() 算好傳進來）。包場時一律 false。 */
   full: boolean;
+  /** 包場，不開放報名（src/lib/private-booking.ts）。月曆標「包場」，不標額滿。 */
+  privateBooking: boolean;
 };
 
 export type RawCalendarEvent = {
@@ -180,6 +182,8 @@ export type RawCalendarEvent = {
   title: CalLocalized;
   externalUrl: string;
   isoDate: string | null;
+  /** 包場（events.notes 的保留 key）。場次時間由呼叫端從 server fn 補進 sessions。 */
+  privateBooking?: boolean;
 };
 
 export type RawCalendarSession = {
@@ -237,6 +241,7 @@ export function buildCalendarEntries(input: CalendarInput): CalendarEntry[] {
   for (const event of input.events) {
     if (!event.slug) continue;
     const kind = isJourney(event) ? "journey" : "event";
+    const privateBooking = event.privateBooking === true;
     const sessions = sessionsByProduct.get(`event-${event.slug}`) ?? [];
     let added = 0;
     for (const s of sessions) {
@@ -267,7 +272,9 @@ export function buildCalendarEntries(input: CalendarInput): CalendarEntry[] {
         endTime: end ? end.time : null,
         sortMs: startMs,
         ended: endMs <= input.nowMs,
-        full: s.full,
+        // 包場不賣位子：名額（capacity 多半只是佔位）不代表「額滿」。
+        full: privateBooking ? false : s.full,
+        privateBooking,
       });
       added++;
     }
@@ -287,6 +294,7 @@ export function buildCalendarEntries(input: CalendarInput): CalendarEntry[] {
         sortMs: ymdToUtcMs(event.isoDate) - 8 * 3_600_000,
         ended: event.isoDate < taipeiDateAt(input.nowMs),
         full: false,
+        privateBooking,
       });
     }
   }

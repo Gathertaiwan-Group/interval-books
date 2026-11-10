@@ -453,11 +453,9 @@ console.log("\n[5b] 策旅：跨日梯次與策旅卡片");
     [plan.event.registration_type, plan.event.payment_enabled, plan.product],
     ["internal", true, { price: 21800 }],
   );
-  const label = { zh: "策旅說明會", en: "Journey Briefings", ja: "旅の説明会" };
   const card = buildJourneyCard(journey, plan.event, {
     sortOrder: 2,
     translations: new Map(),
-    categoryLabel: label,
   });
   check("卡片連到這場活動的頁面", card.external_url, "/events/20261023");
   check(
@@ -465,7 +463,7 @@ console.log("\n[5b] 策旅：跨日梯次與策旅卡片");
     [card.title, card.summary, card.description],
     [plan.event.title, plan.event.summary, plan.event.description],
   );
-  check("卡片主題留空 → 用分類名稱（三語）", card.theme, label);
+  check("卡片主題留空 → 留空（不再拿分類名稱補）", card.theme, { zh: "", en: "", ja: "" });
   check("卡片的幾天幾夜", card.days.zh, "3天2夜");
   check(
     "卡片的報名方式跟著活動",
@@ -475,7 +473,6 @@ console.log("\n[5b] 策旅：跨日梯次與策旅卡片");
   const card2 = buildJourneyCard({ ...journey, theme: "池上秋收" }, plan.event, {
     sortOrder: 2,
     translations: new Map([["池上秋收", { en: "Chishang Harvest", ja: "池上の収穫" }]]),
-    categoryLabel: null,
   });
   check("有填主題就用主題（含翻譯）", card2.theme, {
     zh: "池上秋收",
@@ -491,7 +488,6 @@ console.log("\n[5b] 策旅：跨日梯次與策旅卡片");
   const ext = buildJourneyCard(extInput, extEvent, {
     sortOrder: 1,
     translations: new Map(),
-    categoryLabel: label,
   });
   check(
     "外部連結的策旅：卡片直接連外部網址",

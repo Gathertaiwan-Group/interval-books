@@ -367,7 +367,7 @@ console.log("\n[6] 靜態：前台讀取只看上架");
 const cms = readFile("src/lib/cms.ts");
 checkTrue(
   "活動列表 select 帶 is_published",
-  /"id,slug,title,summary,description,display_date,iso_date,category,external_url,image_key,sort_order",\s*\/\/[\s\S]*?\{ order: "sort_order", eq: \["is_published", true\] \}/.test(
+  /"id,slug,title,summary,description,display_date,iso_date,category,external_url,image_key,sort_order,notes",\s*\/\/[\s\S]*?\{ order: "sort_order", eq: \["is_published", true\] \}/.test(
     cms,
   ),
 );
@@ -429,7 +429,7 @@ checkTrue(
 );
 checkTrue(
   "🔴 priceLines 讀活動本身的 status，並在場次檢查前擋下",
-  /\.from\("events"\)\s*\.select\("id, status"\)/.test(orders) &&
+  /\.from\("events"\)\s*\.select\("id, status, notes"\)/.test(orders) &&
     orders.indexOf("if (!ticketSellable(p, eventStatusById))") > 0 &&
     orders.indexOf("if (!ticketSellable(p, eventStatusById))") <
       orders.indexOf("if (w.sessionId === null)"),

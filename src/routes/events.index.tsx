@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { journeyKicker } from "@/lib/journey-events";
 import { useEffect, useRef, useState } from "react";
 import { isEventPast } from "@/lib/event-status";
 import { PageShell, PageHeader } from "@/components/PageShell";
@@ -41,10 +42,11 @@ import {
   typeParamFor,
   type EventsType,
 } from "@/lib/events-type";
-import { fetchListingFacts } from "@/lib/home-listing";
+import { fetchListingFacts, listingFactsForCard } from "@/lib/home-listing";
 import { eventProductSlug } from "@/lib/shop";
 import { journeyLinkProps } from "@/lib/journey-link";
 import { JourneyCard } from "@/components/events/JourneyCard";
+import { PrivateBookingBadge } from "@/components/ListingBits";
 import eventImg from "@/assets/event-reading.jpg";
 import journeyImg from "@/assets/journey-mist.jpg";
 
@@ -386,7 +388,7 @@ function Events() {
         item: {
           key: j.id,
           title: t(j.title),
-          category: `${t(j.days)} ／ ${t(j.theme)}`,
+          category: journeyKicker(t(j.days), t(j.theme)),
           date: e.date,
           image: e.imageKey ? imageFor(e.imageKey, journeyImg) : journeyImg,
           link: link ? { kind: "href" as const, ...link } : null,
@@ -594,7 +596,11 @@ function Events() {
                           key={j.id}
                           journey={j}
                           linked={linked}
-                          facts={linked ? listing[eventProductSlug(linked.slug)] : undefined}
+                          facts={
+                            linked
+                              ? listingFactsForCard(linked, listing[eventProductSlug(linked.slug)])
+                              : undefined
+                          }
                           layout={journeyLayout}
                           pastBadge={isPastTab ? pastBadge : null}
                         />
@@ -634,16 +640,20 @@ function Events() {
                         <div className={`flex flex-1 flex-col p-6 ${eventLayout.body}`}>
                           {/* 已結束要在卡片上看得出來 —— 分享出去的連結、從搜尋進來的人
                           都不會看到那個分頁。分類字 2026-11-10 拿掉（業主：「活動分類功能都拿掉」）。 */}
-                          {isEventPast(e) ? (
-                            <p>
-                              <span className="border border-border px-2 py-0.5 text-xs tracking-widest text-muted-foreground">
-                                {pastBadge}
-                              </span>
+                          {isEventPast(e) || e.privateBooking ? (
+                            <p className="flex flex-wrap gap-2">
+                              {isEventPast(e) ? (
+                                <span className="border border-border px-2 py-0.5 text-xs tracking-widest text-muted-foreground">
+                                  {pastBadge}
+                                </span>
+                              ) : null}
+                              {/* 包場：不開放報名（src/lib/private-booking.ts）。 */}
+                              {e.privateBooking ? <PrivateBookingBadge /> : null}
                             </p>
                           ) : null}
                           {/* h2（2026-11 SEO 健檢 L4：原本 h1 直接跳 h3）；h1–h5 樣式相同，畫面不變。 */}
                           <h2
-                            className={`display text-2xl leading-snug ${isEventPast(e) ? "mt-4" : ""} ${eventLayout.title}`}
+                            className={`display text-2xl leading-snug ${isEventPast(e) || e.privateBooking ? "mt-4" : ""} ${eventLayout.title}`}
                           >
                             {t(e.title)}
                           </h2>

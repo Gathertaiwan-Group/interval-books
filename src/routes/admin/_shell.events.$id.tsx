@@ -120,6 +120,7 @@ import type { getEventById, listEventProducts, listSessionsForEvent } from "@/li
 import type { listEventBlocks } from "@/lib/admin/fns/event-blocks";
 import type { listArtistOptions } from "@/lib/admin/fns/artists";
 import type { Localized } from "@/i18n/types";
+import { isPrivateBooking, PRIVATE_BOOKING_COPY } from "@/lib/private-booking";
 
 type EventRow = NonNullable<Awaited<ReturnType<typeof getEventById>>>;
 type EventProductRow = Awaited<ReturnType<typeof listEventProducts>>[string];
@@ -259,6 +260,7 @@ const FIELD_LABELS: Record<string, string> = {
   registration_type: "§4 報名方式",
   payment_enabled: "§4 需付款",
   show_seats_remaining: "§4 名額顯示",
+  private_booking: "§4 包場",
   product: "§4 商品",
   "product.price": "§4 售價",
   "product.compare_at_price": "§4 原價",
@@ -320,6 +322,8 @@ function toFormValues(
     // 0029。新增的活動預設**顯示**（＝ 欄位預設，也是 0029 之前的行為）——
     // 關掉名額顯示要是店家的一個明確動作，不是一個安靜的初始值。
     show_seats_remaining: row?.show_seats_remaining ?? true,
+    // 包場旗標住在 notes 的保留 key 上（src/lib/private-booking.ts）。新增＝不是包場。
+    private_booking: isPrivateBooking(row?.notes),
     // 0052：唯一的上架狀態。新增的活動一律從草稿開始——上架要是一個明確的動作。
     status: row?.status ?? "draft",
     sort_order: row?.sort_order ?? nextSortOrder,
@@ -1043,6 +1047,32 @@ function AdminEventAssemblerPage() {
                     　關掉之後「已額滿」還是會顯示。
                   </strong>
                 </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* 包場（不開放報名）。活動照常公開、場次時間照列，但前台沒有任何報名入口，
+              結帳也會拒絕（src/lib/private-booking.ts）。 */}
+          <FormField
+            control={form.control}
+            name="private_booking"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{PRIVATE_BOOKING_COPY.adminLabel}</FormLabel>
+                <div className="flex h-9 items-center gap-2">
+                  <FormControl>
+                    <Switch
+                      checked={field.value === true}
+                      onCheckedChange={field.onChange}
+                      data-testid="event-private-booking"
+                    />
+                  </FormControl>
+                  <span className="text-sm text-muted-foreground">
+                    {field.value ? "包場：前台標示「包場」，不開放報名" : "一般活動"}
+                  </span>
+                </div>
+                <FormDescription>{PRIVATE_BOOKING_COPY.adminHint}</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
