@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { isEventPast } from "@/lib/event-status";
 import { PageShell, PageHeader } from "@/components/PageShell";
 import { CoverImage } from "@/components/CoverImage";
@@ -14,6 +14,9 @@ import { eyebrowOf, fetchEventCategories, fetchEvents, fetchPage, pageText } fro
 import { CARD, featureLayout } from "@/lib/feature-layout";
 import { useSiteContent } from "@/lib/site-content";
 import { imageFor } from "@/lib/images";
+import { EventsCalendar } from "@/components/events/EventsCalendar";
+import { fetchCalendarEntries } from "@/lib/events-calendar-data";
+import { parseMonthParam, taipeiDateAt, taipeiMonthAt } from "@/lib/events-calendar";
 import eventImg from "@/assets/event-reading.jpg";
 
 /**
@@ -110,14 +113,45 @@ const PAST_SHELF = {
   cta: { zh: "查看全部已結束活動", en: "See all past events", ja: "終了したイベントをすべて見る" },
 };
 
+/**
+ * 「列表｜月曆」檢視（2026-11）。
+ *
+ * ?view=list|calendar、?month=YYYY-MM 都是 optional：站內的 <Link to="/events"> 都不帶
+ * search，它們要去的就是預設檢視。canonical 不含這兩個參數（canonicalUrl() 只對 /shop
+ * 保留 ?tab），所以分享出去的月曆網址不會變成另一頁被收錄。
+ *
+ * 沒帶 view 時是「自動」：桌機（md 以上）看月曆、手機看原本的卡片列表 —— 用 CSS 斷點切，
+ * 不是用 JS 量螢幕（SSR 不知道螢幕多寬，量了就會在 hydrate 時跳一次）。理由：桌機一眼
+ * 看得完一整個月，月曆最能回答「這個月有什麼」；手機上卡片有封面圖、是主要的報名入口，
+ * 月曆（議程）一鍵可達。
+ */
+type EventsView = "list" | "calendar";
+type EventsSearch = { view?: EventsView; month?: string };
+
+const VIEW_LABELS = {
+  list: { zh: "列表", en: "List", ja: "リスト" },
+  calendar: { zh: "月曆", en: "Calendar", ja: "カレンダー" },
+  aria: { zh: "檢視方式", en: "View", ja: "表示" },
+};
+
 export const Route = createFileRoute("/events/")({
+  validateSearch: (search: Record<string, unknown>): EventsSearch => {
+    const out: EventsSearch = {};
+    if (search.view === "list" || search.view === "calendar") out.view = search.view;
+    const month = parseMonthParam(search.month);
+    if (month) out.month = month;
+    return out;
+  },
   loader: async () => {
-    const [page, events, categories] = await Promise.all([
+    // loadedAt：月曆的「今天」「已結束」都用它算 —— SSR 與 hydrate 拿到同一個值。
+    const loadedAt = Date.now();
+    const [page, events, categories, calendar] = await Promise.all([
       fetchPage("events"),
       fetchEvents(),
       fetchEventCategories(),
+      fetchCalendarEntries(loadedAt),
     ]);
-    return { page, events, categories };
+    return { page, events, categories, calendar, loadedAt };
   },
   head: ({ loaderData, matches, match }) => {
     const p = pageText(loaderData?.page ?? null);
@@ -141,7 +175,22 @@ export const Route = createFileRoute("/events/")({
 
 function Events() {
   const t = useT();
-  const { page, events, categories } = Route.useLoaderData();
+  const { page, events, categories, calendar, loadedAt } = Route.useLoaderData();
+  const search = Route.useSearch();
+  const currentMonth = taipeiMonthAt(loadedAt);
+  const calendarMonth = search.month ?? currentMonth;
+  // 沒帶 ?view＝自動（見 Route 上方的說明）。掛載後才用 matchMedia 決定「現在算哪一個」，
+  // 只為了切換鈕的 aria-current；畫面本身在 SSR 時就由 CSS 斷點決定好了。
+  const [autoView, setAutoView] = useState<EventsView | null>(null);
+  useEffect(() => {
+    if (search.view) return;
+    const mq = window.matchMedia("(min-width: 768px)");
+    const sync = () => setAutoView(mq.matches ? "calendar" : "list");
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, [search.view]);
+  const view: EventsView | null = search.view ?? autoView;
   const p = pageText(page);
   const { ui } = useSiteContent();
   const heroSrc = imageFor(page?.ogImageKey, eventImg);
@@ -206,150 +255,204 @@ function Events() {
         </div>
       </section>
 
-      <section
-        ref={filtersRef}
-        className="container-editorial pb-12 flex flex-wrap gap-3 text-xs tracking-widest scroll-mt-24"
+      <nav
+        aria-label={t(p.block("view.aria", VIEW_LABELS.aria))}
+        className="container-editorial pb-8"
       >
-        {filterIds.map((f) => {
-          const label =
-            f === PAST_FILTER
-              ? t(p.block("filters.past", PAST_LABEL))
-              : t(p.block("filters.upcoming", UPCOMING_LABEL));
-          const active = filter === f;
-          return (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 border transition-colors ${
-                active
-                  ? "border-foreground bg-foreground text-primary-foreground"
-                  : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </section>
-
-      {list.length === 0 ? (
-        <section className="container-editorial pb-32">
-          <div className="border border-border p-8 md:p-10">
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {filter === PAST_FILTER
-                ? t(p.block("emptyPast", EMPTY_PAST))
-                : t(p.block("emptyUpcoming", EMPTY_UPCOMING))}
-            </p>
-            {/* 只在「報名中是空的、而且真的有辦過活動」時才給這顆按鈕。
-                沒有這個條件的話，按下去只是換到另一頁空白 —— 那比沒有按鈕更糟。 */}
-            {filter !== PAST_FILTER && past.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setFilter(PAST_FILTER)}
-                className="mt-8 inline-block border border-foreground px-5 py-3 tracking-widest hover:bg-foreground hover:text-primary-foreground transition-colors text-base"
+        <div className="inline-flex border border-foreground text-sm tracking-widest">
+          {(["list", "calendar"] as const).map((v) => {
+            const active = view === v;
+            // 自動模式、尚未掛載時：用斷點把「目前這一格」畫成選中（桌機月曆、手機列表）。
+            const autoCls =
+              view === null
+                ? v === "calendar"
+                  ? "md:bg-foreground md:text-primary-foreground"
+                  : "max-md:bg-foreground max-md:text-primary-foreground"
+                : active
+                  ? "bg-foreground text-primary-foreground"
+                  : "";
+            return (
+              <Link
+                key={v}
+                to="/events"
+                search={v === "calendar" ? { view: v, month: search.month } : { view: v }}
+                resetScroll={false}
+                aria-current={active ? "page" : undefined}
+                data-testid={`events-view-${v}`}
+                className={`inline-flex min-h-11 min-w-20 items-center justify-center px-5 transition-colors ${autoCls} ${
+                  active || view === null ? "" : "hover:bg-muted"
+                }`}
               >
-                {t(p.block("seePast", SEE_PAST))}
-              </button>
-            ) : null}
-          </div>
+                {t(p.block(`view.${v}`, VIEW_LABELS[v]))}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
+      {view !== "list" ? (
+        <section
+          className={`container-editorial pb-32 ${view === null ? "hidden md:block" : ""}`}
+          data-testid="events-calendar-section"
+        >
+          <EventsCalendar
+            entries={calendar.entries}
+            unavailable={calendar.unavailable}
+            month={calendarMonth}
+            currentMonth={currentMonth}
+            today={taipeiDateAt(loadedAt)}
+          />
         </section>
-      ) : (
-        <section className={`container-editorial pb-32 ${layout.grid}`}>
-          {list.map((e) => (
-            // 整張卡片不是連結（唯一的連結是底下那顆「活動詳情」），所以不加 CARD_HOVER。
-            <article key={e.id} className={`${CARD} ${layout.card}`}>
-              {/* ⚠️ 先判斷 imageKey 非空**再**呼叫 imageFor()。imageFor(key, fallback)
+      ) : null}
+
+      {view !== "calendar" ? (
+        <div className={view === null ? "md:hidden" : ""}>
+          <section
+            ref={filtersRef}
+            className="container-editorial pb-12 flex flex-wrap gap-3 text-xs tracking-widest scroll-mt-24"
+          >
+            {filterIds.map((f) => {
+              const label =
+                f === PAST_FILTER
+                  ? t(p.block("filters.past", PAST_LABEL))
+                  : t(p.block("filters.upcoming", UPCOMING_LABEL));
+              const active = filter === f;
+              return (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`px-4 py-2 border transition-colors ${
+                    active
+                      ? "border-foreground bg-foreground text-primary-foreground"
+                      : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </section>
+
+          {list.length === 0 ? (
+            <section className="container-editorial pb-32">
+              <div className="border border-border p-8 md:p-10">
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {filter === PAST_FILTER
+                    ? t(p.block("emptyPast", EMPTY_PAST))
+                    : t(p.block("emptyUpcoming", EMPTY_UPCOMING))}
+                </p>
+                {/* 只在「報名中是空的、而且真的有辦過活動」時才給這顆按鈕。
+                沒有這個條件的話，按下去只是換到另一頁空白 —— 那比沒有按鈕更糟。 */}
+                {filter !== PAST_FILTER && past.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setFilter(PAST_FILTER)}
+                    className="mt-8 inline-block border border-foreground px-5 py-3 tracking-widest hover:bg-foreground hover:text-primary-foreground transition-colors text-base"
+                  >
+                    {t(p.block("seePast", SEE_PAST))}
+                  </button>
+                ) : null}
+              </div>
+            </section>
+          ) : (
+            <section className={`container-editorial pb-32 ${layout.grid}`}>
+              {list.map((e) => (
+                // 整張卡片不是連結（唯一的連結是底下那顆「活動詳情」），所以不加 CARD_HOVER。
+                <article key={e.id} className={`${CARD} ${layout.card}`}>
+                  {/* ⚠️ 先判斷 imageKey 非空**再**呼叫 imageFor()。imageFor(key, fallback)
                   永遠會回一張圖，順序反過來就是每一張卡片都長同一張不相干的照片
                   （見 EventEntry.imageKey）。沒設封面的活動就是沒有圖，不放佔位。 */}
-              {e.imageKey ? (
-                <CoverImage
-                  src={imageFor(e.imageKey, eventImg)}
-                  alt={t(e.title)}
-                  loading="lazy"
-                  className={`aspect-[4/3] ${layout.image}`}
-                />
-              ) : null}
-              {/* 按鈕靠摘要的 flex-1 推到卡片底部，同一列的按鈕因此對齊；只有一場時
+                  {e.imageKey ? (
+                    <CoverImage
+                      src={imageFor(e.imageKey, eventImg)}
+                      alt={t(e.title)}
+                      loading="lazy"
+                      className={`aspect-[4/3] ${layout.image}`}
+                    />
+                  ) : null}
+                  {/* 按鈕靠摘要的 flex-1 推到卡片底部，同一列的按鈕因此對齊；只有一場時
                   featureLayout 給 summary 的 md:flex-none 會把它拿掉，讓整段文字在
                   橫版裡垂直置中（見 feature-layout.ts）。不用 mt-auto：auto margin 會
                   先吃掉剩餘空間，橫版的 md:justify-center 就失效了。 */}
-              <div className={`flex flex-1 flex-col p-6 ${layout.body}`}>
-                <div className="flex flex-wrap items-center gap-3">
-                  <p className="eyebrow text-sm tracking-widest">
-                    {t(
-                      labelById.get(e.category) ?? {
-                        zh: e.category,
-                        en: e.category,
-                        ja: e.category,
-                      },
-                    )}
-                  </p>
-                  {/* 已結束要在卡片上看得出來 —— 只靠「它在另一個分頁底下」不夠：
+                  <div className={`flex flex-1 flex-col p-6 ${layout.body}`}>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <p className="eyebrow text-sm tracking-widest">
+                        {t(
+                          labelById.get(e.category) ?? {
+                            zh: e.category,
+                            en: e.category,
+                            ja: e.category,
+                          },
+                        )}
+                      </p>
+                      {/* 已結束要在卡片上看得出來 —— 只靠「它在另一個分頁底下」不夠：
                     分享出去的連結、從搜尋進來的人都不會看到那個分頁。 */}
-                  {isEventPast(e) ? (
-                    <span className="border border-border px-2 py-0.5 text-xs tracking-widest text-muted-foreground">
-                      {t(p.block("filters.pastBadge", PAST_BADGE))}
-                    </span>
-                  ) : null}
-                </div>
-                {/* h2（2026-11 SEO 健檢 L4：原本 h1 直接跳 h3）；h1–h5 樣式相同，畫面不變。 */}
-                <h2 className={`display mt-4 text-2xl leading-snug ${layout.title}`}>
-                  {t(e.title)}
-                </h2>
-                <p className="mt-4 text-sm text-muted-foreground">{e.date}</p>
-                <p
-                  className={`mt-4 text-sm leading-relaxed text-foreground/75 flex-1 ${layout.summary}`}
-                >
-                  {t(e.summary)}
-                </p>
-                {/* 只留站內的詳情頁。原本旁邊還有一顆「前往活動網站」連到
+                      {isEventPast(e) ? (
+                        <span className="border border-border px-2 py-0.5 text-xs tracking-widest text-muted-foreground">
+                          {t(p.block("filters.pastBadge", PAST_BADGE))}
+                        </span>
+                      ) : null}
+                    </div>
+                    {/* h2（2026-11 SEO 健檢 L4：原本 h1 直接跳 h3）；h1–h5 樣式相同，畫面不變。 */}
+                    <h2 className={`display mt-4 text-2xl leading-snug ${layout.title}`}>
+                      {t(e.title)}
+                    </h2>
+                    <p className="mt-4 text-sm text-muted-foreground">{e.date}</p>
+                    <p
+                      className={`mt-4 text-sm leading-relaxed text-foreground/75 flex-1 ${layout.summary}`}
+                    >
+                      {t(e.summary)}
+                    </p>
+                    {/* 只留站內的詳情頁。原本旁邊還有一顆「前往活動網站」連到
                   events.external_url —— 但正式庫七場活動裡有五場的那一欄還是
                   https://example.com/event-N（0001 的種子資料，從未替換），所以
                   那顆按鈕多半是把人送去一個不存在的地方。活動詳情頁存在之後，
                   站內那一頁本來就是我們說得最清楚的地方；真的有外部售票連結時，
                   由詳情頁自己決定要不要顯示。 */}
-                <div className="mt-8">
-                  <Link
-                    to="/events/$slug"
-                    params={{ slug: e.slug }}
-                    className="inline-block border border-foreground px-5 py-3 tracking-widest hover:bg-foreground hover:text-primary-foreground transition-colors text-base"
-                  >
-                    {t(p.block("detail", DETAIL))}
-                  </Link>
-                </div>
-              </div>
-            </article>
-          ))}
-        </section>
-      )}
+                    <div className="mt-8">
+                      <Link
+                        to="/events/$slug"
+                        params={{ slug: e.slug }}
+                        className="inline-block border border-foreground px-5 py-3 tracking-widest hover:bg-foreground hover:text-primary-foreground transition-colors text-base"
+                      >
+                        {t(p.block("detail", DETAIL))}
+                      </Link>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </section>
+          )}
 
-      {/* 只在「報名中」這一格畫：切到「已結束」時上面的列表就是完整版，再畫一次是重複。 */}
-      {filter !== PAST_FILTER ? (
-        <PastShelf
-          testId="events-past-shelf"
-          eyebrow={t(p.block("past.eyebrow", PAST_SHELF.eyebrow))}
-          title={t(p.block("past.title", PAST_SHELF.title))}
-          badge={t(p.block("filters.pastBadge", PAST_BADGE))}
-          items={pastShelf.map((e) => ({
-            key: e.id,
-            title: t(e.title),
-            category: t(
-              labelById.get(e.category) ?? { zh: e.category, en: e.category, ja: e.category },
-            ),
-            date: e.date,
-            image: e.imageKey ? imageFor(e.imageKey, eventImg) : null,
-            link: { kind: "event", slug: e.slug },
-          }))}
-          cta={
-            <button
-              type="button"
-              onClick={showAllPast}
-              className="inline-block tracking-widest text-clay hover-underline text-base"
-            >
-              {t(p.block("past.cta", PAST_SHELF.cta))} →
-            </button>
-          }
-        />
+          {/* 只在「報名中」這一格畫：切到「已結束」時上面的列表就是完整版，再畫一次是重複。 */}
+          {filter !== PAST_FILTER ? (
+            <PastShelf
+              testId="events-past-shelf"
+              eyebrow={t(p.block("past.eyebrow", PAST_SHELF.eyebrow))}
+              title={t(p.block("past.title", PAST_SHELF.title))}
+              badge={t(p.block("filters.pastBadge", PAST_BADGE))}
+              items={pastShelf.map((e) => ({
+                key: e.id,
+                title: t(e.title),
+                category: t(
+                  labelById.get(e.category) ?? { zh: e.category, en: e.category, ja: e.category },
+                ),
+                date: e.date,
+                image: e.imageKey ? imageFor(e.imageKey, eventImg) : null,
+                link: { kind: "event", slug: e.slug },
+              }))}
+              cta={
+                <button
+                  type="button"
+                  onClick={showAllPast}
+                  className="inline-block tracking-widest text-clay hover-underline text-base"
+                >
+                  {t(p.block("past.cta", PAST_SHELF.cta))} →
+                </button>
+              }
+            />
+          ) : null}
+        </div>
       ) : null}
     </PageShell>
   );

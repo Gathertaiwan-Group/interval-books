@@ -203,8 +203,10 @@ check(
   true,
 );
 check(
-  "/events loader 沒有多查（仍是 page/events/categories 三支）",
-  /Promise\.all\(\[\s*fetchPage\("events"\),\s*fetchEvents\(\),\s*fetchEventCategories\(\),\s*\]\)/.test(
+  // 2026-11 月曆檢視多了第四支 fetchCalendarEntries()（場次時間，見 events-calendar-selftest）；
+  // 過往活動區本身仍然沒有多查——它用的是同一份 events。
+  "/events loader 沒有為過往活動多查（page/events/categories ＋ 月曆一支）",
+  /Promise\.all\(\[\s*fetchPage\("events"\),\s*fetchEvents\(\),\s*fetchEventCategories\(\),\s*fetchCalendarEntries\(loadedAt\),\s*\]\)/.test(
     eventsIndex,
   ),
   true,
