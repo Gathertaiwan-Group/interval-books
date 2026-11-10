@@ -12,6 +12,7 @@
  * 呼叫端負責：資料（已結束、排好序、限好筆數）、文案（p.block 讓後台可以改字）、
  * 以及零筆時不要畫這一區。
  */
+import { PrivateBookingBadge } from "@/components/ListingBits";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { CoverImage } from "@/components/CoverImage";
@@ -33,6 +34,8 @@ export type PastShelfItem = {
   date: string;
   image: string | null;
   link: PastShelfLink | null;
+  /** 包場活動（src/lib/private-booking.ts）：在「已結束」旁邊多印一個「包場」小標。 */
+  privateBooking?: boolean;
 };
 
 type PastShelfProps = {
@@ -87,6 +90,7 @@ function PastCard({ item, badge }: { item: PastShelfItem; badge: string }) {
           <span className="border border-border px-2 py-0.5 text-[11px] tracking-widest text-muted-foreground">
             {badge}
           </span>
+          {item.privateBooking ? <PrivateBookingBadge /> : null}
         </div>
         <h3 className="mt-3 line-clamp-2 min-h-[2.75em] font-serif text-lg leading-snug group-hover:underline underline-offset-4">
           {item.title}

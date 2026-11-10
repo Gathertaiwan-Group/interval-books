@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { journeyKicker } from "@/lib/journey-events";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { CalendarDays, List } from "lucide-react";
 import { isEventPast } from "@/lib/event-status";
 import { PageShell, PageHeader } from "@/components/PageShell";
 import { CoverImage } from "@/components/CoverImage";
@@ -18,7 +19,6 @@ import { fitDescription } from "@/lib/seo/core";
 import { pageHead } from "@/lib/seo/head";
 import { pageRowTranslation } from "@/lib/seo/pages";
 import {
-  eyebrowOf,
   fetchEvents,
   fetchJourneyEventDates,
   fetchJourneys,
@@ -47,6 +47,7 @@ import { eventProductSlug } from "@/lib/shop";
 import { journeyLinkProps } from "@/lib/journey-link";
 import { JourneyCard } from "@/components/events/JourneyCard";
 import { PrivateBookingBadge } from "@/components/ListingBits";
+import { cardRail, RAIL_HINT } from "@/lib/card-rail";
 import eventImg from "@/assets/event-reading.jpg";
 import journeyImg from "@/assets/journey-mist.jpg";
 
@@ -98,9 +99,7 @@ const PAGE = {
   },
 };
 
-/** "all" filter pill — a page_block on the events page. */
-const UPCOMING_LABEL = { zh: "報名中", en: "Open", ja: "受付中" };
-const PAST_LABEL = { zh: "已結束", en: "Past", ja: "終了" };
+/** 過往區卡片上的「已結束」小標（page_block filters.pastBadge 可覆寫）。 */
 const PAST_BADGE = { zh: "已結束", en: "Ended", ja: "終了" };
 
 /**
@@ -124,8 +123,8 @@ const DETAIL = { zh: "活動詳情", en: "Event details", ja: "イベント詳�
  *    改成卡片之後灰色色塊不會再出現（單數筆時最後一格的灰色空位也一起沒了），但
  *    「空白看起來像壞掉」這一半還在，所以這段文案照樣留著。
  *
- * 兩種空狀態分開寫，因為這一頁的兩個 filter 空掉時「下一步」不一樣：「報名中」
- * 空了的時候使用者還有地方可以去（過去辦過的活動），「已結束」空了則沒有。
+ * 2026-11-10 起頂部的「報名中／已結束」切換拿掉（已結束的一律在頁面最下方「過往」區），
+ * 所以只剩「目前沒有開放報名」這一種空狀態（依類型三種寫法）。
  *
  * 同一頁其他文案的慣例照舊 —— 三語常數當退路，實際顯示走 p.block() 讓
  * pages/'events' 的區塊（MCP update_page_blocks）可以改字。
@@ -140,27 +139,18 @@ const EMPTY_UPCOMING_ALL = {
   en: "Nothing is open for registration right now. In the meantime, take a look at what we have held.",
   ja: "現在受付中のイベント・旅はありません。これまでの開催をご覧ください。",
 };
-const EMPTY_PAST = {
-  zh: "還沒有已結束的活動。",
-  en: "No past events yet.",
-  ja: "終了したイベントはまだありません。",
-};
-const SEE_PAST = {
-  zh: "看看過去的活動",
-  en: "Browse past events",
-  ja: "過去のイベントを見る",
-};
-
 /**
  * 「過往活動」卡片區（2026-10-28 店長：「這邊下方，幫我多一區，用卡片的形式，去展現
- * 已經辦過的活動」）。畫在「報名中」列表下方，訪客不必切分頁就看得到辦過什麼；
- * 「查看全部」切到既有的「已結束」分頁（那一格本身不動）。資料就是同一份 events，
- * 不多查一次。
+ * 已經辦過的活動」）。畫在列表最下方；2026-11-10 起它是已結束場次唯一的入口（頂部切換拿掉），
+ * 先列 PAST_SHELF_LIMIT 張，多的按「看全部過往」展開。資料就是同一份 events，不多查一次。
  */
 const PAST_SHELF = {
   eyebrow: { zh: "PAST EVENTS", en: "PAST EVENTS", ja: "PAST EVENTS" },
   title: { zh: "過往活動", en: "Past events", ja: "これまでのイベント" },
-  cta: { zh: "查看全部已結束活動", en: "See all past events", ja: "終了したイベントをすべて見る" },
+};
+const PAST_MORE = {
+  more: { zh: "看全部過往", en: "See all past", ja: "過去分をすべて見る" },
+  less: { zh: "收合", en: "Show fewer", ja: "閉じる" },
 };
 
 /** 類型篩選列（全部｜活動｜策旅）。「全部」沿用 pages/'events' 既有的 filters.all 區塊。 */
@@ -207,7 +197,6 @@ const JOURNEY_COPY = {
 const PAST_SHELF_ALL = {
   eyebrow: { zh: "PAST", en: "PAST", ja: "PAST" },
   title: { zh: "過往活動與策旅", en: "Past events & journeys", ja: "これまでのイベント・旅" },
-  cta: { zh: "查看全部已結束", en: "See everything past", ja: "終了分をすべて見る" },
 };
 
 /**
@@ -225,10 +214,12 @@ const PAST_SHELF_ALL = {
 type EventsView = "list" | "calendar";
 type EventsSearch = { view?: EventsView; month?: string; type?: EventsType };
 
+/** 月曆／列表切換鈕（一顆圖示）的 aria-label：鈕上顯示的是「要切過去」的那個檢視。 */
 const VIEW_LABELS = {
-  list: { zh: "列表", en: "List", ja: "リスト" },
-  calendar: { zh: "月曆", en: "Calendar", ja: "カレンダー" },
-  aria: { zh: "檢視方式", en: "View", ja: "表示" },
+  toggle: {
+    calendar: { zh: "切換月曆", en: "Switch to calendar", ja: "カレンダー表示に切り替え" },
+    list: { zh: "切換列表", en: "Switch to list", ja: "リスト表示に切り替え" },
+  },
 };
 
 export const Route = createFileRoute("/events/")({
@@ -327,191 +318,169 @@ function Events() {
     ogImage: heroSrc,
   });
 
-  // 篩選只有兩格：報名中 / 已結束（「已結束」是時間狀態，用寫死的哨兵 id）。
-  //
-  // 這裡原本還有六到七個分類（讀書會、療癒生活節、陶藝工作坊…），但那些對訪客
-  // 不是有用的切法 —— 真正會影響行為的問題只有一個：「這場我還報得到名嗎」。
-  // 2026-11-10 業主：「活動分類功能都拿掉」—— 卡片上的分類字也一起拿掉，不再查 event_categories。
-  // 合併策旅之後多了一個「類型」篩選，但它在網址上 —— 見 src/lib/events-type.ts。
-  const UPCOMING_FILTER = "__upcoming__";
-  const PAST_FILTER = "__past__";
-  const filterIds = [UPCOMING_FILTER, PAST_FILTER];
-
-  const [filter, setFilter] = useState<string>(UPCOMING_FILTER);
-  const isPastTab = filter === PAST_FILTER;
-
+  // 2026-11-10 業主看手機版：「篩選設計現在太複雜，我要畫面簡潔；活動卡片用左右滑動。」
+  //   · 控制收成一排：左邊「全部・活動・策旅」（?type=，網址狀態），右邊一顆小的月曆／列表圖示。
+  //   · 「報名中／已結束」切換拿掉：主體只放還沒結束的；已結束的全部收到頁面最下方「過往」區。
+  //   · 手機上策旅、活動各一列橫滑卡片（src/lib/card-rail.ts，與首頁同一組 class）。
+  // 分類（讀書會、陶藝工作坊…）2026-11-10 起也不再顯示（業主：「活動分類功能都拿掉」）。
   const wantEvents = showsEvents(type);
   const wantJourneys = showsJourneys(type);
 
-  // 🔴 已結束的活動**只有在「已結束」那一格才找得到**。辦過的活動留在站上是為了
-  //    讓人看得到我們辦過什麼，不是為了讓人以為還能報名。
-  const upcoming = wantEvents ? events.filter((e) => !isEventPast(e)) : [];
-  const past = wantEvents ? events.filter((e) => isEventPast(e)) : [];
+  // 🔴 已結束的活動不放進主體，只在最下方「過往」區。辦過的活動留在站上是為了讓人看得到
+  //    我們辦過什麼，不是為了讓人以為還能報名。
+  const eventList = wantEvents ? events.filter((e) => !isEventPast(e)) : [];
   // 策旅的「已結束」＝卡片指著的那場活動已結束（判準見 src/lib/past-shelf.ts，與首頁同一支）。
-  // 「已結束」那一格要列全部，所以 limit 給到整份清單的長度。
+  // 過往區可以展開看全部，所以 limit 給到整份清單的長度。
   const split = splitJourneys(allJourneys, journeyEvents, allJourneys.length);
-  const openJourneys = wantJourneys ? split.open : [];
-  const endedJourneys = wantJourneys ? split.ended : [];
-
-  const eventList = isPastTab ? past : upcoming;
-  const journeyList = isPastTab ? endedJourneys.map(({ journey }) => journey) : openJourneys;
+  const journeyList = wantJourneys ? split.open : [];
   const nothing = eventList.length === 0 && journeyList.length === 0;
-  const hasAnyPast = past.length > 0 || endedJourneys.length > 0;
   // 「全部」時兩段各有小標；只看一種時不需要。
   const sectioned = type === undefined;
 
-  // 卡片排法跟首頁同一套（src/lib/feature-layout.ts）：1 場＝橫版左圖右字佔滿寬，
-  // 2 場兩欄，3 場以上 md 兩欄／lg 三欄。活動與策旅各自算。
+  // 卡片排法：md 以上跟首頁同一套 featureLayout（1 場橫版、2 場兩欄、3 場以上三欄）；
+  // 手機兩張以上改成橫滑一列（cardRail），一張時全寬、不顯示滑動提示。
   const eventLayout = featureLayout(eventList.length);
   const journeyLayout = featureLayout(journeyList.length);
+  const eventRail = cardRail(eventList.length);
+  const journeyRail = cardRail(journeyList.length);
 
-  // 過往卡片區（只在「報名中」那一格畫）：依類型挑來源，「全部」時依結束日合併。
-  const pastEventItems = newestEndedFirst(events).map(
-    (e): { endDate: string; item: PastShelfItem } => ({
-      endDate: effectiveEndDate(e),
-      item: {
-        key: e.id,
-        title: t(e.title),
-        category: "",
-        date: e.date,
-        image: e.imageKey ? imageFor(e.imageKey, eventImg) : null,
-        link: { kind: "event" as const, slug: e.slug },
-      },
-    }),
-  );
-  const pastJourneyItems = split.ended
-    .slice(0, PAST_SHELF_LIMIT)
-    .map(({ journey: j, event: e }): { endDate: string; item: PastShelfItem } => {
-      const link = journeyLinkProps(j.externalUrl, localizeHref);
-      return {
-        endDate: effectiveEndDate(e),
-        item: {
-          key: j.id,
-          title: t(j.title),
-          category: journeyKicker(t(j.days), t(j.theme)),
-          date: e.date,
-          image: e.imageKey ? imageFor(e.imageKey, journeyImg) : journeyImg,
-          link: link ? { kind: "href" as const, ...link } : null,
-        },
-      };
-    });
-  const shelfItems = (
-    type === "event"
-      ? pastEventItems
-      : type === "journey"
-        ? pastJourneyItems
-        : mergeNewestEnded(pastJourneyItems, pastEventItems, PAST_SHELF_LIMIT)
+  // 過往區：依類型挑來源，「全部」時依結束日合併。先列 PAST_SHELF_LIMIT 張，其餘按「看全部」展開。
+  const pastEventItems = wantEvents
+    ? newestEndedFirst(events, events.length).map(
+        (e): { endDate: string; item: PastShelfItem } => ({
+          endDate: effectiveEndDate(e),
+          item: {
+            key: e.id,
+            title: t(e.title),
+            category: "",
+            date: e.date,
+            image: e.imageKey ? imageFor(e.imageKey, eventImg) : null,
+            link: { kind: "event" as const, slug: e.slug },
+            privateBooking: e.privateBooking,
+          },
+        }),
+      )
+    : [];
+  const pastJourneyItems = wantJourneys
+    ? split.ended.map(({ journey: j, event: e }): { endDate: string; item: PastShelfItem } => {
+        const link = journeyLinkProps(j.externalUrl, localizeHref);
+        return {
+          endDate: effectiveEndDate(e),
+          item: {
+            key: j.id,
+            title: t(j.title),
+            category: journeyKicker(t(j.days), t(j.theme)),
+            date: e.date,
+            image: e.imageKey ? imageFor(e.imageKey, journeyImg) : journeyImg,
+            link: link ? { kind: "href" as const, ...link } : null,
+          },
+        };
+      })
+    : [];
+  const allPast = mergeNewestEnded(
+    pastJourneyItems,
+    pastEventItems,
+    pastJourneyItems.length + pastEventItems.length,
   ).map((x) => x.item);
+  const [showAllPast, setShowAllPast] = useState(false);
+  const shelfItems = showAllPast ? allPast : allPast.slice(0, PAST_SHELF_LIMIT);
   const shelfCopy =
     type === "journey"
       ? {
           eyebrow: t(jp.block("pastEyebrow", JOURNEY_COPY.pastEyebrow)),
           title: t(jp.block("pastTitle", JOURNEY_COPY.pastTitle)),
-          cta: null,
         }
       : type === "event"
         ? {
             eyebrow: t(p.block("past.eyebrow", PAST_SHELF.eyebrow)),
             title: t(p.block("past.title", PAST_SHELF.title)),
-            cta: t(p.block("past.cta", PAST_SHELF.cta)),
           }
-        : {
-            eyebrow: t(PAST_SHELF_ALL.eyebrow),
-            title: t(PAST_SHELF_ALL.title),
-            cta: t(PAST_SHELF_ALL.cta),
-          };
-
-  const filtersRef = useRef<HTMLElement>(null);
-  const showAllPast = () => {
-    setFilter(PAST_FILTER);
-    filtersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+        : { eyebrow: t(PAST_SHELF_ALL.eyebrow), title: t(PAST_SHELF_ALL.title) };
 
   const pastBadge = t(p.block("filters.pastBadge", PAST_BADGE));
-  const emptyText = isPastTab
-    ? type === "journey"
-      ? t(JOURNEY_COPY.emptyPast)
-      : t(p.block("emptyPast", EMPTY_PAST))
-    : type === "journey"
+  const emptyText =
+    type === "journey"
       ? t(jp.block("emptyOpen", JOURNEY_COPY.emptyOpen))
       : type === "event"
         ? t(p.block("emptyUpcoming", EMPTY_UPCOMING))
         : t(EMPTY_UPCOMING_ALL);
 
-  const segBtn = "inline-flex min-h-11 items-center justify-center px-4 sm:px-5 transition-colors";
+  // 月曆／列表切換鈕：顯示「另一個」檢視的圖示。沒帶 ?view（自動：手機列表、桌機月曆）而且
+  // 還沒掛載時，用 CSS 斷點各畫一顆，SSR 與 hydrate 不跳。
+  const toggle = (target: EventsView, cls = "") => (
+    <Link
+      to="/events"
+      search={
+        target === "calendar" ? { view: target, month: search.month, type } : { view: target, type }
+      }
+      resetScroll={false}
+      aria-label={t(VIEW_LABELS.toggle[target])}
+      title={t(VIEW_LABELS.toggle[target])}
+      data-testid={`events-view-${target}`}
+      className={`inline-flex h-11 w-11 shrink-0 items-center justify-center text-foreground/70 transition-colors hover:text-foreground ${cls}`}
+    >
+      {target === "calendar" ? (
+        <CalendarDays className="h-5 w-5" aria-hidden="true" />
+      ) : (
+        <List className="h-5 w-5" aria-hidden="true" />
+      )}
+    </Link>
+  );
 
   return (
     <PageShell>
       <PageHeader
-        eyebrow={eyebrowOf(null, "Events & Journeys", t(NAME))}
+        compact
+        clampIntro
+        // 只放頁名（2026-11-10 手機簡化：「EVENTS & JOURNEYS ／ 活動與策旅」在 390 寬會折行）。
+        eyebrow={t(NAME)}
         title={t(p.title(PAGE.title))}
         intro={t(p.intro(PAGE.intro))}
       />
 
-      <div className="container-editorial pb-8 flex flex-wrap items-center justify-between gap-3">
-        {/* 類型：全部｜活動｜策旅。是網址狀態（?type=），可以分享；切換時保留 view 與 month。 */}
-        <nav aria-label={t(TYPE_LABELS.aria)} data-testid="events-type-filter">
-          <div className="inline-flex border border-foreground text-sm tracking-widest">
-            {EVENTS_TYPE_OPTIONS.map((opt) => {
-              const active = optionFor(type) === opt;
-              const label =
-                opt === "all" ? t(p.block("filters.all", TYPE_LABELS.all)) : t(TYPE_LABELS[opt]);
-              return (
-                <Link
-                  key={opt}
-                  to="/events"
-                  search={{ view: search.view, month: search.month, type: typeParamFor(opt) }}
-                  resetScroll={false}
-                  // exact：search 要完全相等才算「目前這一格」。預設是部分比對，/events?type=journey
-                  // 會讓「全部」（search 裡沒有 type）也被框架標成 active、多一個 aria-current。
-                  activeOptions={{ exact: true }}
-                  aria-current={active ? "page" : undefined}
-                  data-testid={`events-type-${opt}`}
-                  className={`${segBtn} min-w-16 ${
-                    active ? "bg-foreground text-primary-foreground" : "hover:bg-muted"
-                  }`}
-                >
-                  {label}
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
+      {/* 控制列：一排。左邊類型（文字分頁，選中畫底線），右邊月曆／列表圖示。 */}
+      <div className="container-editorial pb-6 md:pb-10">
+        <div className="flex items-center justify-between gap-4 border-b border-border">
+          <nav aria-label={t(TYPE_LABELS.aria)} data-testid="events-type-filter">
+            <ul className="flex items-center gap-5 text-sm tracking-widest md:gap-8">
+              {EVENTS_TYPE_OPTIONS.map((opt) => {
+                const active = optionFor(type) === opt;
+                const label =
+                  opt === "all" ? t(p.block("filters.all", TYPE_LABELS.all)) : t(TYPE_LABELS[opt]);
+                return (
+                  <li key={opt}>
+                    <Link
+                      to="/events"
+                      search={{ view: search.view, month: search.month, type: typeParamFor(opt) }}
+                      resetScroll={false}
+                      // exact：search 要完全相等才算「目前這一格」。預設是部分比對，/events?type=journey
+                      // 會讓「全部」（search 裡沒有 type）也被框架標成 active、多一個 aria-current。
+                      activeOptions={{ exact: true }}
+                      aria-current={active ? "page" : undefined}
+                      data-testid={`events-type-${opt}`}
+                      className={`-mb-px inline-flex min-h-11 items-center border-b-2 transition-colors ${
+                        active
+                          ? "border-foreground text-foreground"
+                          : "border-transparent text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
 
-        <nav aria-label={t(p.block("view.aria", VIEW_LABELS.aria))}>
-          <div className="inline-flex border border-foreground text-sm tracking-widest">
-            {(["list", "calendar"] as const).map((v) => {
-              const active = view === v;
-              // 自動模式、尚未掛載時：用斷點把「目前這一格」畫成選中（桌機月曆、手機列表）。
-              const autoCls =
-                view === null
-                  ? v === "calendar"
-                    ? "md:bg-foreground md:text-primary-foreground"
-                    : "max-md:bg-foreground max-md:text-primary-foreground"
-                  : active
-                    ? "bg-foreground text-primary-foreground"
-                    : "";
-              return (
-                <Link
-                  key={v}
-                  to="/events"
-                  search={
-                    v === "calendar" ? { view: v, month: search.month, type } : { view: v, type }
-                  }
-                  resetScroll={false}
-                  activeOptions={{ exact: true }}
-                  aria-current={active ? "page" : undefined}
-                  data-testid={`events-view-${v}`}
-                  className={`${segBtn} min-w-20 ${autoCls} ${
-                    active || view === null ? "" : "hover:bg-muted"
-                  }`}
-                >
-                  {t(p.block(`view.${v}`, VIEW_LABELS[v]))}
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
+          {view === null ? (
+            <>
+              {toggle("calendar", "md:hidden")}
+              {toggle("list", "max-md:hidden")}
+            </>
+          ) : (
+            toggle(view === "list" ? "calendar" : "list")
+          )}
+        </div>
       </div>
 
       {view !== "list" ? (
@@ -532,63 +501,22 @@ function Events() {
 
       {view !== "calendar" ? (
         <div className={view === null ? "md:hidden" : ""}>
-          <section
-            ref={filtersRef}
-            className="container-editorial pb-12 flex flex-wrap gap-3 text-xs tracking-widest scroll-mt-24"
-          >
-            {filterIds.map((f) => {
-              const label =
-                f === PAST_FILTER
-                  ? t(p.block("filters.past", PAST_LABEL))
-                  : t(p.block("filters.upcoming", UPCOMING_LABEL));
-              const active = filter === f;
-              return (
-                <button
-                  key={f}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setFilter(f)}
-                  className={`px-4 py-2 border transition-colors ${
-                    active
-                      ? "border-foreground bg-foreground text-primary-foreground"
-                      : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </section>
-
           {nothing ? (
-            <section className="container-editorial pb-32">
+            <section className="container-editorial pb-16">
               <div className="border border-border p-8 md:p-10">
                 <p className="text-sm leading-relaxed text-muted-foreground">{emptyText}</p>
-                {/* 只在「報名中是空的、而且真的有辦過」時才給這顆按鈕。
-                沒有這個條件的話，按下去只是換到另一頁空白 —— 那比沒有按鈕更糟。 */}
-                {!isPastTab && hasAnyPast ? (
-                  <button
-                    type="button"
-                    onClick={() => setFilter(PAST_FILTER)}
-                    className="mt-8 inline-block border border-foreground px-5 py-3 tracking-widest hover:bg-foreground hover:text-primary-foreground transition-colors text-base"
-                  >
-                    {t(p.block("seePast", SEE_PAST))}
-                  </button>
-                ) : null}
               </div>
             </section>
           ) : (
-            <div className="pb-20">
+            <div className="pb-8 md:pb-16">
               {journeyList.length > 0 ? (
                 <section
-                  className="container-editorial pb-12"
+                  className="container-editorial pb-10 md:pb-12"
                   data-testid="events-journeys-section"
                   aria-label={t(SECTION_LABELS.journey)}
                 >
-                  {sectioned ? (
-                    <SectionHeading label={t(SECTION_LABELS.journey)} count={journeyList.length} />
-                  ) : null}
-                  <div className={journeyLayout.grid}>
+                  {sectioned ? <SectionHeading label={t(SECTION_LABELS.journey)} /> : null}
+                  <div className={`${journeyLayout.grid} ${journeyRail.track}`}>
                     {journeyList.map((j) => {
                       const linked = linkedEventFor(j.externalUrl, journeyEvents);
                       return (
@@ -602,27 +530,30 @@ function Events() {
                               : undefined
                           }
                           layout={journeyLayout}
-                          pastBadge={isPastTab ? pastBadge : null}
+                          pastBadge={null}
+                          className={journeyRail.item}
                         />
                       );
                     })}
                   </div>
+                  <RailHint count={journeyList.length} />
                 </section>
               ) : null}
 
               {eventList.length > 0 ? (
                 <section
-                  className="container-editorial pb-12"
+                  className="container-editorial pb-10 md:pb-12"
                   data-testid="events-events-section"
                   aria-label={t(SECTION_LABELS.event)}
                 >
-                  {sectioned ? (
-                    <SectionHeading label={t(SECTION_LABELS.event)} count={eventList.length} />
-                  ) : null}
-                  <div className={eventLayout.grid}>
+                  {sectioned ? <SectionHeading label={t(SECTION_LABELS.event)} /> : null}
+                  <div className={`${eventLayout.grid} ${eventRail.track}`}>
                     {eventList.map((e) => (
                       // 整張卡片不是連結（唯一的連結是底下那顆「活動詳情」），所以不加 CARD_HOVER。
-                      <article key={e.id} className={`${CARD} ${eventLayout.card}`}>
+                      <article
+                        key={e.id}
+                        className={`${CARD} ${eventLayout.card} ${eventRail.item}`}
+                      >
                         {/* ⚠️ 先判斷 imageKey 非空**再**呼叫 imageFor()。imageFor(key, fallback)
                         永遠會回一張圖，順序反過來就是每一張卡片都長同一張不相干的照片
                         （見 EventEntry.imageKey）。沒設封面的活動就是沒有圖，不放佔位。 */}
@@ -637,38 +568,30 @@ function Events() {
                         {/* 按鈕靠摘要的 flex-1 推到卡片底部，同一列的按鈕因此對齊；只有一場時
                         featureLayout 給 summary 的 md:flex-none 會把它拿掉，讓整段文字在
                         橫版裡垂直置中（見 feature-layout.ts）。 */}
-                        <div className={`flex flex-1 flex-col p-6 ${eventLayout.body}`}>
-                          {/* 已結束要在卡片上看得出來 —— 分享出去的連結、從搜尋進來的人
-                          都不會看到那個分頁。分類字 2026-11-10 拿掉（業主：「活動分類功能都拿掉」）。 */}
-                          {isEventPast(e) || e.privateBooking ? (
-                            <p className="flex flex-wrap gap-2">
-                              {isEventPast(e) ? (
-                                <span className="border border-border px-2 py-0.5 text-xs tracking-widest text-muted-foreground">
-                                  {pastBadge}
-                                </span>
-                              ) : null}
-                              {/* 包場：不開放報名（src/lib/private-booking.ts）。 */}
-                              {e.privateBooking ? <PrivateBookingBadge /> : null}
-                            </p>
-                          ) : null}
+                        <div className={`flex flex-1 flex-col p-5 md:p-6 ${eventLayout.body}`}>
+                          {/* 包場：不開放報名（src/lib/private-booking.ts）。主體只放還沒結束的場次，
+                          所以這裡不再需要「已結束」小標（已結束的在最下方過往區）。 */}
+                          <div className="mb-3 flex flex-wrap gap-2 empty:hidden">
+                            {e.privateBooking ? <PrivateBookingBadge /> : null}
+                          </div>
                           {/* h2（2026-11 SEO 健檢 L4：原本 h1 直接跳 h3）；h1–h5 樣式相同，畫面不變。 */}
                           <h2
-                            className={`display text-2xl leading-snug ${isEventPast(e) || e.privateBooking ? "mt-4" : ""} ${eventLayout.title}`}
+                            className={`display text-xl leading-snug md:text-2xl ${eventLayout.title}`}
                           >
                             {t(e.title)}
                           </h2>
-                          <p className="mt-4 text-sm text-muted-foreground">{e.date}</p>
+                          <p className="mt-3 text-sm text-muted-foreground md:mt-4">{e.date}</p>
                           <p
-                            className={`mt-4 text-sm leading-relaxed text-foreground/75 flex-1 ${eventLayout.summary}`}
+                            className={`mt-3 line-clamp-3 text-sm leading-relaxed text-foreground/75 flex-1 md:mt-4 md:line-clamp-none ${eventLayout.summary}`}
                           >
                             {t(e.summary)}
                           </p>
                           {/* 只留站內的詳情頁（外部連結多半是 0001 的 example.com 種子資料）。 */}
-                          <div className="mt-8">
+                          <div className="mt-6 md:mt-8">
                             <Link
                               to="/events/$slug"
                               params={{ slug: e.slug }}
-                              className="inline-block border border-foreground px-5 py-3 tracking-widest hover:bg-foreground hover:text-primary-foreground transition-colors text-base"
+                              className="inline-flex min-h-11 items-center border border-foreground px-5 tracking-widest hover:bg-foreground hover:text-primary-foreground transition-colors text-base"
                             >
                               {t(p.block("detail", DETAIL))}
                             </Link>
@@ -677,13 +600,14 @@ function Events() {
                       </article>
                     ))}
                   </div>
+                  <RailHint count={eventList.length} />
                 </section>
               ) : null}
             </div>
           )}
 
-          {/* 只在「報名中」這一格畫：切到「已結束」時上面的列表就是完整版，再畫一次是重複。 */}
-          {!isPastTab ? (
+          {/* 過往：頁面最下方，取代原本頂部的「報名中／已結束」切換。零筆時 PastShelf 自己不畫。 */}
+          <div id="past" className="scroll-mt-24">
             <PastShelf
               testId="events-past-shelf"
               eyebrow={shelfCopy.eyebrow}
@@ -691,18 +615,20 @@ function Events() {
               badge={pastBadge}
               items={shelfItems}
               cta={
-                shelfCopy.cta ? (
+                allPast.length > PAST_SHELF_LIMIT ? (
                   <button
                     type="button"
-                    onClick={showAllPast}
-                    className="inline-block tracking-widest text-clay hover-underline text-base"
+                    onClick={() => setShowAllPast((v) => !v)}
+                    aria-expanded={showAllPast}
+                    className="inline-flex min-h-11 items-center tracking-widest text-clay hover-underline text-base"
                   >
-                    {shelfCopy.cta} →
+                    {showAllPast ? t(PAST_MORE.less) : `${t(PAST_MORE.more)}（${allPast.length}）`}{" "}
+                    →
                   </button>
                 ) : undefined
               }
             />
-          ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -736,12 +662,24 @@ function Events() {
   );
 }
 
-/** 「全部」時兩段（策旅／活動）各自的小標，樣式與首頁「近期活動與策旅」的小標一致。 */
-function SectionHeading({ label, count }: { label: string; count: number }) {
+/** 「全部」時兩段（策旅／活動）各自的小標。低調：細字、無計數。 */
+function SectionHeading({ label }: { label: string }) {
   return (
-    <div className="mb-6 flex items-baseline justify-between gap-6 border-b border-border pb-2 md:pb-3">
-      <h2 className="font-serif text-xl md:text-2xl">{label}</h2>
-      <span className="text-sm tracking-widest text-muted-foreground tabular-nums">{count}</span>
-    </div>
+    <h2 className="mb-4 font-serif text-lg text-foreground/80 md:mb-6 md:text-2xl">{label}</h2>
+  );
+}
+
+/** 手機橫滑列底下的提示。一張時不畫（不需要滑）；md 以上不畫（桌機是格線）。 */
+function RailHint({ count }: { count: number }) {
+  const t = useT();
+  if (count < 2) return null;
+  return (
+    <p
+      className="mt-3 text-xs tracking-[0.12em] text-muted-foreground md:hidden"
+      aria-hidden="true"
+    >
+      {t(RAIL_HINT).replace("{n}", String(count))}
+      <span className="ml-1">→</span>
+    </p>
   );
 }

@@ -35,6 +35,7 @@ export function JourneyCard({
   facts,
   layout,
   pastBadge,
+  className = "",
 }: {
   journey: JourneyCardData;
   /** 卡片指著的那場活動（日期、封面）。指不到 → null。 */
@@ -43,6 +44,8 @@ export function JourneyCard({
   layout: ReturnType<typeof featureLayout>;
   /** 已結束時印的小標文字；進行中為 null。 */
   pastBadge: string | null;
+  /** 外層再加的 class（/events 手機橫滑列的寬度與 snap，見 src/lib/card-rail.ts）。 */
+  className?: string;
 }) {
   const t = useT();
   const localizeHref = useLocalizeHref();
@@ -87,13 +90,13 @@ export function JourneyCard({
   return link ? (
     <a
       {...link}
-      className={`${CARD} ${layout.card} ${CARD_HOVER}`}
+      className={`${CARD} ${layout.card} ${CARD_HOVER} ${className}`}
       data-testid="events-journey-card"
     >
       {body}
     </a>
   ) : (
-    <article className={`${CARD} ${layout.card}`} data-testid="events-journey-card">
+    <article className={`${CARD} ${layout.card} ${className}`} data-testid="events-journey-card">
       {body}
     </article>
   );

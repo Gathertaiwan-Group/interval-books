@@ -199,8 +199,9 @@ const shelf = readFile("src/components/PastShelf.tsx");
 const cms = readFile("src/lib/cms.ts");
 check("/events 用 PastShelf", eventsIndex.includes("<PastShelf"), true);
 check(
-  "/events 過往活動沿用同一份 events（newestEndedFirst(events)）",
-  eventsIndex.includes("newestEndedFirst(events)"),
+  // 2026-11-10 過往區可展開看全部，limit 給整份 events 的長度。
+  "/events 過往活動沿用同一份 events（newestEndedFirst(events, …)）",
+  eventsIndex.includes("newestEndedFirst(events, events.length)"),
   true,
 );
 check(
@@ -216,8 +217,9 @@ check(
   true,
 );
 check(
-  "/events 查看全部切到既有的已結束分頁",
-  eventsIndex.includes("setFilter(PAST_FILTER);"),
+  // 2026-11-10 頂部「報名中／已結束」切換拿掉；過往區多的按「看全部過往」就地展開。
+  "/events 過往區可展開看全部（不再切到已結束分頁）",
+  eventsIndex.includes("setShowAllPast((v) => !v)") && !eventsIndex.includes("PAST_FILTER"),
   true,
 );
 check(

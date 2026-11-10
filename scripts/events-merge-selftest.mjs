@@ -170,11 +170,70 @@ checkTrue(
   ),
 );
 checkTrue(
-  "列表／月曆切換鈕保留 type",
-  eventsCode.includes("{ view: v, month: search.month, type }") &&
-    eventsCode.includes("{ view: v, type }"),
+  "月曆／列表切換鈕保留 type（與 month）",
+  eventsCode.includes("{ view: target, month: search.month, type }") &&
+    eventsCode.includes("{ view: target, type }"),
 );
-checkTrue("報名中／已結束分區沿用（PAST_FILTER）", eventsCode.includes("PAST_FILTER"));
+
+// 2026-11-10 業主：「篩選設計現在太複雜，我要畫面簡潔；活動卡片用左右滑動。」
+console.log("\n[2b] 手機版簡化：一排控制、無報名中／已結束切換、橫滑卡片");
+checkTrue(
+  "頂部「報名中／已結束」切換拿掉",
+  !eventsCode.includes("PAST_FILTER") && !/UPCOMING_LABEL|PAST_LABEL/.test(eventsCode),
+);
+checkTrue("主體只放還沒結束的活動", eventsCode.includes("events.filter((e) => !isEventPast(e))"));
+checkTrue(
+  "已結束的在最下方過往區（PastShelf，id=past）",
+  /id="past"[\s\S]*<PastShelf/.test(eventsCode),
+);
+checkTrue(
+  "月曆／列表是一顆圖示鈕（CalendarDays／List）",
+  eventsCode.includes("<CalendarDays") && eventsCode.includes("<List "),
+);
+checkTrue(
+  "圖示鈕有 aria-label（切換月曆／切換列表）",
+  eventsCode.includes("aria-label={t(VIEW_LABELS.toggle[target])}") &&
+    eventsIndex.includes('zh: "切換月曆"'),
+);
+checkTrue("圖示鈕點擊區 ≥44px（h-11 w-11）", eventsCode.includes("h-11 w-11"));
+checkTrue(
+  "類型分頁點擊區 ≥44px、選中用底線（無粗黑框）",
+  eventsCode.includes("min-h-11 items-center border-b-2") &&
+    !eventsCode.includes("border border-foreground text-sm tracking-widest"),
+);
+checkTrue(
+  "活動列與策旅列都用橫滑（cardRail）",
+  eventsCode.includes("cardRail(eventList.length)") &&
+    eventsCode.includes("cardRail(journeyList.length)"),
+);
+checkTrue("區塊小標不再印計數", !/SectionHeading[^>]*count=/.test(eventsCode));
+checkTrue(
+  "頁首手機收斂（compact＋clampIntro）",
+  /<PageHeader\s+compact\s+clampIntro/.test(eventsCode),
+);
+const { cardRail, RAIL_HINT } = await import(
+  pathToFileURL(join(ROOT, "src/lib/card-rail.ts")).href
+);
+check("一張卡：不橫滑", cardRail(1), { track: "", item: "" });
+checkTrue(
+  "兩張以上：82% 寬＋snap",
+  cardRail(2).item.includes("max-md:w-[82%]") &&
+    cardRail(2).track.includes("max-md:snap-mandatory"),
+);
+checkTrue(
+  "橫滑 class 全部帶 max-md:（桌機交回 featureLayout）",
+  [...cardRail(3).track.split(/\s+/), ...cardRail(3).item.split(/\s+/)].every((c) =>
+    c.startsWith("max-md:"),
+  ),
+);
+check("滑動提示文案", RAIL_HINT.zh, "共 {n} 則，左右滑動看更多");
+checkTrue(
+  "過往區的包場活動也標「包場」（PastShelfItem.privateBooking）",
+  eventsCode.includes("privateBooking: e.privateBooking,") &&
+    strip(readFile("src/components/PastShelf.tsx")).includes(
+      "{item.privateBooking ? <PrivateBookingBadge /> : null}",
+    ),
+);
 checkTrue("策旅卡片用 JourneyCard", eventsCode.includes("<JourneyCard"));
 checkTrue("策旅合作共創只在 type=journey", eventsCode.includes('{type === "journey" ? ('));
 checkTrue(

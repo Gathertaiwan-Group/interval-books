@@ -30,6 +30,7 @@ export function PageHeader({
   title,
   intro,
   compact = false,
+  clampIntro = false,
 }: {
   eyebrow: string;
   title: string;
@@ -39,6 +40,11 @@ export function PageHeader({
    * md 以上與預設完全相同。目前只有 /shop 用（2026-11 手機版優化）。
    */
   compact?: boolean;
+  /**
+   * 只影響手機：介紹文最多兩行（多的截斷）。文字本身來自 CMS，不改內容只改樣式。
+   * 目前只有 /events 用（2026-11-10 業主：手機版要簡潔，第一張卡片要進首屏）。
+   */
+  clampIntro?: boolean;
 }) {
   return (
     <section
@@ -56,7 +62,7 @@ export function PageHeader({
         <p
           className={`max-w-2xl md:mt-8 md:text-lg md:leading-[1.9] text-muted-foreground ${
             compact ? "mt-3 text-sm leading-[1.8]" : "mt-8 text-base leading-[1.9]"
-          }`}
+          } ${clampIntro ? "max-md:line-clamp-2" : ""}`}
         >
           {intro}
         </p>
