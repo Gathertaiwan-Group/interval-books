@@ -247,6 +247,43 @@ function distinctLocalized(session: CalLocalized, event: CalLocalized): CalLocal
 }
 
 /**
+ * 要向 server 補讀「已關閉場次」的活動代稱：只送**可能還沒結束**的活動，免得代稱一多就超過
+ * 每次 50 個的上限（超過時呼叫端仍會分批）。包場排最前面。判準（任一成立就送）：
+ *   · anon 讀得到的場次裡有一場還沒結束（結束時間──沒填就是開始時間──在現在之後；
+ *     進行中的多天行程也算）；
+ *   · iso_date 在「今天往前 MAX_SPAN_DAYS 天」之後（多天行程 iso_date 常填第一天、全部場次
+ *     又是關閉的，留一段寬限才不會漏掉進行中的那幾天）；
+ *   · 兩者都讀不到（沒有 open 場次、也沒有 iso_date）→ 不知道，送。
+ * 已結束的活動不送：月曆往回翻到過去的月份時，那些活動只剩 open 場次（關閉的不補）。
+ */
+export function closedLookupSlugs(
+  events: ReadonlyArray<Pick<RawCalendarEvent, "slug" | "isoDate" | "privateBooking">>,
+  sessions: ReadonlyArray<Pick<RawCalendarSession, "productSlug" | "startsAt" | "endsAt">>,
+  nowMs: number,
+): string[] {
+  const latestEndBySlug = new Map<string, number>();
+  for (const s of sessions) {
+    const end = Date.parse(s.endsAt ?? "") || Date.parse(s.startsAt);
+    if (!Number.isFinite(end)) continue;
+    const prev = latestEndBySlug.get(s.productSlug);
+    if (prev === undefined || end > prev) latestEndBySlug.set(s.productSlug, end);
+  }
+  const graceDate = addDays(taipeiDateAt(nowMs), -MAX_SPAN_DAYS);
+  const keep = (e: Pick<RawCalendarEvent, "slug" | "isoDate">) => {
+    const end = latestEndBySlug.get(`event-${e.slug}`);
+    const iso = e.isoDate && DATE_RE.test(e.isoDate) ? e.isoDate : null;
+    if (end !== undefined && end > nowMs) return true;
+    if (iso && iso >= graceDate) return true;
+    return end === undefined && iso === null;
+  };
+  const picked = events.filter((e) => e.slug && keep(e));
+  return [
+    ...picked.filter((e) => e.privateBooking).map((e) => e.slug),
+    ...picked.filter((e) => !e.privateBooking).map((e) => e.slug),
+  ];
+}
+
+/**
  * 把活動與場次組成月曆的筆數，依時間排序。
  *
  *   · 有場次的活動：一個場次一筆（同一活動多場次各自出現）。日期以 starts_at 的台北日期為準。

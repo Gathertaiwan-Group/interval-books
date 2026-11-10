@@ -31,6 +31,11 @@ export type ListingFacts = {
    * 不印「已額滿／最後 N 位」。由 listingFactsForCard() 依活動的旗標蓋上去。
    */
   privateBooking?: boolean;
+  /**
+   * 報名截止：活動的下一個尚未結束的場次是關閉的（非包場，見 upcoming-order.ts
+   * nextSessionClosedSlugs）。true 時卡片只標「報名截止」，不印票價、不印名額狀態（比照包場）。
+   */
+  registrationClosed?: boolean;
 };
 
 /** 包場活動的卡片：沒有票價、沒有名額狀態，只有「包場」。 */
@@ -41,15 +46,26 @@ export const PRIVATE_BOOKING_FACTS: ListingFacts = {
   privateBooking: true,
 };
 
+/** 報名截止的卡片：沒有票價、沒有名額狀態，只有「報名截止」。 */
+export const REGISTRATION_CLOSED_FACTS: ListingFacts = {
+  price: 0,
+  soldOut: false,
+  fewLeft: null,
+  registrationClosed: true,
+};
+
 /**
  * 卡片要用的 facts：活動是包場 → 一律 PRIVATE_BOOKING_FACTS（蓋過商品讀到的票價與名額）；
- * 否則照 fetchListingFacts() 的結果。
+ * 下一個未結束場次報名截止（registrationClosed，呼叫端用 nextSessionClosedSlugs 算）→
+ * REGISTRATION_CLOSED_FACTS；否則照 fetchListingFacts() 的結果。
  */
 export function listingFactsForCard(
   event: { privateBooking?: boolean } | null | undefined,
   facts: ListingFacts | undefined,
+  registrationClosed: boolean = false,
 ): ListingFacts | undefined {
   if (event?.privateBooking) return PRIVATE_BOOKING_FACTS;
+  if (event && registrationClosed) return REGISTRATION_CLOSED_FACTS;
   return facts;
 }
 

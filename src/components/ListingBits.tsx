@@ -11,6 +11,7 @@ import { useT } from "@/i18n/LanguageContext";
 import type { ListingFacts } from "@/lib/home-listing";
 import { formatPrice } from "@/lib/shop";
 import { PRIVATE_BOOKING_COPY } from "@/lib/private-booking";
+import { REGISTRATION_CLOSED_LABEL } from "@/lib/upcoming-order";
 
 const LISTING_COPY = {
   free: { zh: "免費", en: "Free", ja: "無料" },
@@ -38,6 +39,8 @@ export function ListingBadge({ facts }: { facts: ListingFacts | undefined }) {
   if (!facts) return null;
   // 包場優先：不是「額滿」也不是「報名中」，是根本不開放報名。
   if (facts.privateBooking) return <PrivateBookingBadge />;
+  // 報名截止：下一個場次已關閉、活動照常舉辦。不印額滿／名額。
+  if (facts.registrationClosed) return <RegistrationClosedBadge />;
   if (facts.soldOut) {
     return (
       <span className="-my-1 shrink-0 border border-border px-2 py-0.5 text-xs tracking-[0.1em] text-muted-foreground">
@@ -66,6 +69,19 @@ export function PrivateBookingBadge() {
   );
 }
 
+/** 「報名截止」小標（首頁、/events 卡片）。 */
+export function RegistrationClosedBadge() {
+  const t = useT();
+  return (
+    <span
+      className="-my-1 shrink-0 border border-border px-2 py-0.5 text-xs tracking-[0.1em] text-muted-foreground"
+      data-registration-closed="true"
+    >
+      {t(REGISTRATION_CLOSED_LABEL)}
+    </span>
+  );
+}
+
 /**
  * 卡片底部一列：左邊票價，右邊「查看 →」。整張卡本來就是連結，這一列只是讓人一眼看到
  * 價格與下一步。facts 讀不到時只剩右邊的箭頭；cta 為 null（策旅沒設連結）時只剩左邊。
@@ -79,8 +95,8 @@ export function ListingFooter({
   cta: string | null;
 }) {
   const t = useT();
-  // 包場：不印票價（左邊留空）。
-  const priced = facts && !facts.privateBooking ? facts : undefined;
+  // 包場、報名截止：不印票價（左邊留空）。
+  const priced = facts && !facts.privateBooking && !facts.registrationClosed ? facts : undefined;
   if (!priced && !cta) return null;
   return (
     <div className="mt-5 flex min-h-11 items-center justify-between gap-3 border-t border-border/70 pt-3 md:mt-6 md:pt-4">

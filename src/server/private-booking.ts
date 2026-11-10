@@ -59,6 +59,9 @@ export async function readPrivateSessionTimes(
     .from("products")
     .select("source_id, event_sessions(id, title, location, starts_at, ends_at)")
     .eq("source_type", "event")
+    // 加固：只讀上架中（active）的票券商品。活動 live 時 trigger 會讓商品是 active（0052），
+    // 這一條讓兩邊萬一不同步時也不會讀到下架商品的場次。
+    .eq("status", "active")
     .in("source_id", [...slugById.keys()]);
   if (productError) throw new Error(`[private-booking] products：${productError.message}`);
 
@@ -119,6 +122,9 @@ export async function readClosedSessionTimes(
     .from("products")
     .select("source_id, event_sessions(id, title, location, starts_at, ends_at, status)")
     .eq("source_type", "event")
+    // 加固：只讀上架中（active）的票券商品。活動 live 時 trigger 會讓商品是 active（0052），
+    // 這一條讓兩邊萬一不同步時也不會讀到下架商品的場次。
+    .eq("status", "active")
     .in("source_id", [...slugById.keys()]);
   if (productError) throw new Error(`[calendar-closed] products：${productError.message}`);
 
@@ -146,4 +152,65 @@ export async function readClosedSessionTimes(
     out[slug] = list;
   }
   return out;
+}
+
+// =============================================================================
+// 60 秒記憶體快取（伺服器端、每個 instance 各自一份）
+// =============================================================================
+//
+// 月曆／首頁／活動頁的 loader 在 SSR 直接呼叫（不經公開 server fn）；客端換頁（換月、
+// 從首頁點進 /events）時 loader 在瀏覽器跑，才走公開的 server fn。兩條路都經過這裡，
+// 同一組代稱 60 秒內只打一次資料庫（Vercel 函式 CPU 曾超量被暫停）。
+// key = 種類 + 排序後的代稱列表；存的是 Promise（同時進來的請求共用一趟），失敗立刻丟掉。
+// 最多 CACHE_MAX 個 key，滿了先清過期的、再不夠就清掉最舊的。
+
+export const SESSION_TIMES_CACHE_TTL_MS = 60_000;
+const CACHE_MAX = 200;
+type CacheEntry = { at: number; value: Promise<Record<string, PrivateSessionTime[]>> };
+const sessionTimesCache = new Map<string, CacheEntry>();
+
+export function sessionTimesCacheKey(kind: string, slugs: string[]): string {
+  return `${kind}:${[...new Set(slugs)].sort().join(",")}`;
+}
+
+function cachedRead(
+  kind: string,
+  slugs: string[],
+  load: (slugs: string[]) => Promise<Record<string, PrivateSessionTime[]>>,
+  now: number = Date.now(),
+): Promise<Record<string, PrivateSessionTime[]>> {
+  if (slugs.length === 0) return Promise.resolve({});
+  const key = sessionTimesCacheKey(kind, slugs);
+  const hit = sessionTimesCache.get(key);
+  if (hit && now - hit.at < SESSION_TIMES_CACHE_TTL_MS) return hit.value;
+  if (sessionTimesCache.size >= CACHE_MAX) {
+    for (const [k, v] of sessionTimesCache) {
+      if (now - v.at >= SESSION_TIMES_CACHE_TTL_MS) sessionTimesCache.delete(k);
+    }
+    while (sessionTimesCache.size >= CACHE_MAX) {
+      const oldest = sessionTimesCache.keys().next().value;
+      if (oldest === undefined) break;
+      sessionTimesCache.delete(oldest);
+    }
+  }
+  const value = load(slugs);
+  sessionTimesCache.set(key, { at: now, value });
+  value.catch(() => {
+    if (sessionTimesCache.get(key)?.value === value) sessionTimesCache.delete(key);
+  });
+  return value;
+}
+
+/** readClosedSessionTimes 加 60 秒快取。代稱請先過 sanitizePrivateSlugs。 */
+export function readClosedSessionTimesCached(
+  slugs: string[],
+): Promise<Record<string, PrivateSessionTime[]>> {
+  return cachedRead("closed", slugs, readClosedSessionTimes);
+}
+
+/** readPrivateSessionTimes 加 60 秒快取。代稱請先過 sanitizePrivateSlugs。 */
+export function readPrivateSessionTimesCached(
+  slugs: string[],
+): Promise<Record<string, PrivateSessionTime[]>> {
+  return cachedRead("private", slugs, readPrivateSessionTimes);
 }

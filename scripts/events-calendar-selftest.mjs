@@ -29,6 +29,7 @@ import {
   dayLabel,
   rangeLabel,
   eventSlugForProduct,
+  closedLookupSlugs,
 } from "../src/lib/events-calendar.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -602,7 +603,7 @@ check("日期標籤 en", dayLabel("2026-11-24", "en"), "Tue, Nov 24");
   const fns = read("src/lib/private-booking-fns.ts");
   checkTrue(
     "server fn：輸入先截 50、再過 sanitizePrivateSlugs",
-    /getClosedSessionTimes[\s\S]*slice\(0, 50\)[\s\S]*readClosedSessionTimes\(sanitizePrivateSlugs\(data\.slugs\)\)/.test(
+    /slice\(0, MAX_SLUGS_PER_CALL\)[\s\S]*getClosedSessionTimes = createServerFn[\s\S]*\.inputValidator\(validateSlugs\)[\s\S]*readClosedSessionTimesCached\(sanitizePrivateSlugs\(data\.slugs\)\)/.test(
       fns,
     ),
   );
@@ -610,6 +611,56 @@ check("日期標籤 en", dayLabel("2026-11-24", "en"), "Tue, Nov 24");
     "service role 只在 server 端（fns 動態 import server 模組）",
     !/supabase-admin|supabaseAdmin/.test(fns) &&
       read("src/server/private-booking.ts").includes('import "@tanstack/react-start/server-only";'),
+  );
+}
+
+// ── 補讀關閉場次：只送尚未結束的活動 ─────────────────────────────────────
+{
+  const NOWL = Date.parse("2026-11-10T04:00:00Z"); // 台北 11/10 12:00
+  const evs = [
+    { slug: "future-open", isoDate: "2026-11-01" }, // iso 舊，但有未結束的 open 場次
+    { slug: "past", isoDate: "2026-09-01" }, // 已結束
+    { slug: "past-open", isoDate: null }, // open 場次都結束了
+    { slug: "multi", isoDate: "2026-11-05" }, // 多天行程進行中（iso 填第一天、場次全關）→ 寬限 14 天
+    { slug: "upcoming", isoDate: "2026-12-04" },
+    { slug: "unknown", isoDate: null }, // 沒 open 場次也沒日期 → 送
+    { slug: "tea", isoDate: "2026-11-17", privateBooking: true },
+    { slug: "old-private", isoDate: "2026-08-01", privateBooking: true },
+  ];
+  const ss = [
+    { productSlug: "event-future-open", startsAt: "2026-11-20T06:00:00Z", endsAt: null },
+    {
+      productSlug: "event-past-open",
+      startsAt: "2026-10-01T06:00:00Z",
+      endsAt: "2026-10-01T08:00:00Z",
+    },
+    { productSlug: "event-past", startsAt: "2026-09-01T06:00:00Z", endsAt: null },
+  ];
+  check(
+    "只送未結束（含進行中多天、未知），包場排最前，已結束的不送",
+    closedLookupSlugs(evs, ss, NOWL),
+    ["tea", "future-open", "multi", "upcoming", "unknown"],
+  );
+  check(
+    "進行中的 open 場次（開始已過、結束未到）也算未結束",
+    closedLookupSlugs(
+      [{ slug: "now", isoDate: "2026-10-01" }],
+      [
+        {
+          productSlug: "event-now",
+          startsAt: "2026-11-09T06:00:00Z",
+          endsAt: "2026-11-11T06:00:00Z",
+        },
+      ],
+      NOWL,
+    ),
+    ["now"],
+  );
+  const many = Array.from({ length: 80 }, (_, i) => ({ slug: `p${i}`, isoDate: "2026-01-01" }));
+  check(
+    "大量已結束活動不會被送出（避免超過 50 上限）",
+    closedLookupSlugs([...many, { slug: "next", isoDate: "2026-12-01" }], [], NOWL),
+    ["next"],
   );
 }
 

@@ -11,8 +11,8 @@
  *      （eventSlugForProduct）。
  *
  * anon 的 RLS 只放行「active 商品的 open 場次」（0020）。已關閉的場次（報名截止、包場）
- * 由 server fn（fetchClosedSessionTimes → src/server/private-booking.ts#readClosedSessionTimes，
- * service role、只回 live 活動、只有時間與地點）補回來，標「報名截止」／「包場」——
+ * 由 fetchClosedSessionTimes（SSR 直接呼叫 src/server/private-booking.ts#readClosedSessionTimes，
+ * 客端走公開 server fn；service role、只回 live 活動、只有時間與地點）補回來，標「報名截止」／「包場」——
  * 所以月曆與 /calendar.ics 收的是同一批場次。
  *
  * ── 🔴 額滿 ───────────────────────────────────────────────────────────────
@@ -29,6 +29,7 @@ import { isPrivateBooking } from "@/lib/private-booking";
 import { fetchClosedSessionTimes } from "@/lib/private-booking-fns";
 import {
   buildCalendarEntries,
+  closedLookupSlugs,
   eventSlugForProduct,
   type CalLocalized,
   type CalendarEntry,
@@ -137,13 +138,11 @@ export async function fetchCalendarEntries(nowMs: number): Promise<CalendarData>
       }
     }
 
-    // 已關閉的場次（報名截止、包場）：anon 讀不到，時間另由 server fn 用 service role 讀回來
-    // （只回 live 活動的 closed 場次、只有時間與地點）。包場的代稱排前面——server fn 最多收
-    // MAX_PRIVATE_SLUGS 個，超過時優先保住包場（它們的場次一定是 closed）。
-    const closedSlugs = [
-      ...events.filter((e) => e.privateBooking).map((e) => e.slug),
-      ...events.filter((e) => !e.privateBooking).map((e) => e.slug),
-    ];
+    // 已關閉的場次（報名截止、包場）：anon 讀不到，時間另由 service role 讀回來（只回 live
+    // 活動的 closed 場次、只有時間與地點）。SSR 時直接呼叫 server 端（不經公開 server fn），
+    // 客端換月才走 server fn；兩邊都有 60 秒快取（src/lib/private-booking-fns.ts）。
+    // 只送可能還沒結束的活動（closedLookupSlugs，包場排前面），超過 50 個時分批。
+    const closedSlugs = closedLookupSlugs(events, sessions, nowMs);
     if (closedSlugs.length > 0) {
       const times = await fetchClosedSessionTimes(closedSlugs);
       const seen = new Set(sessions.map((s) => s.id));

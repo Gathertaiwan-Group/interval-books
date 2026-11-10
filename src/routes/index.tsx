@@ -30,7 +30,7 @@ import { pageHead } from "@/lib/seo/head";
 import { pageRowTranslation } from "@/lib/seo/pages";
 import { linkedEventFor, newestEndedFirst, splitJourneys } from "@/lib/past-shelf";
 import { fetchCalendarEntries } from "@/lib/events-calendar-data";
-import { nextStartBySlug, sortByNextStart } from "@/lib/upcoming-order";
+import { nextSessionClosedSlugs, nextStartBySlug, sortByNextStart } from "@/lib/upcoming-order";
 
 /** Fallback copy — used only when the Supabase read fails. */
 const PAGE_META = {
@@ -249,7 +249,19 @@ export const Route = createFileRoute("/")({
         fetchCalendarEntries(Date.now()),
       ]);
     const nextStarts = Object.fromEntries(nextStartBySlug(calendar.entries));
-    return { page, events, journeys, journeyEvents, shelf, archive, listing, nextStarts };
+    // 下一個未結束場次是「報名截止」的活動（卡片標報名截止、不印票價；排序不變）。
+    const closedNext = [...nextSessionClosedSlugs(calendar.entries)];
+    return {
+      page,
+      events,
+      journeys,
+      journeyEvents,
+      shelf,
+      archive,
+      listing,
+      nextStarts,
+      closedNext,
+    };
   },
   head: ({ loaderData, matches, match }) => {
     const p = pageText(loaderData?.page ?? null);
@@ -274,7 +286,7 @@ export const Route = createFileRoute("/")({
 function Index() {
   const t = useT();
   const localizeHref = useLocalizeHref();
-  const { page, events, journeys, journeyEvents, shelf, archive, listing, nextStarts } =
+  const { page, events, journeys, journeyEvents, shelf, archive, listing, nextStarts, closedNext } =
     Route.useLoaderData();
   const shelfProducts = shelf.products;
 
@@ -499,7 +511,11 @@ function Index() {
                           平常不印、整行不佔高度。 */}
                       <div className="flex items-start justify-end gap-3 empty:hidden">
                         <ListingBadge
-                          facts={listingFactsForCard(e, listing[eventProductSlug(e.slug)])}
+                          facts={listingFactsForCard(
+                            e,
+                            listing[eventProductSlug(e.slug)],
+                            closedNext.includes(e.slug),
+                          )}
                         />
                       </div>
                       <h3
@@ -517,7 +533,11 @@ function Index() {
                       </p>
                       <div aria-hidden="true" className={`flex-1 ${eventsLayout.summary}`} />
                       <ListingFooter
-                        facts={listingFactsForCard(e, listing[eventProductSlug(e.slug)])}
+                        facts={listingFactsForCard(
+                          e,
+                          listing[eventProductSlug(e.slug)],
+                          closedNext.includes(e.slug),
+                        )}
                         cta={t(ui.buttons.viewEvent)}
                       />
                     </div>
@@ -571,6 +591,7 @@ function Index() {
                                 ? listingFactsForCard(
                                     linked,
                                     listing[eventProductSlug(linked.slug)],
+                                    closedNext.includes(linked.slug),
                                   )
                                 : undefined
                             }
@@ -591,7 +612,11 @@ function Index() {
                         <ListingFooter
                           facts={
                             linked
-                              ? listingFactsForCard(linked, listing[eventProductSlug(linked.slug)])
+                              ? listingFactsForCard(
+                                  linked,
+                                  listing[eventProductSlug(linked.slug)],
+                                  closedNext.includes(linked.slug),
+                                )
                               : undefined
                           }
                           cta={link ? t(ui.buttons.toJourney) : null}

@@ -25,6 +25,16 @@ const SELF = "scripts/private-booking-selftest.mjs";
 
 registerHooks({
   resolve(spec, ctx, next) {
+    // [9]：server 讀取與快取用的替身（不碰資料庫）。
+    if (spec === "@tanstack/react-start/server-only") {
+      return { url: "data:text/javascript,export {};", shortCircuit: true };
+    }
+    if (spec === "@/server/supabase-admin") {
+      return {
+        url: "data:text/javascript,export const supabaseAdmin = () => globalThis.__fakeDb;",
+        shortCircuit: true,
+      };
+    }
     if (spec === "@/lib/supabase") {
       return { url: "data:text/javascript,export const supabase = null;", shortCircuit: true };
     }
@@ -186,10 +196,10 @@ const n = entries.find((e) => e.slug === "normal");
 check("一般活動：額滿照舊、不是包場", [n?.full, n?.privateBooking], [true, false]);
 const calData = readFile("src/lib/events-calendar-data.ts");
 checkTrue(
-  "月曆資料：讀 notes、包場代稱排前面交給 server fn 補關閉場次時間",
+  "月曆資料：讀 notes、只送未結束活動（包場排前面）補關閉場次時間",
   calData.includes('.select("id,slug,title,external_url,iso_date,notes")') &&
     calData.includes("privateBooking: isPrivateBooking(r.notes)") &&
-    /\.\.\.events\.filter\(\(e\) => e\.privateBooking\)[\s\S]*fetchClosedSessionTimes\(closedSlugs\)/.test(
+    /closedLookupSlugs\(events, sessions, nowMs\)[\s\S]*fetchClosedSessionTimes\(closedSlugs\)/.test(
       calData,
     ),
 );
@@ -227,18 +237,25 @@ checkTrue(
 );
 checkTrue(
   "ListingFooter：包場不印票價",
-  bits.includes("const priced = facts && !facts.privateBooking ? facts : undefined;"),
+  bits.includes(
+    "const priced = facts && !facts.privateBooking && !facts.registrationClosed ? facts : undefined;",
+  ),
 );
 const home = readFile("src/routes/index.tsx");
 checkTrue(
   "首頁活動卡：badge 與 footer 都走 listingFactsForCard",
-  (home.match(/listingFactsForCard\(e, listing\[eventProductSlug\(e\.slug\)\]\)/g) ?? []).length ===
-    2,
+  (
+    home.match(
+      /listingFactsForCard\(\s*e,\s*listing\[eventProductSlug\(e\.slug\)\],\s*closedNext\.includes\(e\.slug\),?\s*\)/g,
+    ) ?? []
+  ).length === 2,
 );
 const evIndex = readFile("src/routes/events.index.tsx");
 checkTrue(
   "/events 活動卡：標「包場」",
-  evIndex.includes("{e.privateBooking ? <PrivateBookingBadge /> : null}"),
+  /\{e\.privateBooking \? \(\s*<PrivateBookingBadge \/>\s*\) : closedNext\.has\(e\.slug\) \? \(\s*<RegistrationClosedBadge \/>\s*\) : null\}/.test(
+    evIndex,
+  ),
 );
 const cms = readFile("src/lib/cms.ts");
 checkTrue(
@@ -332,6 +349,260 @@ checkTrue(
   "server 不再查分類來補主題",
   !/getEventCategoryById/.test(readFile("src/server/event-quick-create.ts")),
 );
+
+// ── [9] 已關閉場次：server 讀取範圍、60 秒快取、SSR 直呼、分批 ─────────────
+console.log("\n[9] 已關閉場次：server 讀取、快取、SSR 直呼、分批");
+{
+  const calls = [];
+  let failNext = false;
+  const rows = {
+    events: [{ id: "ev-talk", slug: "talk", notes: { zh: [], en: [], ja: [] } }],
+    products: [
+      {
+        source_id: "ev-talk",
+        event_sessions: [
+          {
+            id: "s-open",
+            title: { zh: "開放", en: "", ja: "" },
+            location: { zh: "書店", en: "", ja: "" },
+            starts_at: "2026-11-20T06:00:00Z",
+            ends_at: null,
+            status: "open",
+          },
+          {
+            id: "s-closed",
+            title: { zh: "截止", en: "", ja: "" },
+            location: { zh: "書店", en: "", ja: "" },
+            starts_at: "2026-11-21T06:00:00Z",
+            ends_at: "2026-11-21T08:00:00Z",
+            status: "closed",
+            capacity: 20,
+            seats_taken: 3,
+          },
+        ],
+      },
+    ],
+  };
+  globalThis.__fakeDb = {
+    from(table) {
+      const q = { table, filters: [], select: null };
+      calls.push(q);
+      const b = {
+        select(cols) {
+          q.select = cols;
+          return b;
+        },
+        in(col, vals) {
+          q.filters.push(["in", col, vals]);
+          return b;
+        },
+        eq(col, val) {
+          q.filters.push(["eq", col, val]);
+          return b;
+        },
+        then(res, rej) {
+          if (failNext) {
+            failNext = false;
+            return Promise.resolve({ data: null, error: { message: "boom" } }).then(res, rej);
+          }
+          return Promise.resolve({ data: rows[table] ?? [], error: null }).then(res, rej);
+        },
+      };
+      return b;
+    },
+  };
+  const srv = await imp("src/server/private-booking.ts");
+  const got = await srv.readClosedSessionTimes(["talk"]);
+  check("只回 closed 場次，欄位只有 id/title/location/startsAt/endsAt", got, {
+    talk: [
+      {
+        id: "s-closed",
+        title: { zh: "截止", en: "", ja: "" },
+        location: { zh: "書店", en: "", ja: "" },
+        startsAt: "2026-11-21T06:00:00Z",
+        endsAt: "2026-11-21T08:00:00Z",
+      },
+    ],
+  });
+  const evQ = calls.find((c) => c.table === "events");
+  const prQ = calls.find((c) => c.table === "products");
+  checkTrue(
+    "events 查詢：只讀 live",
+    evQ.filters.some((f) => f[0] === "eq" && f[1] === "status" && f[2] === "live"),
+  );
+  checkTrue(
+    "🔴 products 查詢加固：source_type=event 且 status=active",
+    prQ.filters.some((f) => f[0] === "eq" && f[1] === "source_type" && f[2] === "event") &&
+      prQ.filters.some((f) => f[0] === "eq" && f[1] === "status" && f[2] === "active"),
+  );
+  checkTrue("products 不 select 名額欄位", !/capacity|seats_taken/.test(prQ.select));
+
+  // 包場版本也有 status=active
+  calls.length = 0;
+  rows.events = [
+    { id: "ev-talk", slug: "talk", notes: { zh: [], en: [], ja: [], private_booking: true } },
+  ];
+  await srv.readPrivateSessionTimes(["talk"]);
+  checkTrue(
+    "🔴 包場版本 products 查詢也加 status=active",
+    calls
+      .find((c) => c.table === "products")
+      ?.filters.some((f) => f[0] === "eq" && f[1] === "status" && f[2] === "active"),
+  );
+
+  // 60 秒快取：同一組代稱（順序不同）只打一次；不同種類分開；失敗不快取
+  calls.length = 0;
+  await srv.readClosedSessionTimesCached(["x1", "x2"]);
+  await srv.readClosedSessionTimesCached(["x2", "x1"]);
+  check(
+    "快取：同一組代稱（順序不同）60 秒內只查一次",
+    calls.filter((c) => c.table === "events").length,
+    1,
+  );
+  await srv.readPrivateSessionTimesCached(["x1", "x2"]);
+  check("快取：closed 與 private 分開", calls.filter((c) => c.table === "events").length, 2);
+  check("快取 key：排序、去重", srv.sessionTimesCacheKey("closed", ["b", "a", "b"]), "closed:a,b");
+  check("快取 TTL = 60 秒", srv.SESSION_TIMES_CACHE_TTL_MS, 60_000);
+  calls.length = 0;
+  failNext = true;
+  let threw = false;
+  try {
+    await srv.readClosedSessionTimesCached(["y1"]);
+  } catch {
+    threw = true;
+  }
+  await srv.readClosedSessionTimesCached(["y1"]);
+  check(
+    "快取：失敗不留在快取（下一次重查）",
+    [threw, calls.filter((c) => c.table === "events").length],
+    [true, 2],
+  );
+
+  // fns：SSR 直呼 server、客端才走公開 server fn；分批
+  const fnsSrc = readFile("src/lib/private-booking-fns.ts");
+  checkTrue(
+    "SSR：createIsomorphicFn().server 直接呼叫 readClosedSessionTimesCached（不經公開 server fn）",
+    /const readClosedTimes = createIsomorphicFn\(\)\s*\.server\([\s\S]*?readClosedSessionTimesCached\(sanitizePrivateSlugs\(slugs\)\)[\s\S]*?\.client\([\s\S]*?getClosedSessionTimes\(/.test(
+      fnsSrc,
+    ),
+  );
+  checkTrue(
+    "SSR：包場同樣直呼 readPrivateSessionTimesCached",
+    /const readPrivateTimes = createIsomorphicFn\(\)\s*\.server\([\s\S]*?readPrivateSessionTimesCached\(sanitizePrivateSlugs\(slugs\)\)[\s\S]*?\.client\([\s\S]*?getPrivateSessionTimes\(/.test(
+      fnsSrc,
+    ),
+  );
+  checkTrue(
+    "公開 server fn 也走快取版本",
+    /getClosedSessionTimes = createServerFn[\s\S]*?readClosedSessionTimesCached\(sanitizePrivateSlugs\(data\.slugs\)\)/.test(
+      fnsSrc,
+    ) &&
+      /getPrivateSessionTimes = createServerFn[\s\S]*?readPrivateSessionTimesCached\(sanitizePrivateSlugs\(data\.slugs\)\)/.test(
+        fnsSrc,
+      ),
+  );
+  checkTrue(
+    "fns 不直接 import server 模組（只在 .server／handler 裡動態 import）",
+    !/^import .*@\/server\//m.test(fnsSrc),
+  );
+  const fns = await imp("src/lib/private-booking-fns.ts");
+  check("每次最多 50 個代稱", fns.MAX_SLUGS_PER_CALL, 50);
+  const many = Array.from({ length: 120 }, (_, i) => `e${i}`);
+  check(
+    "分批：120 個 → 50／50／20，去重",
+    fns.chunkSlugs([...many, "e0"]).map((b) => b.length),
+    [50, 50, 20],
+  );
+  checkTrue(
+    "fetchClosedSessionTimes 分批平行呼叫",
+    /fetchClosedSessionTimes[\s\S]*readInBatches\(slugs, readClosedTimes/.test(fnsSrc) &&
+      /chunkSlugs\(slugs\)\.map/.test(fnsSrc),
+  );
+}
+
+// ── [10] 卡片：報名截止 ──────────────────────────────────────────────────
+console.log("\n[10] 卡片：下一場報名截止");
+{
+  const uo = await imp("src/lib/upcoming-order.ts");
+  const NOWX = Date.parse("2026-11-10T04:00:00Z");
+  const e = (key, slug, iso, extra = {}) => ({
+    key,
+    slug,
+    sortMs: Date.parse(iso),
+    ended: Date.parse(iso) < NOWX,
+    ...extra,
+  });
+  const set = uo.nextSessionClosedSlugs([
+    e("a1", "a", "2026-11-20T06:00:00Z", { registrationClosed: true }),
+    e("a2", "a", "2026-11-27T06:00:00Z"),
+    e("b1", "b", "2026-11-20T06:00:00Z"),
+    e("b2", "b", "2026-11-27T06:00:00Z", { registrationClosed: true }),
+    e("c0", "c", "2026-11-01T06:00:00Z"),
+    e("c1", "c", "2026-11-25T06:00:00Z", { registrationClosed: true }),
+    e("d1", "d", "2026-11-25T06:00:00Z", { registrationClosed: true }),
+    e("d2", "d", "2026-11-25T06:00:00Z"),
+    { key: "event:z", slug: "z", sortMs: Date.parse("2026-11-25T00:00:00Z"), ended: false },
+  ]);
+  check(
+    "下一個未結束場次是 closed → a、c；下一場開放 → b 不算；同時刻有一場開放 → d 不算",
+    [...set].sort(),
+    ["a", "c"],
+  );
+  check(
+    "排序照舊：報名截止的場次仍是下一場（不跳過）",
+    uo
+      .nextStartBySlug([
+        e("a1", "a", "2026-11-20T06:00:00Z", { registrationClosed: true }),
+        e("a2", "a", "2026-11-27T06:00:00Z"),
+      ])
+      .get("a"),
+    Date.parse("2026-11-20T06:00:00Z"),
+  );
+  check("三語", uo.REGISTRATION_CLOSED_LABEL, {
+    zh: "報名截止",
+    en: "Registration closed",
+    ja: "受付終了",
+  });
+  const facts = { price: 500, soldOut: false, fewLeft: 2 };
+  check(
+    "報名截止 → REGISTRATION_CLOSED_FACTS（不印票價／名額）",
+    hl.listingFactsForCard({}, facts, true),
+    hl.REGISTRATION_CLOSED_FACTS,
+  );
+  check(
+    "包場優先於報名截止",
+    hl.listingFactsForCard({ privateBooking: true }, facts, true),
+    hl.PRIVATE_BOOKING_FACTS,
+  );
+  check("沒截止 → 原 facts", hl.listingFactsForCard({}, facts, false), facts);
+  check("預設參數 → 原 facts（舊呼叫不變）", hl.listingFactsForCard({}, facts), facts);
+  const bits = readFile("src/components/ListingBits.tsx");
+  checkTrue(
+    "ListingBadge：包場之後、額滿之前畫報名截止",
+    /facts\.privateBooking\) return <PrivateBookingBadge \/>;[\s\S]*facts\.registrationClosed\) return <RegistrationClosedBadge \/>;[\s\S]*facts\.soldOut/.test(
+      bits,
+    ),
+  );
+  checkTrue(
+    "ListingFooter：報名截止不印票價",
+    bits.includes(
+      "facts && !facts.privateBooking && !facts.registrationClosed ? facts : undefined",
+    ),
+  );
+  const home = readFile("src/routes/index.tsx");
+  checkTrue(
+    "首頁：loader 算 closedNext，活動卡與策旅卡都傳進 listingFactsForCard",
+    home.includes("const closedNext = [...nextSessionClosedSlugs(calendar.entries)];") &&
+      (home.match(/closedNext\.includes\((e|linked)\.slug\)/g) ?? []).length === 4,
+  );
+  const evp = readFile("src/routes/events.index.tsx");
+  checkTrue(
+    "/events：活動卡標報名截止、策旅卡傳 closedNext",
+    evp.includes("const closedNext = nextSessionClosedSlugs(calendar.entries);") &&
+      evp.includes("<RegistrationClosedBadge />") &&
+      evp.includes("closedNext.has(linked.slug)"),
+  );
+}
 
 console.log("\n────────────────────────────────────────────────────");
 console.log(`##SELFTEST## file=${SELF} pass=${pass} fail=${fail}`);

@@ -46,10 +46,10 @@ import { fetchListingFacts, listingFactsForCard } from "@/lib/home-listing";
 import { eventProductSlug } from "@/lib/shop";
 import { journeyLinkProps } from "@/lib/journey-link";
 import { JourneyCard } from "@/components/events/JourneyCard";
-import { PrivateBookingBadge } from "@/components/ListingBits";
+import { PrivateBookingBadge, RegistrationClosedBadge } from "@/components/ListingBits";
 import { cardRail, RAIL_HINT } from "@/lib/card-rail";
 import { splitAtComma } from "@/lib/title-break";
-import { nextStartBySlug, sortByNextStart } from "@/lib/upcoming-order";
+import { nextSessionClosedSlugs, nextStartBySlug, sortByNextStart } from "@/lib/upcoming-order";
 import eventImg from "@/assets/event-reading.jpg";
 import journeyImg from "@/assets/journey-mist.jpg";
 
@@ -333,6 +333,8 @@ function Events() {
   // 由近到遠：下一個尚未結束的場次開始時間（月曆資料，含包場場次）；沒有場次時間的排最後。
   // 規則見 src/lib/upcoming-order.ts（2026-11-10 業主：「活動都是先顯示日期最近的」）。
   const nextStarts = nextStartBySlug(calendar.entries);
+  // 下一個未結束場次是「報名截止」的活動：卡片標報名截止（排序不變）。
+  const closedNext = nextSessionClosedSlugs(calendar.entries);
   const eventList = wantEvents
     ? sortByNextStart(
         events.filter((e) => !isEventPast(e)),
@@ -545,7 +547,11 @@ function Events() {
                           linked={linked}
                           facts={
                             linked
-                              ? listingFactsForCard(linked, listing[eventProductSlug(linked.slug)])
+                              ? listingFactsForCard(
+                                  linked,
+                                  listing[eventProductSlug(linked.slug)],
+                                  closedNext.has(linked.slug),
+                                )
                               : undefined
                           }
                           layout={journeyLayout}
@@ -591,7 +597,11 @@ function Events() {
                           {/* 包場：不開放報名（src/lib/private-booking.ts）。主體只放還沒結束的場次，
                           所以這裡不再需要「已結束」小標（已結束的在最下方過往區）。 */}
                           <div className="mb-3 flex flex-wrap gap-2 empty:hidden">
-                            {e.privateBooking ? <PrivateBookingBadge /> : null}
+                            {e.privateBooking ? (
+                              <PrivateBookingBadge />
+                            ) : closedNext.has(e.slug) ? (
+                              <RegistrationClosedBadge />
+                            ) : null}
                           </div>
                           {/* h2（2026-11 SEO 健檢 L4：原本 h1 直接跳 h3）；h1–h5 樣式相同，畫面不變。 */}
                           <h2
