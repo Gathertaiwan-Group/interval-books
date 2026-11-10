@@ -207,10 +207,29 @@ checkTrue(
     eventsCode.includes("cardRail(journeyList.length)"),
 );
 checkTrue("區塊小標不再印計數", !/SectionHeading[^>]*count=/.test(eventsCode));
+// 2026-11-10 頁首新文案夠短：說明不截斷；標題在逗號後換行（不從詞中間斷）。
+checkTrue("頁首手機收斂（compact）", /<PageHeader\s+compact\b/.test(eventsCode));
+checkTrue("說明文不截斷（沒有 clampIntro／line-clamp）", !/clampIntro/.test(eventsCode));
 checkTrue(
-  "頁首手機收斂（compact＋clampIntro）",
-  /<PageHeader\s+compact\s+clampIntro/.test(eventsCode),
+  "標題用 splitAtComma 切成 inline-block",
+  eventsCode.includes("splitAtComma(t(p.title(PAGE.title)))") &&
+    eventsCode.includes('className="inline-block"'),
 );
+const { splitAtComma } = await import(pathToFileURL(join(ROOT, "src/lib/title-break.ts")).href);
+check("標題切分（中）", splitAtComma("在書店相遇，走進台灣的土地"), [
+  "在書店相遇，",
+  "走進台灣的土地",
+]);
+check("標題切分（英）", splitAtComma("Meet at the bookstore, step into Taiwan"), [
+  "Meet at the bookstore,",
+  "step into Taiwan",
+]);
+check("標題切分（日）", splitAtComma("本屋で出会い、台湾の土地へ"), [
+  "本屋で出会い、",
+  "台湾の土地へ",
+]);
+check("沒有逗號 → 原樣", splitAtComma("閱讀"), ["閱讀"]);
+check("只在第一個逗號切", splitAtComma("甲，乙，丙"), ["甲，", "乙，丙"]);
 const { cardRail, RAIL_HINT } = await import(
   pathToFileURL(join(ROOT, "src/lib/card-rail.ts")).href
 );

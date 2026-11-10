@@ -48,6 +48,7 @@ import { journeyLinkProps } from "@/lib/journey-link";
 import { JourneyCard } from "@/components/events/JourneyCard";
 import { PrivateBookingBadge } from "@/components/ListingBits";
 import { cardRail, RAIL_HINT } from "@/lib/card-rail";
+import { splitAtComma } from "@/lib/title-break";
 import eventImg from "@/assets/event-reading.jpg";
 import journeyImg from "@/assets/journey-mist.jpg";
 
@@ -431,10 +432,14 @@ function Events() {
     <PageShell>
       <PageHeader
         compact
-        clampIntro
         // 只放頁名（2026-11-10 手機簡化：「EVENTS & JOURNEYS ／ 活動與策旅」在 390 寬會折行）。
         eyebrow={t(NAME)}
-        title={t(p.title(PAGE.title))}
+        // 在逗號後換行（「在書店相遇，／走進台灣的土地」），不會從詞中間斷；三語都適用。
+        title={splitAtComma(t(p.title(PAGE.title))).map((part, i) => (
+          <span key={i} className="inline-block">
+            {part}
+          </span>
+        ))}
         intro={t(p.intro(PAGE.intro))}
       />
 
