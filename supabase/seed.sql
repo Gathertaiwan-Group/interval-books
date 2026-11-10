@@ -137,27 +137,8 @@ values
   ('ct-2', '{"zh":"器物與陶","en":"Vessels & Clay","ja":"器と陶"}'::jsonb, '{"zh":"每一只都是職人手中緩慢的時間。","en":"Each piece, the slow time of a maker''s hands.","ja":"ひとつひとつが、職人の手のなかの緩やかな時間。"}'::jsonb, 2),
   ('ct-3', '{"zh":"茶與日常","en":"Tea & Daily","ja":"茶と日々"}'::jsonb, '{"zh":"讀一頁書，配一口靜。","en":"A page of reading, a sip of quiet.","ja":"一頁の読書に、ひと口の静けさを。"}'::jsonb, 3);
 
-insert into public.curated_items
-  (theme_id, name, note, sort_order)
-values
-  ('ct-1', '{"zh":"山村釀造．桂花蜜","en":"Mountain Village Osmanthus Honey","ja":"山村醸造 桂花蜜"}'::jsonb, '{"zh":"南投手工小批次","en":"Small batch from Nantou","ja":"南投の小ロット"}'::jsonb, 1),
-  ('ct-1', '{"zh":"東海岸海鹽","en":"East Coast Sea Salt","ja":"東海岸の海塩"}'::jsonb, '{"zh":"粗粒、慢曬","en":"Coarse, slow-dried","ja":"粗粒、ゆっくり天日干し"}'::jsonb, 2),
-  ('ct-1', '{"zh":"苗栗黑糖磚","en":"Miaoli Brown Sugar Block","ja":"苗栗の黒糖ブロック"}'::jsonb, '{"zh":"古法柴燒","en":"Wood-fired the old way","ja":"古法の薪焚き"}'::jsonb, 3),
-  ('ct-1', '{"zh":"阿里山高山茶","en":"Alishan High Mountain Tea","ja":"阿里山高山茶"}'::jsonb, '{"zh":"春摘．烏龍","en":"Spring pick · Oolong","ja":"春摘み・烏龍"}'::jsonb, 4),
-  ('ct-1', '{"zh":"金門高粱醋","en":"Kinmen Sorghum Vinegar","ja":"金門高粱酢"}'::jsonb, '{"zh":"陳年三年","en":"Aged three years","ja":"三年熟成"}'::jsonb, 5),
-  ('ct-1', '{"zh":"花蓮米果","en":"Hualien Rice Cracker","ja":"花蓮の米菓"}'::jsonb, '{"zh":"在地稻米製","en":"Made with local rice","ja":"地の米から"}'::jsonb, 6),
-  ('ct-2', '{"zh":"粗陶茶碗","en":"Stoneware Tea Bowl","ja":"粗陶の茶碗"}'::jsonb, '{"zh":"手捏．不規則口緣","en":"Hand-pinched, irregular rim","ja":"手びねり・不揃いの縁"}'::jsonb, 1),
-  ('ct-2', '{"zh":"白瓷小皿","en":"White Porcelain Small Dish","ja":"白磁の小皿"}'::jsonb, '{"zh":"釉下青花","en":"Underglaze blue-and-white","ja":"釉下の青花"}'::jsonb, 2),
-  ('ct-2', '{"zh":"黑陶花器","en":"Black Clay Vase","ja":"黒陶の花器"}'::jsonb, '{"zh":"燻燒．霧面","en":"Smoke-fired, matte","ja":"燻し焼き・マット"}'::jsonb, 3),
-  ('ct-2', '{"zh":"木製茶則","en":"Wooden Tea Scoop","ja":"木の茶則"}'::jsonb, '{"zh":"台灣相思木","en":"Taiwanese acacia","ja":"台湾相思木"}'::jsonb, 4),
-  ('ct-2', '{"zh":"亞麻織布巾","en":"Linen Cloth","ja":"リネンの布巾"}'::jsonb, '{"zh":"天然染","en":"Naturally dyed","ja":"天然染め"}'::jsonb, 5),
-  ('ct-2', '{"zh":"鑄鐵燭台","en":"Cast Iron Candlestick","ja":"鋳鉄の燭台"}'::jsonb, '{"zh":"霧黑塗裝","en":"Matte black finish","ja":"マットブラック仕上げ"}'::jsonb, 6),
-  ('ct-3', '{"zh":"手工焙茶包","en":"Hand-roasted Tea Bags","ja":"手焙煎ティーバッグ"}'::jsonb, '{"zh":"三入裝","en":"Set of three","ja":"三入り"}'::jsonb, 1),
-  ('ct-3', '{"zh":"海鹽可可","en":"Sea Salt Cocoa","ja":"海塩ココア"}'::jsonb, '{"zh":"70% 黑巧克力","en":"70% dark chocolate","ja":"70% ダーク"}'::jsonb, 2),
-  ('ct-3', '{"zh":"奶油酥餅","en":"Butter Shortbread","ja":"バターショートブレッド"}'::jsonb, '{"zh":"古早味．小份量","en":"Old-fashioned, small","ja":"昔ながら・小ぶり"}'::jsonb, 3),
-  ('ct-3', '{"zh":"蜂蜜檸檬糖","en":"Honey Lemon Drops","ja":"はちみつレモン飴"}'::jsonb, '{"zh":"台南龍眼蜜","en":"Tainan longan honey","ja":"台南の龍眼蜜"}'::jsonb, 4),
-  ('ct-3', '{"zh":"杏仁脆片","en":"Almond Crisps","ja":"アーモンドクリスプ"}'::jsonb, '{"zh":"薄．脆．香","en":"Thin, crisp, fragrant","ja":"薄く・香ばしく"}'::jsonb, 5),
-  ('ct-3', '{"zh":"桂圓紅棗茶","en":"Longan & Date Tea","ja":"竜眼と紅棗の茶"}'::jsonb, '{"zh":"冬季限定","en":"Winter only","ja":"冬季限定"}'::jsonb, 6);
+-- curated_items：原本 18 件範例選品（蜂蜜、茶碗之類的示意品名）不是真的商品，2026-11-10 業主要求
+-- 移除假資料，正式庫已刪除，這裡也不再種。真的選品由後台新增。
 
 -- collaborations --------------------------------------------------------------
 -- src/data/content.ts:517-566. Source has no ids; co-1..co-N assigned by order.
@@ -291,7 +272,7 @@ commit;
 --   journeys             3
 --   news                 3
 --   curated_themes       3
---   curated_items       18
+--   curated_items        0
 --   collaborations       4
 --   pages               11
 --   page_blocks         47

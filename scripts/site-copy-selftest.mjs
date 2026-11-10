@@ -18,6 +18,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const SELF = "scripts/site-copy-selftest.mjs";
 
 let pass = 0;
 let fail = 0;
@@ -170,6 +171,26 @@ checkTrue(
     files.partnership.includes('zh: "我們做過的合作類型"'),
 );
 
+// =============================================================================
+console.log("\n[4] 假資料移除（業主 2026-11-10）：程式後備與 seed 不再有範例選品");
+// =============================================================================
+{
+  const content = readFile("src/data/content.ts");
+  const seed = readFile("supabase/seed.sql");
+  for (const name of ["山村釀造．桂花蜜", "粗陶茶碗", "海鹽可可", "桂圓紅棗茶"]) {
+    checkFalse(`src/data/content.ts 不再有「${name}」`, content.includes(name));
+    checkFalse(`supabase/seed.sql 不再有「${name}」`, seed.includes(name));
+  }
+  const data = await import(pathToFileURL(join(ROOT, "src/data/content.ts")).href);
+  check(
+    "後備主題保留三個，底下沒有任何品項",
+    data.curatedThemes.map((t) => t.items.length),
+    [0, 0, 0],
+  );
+  checkFalse("seed.sql 不再 insert curated_items", /insert into public\.curated_items/.test(seed));
+}
+
+console.log(`\n##SELFTEST## file=${SELF} pass=${pass} fail=${fail}`);
 console.log("");
 if (fail > 0) {
   console.log(red(`✗ ${fail} failed, ${pass} passed`));

@@ -52,6 +52,9 @@ export const events: EventItem[] = [];
 
 export const journeys: JourneyItem[] = [];
 
+// 2026-11-10 業主要求移除假資料：原本每個主題底下各 6 件的範例選品（蜂蜜、茶碗之類的示意品名）
+// 已從正式庫 curated_items 刪除，這裡的後備也一併拿掉——讀不到資料庫時不能又冒出假品名。
+// 主題本身保留（後台還有這三個主題，之後主理人放真的選品進去）。
 export const curatedThemes: CuratedTheme[] = [
   {
     id: "ct-1",
@@ -61,36 +64,7 @@ export const curatedThemes: CuratedTheme[] = [
       en: "From a local journal to a jar of home-cooked jam.",
       ja: "地方誌から、自家製のジャムまで。",
     },
-    items: [
-      {
-        name: {
-          zh: "山村釀造．桂花蜜",
-          en: "Mountain Village Osmanthus Honey",
-          ja: "山村醸造 桂花蜜",
-        },
-        note: { zh: "南投手工小批次", en: "Small batch from Nantou", ja: "南投の小ロット" },
-      },
-      {
-        name: { zh: "東海岸海鹽", en: "East Coast Sea Salt", ja: "東海岸の海塩" },
-        note: { zh: "粗粒、慢曬", en: "Coarse, slow-dried", ja: "粗粒、ゆっくり天日干し" },
-      },
-      {
-        name: { zh: "苗栗黑糖磚", en: "Miaoli Brown Sugar Block", ja: "苗栗の黒糖ブロック" },
-        note: { zh: "古法柴燒", en: "Wood-fired the old way", ja: "古法の薪焚き" },
-      },
-      {
-        name: { zh: "阿里山高山茶", en: "Alishan High Mountain Tea", ja: "阿里山高山茶" },
-        note: { zh: "春摘．烏龍", en: "Spring pick · Oolong", ja: "春摘み・烏龍" },
-      },
-      {
-        name: { zh: "金門高粱醋", en: "Kinmen Sorghum Vinegar", ja: "金門高粱酢" },
-        note: { zh: "陳年三年", en: "Aged three years", ja: "三年熟成" },
-      },
-      {
-        name: { zh: "花蓮米果", en: "Hualien Rice Cracker", ja: "花蓮の米菓" },
-        note: { zh: "在地稻米製", en: "Made with local rice", ja: "地の米から" },
-      },
-    ],
+    items: [],
   },
   {
     id: "ct-2",
@@ -100,36 +74,7 @@ export const curatedThemes: CuratedTheme[] = [
       en: "Each piece, the slow time of a maker's hands.",
       ja: "ひとつひとつが、職人の手のなかの緩やかな時間。",
     },
-    items: [
-      {
-        name: { zh: "粗陶茶碗", en: "Stoneware Tea Bowl", ja: "粗陶の茶碗" },
-        note: {
-          zh: "手捏．不規則口緣",
-          en: "Hand-pinched, irregular rim",
-          ja: "手びねり・不揃いの縁",
-        },
-      },
-      {
-        name: { zh: "白瓷小皿", en: "White Porcelain Small Dish", ja: "白磁の小皿" },
-        note: { zh: "釉下青花", en: "Underglaze blue-and-white", ja: "釉下の青花" },
-      },
-      {
-        name: { zh: "黑陶花器", en: "Black Clay Vase", ja: "黒陶の花器" },
-        note: { zh: "燻燒．霧面", en: "Smoke-fired, matte", ja: "燻し焼き・マット" },
-      },
-      {
-        name: { zh: "木製茶則", en: "Wooden Tea Scoop", ja: "木の茶則" },
-        note: { zh: "台灣相思木", en: "Taiwanese acacia", ja: "台湾相思木" },
-      },
-      {
-        name: { zh: "亞麻織布巾", en: "Linen Cloth", ja: "リネンの布巾" },
-        note: { zh: "天然染", en: "Naturally dyed", ja: "天然染め" },
-      },
-      {
-        name: { zh: "鑄鐵燭台", en: "Cast Iron Candlestick", ja: "鋳鉄の燭台" },
-        note: { zh: "霧黑塗裝", en: "Matte black finish", ja: "マットブラック仕上げ" },
-      },
-    ],
+    items: [],
   },
   {
     id: "ct-3",
@@ -139,32 +84,7 @@ export const curatedThemes: CuratedTheme[] = [
       en: "A page of reading, a sip of quiet.",
       ja: "一頁の読書に、ひと口の静けさを。",
     },
-    items: [
-      {
-        name: { zh: "手工焙茶包", en: "Hand-roasted Tea Bags", ja: "手焙煎ティーバッグ" },
-        note: { zh: "三入裝", en: "Set of three", ja: "三入り" },
-      },
-      {
-        name: { zh: "海鹽可可", en: "Sea Salt Cocoa", ja: "海塩ココア" },
-        note: { zh: "70% 黑巧克力", en: "70% dark chocolate", ja: "70% ダーク" },
-      },
-      {
-        name: { zh: "奶油酥餅", en: "Butter Shortbread", ja: "バターショートブレッド" },
-        note: { zh: "古早味．小份量", en: "Old-fashioned, small", ja: "昔ながら・小ぶり" },
-      },
-      {
-        name: { zh: "蜂蜜檸檬糖", en: "Honey Lemon Drops", ja: "はちみつレモン飴" },
-        note: { zh: "台南龍眼蜜", en: "Tainan longan honey", ja: "台南の龍眼蜜" },
-      },
-      {
-        name: { zh: "杏仁脆片", en: "Almond Crisps", ja: "アーモンドクリスプ" },
-        note: { zh: "薄．脆．香", en: "Thin, crisp, fragrant", ja: "薄く・香ばしく" },
-      },
-      {
-        name: { zh: "桂圓紅棗茶", en: "Longan & Date Tea", ja: "竜眼と紅棗の茶" },
-        note: { zh: "冬季限定", en: "Winter only", ja: "冬季限定" },
-      },
-    ],
+    items: [],
   },
 ];
 
