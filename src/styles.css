@@ -4,6 +4,33 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* 字型 fallback 的度量校正（2026-11 字型載入優化）。
+   網頁字型（Google Fonts，display=swap）還沒到的那一瞬間，拉丁字先用系統的 Times New Roman／Arial
+   畫，但用 size-adjust／ascent／descent 把它們調到跟 Cormorant Garamond／Inter 一樣寬、一樣高，
+   字型換上來時行寬與斷行幾乎不變（降低 CLS）。
+   數值是用 fontTools 從 Google 實際供應的 latin 分片（Cormorant wght 400、Inter wght 400）
+   對系統字算出來的；unicode-range 只列「網頁字型與系統字都有」的字元，所以網頁字型載入後
+   這兩個 fallback 一個字都不會畫到——最終畫面與沒有它們時逐像素相同。
+   中文不做：中文字一律方塊等寬，行高又由 line-height 固定，換字時幾乎不位移。 */
+@font-face {
+  font-family: "Cormorant Garamond Fallback";
+  src: local("Times New Roman"), local("TimesNewRomanPSMT");
+  size-adjust: 96.87%;
+  ascent-override: 95.39%;
+  descent-override: 29.63%;
+  line-gap-override: 0%;
+  unicode-range: U+0020-007E, U+00A0-00B4, U+00B6-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+2002, U+2009, U+200B, U+2013-2014, U+2018-201A, U+201C-201E, U+2022, U+2026, U+2032-2033, U+2039-203A, U+2044, U+20AC, U+2122, U+2191, U+2193, U+2212;
+}
+@font-face {
+  font-family: "Inter Fallback";
+  src: local("Arial"), local("ArialMT");
+  size-adjust: 107.23%;
+  ascent-override: 90.34%;
+  descent-override: 22.49%;
+  line-gap-override: 0%;
+  unicode-range: U+0020-007E, U+00A0-00AC, U+00AE-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+2002, U+2009, U+200B, U+2013-2014, U+2018-201A, U+201C-201E, U+2022, U+2026, U+2032-2033, U+2039-203A, U+2044, U+20AC, U+2122, U+2191, U+2193, U+2212;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -36,8 +63,8 @@
   --color-clay: var(--clay);
   --color-ink: var(--ink);
 
-  --font-serif: "Cormorant Garamond", "Noto Serif TC", Georgia, serif;
-  --font-sans: "Inter", "Noto Sans TC", system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", "Cormorant Garamond Fallback", "Noto Serif TC", Georgia, serif;
+  --font-sans: "Inter", "Inter Fallback", "Noto Sans TC", system-ui, sans-serif;
 }
 
 /**

@@ -166,9 +166,16 @@ export const Route = createRootRoute({
         { rel: "stylesheet", href: appCss },
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+        // Google Fonts（2026-11 字型載入優化）：
+        // - 四個字族都是可變字型，Google 對 300／400／500 三個字重給的是「同一批」woff2。用
+        //   wght@300..500 範圍寫法，CSS 每個 unicode-range 分片只宣告一次（不是每個字重各一次），
+        //   這支會擋渲染的 CSS 從 ~290KB(gzip) 降到 ~70KB；字型檔與畫面完全不變（逐像素比對過）。
+        // - 拿掉 Noto Sans JP：站上沒有任何 font-family 用到它（日文版的假名也是 Noto Sans TC 畫的），
+        //   之前只是白白多出 ~90KB 的 @font-face 宣告。
+        // - 不 preload 任何 woff2：gstatic 的檔名帶版本會變，中文又切成上百個分片。
         {
           rel: "stylesheet",
-          href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Inter:wght@300;400;500&family=Noto+Sans+TC:wght@300;400;500&family=Noto+Sans+JP:wght@300;400;500&family=Noto+Serif+TC:wght@300;400;500&display=swap",
+          href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300..500&family=Inter:wght@300..500&family=Noto+Sans+TC:wght@300..500&family=Noto+Serif+TC:wght@300..500&display=swap",
         },
         { rel: "icon", type: "image/png", href: "/logo.png" },
         { rel: "apple-touch-icon", href: "/logo.png" },
