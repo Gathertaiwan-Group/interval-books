@@ -528,6 +528,11 @@ console.log("\n[7] LCP：只有首屏第一張卡優先載入（2026-11-10 Light
     (cover.match(/loading=\{load\}/g) ?? []).length,
     2,
   );
+  check(
+    "模糊底與前景同一個 fetchPriority（同一網址只下載一次，不能以低優先序開始）",
+    (cover.match(/fetchPriority=\{priority \? "high" : undefined\}/g) ?? []).length,
+    2,
+  );
   const ev = strip(readFile("src/routes/events.index.tsx"));
   checkTrue("策旅段第一張 priority", ev.includes("priority={listPriority && i === 0}"));
   checkTrue(

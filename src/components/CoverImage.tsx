@@ -27,8 +27,8 @@ type CoverImageProps = {
   height?: number;
   /**
    * 首屏的那一張（例：/events 第一張卡片）：前景圖 eager＋fetchPriority="high"（React 19 會在
-   * <head> 自動輸出 preload），模糊底也改 eager——兩層是同一個網址、同一次下載，模糊底不會
-   * 晚於前景圖才畫出來，於是不再以 lazy 的身分成為很晚才完成的 LCP。
+   * <head> 自動輸出 preload），模糊底同樣 eager＋high——兩層是同一個網址、同一次下載，模糊底不會
+   * 晚於前景圖才畫出來，也不會讓那一次下載以低優先序開始。
    * 預設 false：其他頁、其他卡片行為完全不變（照 loading 參數，通常是 lazy）。
    * 一頁最多給一張，給多了等於沒有優先順序。
    */
@@ -55,6 +55,10 @@ export function CoverImage({
         alt=""
         aria-hidden="true"
         loading={load}
+        // 模糊底在 DOM 裡排在前面、而且比前景大（scale-110），瀏覽器先發現的、Lighthouse 判定為
+        // LCP 的都是它。同一個網址只下載一次，所以兩層給一樣的優先序，不然那一次下載會以模糊底的
+        // 低優先序開始（2026-11-10 量到：priority 只給前景時，請求仍是 Low）。
+        fetchPriority={priority ? "high" : undefined}
         decoding="async"
         className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-60 blur-2xl"
       />
