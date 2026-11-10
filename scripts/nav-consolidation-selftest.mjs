@@ -726,7 +726,9 @@ walk(ast.footer.program, (n) => {
 });
 checkTrue("footer 的資料來自 useSiteContent()（與舊 /contact 同一份來源）", footerFromSiteContent);
 
-for (const ident of ["contactEmail", "phones", "siteUrl"]) {
+// 2026-11-10 footer 精簡（業主要求）：intervalbooks.tw 文字連結拿掉（訪客已在本站），
+// 所以不再要求 siteUrl；電話只留市話（landline），手機號碼不在 footer 顯示。
+for (const ident of ["contactEmail", "landline"]) {
   checkTrue(`footer 有 ${ident}`, footerIdents.has(ident));
 }
 for (const path of [
@@ -748,13 +750,26 @@ walk(ast.footer.program, (n) => {
 });
 checkTrue("footer 的 email 是可點的 mailto:", footerMailto);
 checkTrue("footer 的電話是可點的 tel:", footerTel);
-// 兩支電話是 .map() 出來的：只驗「有 phones 這個字」不夠，那在解構那一行就成立了。
+// 市話是從 phones 挑出來的（phones.find），不是寫死號碼；手機（phones.map 全畫）刻意不出現。
+let footerLandlineFromPhones = false;
 let footerPhonesMapped = false;
 walk(ast.footer.program, (n) => {
-  if (n.type === "CallExpression" && memberPath(n.callee) === "phones.map")
-    footerPhonesMapped = true;
+  if (n.type !== "CallExpression") return;
+  const callee = memberPath(n.callee);
+  if (callee === "phones.find") footerLandlineFromPhones = true;
+  if (callee === "phones.map") footerPhonesMapped = true;
 });
-checkTrue("footer 真的把每一支電話都畫出來（phones.map）", footerPhonesMapped);
+checkTrue(
+  "footer 的市話從 useSiteContent 的 phones 挑出來（phones.find）",
+  footerLandlineFromPhones,
+);
+checkFalse(
+  "footer 不把每一支電話都畫出來（手機號碼不在 footer，業主 2026-11-10）",
+  footerPhonesMapped,
+);
+for (const path of ["map.link"]) {
+  checkTrue(`footer 有 ${path}（地址整行與地圖 icon 都連去地圖）`, footerPaths.has(path));
+}
 
 // =============================================================================
 // [6] 首頁的站內連結指向新家

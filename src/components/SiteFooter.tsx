@@ -1,60 +1,77 @@
 import { Link } from "@tanstack/react-router";
-import { Facebook, Instagram } from "lucide-react";
-import { useT } from "@/i18n/LanguageContext";
+import { Clock, Facebook, Instagram, Mail, Map as MapIcon, MapPin, Phone } from "lucide-react";
+import { useLang } from "@/i18n/LanguageContext";
 import { useSiteContent } from "@/lib/site-content";
 
+// 44px 圓形 icon 按鈕（點擊區 ≥44px）。
+const ICON_BTN =
+  "inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/70 transition-colors hover:border-foreground hover:text-foreground";
+
+// footer 專用的兩個小字串（三語）。只在這個元件用，不進 CMS。
+const DAILY = { zh: "每日", en: "Daily", ja: "毎日" };
+const CALL = { zh: "致電", en: "Call", ja: "電話" };
+
+/** 「週一至週日 11:00 – 19:00」→「每日 11:00–19:00」。抓不到時間區間就原樣顯示（CMS 可能改成別的寫法）。 */
+function dailyHours(hours: string, daily: string): string {
+  const m = hours.match(/(\d{1,2}:\d{2})\s*[–—~-]\s*(\d{1,2}:\d{2})/);
+  return m ? `${daily} ${m[1]}–${m[2]}` : hours;
+}
+
 export function SiteFooter() {
-  const t = useT();
-  const { ui, site, contactEmail, siteUrl, phones, social } = useSiteContent();
+  const { t, lang } = useLang();
+  const { ui, site, contactEmail, phones, social, map } = useSiteContent();
+  // 只放市話：label "Tel" 那支；找不到就退回第一支。手機號碼不在 footer 顯示（業主 2026-11-10）。
+  const landline = phones.find((p) => p.label === "Tel") ?? phones[0];
   return (
     <footer className="mt-24 md:mt-32 border-t border-border/60 bg-[oklch(0.96_0.014_82)]/60">
-      <div className="container-editorial py-16 md:py-20 grid gap-12 md:grid-cols-4">
-        <div className="md:col-span-2">
-          {/* h2（2026-11 SEO 健檢 L4）：頁尾在每頁的 h1 之後，h3 會讓只有一個 h1 的頁面跳級。
-              h1–h5 共用同一組 base 樣式，class 不變，畫面不變。 */}
-          <h2 className="font-serif text-2xl">{t(ui.brand)}</h2>
-          <p className="eyebrow mt-2 text-[0.6rem]">{t(ui.brandSub)}</p>
-          <p className="mt-6 text-sm leading-[1.9] text-muted-foreground max-w-sm">
-            {t(site.shortDesc)}
-          </p>
-        </div>
+      {/* 2026-11-10 業主要求「更簡潔、重複資訊移除、能變 icon 就變 icon」：
+          - 拿掉大字店名（頁首已有）與「來訪」「聯繫」小標、「每日開放」、intervalbooks.tw 文字連結
+          - 地址＋時間各一行加 icon；聯繫改成一排 44px 圓形 icon 按鈕
+          - 只放市話（phones 的第一支，label "Tel"）；手機不在 footer 顯示 */}
+      <div className="container-editorial py-12 md:py-16 grid gap-8 md:grid-cols-2 md:gap-16">
+        <p className="text-[0.8rem] leading-[1.9] text-muted-foreground max-w-sm">
+          {t(ui.footer.aboutBlurb ?? site.shortDesc)}
+        </p>
 
-        <div className="text-sm leading-relaxed">
-          <p className="eyebrow text-2xl mb-4">{t(ui.footer.visit)}</p>
-          <p>{t(site.address)}</p>
-          <p className="text-muted-foreground mt-1">{t(site.city)}</p>
-          <p className="mt-3">{t(site.hours)}</p>
-          <p className="text-muted-foreground">{t(ui.footer.everyday)}</p>
-        </div>
-
-        <div className="text-sm leading-relaxed">
-          <p className="eyebrow text-2xl mb-4">{t(ui.footer.contact)}</p>
-          <a href={`mailto:${contactEmail}`} className="hover-underline break-all">
-            {contactEmail}
-          </a>
-          <div className="mt-2 space-y-1">
-            {phones.map((p) => (
-              <a
-                key={p.tel}
-                href={`tel:${p.tel}`}
-                className="block hover-underline text-muted-foreground"
-              >
-                {p.display}
-              </a>
-            ))}
-          </div>
+        <div className="text-sm leading-relaxed space-y-3">
           <a
-            href={siteUrl}
+            href={map.link}
             target="_blank"
             rel="noreferrer"
-            className="block mt-3 text-muted-foreground hover-underline"
+            className="flex items-start gap-2.5 hover-underline"
           >
-            {siteUrl.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+            <MapPin className="mt-[0.2em] h-4 w-4 shrink-0 text-clay" aria-hidden="true" />
+            <span>
+              {lang === "en"
+                ? `${site.address.en}, ${site.city.en}`
+                : `${t(site.city)} ${t(site.address)}`}
+            </span>
           </a>
-          {/* 社群改成圖示。⚠️ 圖示沒有文字，所以 aria-label 是這些連結**唯一**的無障礙
-              名稱——拿掉的話螢幕閱讀器只會唸出網址。title 是給滑鼠停留看的，兩個都要。
-              LINE 沒有對應的 lucide 圖示，維持文字，這是刻意的不對稱。 */}
-          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-muted-foreground">
+          <p className="flex items-start gap-2.5">
+            <Clock className="mt-[0.2em] h-4 w-4 shrink-0 text-clay" aria-hidden="true" />
+            <span>{dailyHours(t(site.hours), t(DAILY))}</span>
+          </p>
+
+          <div className="pt-3 flex flex-wrap items-center gap-2 text-muted-foreground">
+            <a
+              href={`mailto:${contactEmail}`}
+              aria-label={`Email ${contactEmail}`}
+              title={`Email ${contactEmail}`}
+              className={ICON_BTN}
+            >
+              <Mail className="h-4 w-4" aria-hidden="true" />
+            </a>
+            {landline && (
+              <a
+                href={`tel:${landline.tel}`}
+                aria-label={`${t(CALL)} ${landline.display}`}
+                title={`${t(CALL)} ${landline.display}`}
+                className={ICON_BTN}
+              >
+                <Phone className="h-4 w-4" aria-hidden="true" />
+              </a>
+            )}
+            {/* 社群圖示沒有文字，aria-label 是這些連結**唯一**的無障礙名稱；title 給滑鼠停留看。 */}
             {social.instagram && (
               <a
                 href={social.instagram}
@@ -62,7 +79,7 @@ export function SiteFooter() {
                 rel="noreferrer"
                 aria-label="Instagram"
                 title="Instagram"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 transition-colors hover:border-foreground hover:text-foreground"
+                className={ICON_BTN}
               >
                 <Instagram className="h-4 w-4" aria-hidden="true" />
               </a>
@@ -74,16 +91,33 @@ export function SiteFooter() {
                 rel="noreferrer"
                 aria-label="Facebook"
                 title="Facebook"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 transition-colors hover:border-foreground hover:text-foreground"
+                className={ICON_BTN}
               >
                 <Facebook className="h-4 w-4" aria-hidden="true" />
               </a>
             )}
+            {/* LINE 沒有對應的 lucide 圖示，圓鈕裡維持文字。 */}
             {social.line && (
-              <a href={social.line} target="_blank" rel="noreferrer" className="hover-underline">
+              <a
+                href={social.line}
+                target="_blank"
+                rel="noreferrer"
+                title="LINE"
+                className={`${ICON_BTN} text-[0.6rem] font-medium tracking-wide`}
+              >
                 LINE
               </a>
             )}
+            <a
+              href={map.link}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={t(ui.buttons.navigate)}
+              title={t(ui.buttons.navigate)}
+              className={ICON_BTN}
+            >
+              <MapIcon className="h-4 w-4" aria-hidden="true" />
+            </a>
           </div>
         </div>
       </div>
