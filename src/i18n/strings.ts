@@ -55,9 +55,9 @@ export const UI = {
     follow: { zh: "追蹤", en: "Follow", ja: "フォロー" },
     account: { zh: "我的帳號", en: "My Account", ja: "マイページ" },
     aboutBlurb: {
-      zh: "我們是在華山的小時光書店，聽得到鳥鳴，聞得到茶香與書香，感受得到人情的溫度與連結。",
-      en: "Tucked inside Huashan Cultural Park, Interval Books is a quiet pause — birdsong outside, the scent of tea and paper within, and the warmth of small encounters.",
-      ja: "華山文化園にひっそりと佇む小時光書店。鳥のさえずり、茶と本の香り、ひとと人のあたたかな繋がりが息づく場所です。",
+      zh: "小時光書店在華山紅磚六合院，以書店為載體，從一份地方刊物、一場讀書會、一趟策旅出發，讓更多人認識台灣的美好事物。",
+      en: "Set in the Red Brick Courtyard of Huashan 1914, Interval Books uses the bookstore as a vessel: starting from a local magazine, a reading circle or a cultural journey, we help more people discover the good things of Taiwan.",
+      ja: "華山・紅煉瓦六合院にある小時光書店は、本屋をひとつの器として、一冊の地域誌、ひとつの読書会、ひとつの旅から、台湾のすてきなものをより多くの人に届けています。",
     },
     rights: {
       zh: "小時光書店．保留所有權利",
@@ -96,9 +96,9 @@ export const UI = {
 
 export const SITE_INFO = {
   shortDesc: {
-    zh: "我們是在華山的小時光書店，聽得到鳥鳴，聞得到茶香與書香，感受得到人情的溫度與連結。",
-    en: "Tucked inside Huashan Cultural Park, Interval Books is a quiet pause — birdsong outside, the scent of tea and paper within, and the warmth of small encounters.",
-    ja: "華山文化園にひっそりと佇む小時光書店。鳥のさえずり、茶と本の香り、ひとと人のあたたかな繋がりが息づく場所です。",
+    zh: "小時光書店在華山紅磚六合院，以書店為載體，從一份地方刊物、一場讀書會、一趟策旅出發，讓更多人認識台灣的美好事物。",
+    en: "Set in the Red Brick Courtyard of Huashan 1914, Interval Books uses the bookstore as a vessel: starting from a local magazine, a reading circle or a cultural journey, we help more people discover the good things of Taiwan.",
+    ja: "華山・紅煉瓦六合院にある小時光書店は、本屋をひとつの器として、一冊の地域誌、ひとつの読書会、ひとつの旅から、台湾のすてきなものをより多くの人に届けています。",
   } as Localized,
   address: {
     zh: "華山文創園區．紅磚六合院 西7-3館",

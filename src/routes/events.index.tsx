@@ -87,14 +87,14 @@ const PAGE = {
     ja: "読書会、絵本のおはなし会、都市のサロン、そして本とともに土地を訪ねる文化の旅。受付中と終了したイベント・旅をまとめ、カレンダー表示と申し込みページへご案内します。",
   },
   title: {
-    zh: "閱讀，是一種共同進行的生活",
-    en: "Reading, a life held in common",
-    ja: "読むことは、ともにある暮らし",
+    zh: "在書店相遇，走進台灣的土地",
+    en: "Meet at the bookstore, step into Taiwan",
+    ja: "本屋で出会い、台湾の土地へ",
   },
   intro: {
-    zh: "每一場活動都有獨立的網站。本頁僅作為策展式彙整，幫助你在書店發生的事情之間，找到屬於自己的節奏。",
-    en: "Each event has its own site. This page is a curated overview — find your own rhythm among what unfolds in the bookshop.",
-    ja: "各イベントには専用サイトがあります。このページはキュレーションされた目次として、書店で起きることのなかから、ご自身のリズムを見つけていただくためのものです。",
+    zh: "讀書會、講座、手作工作坊，還有走出書店的文化策旅。在這裡找一場想參加的，跟我們一起認識台灣的美好事物。",
+    en: "Reading circles, talks, hands-on workshops, and cultural journeys beyond the shop. Find one that speaks to you and discover the good things of Taiwan with us.",
+    ja: "読書会、トーク、ワークショップ、そして本屋の外へ出る文化の旅。気になるひとつを見つけて、台湾の素晴らしさを一緒に知りましょう。",
   },
 };
 

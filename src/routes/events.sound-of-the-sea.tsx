@@ -495,7 +495,7 @@ function About() {
         <div className="grid items-start gap-10 md:grid-cols-[3fr_2fr] md:gap-16">
           <div className="space-y-5 leading-loose text-foreground/85">
             <p className={`${SERIF} text-lg text-primary/90`}>
-              我們是在華山的小時光書店，聽得到鳥鳴，聞得到茶香與書香，感受得到人情的溫度與連結。
+              小時光書店在華山紅磚六合院，以書店為載體，從一份地方刊物、一場讀書會、一趟策旅出發，讓更多人認識台灣的美好事物。
             </p>
             <p>
               從一櫃書、一張長桌開始，我們慢慢有了陶藝家的器物、地方夥伴的選物，與每月一場讀書會。書店並不大，但它是我們對於「閱讀」的長時間練習——讓書頁與生活，能彼此呼吸。

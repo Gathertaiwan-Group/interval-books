@@ -288,7 +288,7 @@ export const FALLBACK_SITE_CONTENT: SiteContent = {
     ogType: "website",
     defaultTitle: "小時光書店 Interval Books｜華山的風土誌選書與地方刊物",
     defaultDescription:
-      "我們是在華山的小時光書店，聽得到鳥鳴，聞得到茶香與書香，感受得到人情的溫度與連結。",
+      "小時光書店在華山紅磚六合院，以書店為載體，從一份地方刊物、一場讀書會、一趟策旅出發，讓更多人認識台灣的美好事物。",
   },
 };
 
