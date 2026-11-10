@@ -12,7 +12,9 @@ import { useSiteContent } from "@/lib/site-content";
 import { isEventPast } from "@/lib/event-status";
 import { CARD, CARD_HOVER, featureLayout } from "@/lib/feature-layout";
 import { imageFor, srcSetFor } from "@/lib/images";
-import { fetchHomeShelfProducts } from "@/lib/shop";
+import { eventProductSlug, fetchHomeShelfProducts, formatPrice } from "@/lib/shop";
+import { fetchListingFacts, type ListingFacts } from "@/lib/home-listing";
+import { CalendarDays } from "lucide-react";
 import { fetchPublicationsTeaser } from "@/lib/publications";
 import heroImg from "@/assets/hero-mountain.jpg";
 import storefrontImg from "@/assets/storefront.jpg";
@@ -200,6 +202,15 @@ const HOME = {
   },
   upcomingEventsLabel: { zh: "活動", en: "Events", ja: "イベント" },
   upcomingJourneysLabel: { zh: "策旅", en: "Journeys", ja: "旅" },
+  /** 手機橫滑卡片列底下的提示。{n} = 這一列幾張。 */
+  railHint: {
+    zh: "共 {n} 則，左右滑動看更多",
+    en: "{n} in total — swipe for more",
+    ja: "全{n}件・横にスワイプ",
+  },
+  listingFree: { zh: "免費", en: "Free", ja: "無料" },
+  listingSoldOut: { zh: "已額滿", en: "Sold out", ja: "満席" },
+  listingFewLeft: { zh: "最後 {n} 位", en: "{n} left", ja: "残り{n}席" },
 
   archiveKicker: {
     zh: "地方刊物典藏",
@@ -280,15 +291,18 @@ export const Route = createFileRoute("/")({
     // journeyEvents：策旅卡片指著的那幾列 events（日期＋最晚場次＋封面），用來判斷
     // 「已結束」與決定卡片封面——與 /journeys 同一支查詢、同一套判準。
     // archive：「地方刊物典藏」區塊的份數與幾張封面（2026-11 改版，只聚合後的數字進 payload）。
-    const [page, events, journeys, journeyEvents, shelf, archive] = await Promise.all([
+    // listing：活動／策旅卡片上的票價與「額滿／最後 N 位」（見 src/lib/home-listing.ts），
+    // 讀不到就是空物件，卡片只是不印那一行。
+    const [page, events, journeys, journeyEvents, shelf, archive, listing] = await Promise.all([
       fetchPage("index"),
       fetchEvents(),
       fetchJourneys(),
       fetchJourneyEventDates(),
       fetchHomeShelfProducts(4),
       fetchPublicationsTeaser(),
+      fetchListingFacts(),
     ]);
-    return { page, events, journeys, journeyEvents, shelf, archive };
+    return { page, events, journeys, journeyEvents, shelf, archive, listing };
   },
   head: ({ loaderData, matches, match }) => {
     const p = pageText(loaderData?.page ?? null);
@@ -313,7 +327,7 @@ export const Route = createFileRoute("/")({
 function Index() {
   const t = useT();
   const localizeHref = useLocalizeHref();
-  const { page, events, journeys, journeyEvents, shelf, archive } = Route.useLoaderData();
+  const { page, events, journeys, journeyEvents, shelf, archive, listing } = Route.useLoaderData();
   const shelfProducts = shelf.products;
 
   // 策旅與活動用同一種卡片、同一套版面規則（見 featureLayout），所以這裡也
@@ -503,6 +517,185 @@ function Index() {
         </dl>
       </section>
 
+      {/* ── 近期活動與策旅 ───────────────────────────────────────────────────
+          2026-11-10 從「讀．聚．行」之後移到 hero 正後方：hero（店名、定位句、首圖、三個數字）
+          已經把「這是哪裡、在做什麼」講完，支柱區是同一段敘事的展開，可以晚一點讀；
+          活動與策旅才是有時效、要報名的東西，手機上原本要滑過支柱區近 2000px 才看得到。
+          已結束的不顯示（活動 isEventPast、策旅 splitJourneys）。兩邊都沒有時留一句話與入口，
+          不讓整區消失——「有在辦活動」是這間店的核心。
+          手機版：兩筆以上排成可橫滑的卡片列（露出下一張一截＋一行提示），桌機維持 featureLayout。 */}
+      <section
+        id="upcoming"
+        className="scroll-mt-24 border-t border-border"
+        aria-labelledby="home-upcoming"
+      >
+        <div className="container-editorial section-y max-md:py-12">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="kicker">{t(p.block("home.upcomingKicker", HOME.upcomingKicker))}</p>
+              <h2 id="home-upcoming" className="display mt-4 text-3xl md:mt-5 md:text-5xl">
+                {t(p.block("home.upcomingTitle", HOME.upcomingTitle))}
+              </h2>
+            </div>
+          </div>
+
+          {!hasUpcoming ? (
+            <div className="mt-12 border border-border bg-card/70 p-8 md:p-10">
+              <p className="max-w-xl leading-[1.9] text-foreground/80">
+                {t(p.block("home.upcomingEmpty", HOME.upcomingEmpty))}
+              </p>
+              <Link to="/events" className="link-arrow mt-6 min-h-11 text-sm">
+                {t(ui.buttons.viewAll)}
+                <span className="arrow" aria-hidden="true">
+                  →
+                </span>
+              </Link>
+            </div>
+          ) : null}
+
+          {/* 精選活動 —— 沒有任何一場就整組（含小標與「查看全部」）不出現 */}
+          {featuredEvents.length > 0 && (
+            <>
+              <SubHeader
+                label={t(p.block("home.upcomingEventsLabel", HOME.upcomingEventsLabel))}
+                link={{ to: "/events", label: t(ui.buttons.viewAll) }}
+              />
+              {/* ⚠️ 這裡連的是**站內**的 /events/$slug，不是 e.externalUrl。
+                  0001 的種子資料把 externalUrl 填成 https://example.com/event-N，首頁曾經
+                  有三顆按鈕直接把客人送去 example.com（那批 ev-1~ev-6 已於 2026-09-12 連同
+                  content.ts 與 seed.sql 裡的副本一起清掉）。規則不變：活動詳情頁才是正確的
+                  目的地，外部售票連結留在詳情頁上，由那一頁自己決定要不要顯示。 */}
+              <div
+                data-home-events
+                className={`${eventsLayout.grid} ${railFor(featuredEvents.length).track}`}
+              >
+                {featuredEvents.map((e) => (
+                  <Link
+                    key={e.id}
+                    to="/events/$slug"
+                    params={{ slug: e.slug }}
+                    className={`${CARD} ${CARD_HOVER} ${eventsLayout.card} ${railFor(featuredEvents.length).item}`}
+                  >
+                    {/* ⚠️ 先判斷 imageKey 非空**再**呼叫 imageFor()。imageFor(key, fallback)
+                        永遠會回一張圖，順序反過來就是每一張卡片都長同一張不相干的照片。 */}
+                    {e.imageKey ? (
+                      <CoverImage
+                        src={imageFor(e.imageKey, storefrontImg)}
+                        alt={t(e.title)}
+                        loading="lazy"
+                        className={`aspect-[4/3] ${eventsLayout.image}`}
+                        imgClassName="img-zoom"
+                      />
+                    ) : null}
+                    <div className={`flex flex-1 flex-col p-5 md:p-7 ${eventsLayout.body}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-xs tracking-[0.18em] text-clay">{e.category}</p>
+                        <ListingBadge facts={listing[eventProductSlug(e.slug)]} />
+                      </div>
+                      <h3
+                        className={`display mt-2 text-xl leading-snug md:mt-3 md:text-2xl ${eventsLayout.title}`}
+                      >
+                        {t(e.title)}
+                      </h3>
+                      <ListingDate>{e.date}</ListingDate>
+                      {/* line-clamp 的段落不能自己 flex-1：被撐高後，截斷點之後的字會照樣露出來。
+                          撐高的工作交給下面的空白 div（單筆橫版時同樣被 summary 的 md:flex-none 取消）。 */}
+                      <p
+                        className={`mt-3 line-clamp-2 text-sm leading-[1.8] text-foreground/75 md:mt-4 md:line-clamp-4 md:leading-[1.85]`}
+                      >
+                        {t(e.summary)}
+                      </p>
+                      <div aria-hidden="true" className={`flex-1 ${eventsLayout.summary}`} />
+                      <ListingFooter
+                        facts={listing[eventProductSlug(e.slug)]}
+                        cta={t(ui.buttons.viewEvent)}
+                      />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              <RailHint count={featuredEvents.length} />
+            </>
+          )}
+
+          {/* 精選策旅 —— 沒有任何一趟就整組不出現 */}
+          {featuredJourneys.length > 0 && (
+            <>
+              <SubHeader
+                label={t(p.block("home.upcomingJourneysLabel", HOME.upcomingJourneysLabel))}
+                link={{ to: "/journeys", label: t(ui.buttons.viewAll) }}
+              />
+              <div
+                data-home-journeys
+                className={`${journeysLayout.grid} ${railFor(featuredJourneys.length).track}`}
+              >
+                {featuredJourneys.map((j) => {
+                  // 策旅的連結可能是站內路徑、也可能是外部網站（見 journeyLinkProps）。
+                  // 還沒設連結的策旅仍然要看得到卡片，只是整張卡不可點——不要讓它消失。
+                  const link = journeyLinkProps(j.externalUrl, localizeHref);
+                  // 日期區間、票價與名額都在卡片指著的那場活動上（journeys 表沒有日期與價格）。
+                  const linked = linkedEventFor(j.externalUrl, journeyEvents);
+                  const body = (
+                    <>
+                      {/* journeys 表沒有 image_key；封面用卡片指著的那場活動的 events.image_key
+                          （與 /journeys、過往策旅同一個來源），指不到或沒設圖才用固定意象圖。
+                          手機框改 16:10 壓低高度；CoverImage 完整顯示＋模糊補邊，不會裁到字。 */}
+                      <CoverImage
+                        src={imageFor(
+                          linkedEventFor(j.externalUrl, journeyEvents)?.imageKey,
+                          journeyImg,
+                        )}
+                        alt={t(j.title)}
+                        loading="lazy"
+                        className={`aspect-[16/10] md:aspect-[4/3] ${journeysLayout.image}`}
+                        imgClassName="img-zoom"
+                      />
+                      <div className={`flex flex-1 flex-col p-5 md:p-7 ${journeysLayout.body}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-xs tracking-[0.18em] text-clay">
+                            {t(j.days)} ／ {t(j.theme)}
+                          </p>
+                          <ListingBadge
+                            facts={linked ? listing[eventProductSlug(linked.slug)] : undefined}
+                          />
+                        </div>
+                        <h3
+                          className={`display mt-2 text-xl leading-snug whitespace-pre-line md:mt-3 md:text-2xl ${journeysLayout.title}`}
+                        >
+                          {t(j.title)}
+                        </h3>
+                        {linked?.date ? <ListingDate>{linked.date}</ListingDate> : null}
+                        <p
+                          className={`mt-3 line-clamp-3 text-sm leading-[1.8] text-foreground/75 md:mt-4 md:line-clamp-none md:leading-[1.85]`}
+                        >
+                          {t(j.summary)}
+                        </p>
+                        <div aria-hidden="true" className={`flex-1 ${journeysLayout.summary}`} />
+                        <ListingFooter
+                          facts={linked ? listing[eventProductSlug(linked.slug)] : undefined}
+                          cta={link ? t(ui.buttons.toJourney) : null}
+                        />
+                      </div>
+                    </>
+                  );
+                  const cardClass = `${CARD} ${journeysLayout.card} ${railFor(featuredJourneys.length).item}`;
+                  return link ? (
+                    <a key={j.id} {...link} className={`${cardClass} ${CARD_HOVER}`}>
+                      {body}
+                    </a>
+                  ) : (
+                    <div key={j.id} className={cardClass}>
+                      {body}
+                    </div>
+                  );
+                })}
+              </div>
+              <RailHint count={featuredJourneys.length} />
+            </>
+          )}
+        </div>
+      </section>
+
       {/* ── 三個支柱：讀．聚．行 ─────────────────────────────────────────── */}
       <section className="container-editorial section-y" aria-labelledby="home-pillars">
         <div className="max-w-2xl">
@@ -543,161 +736,6 @@ function Index() {
             </li>
           ))}
         </ul>
-      </section>
-
-      {/* ── 近期活動與策旅 ───────────────────────────────────────────────────
-          已結束的不顯示（活動 isEventPast、策旅 splitJourneys）。兩邊都沒有時留一句話與入口，
-          不讓整區消失——「有在辦活動」是這間店的核心。 */}
-      <section
-        id="upcoming"
-        className="scroll-mt-24 border-t border-border"
-        aria-labelledby="home-upcoming"
-      >
-        <div className="container-editorial section-y">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="kicker">{t(p.block("home.upcomingKicker", HOME.upcomingKicker))}</p>
-              <h2 id="home-upcoming" className="display mt-5 text-3xl md:text-5xl">
-                {t(p.block("home.upcomingTitle", HOME.upcomingTitle))}
-              </h2>
-            </div>
-          </div>
-
-          {!hasUpcoming ? (
-            <div className="mt-12 border border-border bg-card/70 p-8 md:p-10">
-              <p className="max-w-xl leading-[1.9] text-foreground/80">
-                {t(p.block("home.upcomingEmpty", HOME.upcomingEmpty))}
-              </p>
-              <Link to="/events" className="link-arrow mt-6 text-sm">
-                {t(ui.buttons.viewAll)}
-                <span className="arrow" aria-hidden="true">
-                  →
-                </span>
-              </Link>
-            </div>
-          ) : null}
-
-          {/* 精選活動 —— 沒有任何一場就整組（含小標與「查看全部」）不出現 */}
-          {featuredEvents.length > 0 && (
-            <>
-              <SubHeader
-                label={t(p.block("home.upcomingEventsLabel", HOME.upcomingEventsLabel))}
-                link={{ to: "/events", label: t(ui.buttons.viewAll) }}
-              />
-              {/* ⚠️ 這裡連的是**站內**的 /events/$slug，不是 e.externalUrl。
-                  0001 的種子資料把 externalUrl 填成 https://example.com/event-N，首頁曾經
-                  有三顆按鈕直接把客人送去 example.com（那批 ev-1~ev-6 已於 2026-09-12 連同
-                  content.ts 與 seed.sql 裡的副本一起清掉）。規則不變：活動詳情頁才是正確的
-                  目的地，外部售票連結留在詳情頁上，由那一頁自己決定要不要顯示。 */}
-              <div className={eventsLayout.grid}>
-                {featuredEvents.map((e) => (
-                  <Link
-                    key={e.id}
-                    to="/events/$slug"
-                    params={{ slug: e.slug }}
-                    className={`${CARD} ${CARD_HOVER} ${eventsLayout.card}`}
-                  >
-                    {/* ⚠️ 先判斷 imageKey 非空**再**呼叫 imageFor()。imageFor(key, fallback)
-                        永遠會回一張圖，順序反過來就是每一張卡片都長同一張不相干的照片。 */}
-                    {e.imageKey ? (
-                      <CoverImage
-                        src={imageFor(e.imageKey, storefrontImg)}
-                        alt={t(e.title)}
-                        loading="lazy"
-                        className={`aspect-[4/3] ${eventsLayout.image}`}
-                        imgClassName="img-zoom"
-                      />
-                    ) : null}
-                    <div className={`flex flex-1 flex-col p-6 md:p-7 ${eventsLayout.body}`}>
-                      <p className="text-xs tracking-[0.18em] text-clay">{e.category}</p>
-                      <h3 className={`display mt-3 text-2xl leading-snug ${eventsLayout.title}`}>
-                        {t(e.title)}
-                      </h3>
-                      <p className="mt-3 text-sm text-muted-foreground">{e.date}</p>
-                      <p
-                        className={`mt-4 line-clamp-4 text-sm leading-[1.85] text-foreground/75 flex-1 ${eventsLayout.summary}`}
-                      >
-                        {t(e.summary)}
-                      </p>
-                      <span className="link-arrow mt-6 self-start text-sm">
-                        {t(ui.buttons.viewEvent)}
-                        <span className="arrow" aria-hidden="true">
-                          →
-                        </span>
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* 精選策旅 —— 沒有任何一趟就整組不出現 */}
-          {featuredJourneys.length > 0 && (
-            <>
-              <SubHeader
-                label={t(p.block("home.upcomingJourneysLabel", HOME.upcomingJourneysLabel))}
-                link={{ to: "/journeys", label: t(ui.buttons.viewAll) }}
-              />
-              <div className={journeysLayout.grid}>
-                {featuredJourneys.map((j) => {
-                  // 策旅的連結可能是站內路徑、也可能是外部網站（見 journeyLinkProps）。
-                  // 還沒設連結的策旅仍然要看得到卡片，只是整張卡不可點——不要讓它消失。
-                  const link = journeyLinkProps(j.externalUrl, localizeHref);
-                  const body = (
-                    <>
-                      {/* journeys 表沒有 image_key；封面用卡片指著的那場活動的 events.image_key
-                          （與 /journeys、過往策旅同一個來源），指不到或沒設圖才用固定意象圖。 */}
-                      <CoverImage
-                        src={imageFor(
-                          linkedEventFor(j.externalUrl, journeyEvents)?.imageKey,
-                          journeyImg,
-                        )}
-                        alt={t(j.title)}
-                        loading="lazy"
-                        className={`aspect-[4/3] ${journeysLayout.image}`}
-                        imgClassName="img-zoom"
-                      />
-                      <div className={`flex flex-1 flex-col p-6 md:p-7 ${journeysLayout.body}`}>
-                        <p className="text-xs tracking-[0.18em] text-clay">
-                          {t(j.days)} ／ {t(j.theme)}
-                        </p>
-                        <h3
-                          className={`display mt-3 text-2xl leading-snug whitespace-pre-line ${journeysLayout.title}`}
-                        >
-                          {t(j.title)}
-                        </h3>
-                        <p
-                          className={`mt-4 text-sm leading-[1.85] text-foreground/75 flex-1 ${journeysLayout.summary}`}
-                        >
-                          {t(j.summary)}
-                        </p>
-                        {link ? (
-                          <span className="link-arrow mt-6 self-start text-sm">
-                            {t(ui.buttons.toJourney)}
-                            <span className="arrow" aria-hidden="true">
-                              →
-                            </span>
-                          </span>
-                        ) : null}
-                      </div>
-                    </>
-                  );
-                  const cardClass = `${CARD} ${journeysLayout.card}`;
-                  return link ? (
-                    <a key={j.id} {...link} className={`${cardClass} ${CARD_HOVER}`}>
-                      {body}
-                    </a>
-                  ) : (
-                    <div key={j.id} className={cardClass}>
-                      {body}
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
       </section>
 
       {/* ── 地方刊物典藏 ─────────────────────────────────────────────────────
@@ -961,6 +999,92 @@ function Index() {
   );
 }
 
+/**
+ * 手機（< md）兩筆以上時，卡片排成可橫滑的一列：每張 82% 寬，露出下一張一截。
+ * 只加 max-md: 前綴的 class，md 以上完全交回 featureLayout（桌機不變）。
+ * 一筆時不需要滑，照原本的直排。
+ */
+function railFor(count: number) {
+  if (count < 2) return { track: "", item: "" };
+  return {
+    track:
+      "max-md:-mx-6 max-md:flex max-md:snap-x max-md:snap-mandatory max-md:gap-4 max-md:overflow-x-auto max-md:scroll-px-6 max-md:px-6 max-md:pb-2 max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden",
+    item: "max-md:w-[82%] max-md:shrink-0 max-md:snap-start",
+  };
+}
+
+function RailHint({ count }: { count: number }) {
+  const t = useT();
+  if (count < 2) return null;
+  return (
+    <p
+      className="mt-3 text-xs tracking-[0.12em] text-muted-foreground md:hidden"
+      aria-hidden="true"
+    >
+      {fill(t(HOME.railHint), { n: count })}
+      <span className="ml-1">→</span>
+    </p>
+  );
+}
+
+/** 卡片上的日期：用正文色＋圖示，不再是一行淺灰小字。內容是 display_date（自由文字）。 */
+function ListingDate({ children }: { children: ReactNode }) {
+  return (
+    <p className="mt-3 flex items-start gap-2 text-sm font-medium text-foreground/90 [font-variant-numeric:lining-nums]">
+      <CalendarDays className="mt-[0.15em] h-4 w-4 shrink-0 text-clay" aria-hidden="true" />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+/** 報名狀態小標（「已額滿」／「最後 N 位」），放在卡片頂端分類那一行的右邊。平常不印。 */
+function ListingBadge({ facts }: { facts: ListingFacts | undefined }) {
+  const t = useT();
+  if (!facts) return null;
+  if (facts.soldOut) {
+    return (
+      <span className="-my-1 shrink-0 border border-border px-2 py-0.5 text-xs tracking-[0.1em] text-muted-foreground">
+        {t(HOME.listingSoldOut)}
+      </span>
+    );
+  }
+  if (facts.fewLeft === null) return null;
+  return (
+    <span className="-my-1 shrink-0 border border-clay/40 px-2 py-0.5 text-xs tracking-[0.1em] text-clay">
+      {fill(t(HOME.listingFewLeft), { n: facts.fewLeft })}
+    </span>
+  );
+}
+
+/**
+ * 卡片底部一列：左邊票價，右邊「查看 →」。整張卡本來就是連結，這一列只是讓人一眼看到
+ * 價格與下一步。facts 讀不到時只剩右邊的箭頭；cta 為 null（策旅沒設連結）時只剩左邊。
+ * 兩邊都沒有就整列不畫。
+ */
+function ListingFooter({ facts, cta }: { facts: ListingFacts | undefined; cta: string | null }) {
+  const t = useT();
+  if (!facts && !cta) return null;
+  return (
+    <div className="mt-5 flex min-h-11 items-center justify-between gap-3 border-t border-border/70 pt-3 md:mt-6 md:pt-4">
+      {facts ? (
+        <span className="text-base font-medium text-foreground [font-variant-numeric:lining-nums]">
+          {facts.price > 0 ? formatPrice(facts.price) : t(HOME.listingFree)}
+        </span>
+      ) : (
+        <span />
+      )}
+      {cta ? (
+        <span className="link-arrow shrink-0 text-sm">
+          {cta}
+          <span className="arrow" aria-hidden="true">
+            →
+          </span>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function SubHeader({
   label,
   link,
@@ -969,9 +1093,10 @@ function SubHeader({
   link: { to: "/events" | "/journeys"; label: string };
 }) {
   return (
-    <div className="mt-14 mb-6 flex items-center justify-between gap-6 border-b border-border pb-4">
+    <div className="mt-10 mb-5 flex items-center justify-between gap-6 border-b border-border pb-2 md:mt-14 md:mb-6 md:pb-3">
       <p className="font-serif text-xl md:text-2xl">{label}</p>
-      <Link to={link.to} className="link-arrow text-sm">
+      {/* min-h-11：手機點擊區至少 44px（文字本身只有 20px 高）。 */}
+      <Link to={link.to} className="link-arrow min-h-11 text-sm">
         {link.label}
         <span className="arrow" aria-hidden="true">
           →
