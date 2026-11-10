@@ -807,7 +807,12 @@ const indexLinks = jsxElements(ast.index, "Link");
 const indexTargets = indexLinks.map((e) => strOf(e.props.to));
 checkFalse('首頁沒有 <Link to="/curated">', indexTargets.includes("/curated"));
 checkFalse('首頁沒有 <Link to="/visit">', indexTargets.includes("/visit"));
-checkTrue('首頁有 <Link to="/about">', indexTargets.includes("/about"));
+// 2026-11-10 首頁「來小時光坐坐」整塊拿掉（地址／時間改由頁尾呈現），原本唯一一顆
+// <Link to="/about">（完整來訪資訊）跟著消失；改成確認首頁沒有連回已拿掉的區塊錨點。
+checkFalse(
+  "首頁沒有指向已拿掉的來訪資訊錨點（#visit／#home-visit）",
+  /href="#(?:home-)?visit"/.test(src.index),
+);
 
 const shopLinkWithTab = indexLinks.find((e) => strOf(e.props.to) === "/shop" && e.props.search);
 checkTrue('首頁有 <Link to="/shop" search={…}>', !!shopLinkWithTab);
@@ -855,7 +860,7 @@ for (const [key, zh] of Object.entries(NEW_KEYS)) {
     );
   }
 }
-// 舊 key 不能刪：index.tsx 拿 curated/visit 當區塊標題，footer 拿 curation/privacy。
+// 舊 key 不能刪：curated/visit 站上其他地方還在用（首頁的來訪資訊 2026-11-10 已拿掉），footer 拿 curation/privacy。
 for (const key of ["curated", "visit", "curation", "privacy", "cart"]) {
   checkTrue(`舊的 UI.nav.${key} 還在（站上其他地方還在用）`, hasProp(navObj, key));
 }

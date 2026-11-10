@@ -206,16 +206,6 @@ const HOME = {
   pastTitle: { zh: "在這裡發生過的事", en: "What has happened here", ja: "ここで起きたこと" },
   pastBadge: { zh: "已結束", en: "Past", ja: "終了" },
   pastCta: { zh: "看所有過往活動", en: "All past events", ja: "過去のイベントをすべて見る" },
-
-  visitTitle: { zh: "來小時光坐坐", en: "Come and sit a while", ja: "小時光で、ひと休み" },
-  visitTransit: {
-    zh: "捷運板南線忠孝新生站 1 號出口，步行約 3 分鐘；穿過紅磚六合院中庭，西側第三間。",
-    en: "MRT Zhongxiao Xinsheng Station, Exit 1 — about 3 minutes on foot. Cross the Red Brick Courtyard; we are the third door on the west side.",
-    ja: "MRT板南線・忠孝新生駅1番出口から徒歩約3分。紅煉瓦六合院の中庭を抜け、西側の三軒目です。",
-  },
-  visitHoursLabel: { zh: "營業時間", en: "Hours", ja: "営業時間" },
-  visitWhereLabel: { zh: "地址", en: "Address", ja: "所在地" },
-  visitHowLabel: { zh: "交通", en: "Getting here", ja: "アクセス" },
 };
 
 const ENTRIES = {
@@ -230,7 +220,6 @@ const ENTRIES = {
     ja: "三つのテーマ、数十の品. 土地, 器, 茶. それぞれが、留め置かれた緩やかな時間。",
   },
   curatedCta: { zh: "走進選品櫥窗", en: "Enter the window", ja: "選品の窓辺へ" },
-  visitFull: { zh: "完整來訪資訊", en: "Full visit info", ja: "ご案内" },
 };
 
 function fill(template: string, values: Record<string, string | number>): string {
@@ -316,7 +305,7 @@ function Index() {
   const eventsLayout = featureLayout(featuredEvents.length);
   const journeysLayout = featureLayout(featuredJourneys.length);
   const p = pageText(page);
-  const { ui, site, map } = useSiteContent();
+  const { ui } = useSiteContent();
   const heroSrc = imageFor(page?.ogImageKey, heroImg);
   const counts = archive.counts;
 
@@ -809,12 +798,10 @@ function Index() {
       {/* ── 三個支柱：讀．聚．行 ───────────────────────────────────────────
           2026-11-10 業主要求移到「來小時光坐坐」（來訪資訊）正上方，內容不變。
           上一區通常是「回顧」（PastShelf：container 內一條上框線＋pb-24），這裡用同一個做法——
-          container 內畫上框線、上方不再疊 section-y 的留白，免得兩區之間空一大段卻沒有分隔；
-          下方的來訪資訊自帶整寬上框線。 */}
-      <section
-        className="container-editorial pb-[var(--space-section)]"
-        aria-labelledby="home-pillars"
-      >
+          container 內畫上框線、上方不再疊 section-y 的留白，免得兩區之間空一大段卻沒有分隔。
+          2026-11-10 來訪資訊拿掉後它是首頁最後一區；頁尾自帶上框線與上方留白，這裡底部只留 pb-12／md:pb-16，
+          不再疊整段 section 留白（疊起來桌機會空約 230px）。 */}
+      <section className="container-editorial pb-12 md:pb-16" aria-labelledby="home-pillars">
         <div className="border-t border-border pt-16">
           <div className="max-w-2xl">
             <p className="kicker">{t(p.block("home.pillarsKicker", HOME.pillarsKicker))}</p>
@@ -861,61 +848,8 @@ function Index() {
         </div>
       </section>
 
-      {/* ── 來訪資訊 ─────────────────────────────────────────────────────── */}
-      <section className="border-t border-border" aria-labelledby="home-visit">
-        <div className="container-editorial section-y grid items-stretch gap-12 md:grid-cols-2 lg:gap-16">
-          <div className="flex flex-col justify-center md:order-2">
-            <p className="kicker">{t(ui.nav.visit)}</p>
-            <h2 id="home-visit" className="display mt-5 text-3xl md:text-5xl">
-              {t(p.block("home.visitTitle", HOME.visitTitle))}
-            </h2>
-            <dl className="mt-10 space-y-6 text-[0.95rem] leading-[1.85]">
-              <div className="grid grid-cols-[5.5rem_1fr] gap-4 border-t border-border pt-5">
-                <dt className="text-sm text-muted-foreground">{t(HOME.visitWhereLabel)}</dt>
-                <dd>
-                  {t(site.address)}
-                  <span className="block text-muted-foreground">{t(site.city)}</span>
-                </dd>
-              </div>
-              <div className="grid grid-cols-[5.5rem_1fr] gap-4 border-t border-border pt-5">
-                <dt className="text-sm text-muted-foreground">{t(HOME.visitHoursLabel)}</dt>
-                <dd>
-                  {t(site.hours)}
-                  <span className="block text-muted-foreground">{t(ui.footer.everyday)}</span>
-                </dd>
-              </div>
-              <div className="grid grid-cols-[5.5rem_1fr] gap-4 border-y border-border py-5">
-                <dt className="text-sm text-muted-foreground">{t(HOME.visitHowLabel)}</dt>
-                <dd>{t(p.block("home.visitTransit", HOME.visitTransit))}</dd>
-              </div>
-            </dl>
-            <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
-              <a href={map.link} target="_blank" rel="noreferrer" className="btn-solid">
-                {t(ui.buttons.navigate)}
-                <span className="arrow" aria-hidden="true">
-                  ↗
-                </span>
-              </a>
-              {/* 來店資訊 2026-09-02 併進 /about 的後半。同上：站內連結直接指向新家。 */}
-              <Link to="/about" className="link-arrow">
-                {t(p.block("entries.visitFull", ENTRIES.visitFull))}
-                <span className="arrow" aria-hidden="true">
-                  →
-                </span>
-              </Link>
-            </div>
-          </div>
-          <div className="aspect-[4/3] bg-muted md:order-1 md:aspect-auto md:min-h-[28rem]">
-            <iframe
-              src={map.embed}
-              className="h-full w-full border-0"
-              loading="lazy"
-              title={t(site.address)}
-            />
-          </div>
-        </div>
-      </section>
-
+      {/* 2026-11-10：「來小時光坐坐」（地圖＋地址／時間／交通＋導航）整塊拿掉，地址與時間改由頁尾呈現；
+          完整來訪資訊仍在 /about 後半。首頁最後一區就是上面的「讀．聚．行」，直接接頁尾。 */}
       {/* 2026-11-10：原本這裡的收尾段（休止符＋INTERVAL＋「留一段屬於自己的＿＿＿小時光。」）
           搬到 /about 當「店名的由來」，見 src/components/IntervalCoda.tsx。 */}
     </PageShell>

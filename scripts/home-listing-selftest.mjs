@@ -227,16 +227,18 @@ check(
 check("hero 下方的「三個數字」已拿掉", /HOME\.fact[A-Z]/.test(home), false);
 check("近期活動與策旅在 hero 之後", posHeroEnd > 0 && posUpcoming > posHeroEnd, true);
 check("近期活動與策旅在地方刊物典藏之前", posUpcoming > 0 && posUpcoming < posArchive, true);
-// 2026-11-10 業主：讀．聚．行移到來訪資訊（來小時光坐坐）正上方
+// 2026-11-10 業主：讀．聚．行移到回顧之後；同日「來小時光坐坐」整塊拿掉 → 讀．聚．行是首頁最後一區
+check("「讀．聚．行」在回顧之後", posPast > 0 && posPillars > posPast, true);
+check("首頁不再有「來小時光坐坐」來訪資訊區塊", posVisit, -1);
 check(
-  "「讀．聚．行」在回顧之後、來訪資訊正上方",
-  posPast > 0 && posPillars > posPast && posPillars < posVisit,
-  true,
+  "首頁不再嵌地圖、不再有 #visit 錨點",
+  ["map.embed", "map.link", 'href="#visit"', "HOME.visit"].filter((k) => home.includes(k)),
+  [],
 );
 check(
-  "「讀．聚．行」與來訪資訊之間沒有別的區塊",
-  home.slice(posPillars, posVisit).split("<section").length - 1,
-  1,
+  "「讀．聚．行」之後沒有別的區塊（直接接頁尾）",
+  home.slice(posPillars).split("<section").length - 1,
+  0,
 );
 check(
   "listing 與其他讀取同一個 Promise.all",
