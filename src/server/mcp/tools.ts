@@ -528,8 +528,9 @@ export const TOOL_INPUTS = {
       .describe(
         "上架狀態（選填）。與文案同一個交易寫入，票券商品與策旅卡片會一起跟著。只想改狀態請用 set_event_status。",
       ),
+    // 也收 "true"／"false" 字串：工具清單快取在舊版的客戶端不知道這是布林，會把它當字串送。
     private_booking: z
-      .boolean()
+      .union([z.boolean(), z.enum(["true", "false"])])
       .optional()
       .describe(
         "包場，不開放報名。true＝活動照常公開、場次時間照列並標「包場」，報名區只顯示「本場為包場活動，不開放對外報名。」，沒有報名／購買入口，結帳也會拒絕；false＝恢復一般活動。場次的開放／關閉仍在後台設定（包場請維持關閉）。",
@@ -1045,6 +1046,11 @@ export function registerContentTools(server: McpServer): void {
       }
 
       const patch: Record<string, unknown> = { ...args };
+      const privateBookingArg =
+        args.private_booking === undefined
+          ? undefined
+          : args.private_booking === true || args.private_booking === "true";
+      if (privateBookingArg !== undefined) patch.private_booking = privateBookingArg;
       if (args.image_key !== undefined)
         patch.image_key = imageKeyFromArg(args.image_key, [row.image_key]);
 
@@ -1086,7 +1092,7 @@ export function registerContentTools(server: McpServer): void {
               id: row.id,
               lists: {},
               ...(args.status !== undefined ? { status } : {}),
-              ...(args.private_booking !== undefined ? { private_booking } : {}),
+              ...(privateBookingArg !== undefined ? { private_booking } : {}),
             },
             null,
           );

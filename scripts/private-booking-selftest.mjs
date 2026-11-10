@@ -309,7 +309,8 @@ const mcp = readFile("src/server/mcp/tools.ts");
 checkTrue(
   "MCP update_event：收 private_booking、有帶才送",
   /update_event: z\.object\(\{[\s\S]*?private_booking: z/.test(mcp) &&
-    mcp.includes("...(args.private_booking !== undefined ? { private_booking } : {})"),
+    mcp.includes("...(privateBookingArg !== undefined ? { private_booking } : {})") &&
+    mcp.includes('args.private_booking === true || args.private_booking === "true"'),
 );
 const reader = readFile("src/server/private-booking.ts");
 checkTrue(
