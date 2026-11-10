@@ -476,7 +476,12 @@ checkFalse(
   /打開「發布狀態」/.test(qc),
 );
 const up = readFile("src/lib/admin/unified-products.ts");
-checkTrue("商品列表：活動票券標「跟著活動」", /（跟著活動）/.test(up));
+// 2026-11-10：商品列表不再列活動／策旅票券（業主：「這一頁不應該出現活動跟策旅」），
+// 所以也沒有「跟著活動」的鎖住開關——票券狀態只剩活動頁那一個入口可以改。
+checkTrue(
+  "商品列表：活動／策旅票券不列（buildUnifiedRows 略過 isTicketProduct），狀態只在活動頁改",
+  /if \(isTicketProduct\(p\)\) continue;/.test(up) && !/（跟著活動）/.test(up),
+);
 
 // =============================================================================
 console.log("\n[8] MCP set_event_status");

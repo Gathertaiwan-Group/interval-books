@@ -67,7 +67,8 @@ export const getAdminProductsPageData = createServerFn({ method: "GET" })
     const { matchPublicationNames } = await import("@/lib/admin/publication-name-match");
 
     const [products, publications, candidates, listed, curatedItemsAndThemes] = await Promise.all([
-      listProducts(),
+      // 業主 2026-11-10：這一頁不列活動／策旅票券（只是不讀出來，票券資料不動）。
+      listProducts({ excludeTickets: true }),
       listPublications(),
       listInventoryCandidates(),
       listListedInventoryProducts(),

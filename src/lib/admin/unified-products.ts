@@ -7,12 +7,20 @@
  * （public.publications）、內容管理 › 選品（public.curated_themes/curated_items）。
  * 前台 /shop 是一頁三分頁，後台卻是三個不同群組裡的三頁。
  *
- * ── 四種品項，四張表，一條規則：不重複列 ────────────────────────────────────
+ * ── 三種品項，一條規則：不重複列 ──────────────────────────────────────────
  *   goods        一般商品  products.product_type ∈ goods/book，**且沒有刊物指向它**
  *   publication  地方刊物  publications 每一本一列；連到商品的那本，價格／可售量跟著帶過來
  *   curated      選品      curated_items 每一項一列（名稱與備註；0041 起可連到一件書籍／選物，
  *                          連了的那一列帶出那件商品的名稱、價格、可售量）
- *   ticket       活動票券  products.product_type ∈ event/journey
+ *
+ * ── 活動／策旅票券不在這一頁（2026-11-10 業主：「這一頁不應該出現活動跟策旅」）──
+ * products.product_type ∈ event/journey 的票券商品原本是第四種「活動票券」。現在：
+ *   · 清單的查詢層就不讀它們（repos/products.ts#listProducts({ excludeTickets })，
+ *     只有 getAdminProductsPageData 帶這個參數；其他呼叫端預設行為不變），
+ *     buildUnifiedRows 也再擋一次（isTicketProduct）——分頁、計數、搜尋自然都不含票券；
+ *   · 沒有「活動票券」分頁籤，舊網址 ?type=ticket 當成沒帶（＝全部）；
+ *   · 直接打 /admin/products/product/<票券 id> → ticketAdminRedirect 轉去活動／策旅頁。
+ * 票券商品本身一個欄位都不動：活動／策旅的報名與金流掛在它們上面（CLAUDE.md 🔴）。
  *
  * 刊物連上庫存後，publications.product_id 指向一件 slug 為 `pub-…` 的 book 商品。
  * 那件商品**只出現在刊物那一列**，不再在「一般商品」重複一次 —— 否則同一本書在
@@ -27,7 +35,7 @@
 // 分頁
 // ---------------------------------------------------------------------------
 
-export const UNIFIED_KINDS = ["goods", "publication", "curated", "ticket"] as const;
+export const UNIFIED_KINDS = ["goods", "publication", "curated"] as const;
 export type UnifiedKind = (typeof UNIFIED_KINDS)[number];
 export type UnifiedTab = "all" | UnifiedKind;
 export const UNIFIED_TABS: readonly UnifiedTab[] = ["all", ...UNIFIED_KINDS];
@@ -36,7 +44,6 @@ export const KIND_LABEL: Record<UnifiedKind, string> = {
   goods: "一般商品",
   publication: "地方刊物",
   curated: "選品",
-  ticket: "活動票券",
 };
 
 export const TAB_LABEL: Record<UnifiedTab, string> = { all: "全部", ...KIND_LABEL };
@@ -159,16 +166,36 @@ function lower(...parts: (string | null | undefined)[]): string {
     .toLowerCase();
 }
 
-/** 0052：票券商品狀態 → 活動的單一狀態用語（active＝上架）。 */
-const TICKET_STATUS_LABEL: Record<UPProduct["status"], string> = {
-  draft: "草稿",
-  active: "上架",
-  archived: "下架",
-};
+/** 活動／策旅的票券商品。這一頁不列它們（見檔頭）。 */
+export function isTicketProduct(p: Pick<UPProduct, "product_type">): boolean {
+  return p.product_type === "event" || p.product_type === "journey";
+}
 
-function ticketHref(p: UPProduct): string | null {
-  if (p.source_type === "event" && p.source_id) return `/admin/events/${p.source_id}`;
-  return null;
+/** 票券商品的後台編輯去處（TanStack Router 的 to/params 形狀）。 */
+export type TicketAdminRedirect =
+  | { to: "/admin/events/$id"; params: { id: string } }
+  | { to: "/admin/journeys/$id"; params: { id: string } }
+  | { to: "/admin/events" }
+  | { to: "/admin/journeys" };
+
+/**
+ * 直接打 /admin/products/product/<id> 進到一張票券商品時要轉去哪裡；不是票券回 null。
+ *   source_type='event'   + source_id → 那場活動的編輯頁（＝清單上原本「到活動頁編輯」的連結）
+ *   source_type='journey' + source_id → 那張策旅卡片的編輯頁
+ *   沒有連到任何一筆（舊資料）           → 活動／策旅列表
+ * 一律不留在商品表單：在這裡改票券價格會與活動頁互相覆蓋（0026／0029）。
+ */
+export function ticketAdminRedirect(
+  p: Pick<UPProduct, "product_type" | "source_type" | "source_id">,
+): TicketAdminRedirect | null {
+  if (!isTicketProduct(p)) return null;
+  if (p.source_type === "event" && p.source_id) {
+    return { to: "/admin/events/$id", params: { id: p.source_id } };
+  }
+  if (p.source_type === "journey" && p.source_id) {
+    return { to: "/admin/journeys/$id", params: { id: p.source_id } };
+  }
+  return p.product_type === "journey" ? { to: "/admin/journeys" } : { to: "/admin/events" };
 }
 
 export function productStock(p: UPProduct, listed: UPListed | undefined) {
@@ -181,8 +208,8 @@ export function productStock(p: UPProduct, listed: UPListed | undefined) {
 }
 
 /**
- * 把四張表攤成一張清單。順序：一般商品 → 地方刊物 → 選品 → 活動票券，每一種內部
- * 保留各自 repo 的順序（那就是前台的順序）。
+ * 把三種品項攤成一張清單。順序：一般商品 → 地方刊物 → 選品，每一種內部
+ * 保留各自 repo 的順序（那就是前台的順序）。活動／策旅票券就算被傳進來也略過（見檔頭）。
  */
 export function buildUnifiedRows(input: {
   products: UPProduct[];
@@ -199,45 +226,32 @@ export function buildUnifiedRows(input: {
   const themeTitle = new Map(input.curatedThemes.map((t) => [t.id, t.title.zh]));
 
   const goods: UnifiedRow[] = [];
-  const tickets: UnifiedRow[] = [];
   for (const p of input.products) {
-    const isTicket = p.product_type === "event" || p.product_type === "journey";
-    if (!isTicket && pubProductIds.has(p.id)) continue; // 在刊物那一列
+    if (isTicketProduct(p)) continue; // 活動／策旅票券不在這一頁
+    if (pubProductIds.has(p.id)) continue; // 在刊物那一列
     const listed = listedByProduct.get(p.id);
-    const href = isTicket ? ticketHref(p) : null;
-    const editable = href === null;
     const row: UnifiedRow = {
-      key: `${isTicket ? "ticket" : "goods"}:${p.id}`,
-      kind: isTicket ? "ticket" : "goods",
+      key: `goods:${p.id}`,
+      kind: "goods",
       id: p.id,
       name: p.title.zh,
-      subtitle: isTicket
-        ? p.product_type === "event"
-          ? "活動"
-          : "策旅"
-        : p.product_type === "book"
-          ? "書籍"
-          : "商品",
+      subtitle: p.product_type === "book" ? "書籍" : "商品",
       imageKey: p.image_key,
       productId: p.id,
       price: p.price,
       comparePrice: p.compare_at_price,
       published: p.status === "active",
-      // 0052：活動票券的上下架跟著活動的單一狀態（開關是鎖住的，editable=false），
-      //       標籤直接講出來，免得有人以為要在這裡另外上架。
-      statusLabel: href
-        ? `${TICKET_STATUS_LABEL[p.status]}（跟著活動）`
-        : PRODUCT_STATUS_LABEL[p.status],
+      statusLabel: PRODUCT_STATUS_LABEL[p.status],
       ...productStock(p, listed),
       invName: listed?.inv_name ?? null,
       updatedAt: p.updated_at,
-      editable,
-      priceEditable: editable,
-      externalEditHref: href,
-      eventId: href ? p.source_id : null,
+      editable: true,
+      priceEditable: true,
+      externalEditHref: null,
+      eventId: null,
       searchText: lower(p.title.zh, p.title.en, p.title.ja, p.slug, listed?.inv_name),
     };
-    (isTicket ? tickets : goods).push(row);
+    goods.push(row);
   }
 
   const publications: UnifiedRow[] = input.publications.map((pub) => {
@@ -321,7 +335,7 @@ export function buildUnifiedRows(input: {
     };
   });
 
-  return [...goods, ...publications, ...curated, ...tickets];
+  return [...goods, ...publications, ...curated];
 }
 
 // ---------------------------------------------------------------------------
@@ -373,7 +387,6 @@ export function countByTab(rows: UnifiedRow[]): Record<UnifiedTab, number> {
     goods: 0,
     publication: 0,
     curated: 0,
-    ticket: 0,
   };
   for (const r of rows) counts[r.kind] += 1;
   return counts;
@@ -492,52 +505,33 @@ export function nextCuratedSortOrder(
 }
 
 /**
- * 「新增」時可以選的種類。活動與策旅的票不在這一頁建：2026-10-20 起活動頁與策旅頁
- * 各有「一頁新增」（/admin/events/new、/admin/journeys/new），活動＋商品＋場次＋票種
- * 一次建好 —— 在這裡另做一份就是第二條建立路徑。地方刊物是匯入的固定集合，不新增。
+ * 「新增」時可以選的種類。活動與策旅的票不在這一頁建，也不再列在這個選單
+ * （2026-11-10 這一頁不出現活動／策旅）：它們各有「一頁新增」（/admin/events/new、
+ * /admin/journeys/new），從活動／策旅頁進去。地方刊物是匯入的固定集合，不新增。
  */
 export const CREATE_OPTIONS: readonly {
   key: string;
   kind: UnifiedKind;
   label: string;
   hint: string;
-  /** 不在這裡建立 → 要去的地方（null = 就在這裡建）。 */
-  href: "/admin/events/new" | "/admin/journeys/new" | null;
 }[] = [
   {
     key: "goods",
     kind: "goods",
     label: "一般商品",
     hint: "書、器物、茶…可以直接結帳的實體商品。",
-    href: null,
   },
   {
     key: "curated",
     kind: "curated",
     label: "選品",
     hint: "主理人選品清單上的一項；可連結一件書籍／商品，首頁那一排會優先放它。",
-    href: null,
-  },
-  {
-    key: "event",
-    kind: "ticket",
-    label: "活動票券",
-    hint: "到「新增活動」一頁建好活動、商品、場次與票種。",
-    href: "/admin/events/new",
-  },
-  {
-    key: "journey",
-    kind: "ticket",
-    label: "策旅票券",
-    hint: "到「新增策旅」一頁建好策旅、商品與梯次。",
-    href: "/admin/journeys/new",
   },
   {
     key: "publication",
     kind: "publication",
     label: "地方刊物",
     hint: "126 本是從原始清單匯入的固定集合，不在這裡新增；要賣某一本，請在清單上按「連到庫存」。",
-    href: null,
   },
 ];
 
@@ -547,10 +541,10 @@ export const CREATE_OPTIONS: readonly {
 
 /**
  * 清單上一列按「編輯」要去哪一個內頁：
- *   product      /admin/products/product/$id      一般商品、沒有活動頁可去的票券（策旅…）
+ *   product      /admin/products/product/$id      一般商品
  *   publication  /admin/products/publication/$id  刊物校稿
  *   curated      /admin/products/curated/$id      選品一項
- *   null         不在這裡編：活動票券（eventId）一律連到 /admin/events/$id，不重做一份
+ *   null         不在這裡編（eventId 有值；票券不再列在這一頁，保留給相容）
  */
 export type ProductDetailKind = "product" | "publication" | "curated";
 

@@ -56,13 +56,8 @@ console.log("\n[1] 純邏輯：一列 → 內頁、網址 id");
   const up = await imp("src/lib/admin/unified-products.ts");
   check("一般商品 → product", up.detailKindFor({ kind: "goods", eventId: null }), "product");
   check(
-    "沒有活動頁的票券（策旅）→ product",
-    up.detailKindFor({ kind: "ticket", eventId: null }),
-    "product",
-  );
-  check(
-    "🔴 活動票券（有 eventId）→ null（連到活動頁，不在這裡另做一份）",
-    up.detailKindFor({ kind: "ticket", eventId: "e1" }),
+    "🔴 有 eventId 的列 → null（連到活動頁，不在這裡另做一份）",
+    up.detailKindFor({ kind: "goods", eventId: "e1" }),
     null,
   );
   check(
@@ -164,10 +159,43 @@ console.log("\n[2] loader 一支 fn、授權與原本的存檔 fn 相同");
     ),
   );
   checkTrue(
-    "🔴 活動投影的商品直接打網址 → 轉去活動頁（不另開一條會互相覆蓋的編輯路徑）",
-    /product\?\.source_type === "event" && product\.source_id\)\s*\{\s*throw redirect\(\{ to: "\/admin\/events\/\$id"/.test(
+    "🔴 活動／策旅票券直接打網址 → loader 用 ticketAdminRedirect 轉去活動／策旅頁（不另開一條會互相覆蓋的編輯路徑）",
+    /const ticketTarget = product \? ticketAdminRedirect\(product\) : null;\s*if \(ticketTarget\) throw redirect\(ticketTarget\);/.test(
       code(R("_shell.products_.product.$id.tsx")),
     ),
+  );
+  checkTrue(
+    "🔴 轉址在 loader 裡、在回傳 product 之前（票券表單一次都不會畫出來）",
+    (() => {
+      const src = code(R("_shell.products_.product.$id.tsx"));
+      const a = src.indexOf("throw redirect(ticketTarget)");
+      const b = src.indexOf("return { product };");
+      return a > 0 && b > a;
+    })(),
+  );
+  checkTrue(
+    "🔴 /admin/products 整頁資料只在清單用 listProducts({ excludeTickets: true })，其他呼叫維持預設",
+    (() => {
+      const fns = code("src/lib/admin/fns/products.ts");
+      const calls = fns.match(/listProducts\([^)]*\)/g) ?? [];
+      const excl = calls.filter((c) => c.includes("excludeTickets: true"));
+      const pageFn = fns.slice(
+        fns.indexOf("export const getAdminProductsPageData"),
+        fns.indexOf("export const getProductEditPageData"),
+      );
+      return excl.length === 1 && pageFn.includes("listProducts({ excludeTickets: true })");
+    })(),
+  );
+  checkTrue(
+    "🔴 repo：listProducts 預設不過濾，excludeTickets 才排除 event／journey",
+    (() => {
+      const repo = code("src/server/repos/products.ts");
+      return (
+        /listProducts\(opts: \{ excludeTickets\?: boolean \} = \{\}\)/.test(repo) &&
+        /if \(opts\.excludeTickets\) \{\s*query = query\.not\("product_type", "in"/.test(repo) &&
+        /TICKET_PRODUCT_TYPES = \["event", "journey"\] as const/.test(repo)
+      );
+    })(),
   );
 }
 

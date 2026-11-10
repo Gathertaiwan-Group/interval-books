@@ -88,10 +88,23 @@ export type ProductUpsertInput = {
   sort_order: number;
 };
 
-export async function listProducts(): Promise<ProductRow[]> {
-  const { data, error } = await supabaseAdmin()
-    .from("products")
-    .select(COLUMNS)
+/** 活動／策旅的票券商品（報名與金流依賴它們：products → event_sessions → orders）。 */
+export const TICKET_PRODUCT_TYPES = ["event", "journey"] as const;
+
+/**
+ * 全表讀取。預設（不帶參數）行為不變：所有 product_type 都回來——電話訂單、MCP、
+ * 選品連結、新增商品的排序值都依賴這個預設。
+ *
+ * `excludeTickets: true` 只給後台 /admin/products 清單（getAdminProductsPageData）用：
+ * 2026-11-10 業主「商品這一頁不應該出現活動跟策旅」。這只是**不讀出來**，票券商品本身
+ * 一個欄位都不動（CLAUDE.md 🔴：活動／策旅的報名與金流掛在這些商品上）。
+ */
+export async function listProducts(opts: { excludeTickets?: boolean } = {}): Promise<ProductRow[]> {
+  let query = supabaseAdmin().from("products").select(COLUMNS);
+  if (opts.excludeTickets) {
+    query = query.not("product_type", "in", `(${TICKET_PRODUCT_TYPES.join(",")})`);
+  }
+  const { data, error } = await query
     .order("sort_order", { ascending: true })
     .order("id", { ascending: true });
 

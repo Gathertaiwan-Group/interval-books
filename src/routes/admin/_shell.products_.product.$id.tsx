@@ -1,5 +1,5 @@
 /**
- * /admin/products/product/$id —— 一般商品（與沒有活動頁可去的票券，例如策旅）的完整編輯表單。
+ * /admin/products/product/$id —— 一般商品的完整編輯表單。
  *
  * 2026-10-25 從 /admin/products 的編輯彈窗改成內頁（業主：「不要用彈窗，直接顯示內頁＆
  * 回到上一頁」）。欄位與寫入路徑沒變：ProductForm → fns/products.ts#upsertProduct。
@@ -7,9 +7,10 @@
  * loader 只叫一支 getProductEditPageData（adminFnMiddleware，與 upsertProduct 相同），
  * 只抓這一件商品；原本彈窗用的是整頁 loader 在記憶體裡的那一列。
  *
- * ⚠️ 活動商品（source_type='event' 且有 source_id）是活動編輯頁投影出來的（0026／0029），
- *    清單上本來就只給「到活動頁編輯」。有人直接打這個網址也一樣轉去 /admin/events/$id，
- *    不在這裡另開一條會與活動頁互相覆蓋的編輯路徑。
+ * ⚠️ 活動／策旅票券（product_type ∈ event/journey）不在商品頁編：2026-11-10 起清單上不列它們，
+ *    有人直接打這個網址也轉走（unified-products.ts#ticketAdminRedirect）——有連到活動就去
+ *    /admin/events/$id、連到策旅卡片就去 /admin/journeys/$id，都沒連就去活動／策旅列表。
+ *    不在這裡另開一條會與活動頁互相覆蓋的編輯路徑（誤改票券價格）。
  */
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import {
@@ -21,7 +22,12 @@ import { ProductForm } from "@/components/admin/products/ProductForm";
 import { ProductFormPage } from "@/components/admin/products/ProductFormPage";
 import { toFormValues } from "@/components/admin/products/form-values";
 import { readAdminPeek } from "@/lib/admin/list-memory";
-import { isProductTextId, PRODUCT_PEEK_KIND, type UnifiedRow } from "@/lib/admin/unified-products";
+import {
+  isProductTextId,
+  PRODUCT_PEEK_KIND,
+  ticketAdminRedirect,
+  type UnifiedRow,
+} from "@/lib/admin/unified-products";
 import type { ProductFormValues } from "@/lib/admin/schemas";
 
 export const Route = createFileRoute("/admin/_shell/products_/product/$id")({
@@ -29,9 +35,8 @@ export const Route = createFileRoute("/admin/_shell/products_/product/$id")({
     if (!isProductTextId(params.id)) return { product: null };
     const { getProductEditPageData } = await import("@/lib/admin/fns/products");
     const { product } = await getProductEditPageData({ data: { id: params.id } });
-    if (product?.source_type === "event" && product.source_id) {
-      throw redirect({ to: "/admin/events/$id", params: { id: product.source_id } });
-    }
+    const ticketTarget = product ? ticketAdminRedirect(product) : null;
+    if (ticketTarget) throw redirect(ticketTarget);
     return { product };
   },
   head: ({ loaderData }) => ({
@@ -47,11 +52,6 @@ export const Route = createFileRoute("/admin/_shell/products_/product/$id")({
   pendingComponent: ProductEditPending,
   component: ProductEditPage,
 });
-
-/** 商品類型 → 回列表時的分頁籤（票券在「活動票券」、其餘在「一般商品」）。 */
-function tabFor(type: ProductFormValues["product_type"] | undefined) {
-  return type === "event" || type === "journey" ? "ticket" : "goods";
-}
 
 function ProductEditPending() {
   const { id } = Route.useParams();
@@ -87,7 +87,7 @@ function ProductEditPage() {
       title={`編輯「${product.title.zh}」`}
       meta="中文、英文、日文皆為必填——資料庫要求三語齊備才能儲存。"
       backTo="/admin/products"
-      backSearch={{ type: tabFor(product.product_type) }}
+      backSearch={{ type: "goods" }}
       backLabel="回商品列表"
       submitLabel="儲存變更"
       successMessage="已更新商品"

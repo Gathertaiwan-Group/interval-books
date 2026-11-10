@@ -7,7 +7,11 @@
  *   一般商品  public.products（goods/book，沒有刊物指向它的）   原本就在這一頁
  *   地方刊物  public.publications（＋連到的那件 book 商品）      原本 /admin/publications
  *   選品      public.curated_items                              原本 /admin/curated
- *   活動票券  public.products（event/journey）                   原本就在這一頁
+ *
+ * 活動／策旅票券（products.product_type ∈ event/journey）**不在這一頁**（2026-11-10 業主：
+ * 「這一頁不應該出現活動跟策旅」）：loader 的查詢就不讀它們（listProducts({ excludeTickets })），
+ * 分頁、計數、搜尋都不含；直接打票券的商品內頁網址會轉去活動／策旅頁。票券資料本身不動——
+ * 活動與策旅的報名、金流掛在它們上面（CLAUDE.md 🔴）。
  *
  * 怎麼攤成一張清單、哪一件不重複列、上下架開關對應到哪一欄，全部在
  * src/lib/admin/unified-products.ts（純函式，scripts/unified-products-selftest.mjs
@@ -18,18 +22,16 @@
  *    表單也是同一份（刊物與選品的表單搬到 src/components/admin/products/）。
  *
  * ⚠️ 活動商品（source_type='event'）是活動編輯頁投影出來的（0026／0029）：價格、
- *    上下架在活動頁改，這裡只顯示並連過去。在這裡改會跟活動頁互相覆蓋。
- *
- * 名額與日期不在商品上——由「活動報名」頁按場次維護（0020）。
+ *    上下架在活動頁改。在這裡改會跟活動頁互相覆蓋——這也是它們不列在這一頁的理由之一。
  *
  * ── 內頁（2026-10-25 起，業主：「不要用彈窗，直接顯示內頁＆回到上一頁」）─────
  * 編輯／新增不再是彈窗：
- *   /admin/products/product/$id      一般商品／策旅票券（ProductForm）
+ *   /admin/products/product/$id      一般商品（ProductForm；票券 id 會被轉去活動／策旅頁）
  *   /admin/products/product/new      新增一般商品（NewGoodsForm）
  *   /admin/products/publication/$id  刊物校稿（PublicationForm）
  *   /admin/products/curated/$id      選品一項（CuratedItemForm）
  *   /admin/products/curated/new      新增選品
- * 活動票券照舊連到 /admin/events/$id。各內頁的 loader 只抓那一筆（fns/products.ts 最後）。
+ * 各內頁的 loader 只抓那一筆（fns/products.ts 最後）。
  * 留在這一頁的：改價、上下架、連到庫存／解除連結（上架動作）、刪除確認。
  * 搜尋字、狀態、排序記在 list-memory，從內頁「← 回到列表」回來原樣還原；分頁籤本來就在網址
  * （?type=）。這一頁的資料直接用 loader 的（沒有抄進 useState），存檔後 invalidate 就是新的。
@@ -37,7 +39,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ChevronDown, ExternalLink, Link2, ListOrdered, Plus, Search } from "lucide-react";
+import { ChevronDown, Link2, ListOrdered, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -348,7 +350,8 @@ function AdminProductsPage() {
         <div>
           <h1 className="text-2xl font-medium">商品</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            前台看得到的一般商品、地方刊物、選品與活動票券，都在這一頁。共 {counts.all} 項。
+            前台看得到的一般商品、地方刊物與選品，都在這一頁（活動與策旅請到各自的頁面）。共{" "}
+            {counts.all} 項。
           </p>
         </div>
         <CreateMenu />
@@ -597,13 +600,6 @@ function AdminProductsPage() {
             <AlertDialogTitle>確定要刪除「{deleteTarget?.name}」嗎？</AlertDialogTitle>
             <AlertDialogDescription>
               刪除後無法復原。只是暫時不賣的話，用「上架」開關關掉就好。
-              {deleteTarget?.kind === "ticket" ? (
-                <span className="mt-2 block font-medium text-destructive">
-                  這是活動類商品。刪除會連帶刪掉它的所有場次——只要任何一個場次有人
-                  報名或下過單，資料庫會擋下整筆刪除（場次與訂單明細之間是 on delete
-                  restrict）。請先到「活動報名」處理那些場次。
-                </span>
-              ) : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -627,7 +623,7 @@ function AdminProductsPage() {
 
 /**
  * 「＋ 新增商品」：選單（不是彈窗），每一項直接連到那一種的新增內頁。
- * 活動／策旅票券去各自的「一頁新增」；地方刊物是匯入的固定集合，不新增（灰掉並說明）。
+ * 活動／策旅不在這裡新增（到各自的頁面）；地方刊物是匯入的固定集合，不新增（灰掉並說明）。
  */
 function CreateMenu() {
   return (
@@ -643,32 +639,13 @@ function CreateMenu() {
         {CREATE_OPTIONS.map((opt) => {
           const body = (
             <span className="min-w-0">
-              <span className="flex items-center gap-1 font-medium">
-                {opt.label}
-                {opt.href ? <ExternalLink className="h-3 w-3" aria-hidden /> : null}
-              </span>
+              <span className="flex items-center gap-1 font-medium">{opt.label}</span>
               <span className="mt-0.5 block whitespace-normal break-words text-xs text-muted-foreground">
                 {opt.hint}
               </span>
             </span>
           );
           const testid = `create-${opt.key}`;
-          if (opt.href === "/admin/journeys/new") {
-            return (
-              <DropdownMenuItem key={opt.key} asChild data-testid={testid}>
-                <Link to="/admin/journeys/new">{body}</Link>
-              </DropdownMenuItem>
-            );
-          }
-          if (opt.href === "/admin/events/new") {
-            return (
-              <DropdownMenuItem key={opt.key} asChild data-testid={testid}>
-                <Link to="/admin/events/$id" params={{ id: "new" }}>
-                  {body}
-                </Link>
-              </DropdownMenuItem>
-            );
-          }
           if (opt.kind === "goods") {
             return (
               <DropdownMenuItem key={opt.key} asChild data-testid={testid}>

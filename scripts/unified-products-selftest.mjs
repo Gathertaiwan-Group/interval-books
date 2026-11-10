@@ -3,8 +3,9 @@
  * unified-products-selftest.mjs —— 後台「商品」單一頁（2026-10-20）的自檢
  *
  *   [執行] 直接 `await import()` src/lib/admin/unified-products.ts（產線上跑的那一份，
- *          沒有任何 import，所以不需要 hook），驗：四種品項怎麼攤成一張清單、刊物連到的
- *          商品不重複列、活動商品只讀、分頁／搜尋／狀態篩選、排序穩定、上下架開關對應的
+ *          沒有任何 import，所以不需要 hook），驗：三種品項怎麼攤成一張清單、刊物連到的
+ *          商品不重複列、活動／策旅票券不列（2026-11-10）與直接進票券內頁的轉址、
+ *          分頁／搜尋／狀態篩選、排序穩定、上下架開關對應的
  *          status、列上改價的輸入檢查、新增一般商品的完整 payload、選品 sort_order。
  *
  *   [靜態] 讀原始碼守住幾條「改錯了不會有人發現」的線：
@@ -68,7 +69,7 @@ function stripTs(src) {
 const up = await import(pathToFileURL(join(ROOT, "src/lib/admin/unified-products.ts")).href);
 
 // -----------------------------------------------------------------------------
-console.log("\n[執行] 攤平四張表");
+console.log("\n[執行] 攤平三種品項（票券不列）");
 // -----------------------------------------------------------------------------
 
 const L = (zh, en = zh, ja = zh) => ({ zh, en, ja });
@@ -183,17 +184,14 @@ const listed = [{ product_id: "b-pub", inv_name: "基隆刊物 第3期", availab
 const rows = up.buildUnifiedRows({ products, publications, curatedThemes, curatedItems, listed });
 
 check(
-  "順序：一般商品 → 地方刊物 → 選品 → 活動票券",
+  "順序：一般商品 → 地方刊物 → 選品（🔴 活動／策旅票券不列，就算被傳進來）",
   rows.map((r) => r.key),
-  [
-    "goods:g1",
-    "goods:g2",
-    "publication:p1",
-    "publication:p2",
-    "curated:11",
-    "ticket:e1",
-    "ticket:j1",
-  ],
+  ["goods:g1", "goods:g2", "publication:p1", "publication:p2", "curated:11"],
+);
+check(
+  "🔴 清單裡沒有任何 event／journey 商品",
+  rows.filter((r) => r.id === "e1" || r.id === "j1" || r.kind === "ticket").length,
+  0,
 );
 check(
   "🔴 刊物連到的那件 book 商品不在「一般商品」重複出現",
@@ -201,7 +199,12 @@ check(
   0,
 );
 check("每一列的 key 都不重複", new Set(rows.map((r) => r.key)).size, rows.length);
-check("計數", up.countByTab(rows), { all: 7, goods: 2, publication: 2, curated: 1, ticket: 2 });
+check("🔴 計數不含票券、沒有 ticket 這一格", up.countByTab(rows), {
+  all: 5,
+  goods: 2,
+  publication: 2,
+  curated: 1,
+});
 
 const byKey = Object.fromEntries(rows.map((r) => [r.key, r]));
 check(
@@ -250,24 +253,41 @@ check(
   [true, false],
 );
 check(
-  "🔴 活動來源的票券：唯讀、指去活動編輯頁",
+  "isTicketProduct：event／journey 是、goods／book 不是",
+  ["event", "journey", "goods", "book"].map((t) => up.isTicketProduct({ product_type: t })),
+  [true, true, false, false],
+);
+
+// -----------------------------------------------------------------------------
+console.log("\n[執行] 直接打票券的商品內頁 → 轉去活動／策旅頁");
+// -----------------------------------------------------------------------------
+check(
+  "🔴 活動票券（source_type=event）→ /admin/events/$id（＝原本「到活動頁編輯」的連結）",
+  up.ticketAdminRedirect(products.find((p) => p.id === "e1")),
+  { to: "/admin/events/$id", params: { id: "ev-uuid" } },
+);
+check(
+  "策旅票券連到策旅卡片（source_type=journey）→ /admin/journeys/$id",
+  up.ticketAdminRedirect({ product_type: "journey", source_type: "journey", source_id: "jr-1" }),
+  { to: "/admin/journeys/$id", params: { id: "jr-1" } },
+);
+check(
+  "沒連到任何一筆的舊策旅票券 → 策旅列表（不留在商品表單）",
+  up.ticketAdminRedirect(products.find((p) => p.id === "j1")),
+  { to: "/admin/journeys" },
+);
+check(
+  "沒連到任何一筆的活動票券 → 活動列表",
+  up.ticketAdminRedirect({ product_type: "event", source_type: null, source_id: null }),
+  { to: "/admin/events" },
+);
+check(
+  "一般商品／書籍不轉址（就算 source_type 是 curated_item）",
   [
-    byKey["ticket:e1"].editable,
-    byKey["ticket:e1"].priceEditable,
-    byKey["ticket:e1"].externalEditHref,
-    byKey["ticket:e1"].eventId,
+    up.ticketAdminRedirect(products.find((p) => p.id === "g1")),
+    up.ticketAdminRedirect({ product_type: "book", source_type: "curated_item", source_id: "9" }),
   ],
-  [false, false, "/admin/events/ev-uuid", "ev-uuid"],
-);
-check(
-  "沒有活動來源的策旅票券：在這一頁編輯",
-  [byKey["ticket:j1"].editable, byKey["ticket:j1"].externalEditHref],
-  [true, null],
-);
-check(
-  "票券的可售量寫「按場次」（名額在 event_sessions，不在商品）",
-  [byKey["ticket:e1"].stock, byKey["ticket:e1"].stockNote],
-  [null, "按場次"],
+  [null, null],
 );
 
 // -----------------------------------------------------------------------------
@@ -279,7 +299,14 @@ check(
   up.filterUnifiedRows(rows, { tab: "curated", query: "" }).map((r) => r.key),
   ["curated:11"],
 );
-check("分頁：全部", up.filterUnifiedRows(rows, { tab: "all", query: "" }).length, 7);
+check("分頁：全部", up.filterUnifiedRows(rows, { tab: "all", query: "" }).length, 5);
+check(
+  "🔴 搜尋：票券的名稱／代稱搜不到",
+  ["海的聲音", "event-sea", "策旅", "journey-x"].map(
+    (q) => up.filterUnifiedRows(rows, { tab: "all", query: q }).length,
+  ),
+  [0, 0, 0, 0],
+);
 check(
   "搜尋：英文標題、不分大小寫",
   up.filterUnifiedRows(rows, { tab: "all", query: "OOLONG" }).map((r) => r.key),
@@ -298,7 +325,7 @@ check(
 check(
   "狀態：未上架",
   up.filterUnifiedRows(rows, { tab: "all", query: "", status: "unpublished" }).map((r) => r.key),
-  ["goods:g2", "publication:p2", "ticket:j1"],
+  ["goods:g2", "publication:p2"],
 );
 check("搜尋＋分頁一起作用", up.filterUnifiedRows(rows, { tab: "goods", query: "基隆" }).length, 0);
 
@@ -313,15 +340,7 @@ check(
 check(
   "排序：價格高→低，沒價格的排最後且維持原順序",
   up.sortUnifiedRows(rows, "price").map((r) => r.key),
-  [
-    "ticket:j1",
-    "ticket:e1",
-    "goods:g1",
-    "goods:g2",
-    "publication:p1",
-    "publication:p2",
-    "curated:11",
-  ],
+  ["goods:g1", "goods:g2", "publication:p1", "publication:p2", "curated:11"],
 );
 check(
   "排序：預設＝原順序（不改動輸入）",
@@ -332,6 +351,12 @@ check(
 check("?type= 解析：認得的", up.parseUnifiedTab("publication"), "publication");
 check("?type= 解析：all 視同沒帶", up.parseUnifiedTab("all"), undefined);
 check("?type= 解析：亂寫的不丟錯", up.parseUnifiedTab("<script>"), undefined);
+check("🔴 ?type=ticket（舊書籤）當成沒帶＝全部", up.parseUnifiedTab("ticket"), undefined);
+check(
+  "🔴 篩選分頁籤沒有「活動票券」",
+  [up.UNIFIED_TABS, Object.values(up.TAB_LABEL).includes("活動票券")],
+  [["all", "goods", "publication", "curated"], false],
+);
 
 // -----------------------------------------------------------------------------
 console.log("\n[執行] 寫入 payload");
@@ -413,14 +438,12 @@ check(
 );
 check("選品 sort_order：空主題從 1 開始", up.nextCuratedSortOrder([], "t9"), 1);
 check(
-  "新增選單：活動／策旅票券導去各自的「一頁新增」、刊物不在這裡新增",
-  up.CREATE_OPTIONS.map((o) => [o.key, o.kind, o.href]),
+  "新增選單：只有一般商品／選品／刊物（活動、策旅不在這一頁新增）",
+  up.CREATE_OPTIONS.map((o) => [o.key, o.kind]),
   [
-    ["goods", "goods", null],
-    ["curated", "curated", null],
-    ["event", "ticket", "/admin/events/new"],
-    ["journey", "ticket", "/admin/journeys/new"],
-    ["publication", "publication", null],
+    ["goods", "goods"],
+    ["curated", "curated"],
+    ["publication", "publication"],
   ],
 );
 
