@@ -289,7 +289,7 @@ function MonthTable({
                           ? "bg-foreground px-1 text-primary-foreground"
                           : day.inMonth
                             ? "text-foreground"
-                            : "text-muted-foreground/60"
+                            : "text-muted-foreground"
                       }`}
                     >
                       {Number(day.date.slice(8))}
