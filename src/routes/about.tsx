@@ -87,7 +87,7 @@ const PAGE = {
     en: "Our story, from one bookcase and a long table: terroir curation, reading circles and journeys — plus hours and how to find us in Huashan's Red Brick Courtyard.",
     ja: "一棚の本と長いテーブルから始まった小時光の歩み。風土誌のキュレーション、読書会、旅と共創という三つの仕事と、華山・紅煉瓦六合院への行き方、営業時間をご案内します。",
   },
-  eyebrowSuffix: { zh: "關於小時光", en: "About", ja: "小時光について" },
+  eyebrowSuffix: { zh: "關於小時光", en: "About Interval Books", ja: "小時光について" },
   /** h1。與導覽列那一格同一個詞。 */
   pageTitle: {
     zh: "關於小時光",
@@ -105,9 +105,9 @@ const PAGE = {
     ja: "華山・紅煉瓦六合院にある小時光書店は、本屋をひとつの器として、一冊の地域誌、ひとつの読書会、ひとつの旅から、台湾のすてきなものをより多くの人に届けています。",
   },
   story: {
-    zh: "從一櫃書、一張長桌開始，我們慢慢有了陶藝家的器物、地方夥伴的選物、與每月一場讀書會。書店並不大，但它是我們對於「閱讀」的長時間練習——讓書頁與生活，能彼此呼吸。",
-    en: "We began with a single shelf and a long table. Then came the ceramicists' vessels, the local partners' selections, and a monthly reading circle. The shop is small, but it is our long practice of reading — letting page and life breathe together.",
-    ja: "一棚の本と一脚の長机から始まりました。やがて陶芸家の器、地方の作り手の品、月に一度の読書会が加わりました。小さな店ですが、本と暮らしがともに呼吸できる場をめざす、長い練習なのです。",
+    zh: "從一櫃書、一張長桌開始，我們慢慢收進了台灣各地的地方刊物，辦起讀書會與講座，也開始帶著讀者走出書店、走進土地。",
+    en: "We began with a single bookcase and a long table. Slowly we gathered local publications from across Taiwan, started reading circles and talks, and began taking readers out of the shop and into the land.",
+    ja: "一棚の本と一脚の長机から始まりました。少しずつ台湾各地の地域の刊行物を集め、読書会やトークを開き、やがて読者と一緒に書店を出て、土地へと歩きはじめました。",
   },
   workTitle: { zh: "我們做的事", en: "What we do", ja: "わたしたちのしごと" },
   spaceTitle: { zh: "空間特色", en: "Inside the space", ja: "空間" },
@@ -152,31 +152,44 @@ const VISIT = {
   contactEyebrow: { zh: "Contact", en: "Contact", ja: "Contact" },
 };
 
+/** 2026-11-10 文案健檢 A2：三張卡對齊首頁的「讀．聚．行」（src/routes/index.tsx HOME.read*／gather*／go*）。 */
 const WORK_FALLBACK: PageListEntry[] = [
   {
-    label: { zh: "風土誌策展", en: "Terroir Curation", ja: "風土誌キュレーション" },
+    label: {
+      zh: "讀｜選書與地方刊物",
+      en: "Read | Books & local publications",
+      ja: "読｜選書と地域の刊行物",
+    },
     note: {
-      zh: "以地方為線索，策劃書展、選物與內容。",
-      en: "Place as the thread for book shows, objects, and content.",
-      ja: "土地を糸口に、書展・選品・コンテンツを編む。",
+      zh: "以風土為線索選書，收進台灣各地的地方刊物。",
+      en: "Books chosen by the land they come from, and local publications from across Taiwan.",
+      ja: "風土を手がかりに本を選び、台湾各地の地域の刊行物を集めています。",
     },
     imageKey: null,
   },
   {
-    label: { zh: "活動與讀書會", en: "Events & Reading Circles", ja: "イベントと読書会" },
+    label: {
+      zh: "聚｜讀書會、講座與工作坊",
+      en: "Gather | Reading circles, talks & workshops",
+      ja: "集｜読書会・トーク・ワークショップ",
+    },
     note: {
-      zh: "讀書會、講座、工作坊、身心靈活動。",
-      en: "Reading circles, talks, workshops, and healing practice.",
-      ja: "読書会、トーク、ワークショップ、ヒーリング。",
+      zh: "一張長桌，讓讀過的書被好好說出來。",
+      en: "One long table, where the books we read get talked through.",
+      ja: "長いテーブルひとつで、読んだ本をゆっくり語り合います。",
     },
     imageKey: null,
   },
   {
-    label: { zh: "策旅與合作共創", en: "Journeys & Co-creation", ja: "旅と共創" },
+    label: {
+      zh: "行｜走進土地的策旅",
+      en: "Go | Journeys into the land",
+      ja: "行｜土地へ歩み入る旅",
+    },
     note: {
-      zh: "與在地夥伴設計風土主題旅程與品牌共創。",
-      en: "Place-rooted journeys and brand co-creation with local partners.",
-      ja: "地のパートナーと風土の旅、ブランド共創を設計します。",
+      zh: "跟著書與作者走出書店，到故事發生的地方。",
+      en: "We follow books and their authors out of the shop to the places they describe.",
+      ja: "本と作家に導かれて書店を出て、物語の舞台へ。",
     },
     imageKey: null,
   },

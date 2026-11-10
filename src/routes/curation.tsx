@@ -21,7 +21,13 @@ const PAGE = {
     en: "Curation with partners: healing arts festivals, book and object selections for hotels and cafés, tea-and-vessel showcases, and reading events for brands.",
     ja: "人と物と空間が互いに見えるように。ヒーリング・アートフェスの現場づくり、宿やカフェの選書・選品、本と茶器のテーマ展示、ブランドの読書イベントや接待を企画します。",
   },
-  eyebrowSuffix: { zh: "策展與合作", en: "策展與合作", ja: "策展與合作" },
+  eyebrowSuffix: { zh: "策展與合作", en: "Curation", ja: "キュレーション" },
+  /** 2026-11-10 文案健檢 C2：與 /partnership 同一組卡片（collaborations），區塊標題同一句。 */
+  casesTitle: {
+    zh: "我們做過的合作類型",
+    en: "Kinds of collaboration we've done",
+    ja: "これまでの協働のかたち",
+  },
   title: {
     zh: "與夥伴，共構一段現場",
     en: "Co-creating a quiet stage",
@@ -40,9 +46,9 @@ const PAGE = {
     ja: "協働のご相談フォームへ",
   },
   contact: {
-    zh: "合作邀請請以 Email 聯繫，我們會親自回覆。",
-    en: "For collaboration, please reach us by email — we'll reply personally.",
-    ja: "ご相談はメールにて。一通ずつお返事いたします。",
+    zh: "填寫合作表單，或直接來信，我們會親自回覆。",
+    en: "Fill in the partnership form or simply email us — we'll reply personally.",
+    ja: "ご相談フォームから、またはメールで直接どうぞ。一通ずつお返事いたします。",
   },
 };
 
@@ -112,23 +118,30 @@ function Curation() {
           </p>
         </section>
       ) : (
-        <section className={`container-editorial pb-24 ${layout.grid}`}>
-          {collaborations.map((c, i) => (
-            <article key={c.id} className={`${CARD} ${layout.card}`}>
-              <div className={`flex flex-1 flex-col p-6 ${layout.body}`}>
-                <p className="text-xs tracking-widest text-muted-foreground">
-                  {String(i + 1).padStart(2, "0")}
-                </p>
-                <h2 className={`display mt-3 text-2xl leading-snug ${layout.title}`}>
-                  {t(c.title)}
-                </h2>
-                <p className="mt-4 text-sm leading-relaxed text-foreground/75">
-                  {t(c.description)}
-                </p>
-              </div>
-            </article>
-          ))}
-        </section>
+        <>
+          <div className="container-editorial pb-10">
+            <h2 className="display text-3xl md:text-4xl" data-testid="curation-cases-title">
+              {t(p.block("casesTitle", PAGE.casesTitle))}
+            </h2>
+          </div>
+          <section className={`container-editorial pb-24 ${layout.grid}`}>
+            {collaborations.map((c, i) => (
+              <article key={c.id} className={`${CARD} ${layout.card}`}>
+                <div className={`flex flex-1 flex-col p-6 ${layout.body}`}>
+                  <p className="text-xs tracking-widest text-muted-foreground">
+                    {String(i + 1).padStart(2, "0")}
+                  </p>
+                  <h3 className={`display mt-3 text-2xl leading-snug ${layout.title}`}>
+                    {t(c.title)}
+                  </h3>
+                  <p className="mt-4 text-sm leading-relaxed text-foreground/75">
+                    {t(c.description)}
+                  </p>
+                </div>
+              </article>
+            ))}
+          </section>
+        </>
       )}
 
       <section className="container-editorial pb-32">

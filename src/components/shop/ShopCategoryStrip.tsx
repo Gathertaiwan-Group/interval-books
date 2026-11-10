@@ -11,6 +11,12 @@
  *    所以每張卡的副標都老實寫出「可線上購買」或「到店翻閱／詢問」。
  *
  * 資料全由 props 帶進來（來源是 shop.index.tsx 的 loader），這個檔案不讀資料庫。
+ *
+ * 2026-11-10 文案健檢（業主核准）：curated_items 的 18 件是範例、不是真的商品，不再露出——
+ *   · 原本卡片列下方那一排「店裡也有：桂花蜜、粗陶茶碗……」整排拿掉（S2）。
+ *   · 「主理人的選品」入口卡的副標：傳進來的 curatedThemes 已經是 ProductsPanel 用
+ *     displayableCuratedThemes() 濾過的（只剩連了真實商品的選品），有才列主題名，
+ *     沒有就寫「整理中・到店看看」（S3）。
  */
 import { Link } from "@tanstack/react-router";
 import { useT } from "@/i18n/LanguageContext";
@@ -23,13 +29,16 @@ import journeyThumb from "@/assets/responsive/journey-mist-360.jpg";
 
 const COPY = {
   heading: { zh: "逛逛店裡的選物", en: "Browse the shop", ja: "店内のセレクトを見る" },
-  alsoInStore: { zh: "店裡也有", en: "Also in store", ja: "店頭には" },
   books: { zh: "書刊", en: "Books & zines", ja: "本と冊子" },
   booksSub: { zh: "本可線上購買", en: "to buy online", ja: "冊をオンラインで" },
   publications: { zh: "地方刊物展", en: "Local publications", ja: "地域の刊行物" },
   publicationsSub: { zh: "本・到店翻閱", en: "titles · browse in store", ja: "冊・店頭で" },
   curated: { zh: "主理人的選品", en: "Curated goods", ja: "店主の選品" },
-  curatedSubFallback: { zh: "器物・茶・風土", en: "Vessels, tea, terroir", ja: "器・茶・風土" },
+  curatedSubFallback: {
+    zh: "整理中・到店看看",
+    en: "Coming soon · visit the shop",
+    ja: "準備中・店頭へどうぞ",
+  },
   events: { zh: "活動", en: "Events", ja: "イベント" },
   eventsSub: { zh: "讀書會與講座", en: "Readings & talks", ja: "読書会と講座" },
   journeys: { zh: "策旅", en: "Journeys", ja: "旅" },
@@ -116,15 +125,6 @@ export function ShopCategoryStrip({
     },
   ];
 
-  // 「店裡也有」：每個主題輪流挑一件，最多 8 件，讓首屏直接看到器物、茶、風土的實際品名。
-  // 這些大多買不到（curated_items 多半沒連商品），所以整列連到〈主理人的選品〉分頁，不放價格。
-  const samples: string[] = [];
-  for (let i = 0; samples.length < 8; i++) {
-    const row = curatedThemes.map((theme) => theme.items[i]).filter(Boolean);
-    if (row.length === 0) break;
-    for (const item of row) if (samples.length < 8) samples.push(t(item.name));
-  }
-
   const body = (entry: Entry) => (
     <>
       <span className="block aspect-square overflow-hidden bg-muted">
@@ -189,24 +189,6 @@ export function ShopCategoryStrip({
           </li>
         ))}
       </ul>
-      {samples.length > 0 && (
-        <Link
-          to="/shop"
-          search={{ tab: "curated" }}
-          className="-mx-6 mt-3 flex items-center gap-2 overflow-x-auto px-6 py-1 text-xs [scrollbar-width:none] md:mx-0 md:mt-5 md:flex-wrap md:px-0 [&::-webkit-scrollbar]:hidden"
-          data-testid="shop-category-samples"
-        >
-          <span className="shrink-0 text-muted-foreground">{t(COPY.alsoInStore)}</span>
-          {samples.map((name) => (
-            <span
-              key={name}
-              className="shrink-0 rounded-full border border-border bg-card/70 px-3 py-1.5 text-foreground/80"
-            >
-              {name}
-            </span>
-          ))}
-        </Link>
-      )}
     </section>
   );
 }

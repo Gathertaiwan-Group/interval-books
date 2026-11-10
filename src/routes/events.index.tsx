@@ -177,10 +177,12 @@ const JOURNEY_COPY = {
   coCreateEyebrow: { zh: "Co-create", en: "Co-create", ja: "Co-create" },
   collab: { zh: "策旅合作共創", en: "Journey co-creation", ja: "旅の共創" },
   collabBody: {
-    zh: "若您是地方夥伴、職人、旅宿或品牌，歡迎與我們共創一段屬於風土的策旅。請以 Email 聯繫。",
-    en: "If you're a local partner, maker, hotel, or brand, we'd love to co-create a journey rooted in place. Reach us by email.",
-    ja: "地域のパートナー、作り手、宿、ブランドの方へ。風土に根ざした旅をともに育てましょう。メールでご連絡ください。",
+    zh: "若您是地方夥伴、職人、旅宿或品牌，歡迎與我們共創一段台灣地方的策旅。填寫合作表單，或直接來信。",
+    en: "If you're a local partner, maker, hotel, or brand, we'd love to co-create a journey somewhere in Taiwan. Fill in the partnership form, or simply email us.",
+    ja: "地域のパートナー、作り手、宿、ブランドの方へ。台湾の土地をめぐる旅を、ともにつくりませんか。ご相談フォームから、またはメールで直接どうぞ。",
   },
+  /** 2026-11-10 文案健檢 E3：共創段加一顆按鈕連到 /partnership 的合作表單。 */
+  collabCta: { zh: "填寫合作表單", en: "Partnership form", ja: "ご相談フォームへ" },
   pastEyebrow: { zh: "PAST JOURNEYS", en: "PAST JOURNEYS", ja: "PAST JOURNEYS" },
   pastTitle: { zh: "過往策旅", en: "Past journeys", ja: "これまでの旅" },
   emptyOpen: {
@@ -677,12 +679,21 @@ function Events() {
               <p className="text-base leading-relaxed text-foreground/80">
                 {t(jp.block("collabBody", JOURNEY_COPY.collabBody))}
               </p>
-              <a
-                href={`mailto:${contactEmail}`}
-                className="mt-6 inline-block border border-foreground px-6 py-3 tracking-widest hover:bg-foreground hover:text-primary-foreground transition-colors text-base break-all"
-              >
-                {contactEmail}
-              </a>
+              <div className="mt-6 flex flex-wrap items-center gap-4">
+                <Link
+                  to="/partnership"
+                  data-testid="events-journey-partnership"
+                  className="inline-block border border-foreground bg-foreground px-6 py-3 tracking-widest text-primary-foreground transition-opacity hover:opacity-85 text-base"
+                >
+                  {t(jp.block("collabCta", JOURNEY_COPY.collabCta))}
+                </Link>
+                <a
+                  href={`mailto:${contactEmail}`}
+                  className="inline-block border border-foreground px-6 py-3 tracking-widest hover:bg-foreground hover:text-primary-foreground transition-colors text-base break-all"
+                >
+                  {contactEmail}
+                </a>
+              </div>
             </div>
           </div>
         </section>

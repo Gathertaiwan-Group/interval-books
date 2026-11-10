@@ -15,6 +15,7 @@ import { useT } from "@/i18n/LanguageContext";
 import type { Localized } from "@/i18n/types";
 import { pageText, type CuratedThemeEntry, type PageContent } from "@/lib/cms";
 import { CARD, CARD_HOVER } from "@/lib/feature-layout";
+import { displayableCuratedThemes } from "@/lib/home-shelf";
 import { imageFor } from "@/lib/images";
 import type { PublicationListResult } from "@/lib/publications";
 import { isSoldOut, remainingFor, SHOP_PRODUCT_TYPES, type ShopListCardResult } from "@/lib/shop";
@@ -60,7 +61,8 @@ export function ProductsPanel({
   catalogue: ShopListCardResult;
   /** 只拿來算品類入口上的「N 本」——清單本身在〈地方刊物〉分頁畫。 */
   publications: PublicationListResult;
-  /** 只拿主題名稱給品類入口用——櫥窗本身在〈主理人的選品〉分頁畫。 */
+  /** 只拿主題名稱給品類入口用——櫥窗本身在〈主理人的選品〉分頁畫。
+   *  傳給入口前先用 displayableCuratedThemes() 濾掉沒連真實商品的範例（2026-11-10 S3）。 */
   curatedThemes: CuratedThemeEntry[];
   heroAlt: string;
 }) {
@@ -108,7 +110,7 @@ export function ProductsPanel({
         bookCount={products.length}
         bookCover={products[0] ? imageFor(products[0].imageKey, curatedImg) : curatedImg}
         publicationCount={publications.publications.length}
-        curatedThemes={curatedThemes}
+        curatedThemes={displayableCuratedThemes(curatedThemes, catalogue.products)}
       />
 
       {presentTypes.length > 1 && (

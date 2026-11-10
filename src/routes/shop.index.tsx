@@ -44,9 +44,9 @@ const PAGE = {
     ja: "セレクト｜小時光書店",
   },
   metaDescription: {
-    zh: "在線上帶走一本地方刊物：從基隆的東北風到新北的緬甸街，每一本都標上製作單位、價格與剩餘數量，可宅配或超商取貨。旁邊的分頁還有完整的地方刊物展，與主理人的選品櫥窗。",
-    en: "Take home a local publication: titles from Keelung to Taitung with maker, price and stock left, shipped to you — plus the full zine show and curated window.",
-    ja: "地域の刊行物をオンラインで。基隆から台東まで、発行元・価格・残り冊数を表示し、宅配やコンビニ受け取りに対応。タブでは地域誌の全展示と店主のセレクトもご覧いただけます。",
+    zh: "線上帶走一本台灣地方刊物：每一本都標上製作單位、價格與剩餘數量。更多刊物與主理人的選品，歡迎到華山的店裡翻閱。",
+    en: "Take home a local publication from Taiwan online — each listed with its maker, price and copies left. More titles and the owner's picks are waiting in our Huashan shop.",
+    ja: "台湾の地域の刊行物を、オンラインで一冊お持ち帰りに。発行元・価格・残り冊数を表示しています。そのほかの刊行物や店主の選品は、華山の店頭でどうぞ。",
   },
   eyebrowSuffix: { zh: "選物", en: "Selection", ja: "セレクト" },
   title: {
@@ -55,11 +55,11 @@ const PAGE = {
     ja: "ひとときを、持ち帰る",
   },
   intro: {
-    zh: "書、器物、茶、活動與策旅名額。清單很短，因為每一件都得先通過我們自己的日常。",
-    en: "Books, vessels, tea, events and journey places. The list is short because everything on it first had to survive our own daily use.",
-    ja: "本、器、茶、イベントと旅の枠。並ぶ数は多くありません。まず私たち自身の日常を通ったものだけを置いているからです。",
+    zh: "線上可以帶走的，目前是台灣各地的地方刊物與選書；更多刊物與主理人的選品，歡迎到店翻閱。",
+    en: "What you can take home online, for now, is local publications and books from around Taiwan. For more titles and the owner's picks, come and browse in the shop.",
+    ja: "オンラインでお求めいただけるのは、いまのところ台湾各地の地域の刊行物と選書です。そのほかの刊行物や店主の選品は、ぜひ店頭で手に取ってご覧ください。",
   },
-  tabProducts: { zh: "商品", en: "Shop", ja: "商品" },
+  tabProducts: { zh: "書刊", en: "Books & zines", ja: "本と冊子" },
   tabPublications: { zh: "地方刊物", en: "Local Publications", ja: "地域の刊行物" },
   tabCurated: { zh: "主理人的選品", en: "Curated", ja: "店主の選品" },
   tabsLabel: { zh: "選物分頁", en: "Selection sections", ja: "セレクトの分類" },
@@ -85,9 +85,9 @@ const PAGE = {
     ja: "店主の選品｜小時光書店",
   },
   curatedMetaDescription: {
-    zh: "主理人的選品不是商品清單，而是三個主題櫥窗：地方風土（桂花蜜、東海岸海鹽、阿里山烏龍）、器物與陶（粗陶茶碗、白瓷小皿）、茶與日常（焙茶包、海鹽可可）。想帶走，歡迎到店或用 Email、LINE 詢問。",
-    en: "The owner's picks in three windows — local terroir, vessels and clay, tea and daily life: osmanthus honey, sea salt, clay tea bowls. Ask in store, by email or LINE.",
-    ja: "店主のセレクトを三つの窓辺で。土地の風土（桂花蜜、東海岸の海塩）、器と陶（粗陶の茶碗、白磁の小皿）、茶と日常（ほうじ茶、海塩ココア）。店頭、メール、LINE でお問い合わせください。",
+    zh: "主理人從台灣各地帶回的器物、茶與風土小物，陸續整理中。歡迎到店看看或來信詢問。",
+    en: "Vessels, tea and small things of place the owner has brought back from around Taiwan — still being sorted. Come by the shop or write to us.",
+    ja: "店主が台湾各地から持ち帰った器や茶、土地の小さなもの。ただいま整理中です。店頭でご覧いただくか、メールでお問い合わせください。",
   },
 };
 

@@ -15,6 +15,15 @@
  * ⚠️ 仍然是自己的分頁，不跟〈商品〉混在同一個格狀清單：大部分選品還是買不到，混在一起
  *    客人會以為那些都能加入購物車。
  *
+ * 2026-11-10 文案健檢（業主核准，S5／S6）：
+ *
+ *   · curated_items 現有的 18 件是種子範例，不是真的商品。前台只畫
+ *     displayableCuratedThemes()（src/lib/home-shelf.ts）挑出來的——連了 catalogue 裡讀得到的
+ *     書籍／選物的那幾件。沒有任何一件時整段換成「主理人的選品整理中……」。資料不刪；主理人在
+ *     後台把真的選品「連結商品」就會出現。
+ *   · 「LINE 私訊」原本 href 是 site_settings.social_line（空字串）＝點了沒反應。改成後台有值
+ *     用後台，沒有就用 SOCIAL.line（官方帳號 @zta2483l），新分頁開。
+ *
  * 🔴 加入購物車只呼叫既有的 useCart().addItem(cartInputFor(product, 1))——與首頁那一排、
  *    地方刊物分頁同一行，數量上限與售完判斷都在那裡，這裡不另外算。
  */
@@ -23,11 +32,12 @@ import { useMemo } from "react";
 import { toast } from "sonner";
 import { PriceTag } from "@/components/shop/ShopBits";
 import { useT } from "@/i18n/LanguageContext";
+import { SOCIAL } from "@/i18n/strings";
 import type { Localized } from "@/i18n/types";
 import { pageText, type CuratedThemeEntry, type PageContent } from "@/lib/cms";
 import { CARD } from "@/lib/feature-layout";
 import { cartInputFor, useCart } from "@/lib/cart";
-import { isShelfProductType } from "@/lib/home-shelf";
+import { displayableCuratedThemes, isShelfProductType } from "@/lib/home-shelf";
 import { isSoldOut, type ShopListCardResult, type ShopProductCard } from "@/lib/shop";
 import { useSiteContent } from "@/lib/site-content";
 import { PanelIntro } from "./PublicationsPanel";
@@ -44,6 +54,11 @@ const COPY = {
     zh: "我們以「主題櫥窗」呈現選物，而非商品清單。每一件物，都是一段被留下來的時間。",
     en: "We arrange the selection as themed windows, not as a catalogue. Each piece holds a quiet stretch of time.",
     ja: "商品リストではなく、テーマの窓辺として並べています。一品一品が、留まった時間そのもの。",
+  },
+  comingSoon: {
+    zh: "主理人的選品整理中，歡迎到店看看或來信詢問。",
+    en: "The owner's picks are still being arranged. Come by the shop, or write to us.",
+    ja: "店主の選品はただいま準備中です。店頭でご覧いただくか、メールでお問い合わせください。",
   },
   windowLabel: { zh: "Window", en: "Window", ja: "Window" },
   askPurchase: { zh: "詢問與選購", en: "Ask & purchase", ja: "お問合せ・お求め" },
@@ -79,6 +94,13 @@ export function CuratedPanel({
     [catalogue.products],
   );
 
+  // 只畫連了真實商品的選品（範例不露出）。catalogue 與上面的 productById 是同一份。
+  const shownThemes = useMemo(
+    () => displayableCuratedThemes(curatedThemes, catalogue.products),
+    [curatedThemes, catalogue.products],
+  );
+  const lineHref = social.line || SOCIAL.line;
+
   /** 只有書籍／選物算「買得到」：票券要先選場次，不能從這裡加購物車。 */
   const linkedProduct = (productId: string | null | undefined): ShopProductCard | null => {
     if (!productId) return null;
@@ -97,80 +119,91 @@ export function CuratedPanel({
     <>
       <PanelIntro title={t(p.title(COPY.title))} intro={t(p.intro(COPY.intro))} />
 
-      <section className="container-editorial pb-24 space-y-32" data-testid="curated-themes">
-        {curatedThemes.map((theme, i) => (
-          <div key={theme.id}>
-            <div className="grid md:grid-cols-12 gap-10 items-end mb-12">
-              <div className="md:col-span-5">
-                <p className="eyebrow text-2xl">
-                  {t(p.block("windowLabel", COPY.windowLabel))} {String(i + 1).padStart(2, "0")}
+      {shownThemes.length === 0 ? (
+        <section className="container-editorial pb-16" data-testid="curated-coming-soon">
+          <p className="border border-border p-7 text-sm leading-relaxed text-muted-foreground md:p-8">
+            {t(p.block("comingSoon", COPY.comingSoon))}
+          </p>
+        </section>
+      ) : (
+        <section className="container-editorial pb-24 space-y-32" data-testid="curated-themes">
+          {shownThemes.map((theme, i) => (
+            <div key={theme.id}>
+              <div className="grid md:grid-cols-12 gap-10 items-end mb-12">
+                <div className="md:col-span-5">
+                  <p className="eyebrow text-2xl">
+                    {t(p.block("windowLabel", COPY.windowLabel))} {String(i + 1).padStart(2, "0")}
+                  </p>
+                  <h3 className="display mt-4 text-4xl md:text-5xl">{t(theme.title)}</h3>
+                </div>
+                <p className="md:col-span-7 text-base leading-relaxed text-muted-foreground md:pb-2">
+                  {t(theme.description)}
                 </p>
-                <h3 className="display mt-4 text-4xl md:text-5xl">{t(theme.title)}</h3>
               </div>
-              <p className="md:col-span-7 text-base leading-relaxed text-muted-foreground md:pb-2">
-                {t(theme.description)}
-              </p>
-            </div>
 
-            {/* 一個還沒放品項的主題，底下會是一個空的格線——主題標題下面什麼都沒有。
+              {/* 一個還沒放品項的主題，底下會是一個空的格線——主題標題下面什麼都沒有。
                 後台是先建主題、再加品項，所以這個中間狀態是真的會被看到的。 */}
-            {theme.items.length === 0 ? (
-              <p className="border border-border p-7 text-sm leading-relaxed text-muted-foreground md:p-8">
-                {t(p.block("themeEmpty", COPY.themeEmpty))}
-              </p>
-            ) : (
-              // 一件一張獨立卡片，外框用前台共用的 CARD（src/lib/feature-layout.ts）；
-              // 卡片本身不是連結，所以不加 CARD_HOVER（可以點的是裡面的購買鈕與商品連結）。
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:gap-8 lg:grid-cols-3">
-                {theme.items.map((item, idx) => {
-                  const product = linkedProduct(item.productId);
-                  const soldOut = product !== null && isSoldOut(product);
-                  return (
-                    <article
-                      key={idx}
-                      className={`${CARD} p-5 md:p-6`}
-                      data-testid="curated-item"
-                      data-purchasable={product !== null && !soldOut ? "yes" : "no"}
-                    >
-                      <p className="text-xs tracking-widest text-muted-foreground">
-                        {String(idx + 1).padStart(2, "0")}
-                      </p>
-                      <h4 className="font-serif text-xl mt-3 leading-snug">{t(item.name)}</h4>
-                      <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                        {t(item.note)}
-                      </p>
-                      {product && (
-                        <div className="mt-auto pt-6">
-                          <PriceTag price={product.price} compareAtPrice={product.compareAtPrice} />
-                          <div className="mt-4 flex flex-wrap items-center gap-3">
-                            <button
-                              type="button"
-                              onClick={() => add(product)}
-                              disabled={soldOut}
-                              data-testid="add-to-cart"
-                              className="border border-foreground bg-foreground px-5 py-2.5 text-sm tracking-widest text-primary-foreground transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-muted-foreground disabled:opacity-100"
-                            >
-                              {soldOut ? t(ui.buttons.soldOut) : t(ui.buttons.addToCart)}
-                              <span className="sr-only">（{t(item.name)}）</span>
-                            </button>
-                            <Link
-                              to="/shop/$slug"
-                              params={{ slug: product.slug }}
-                              className="text-xs tracking-widest text-muted-foreground hover-underline hover:text-foreground"
-                            >
-                              {t(ui.buttons.viewProduct)}
-                            </Link>
+              {theme.items.length === 0 ? (
+                <p className="border border-border p-7 text-sm leading-relaxed text-muted-foreground md:p-8">
+                  {t(p.block("themeEmpty", COPY.themeEmpty))}
+                </p>
+              ) : (
+                // 一件一張獨立卡片，外框用前台共用的 CARD（src/lib/feature-layout.ts）；
+                // 卡片本身不是連結，所以不加 CARD_HOVER（可以點的是裡面的購買鈕與商品連結）。
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:gap-8 lg:grid-cols-3">
+                  {theme.items.map((item, idx) => {
+                    const product = linkedProduct(item.productId);
+                    const soldOut = product !== null && isSoldOut(product);
+                    return (
+                      <article
+                        key={idx}
+                        className={`${CARD} p-5 md:p-6`}
+                        data-testid="curated-item"
+                        data-purchasable={product !== null && !soldOut ? "yes" : "no"}
+                      >
+                        <p className="text-xs tracking-widest text-muted-foreground">
+                          {String(idx + 1).padStart(2, "0")}
+                        </p>
+                        <h4 className="font-serif text-xl mt-3 leading-snug">{t(item.name)}</h4>
+                        <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                          {t(item.note)}
+                        </p>
+                        {product && (
+                          <div className="mt-auto pt-6">
+                            <PriceTag
+                              price={product.price}
+                              compareAtPrice={product.compareAtPrice}
+                            />
+                            <div className="mt-4 flex flex-wrap items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => add(product)}
+                                disabled={soldOut}
+                                data-testid="add-to-cart"
+                                className="border border-foreground bg-foreground px-5 py-2.5 text-sm tracking-widest text-primary-foreground transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-muted-foreground disabled:opacity-100"
+                              >
+                                {soldOut ? t(ui.buttons.soldOut) : t(ui.buttons.addToCart)}
+                                <span className="sr-only">（{t(item.name)}）</span>
+                              </button>
+                              <Link
+                                to="/shop/$slug"
+                                params={{ slug: product.slug }}
+                                className="text-xs tracking-widest text-muted-foreground hover-underline hover:text-foreground"
+                              >
+                                {t(ui.buttons.viewProduct)}
+                              </Link>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ))}
-      </section>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
 
       <section className="container-editorial pb-32">
         <div className="border-t border-border pt-16 flex flex-wrap gap-4 text-xs tracking-widest items-center">
@@ -185,9 +218,10 @@ export function CuratedPanel({
           </a>
           <a
             className="border border-foreground px-5 py-3 hover:bg-foreground hover:text-primary-foreground transition-colors"
-            href={social.line}
+            href={lineHref}
             target="_blank"
             rel="noreferrer"
+            data-testid="curated-line"
           >
             {t(ui.buttons.line)}
           </a>

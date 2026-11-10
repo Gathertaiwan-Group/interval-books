@@ -49,7 +49,7 @@ const PAGE_META = {
   description: {
     zh: "從一份地方刊物，讀懂一片土地。小時光書店位在台北華山文創園區紅磚六合院，是一間以風土誌選書的書店，典藏台灣各地的地方刊物，舉辦讀書會、講座與工作坊，也帶你走進各地的文化策旅。",
     en: "Read a place through its local publications. Interval Books at Huashan 1914: books chosen by the land, local magazines from across Taiwan, talks and journeys.",
-    ja: "一冊の地域誌から、ひとつの土地を読む。台北・華山1914文化創意産業園区の小時光書店は、風土誌を軸に本を選ぶ書店。台湾各地の地域誌を所蔵し、読書会やトーク、各地への旅も企画しています。",
+    ja: "一冊の地域誌から、ひとつの土地を読む。台北・華山1914文化創意産業園區の小時光書店は、風土誌を軸に本を選ぶ書店。台湾各地の地域誌を所蔵し、読書会やトーク、各地への旅も企画しています。",
   },
 };
 
@@ -102,7 +102,7 @@ const HOME = {
   heroCaption: {
     zh: "華山 1914 文創園區，紅磚六合院西 7-3 館。",
     en: "Huashan 1914 Creative Park, Red Brick Courtyard, West 7-3.",
-    ja: "華山1914文化創意産業園区、紅煉瓦六合院 西7-3館。",
+    ja: "華山1914文化創意産業園區、紅煉瓦六合院 西7-3館。",
   },
   pillarsKicker: { zh: "我們做的事", en: "What we do", ja: "私たちのこと" },
   pillarsTitle: {
@@ -179,7 +179,7 @@ const HOME = {
     en: "Local publications archive",
     ja: "地域刊行物アーカイブ",
   },
-  archiveUnit: { zh: "份地方刊物", en: "local publications", ja: "冊の地域刊行物" },
+  archiveUnit: { zh: "本地方刊物", en: "local publications", ja: "冊の地域刊行物" },
   archiveSplit: {
     zh: "台灣 {tw}．日本 {jp}",
     en: "Taiwan {tw} · Japan {jp}",
@@ -208,18 +208,22 @@ const HOME = {
   pastCta: { zh: "看所有過往活動", en: "All past events", ja: "過去のイベントをすべて見る" },
 };
 
+/**
+ * 2026-11-10 文案健檢 H1–H3（業主核准）：這一區底下實際是可以線上買的地方刊物（商品卡），
+ * 舊文案「地方風土、器物與陶、茶與日常」講的是另一回事。不寫宅配／超商取貨（未確認）。
+ */
 const ENTRIES = {
   curatedTitle: {
-    zh: "一本好書，一份心意，\n風帶不走了，都留在美好的人情連結裡。",
-    en: "A window, not a shelf.",
-    ja: "棚ではなく、窓辺に。",
+    zh: "帶一本地方刊物回家",
+    en: "Take a local publication home",
+    ja: "地域の刊行物を、お持ち帰りに",
   },
   curatedBody: {
-    zh: "關於這片土地的故事\n地方風土、器物與陶、茶與日常。\n都是被留下來的緩慢時間。",
-    en: "Three themes, dozens of pieces — place, vessels, tea. Each one a quiet pause held in form.",
-    ja: "三つのテーマ、数十の品. 土地, 器, 茶. それぞれが、留め置かれた緩やかな時間。",
+    zh: "這幾本可以線上選購。",
+    en: "These can be ordered online.",
+    ja: "こちらはオンラインでお求めいただけます。",
   },
-  curatedCta: { zh: "走進選品櫥窗", en: "Enter the window", ja: "選品の窓辺へ" },
+  curatedCta: { zh: "看全部線上選購", en: "See all online", ja: "オンラインで買えるものを見る" },
 };
 
 function fill(template: string, values: Record<string, string | number>): string {

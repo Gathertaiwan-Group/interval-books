@@ -3,7 +3,7 @@ import type { Localized } from "./types";
 
 export const UI = {
   brand: { zh: "小時光書店", en: "Interval Books", ja: "小時光書店" },
-  brandSub: { zh: "Interval Books", en: "Hourlight Bookstore", ja: "Interval Books" },
+  brandSub: { zh: "Interval Books", en: "Interval Books", ja: "Interval Books" },
 
   nav: {
     home: { zh: "首頁", en: "Home", ja: "ホーム" },
@@ -62,17 +62,19 @@ export const UI = {
     rights: {
       zh: "小時光書店．保留所有權利",
       en: "Interval Books. All rights reserved.",
-      ja: "Interval Books. All rights reserved.",
+      ja: "小時光書店 All rights reserved.",
     },
     everyday: { zh: "每日開放", en: "Open every day", ja: "年中無休" },
   },
 
   buttons: {
-    toEvent: { zh: "前往活動網站", en: "Visit event site", ja: "イベントサイトへ" },
+    // 2026-11-10 文案健檢 G3：只在活動真的連到外部報名頁時才出現。
+    toEvent: { zh: "前往外部報名頁", en: "Go to external sign-up", ja: "外部の申込ページへ" },
     // 站內的活動詳情頁。與 toEvent 是兩件事：toEvent 真的把人送去別人的網站
     // （售票頁、主辦單位官網），viewEvent 是留在這個站上。
     viewEvent: { zh: "查看活動", en: "View event", ja: "イベントを見る" },
-    toJourney: { zh: "前往旅程網站", en: "Visit journey site", ja: "旅のサイトへ" },
+    // 2026-11-10 文案健檢 G2：策旅卡連到站內的行程與報名頁，不是「另一個網站」。
+    toJourney: { zh: "看行程與報名", en: "View itinerary & book", ja: "行程とお申し込み" },
     navigate: { zh: "點此導航", en: "Open in Maps", ja: "地図を開く" },
     emailUs: { zh: "Email 聯繫", en: "Email us", ja: "メールで問合せ" },
     line: { zh: "LINE 私訊", en: "Message on LINE", ja: "LINE で連絡" },
@@ -101,7 +103,7 @@ export const SITE_INFO = {
     ja: "華山・紅煉瓦六合院にある小時光書店は、本屋をひとつの器として、一冊の地域誌、ひとつの読書会、ひとつの旅から、台湾のすてきなものをより多くの人に届けています。",
   } as Localized,
   address: {
-    zh: "華山文創園區．紅磚六合院 西7-3館",
+    zh: "華山1914文創園區．紅磚六合院 西7-3館",
     en: "Huashan 1914 Creative Park, Red Brick Courtyard, West 7-3",
     ja: "華山1914文化創意産業園區 紅煉瓦六合院 西7-3館",
   } as Localized,
@@ -135,7 +137,8 @@ export const CONTACT_PHONES = [
 export const SOCIAL = {
   instagram: "https://www.instagram.com/intervalbookstw/",
   facebook: "", // TODO: 填入正式 Facebook 粉絲頁網址
-  line: "", // TODO: 填入正式 LINE 官方帳號連結（例如 https://lin.ee/xxxxxx）
+  // LINE 官方帳號（2026-11-10 業主提供）。site_settings.social_line 有值時以後台為準。
+  line: "https://line.me/R/ti/p/@zta2483l",
 };
 
 export const MAP = {

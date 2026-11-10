@@ -62,7 +62,7 @@ const PAGE = {
     en: "Events, exhibitions, consignment, brand collabs, private bookings or workshops at Huashan: how we work, past cases and FAQs. We reply within 3 business days.",
     ja: "イベント、展示、委託販売、ブランドコラボ、貸切、講座やワークショップ。華山の書店との協働の形と進め方、これまでの事例、よくある質問。3営業日以内にお返事します。",
   },
-  eyebrowSuffix: { zh: "異業合作", en: "異業合作", ja: "異業合作" },
+  eyebrowSuffix: { zh: "異業合作", en: "Partnership", ja: "協働のご相談" },
   title: {
     zh: "在華山，一起做點什麼",
     en: "Let's make something together, at Huashan",
@@ -82,12 +82,17 @@ const PAGE = {
   spaceBody: {
     zh: "小時光位於華山文創園區的紅磚六合院。白天有自然光落在書架與長桌上，傍晚燈一亮，就是講座與讀書會的現場。我們做過療癒藝術節、地方刊物展、器物展售與品牌共創——空間不大，但每一次都用心安排動線、陳列與氛圍，讓來的人願意多停留一會兒。",
     en: "Interval Books sits in the Red Brick Courtyard of Huashan 1914 Creative Park. By day, natural light falls on the shelves and the long table; by evening, the lamps come on for talks and reading circles. We've hosted healing-arts festivals, local-publication fairs, craft exhibitions and brand co-creations — the space is small, but every arrangement is made with care, so people want to stay a little longer.",
-    ja: "小時光は華山1914文化創意産業園区の紅煉瓦六合院にあります。昼は自然光が本棚と長机に落ち、夕方に灯りがともれば講座や読書会の場に。ヒーリング・アートフェス、地域刊行物展、器の展示販売、ブランド共創などを手がけてきました。広くはない空間ですが、動線や陳列、空気感を毎回丁寧に整えています。",
+    ja: "小時光は華山1914文化創意産業園區の紅煉瓦六合院にあります。昼は自然光が本棚と長机に落ち、夕方に灯りがともれば講座や読書会の場に。ヒーリング・アートフェス、地域刊行物展、器の展示販売、ブランド共創などを手がけてきました。広くはない空間ですが、動線や陳列、空気感を毎回丁寧に整えています。",
   },
   typesTitle: { zh: "合作形式", en: "Ways to work with us", ja: "協働のかたち" },
   stepsTitle: { zh: "合作流程", en: "How it works", ja: "進め方" },
-  casesTitle: { zh: "合作案例", en: "Past collaborations", ja: "これまでの協働" },
-  casesMore: { zh: "看更多合作案例", en: "See all collaborations", ja: "協働事例をもっと見る" },
+  // 2026-11-10 文案健檢 C1：卡片寫的是合作「類型」，不是具名的真實案例（真實案例待業主提供）。
+  casesTitle: {
+    zh: "我們做過的合作類型",
+    en: "Kinds of collaboration we've done",
+    ja: "これまでの協働のかたち",
+  },
+  casesMore: { zh: "看更多合作類型", en: "See more", ja: "もっと見る" },
   faqTitle: { zh: "常見問題", en: "FAQ", ja: "よくあるご質問" },
   formEyebrow: { zh: "Contact Form", en: "Contact Form", ja: "Contact Form" },
   formTitle: {

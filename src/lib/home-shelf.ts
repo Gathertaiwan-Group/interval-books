@@ -113,3 +113,35 @@ export function isMissingColumnError(err: unknown): boolean {
     /does not exist/.test(e.message)
   );
 }
+
+/**
+ * 前台〈主理人的選品〉能露出哪幾件（2026-11-10 文案健檢 S2／S3／S5，業主核准）。
+ *
+ * curated_items 目前的 18 件是種子範例（桂花蜜、粗陶茶碗……），**不是真的商品**，買不到也
+ * 不一定在店裡。業主要求這些範例全部不再露出，但**資料不刪**——之後主理人有真的選品時，
+ * 在後台把它「連結商品」即可上架，不需要再改程式。
+ *
+ * 判準：品項有 product_id，而且那件商品在前台讀得到（active）、是書籍或選物。
+ *   · 沒連商品                → 不露出（範例就是這一類）
+ *   · 連了但商品下架／讀不到   → 不露出（點進去會是死路）
+ *   · 連到票券                 → 不露出（票券要先選場次，不能從櫥窗買）
+ * 售完的照樣露出（卡片上會標「已售完」）——那是真的商品，只是暫時沒貨。
+ *
+ * 沒有任何一件可露出的主題整個拿掉；全部都拿掉時回空陣列，由呼叫端顯示「整理中」。
+ * 不另加旗標欄位：不新增 migration，而「連了商品」本來就是「這是真的選品」的意思。
+ */
+export function displayableCuratedThemes<
+  Th extends { items: readonly { productId?: string | null }[] },
+>(themes: readonly Th[], products: readonly { id: string; productType: string }[]): Th[] {
+  const shelfIds = new Set(
+    products.filter((p) => isShelfProductType(p.productType)).map((p) => p.id),
+  );
+  const out: Th[] = [];
+  for (const theme of themes) {
+    const items = theme.items.filter(
+      (it) => typeof it.productId === "string" && shelfIds.has(it.productId),
+    );
+    if (items.length > 0) out.push({ ...theme, items });
+  }
+  return out;
+}
