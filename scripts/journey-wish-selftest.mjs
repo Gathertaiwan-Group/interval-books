@@ -260,22 +260,24 @@ console.log("\n[5] 接線（靜態）");
   const fns = read("src/lib/journey-wish-fns.ts");
   checkTrue("公開 fn：送出走 POST", fns.includes('createServerFn({ method: "POST" })'));
 
-  const adminFns = read("src/lib/admin/fns/journey-wishes.ts");
-  check(
-    "admin fns：每一支都掛 adminFnMiddleware",
-    (adminFns.match(/createServerFn\(/g) ?? []).length,
-    (adminFns.match(/\.middleware\(\[adminFnMiddleware\]\)/g) ?? []).length,
-  );
-  checkTrue(
-    "admin fns 至少三支（列表／詳情／更新）",
-    (adminFns.match(/createServerFn\(/g) ?? []).length >= 3,
-  );
-
+  // 2026-11-10 業主移除後台「旅程願望」收件匣：路由只剩轉址、fns/journey-wishes.ts 刪除、
+  // 側欄拿掉；後台看不到就沒人處理，所以前台表單一起停用（JOURNEY_WISH_FORM_ENABLED）。
+  for (const f of ["_shell.journey-wishes.tsx", "_shell.journey-wishes_.$id.tsx"]) {
+    checkTrue(
+      `${f} 只剩轉址回 /admin`,
+      stripComments(read(`src/routes/admin/${f}`)).includes(
+        'redirect({ to: "/admin", replace: true })',
+      ),
+    );
+  }
   const shell = stripComments(read("src/routes/admin/_shell.tsx"));
+  check("側欄：不再有旅程願望", shell.includes('"/admin/journey-wishes"'), false);
+  const wishLib = stripComments(read("src/lib/journey-wish.ts"));
+  checkTrue("表單開關是關的", /export const JOURNEY_WISH_FORM_ENABLED = false;/.test(wishLib));
   checkTrue(
-    "側欄：旅程願望在「策旅」後面、staff: false",
-    /to: "\/admin\/journeys", label: "策旅"[^\n]*\n\s*\{ to: "\/admin\/journey-wishes", label: "旅程願望", icon: Sparkles, staff: false \}/.test(
-      shell,
+    "🔴 公開送出 fn：開關關著時先回 disabled（不存、不寄）",
+    /if \(!JOURNEY_WISH_FORM_ENABLED\) return \{ ok: false, error: "disabled" \};[\s\S]*await import\("@\/server\/journey-wish"\)/.test(
+      stripComments(fns),
     ),
   );
 
@@ -285,6 +287,10 @@ console.log("\n[5] 接線（靜態）");
     page.indexOf("function MobileReserve("),
   );
   checkTrue("著陸頁：NextJourney 切得出來", nj.length > 500);
+  checkTrue(
+    "🔴 著陸頁：開關關著時不渲染願望區塊",
+    page.includes("{JOURNEY_WISH_FORM_ENABLED ? <NextJourney /> : null}"),
+  );
   check("著陸頁：願望表單不再開 mailto:", /mailto:/.test(nj), false);
   checkTrue("著陸頁：送出走 submitWishForm", nj.includes("submitWishForm("));
   checkTrue("著陸頁：有蜜罐欄位", nj.includes("honeypotRef") && nj.includes("tabIndex={-1}"));

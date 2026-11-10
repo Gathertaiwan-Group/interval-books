@@ -348,7 +348,23 @@ checkTrue(
 );
 checkTrue("清單裡有「儀表板」/admin", NAV_TARGETS.includes("/admin"));
 checkTrue("清單裡有「活動」/admin/events", NAV_TARGETS.includes("/admin/events"));
-checkTrue("清單裡有「最新消息」/admin/news", NAV_TARGETS.includes("/admin/news"));
+// 2026-11-10 業主要求移除後台最新消息／講者／旅程願望／合作／全站設定／介面文字。
+for (const gone of [
+  "/admin/news",
+  "/admin/artists",
+  "/admin/journey-wishes",
+  "/admin/collaborations",
+  "/admin/settings",
+  "/admin/strings",
+]) {
+  checkTrue(`清單裡已經沒有 ${gone}`, !NAV_TARGETS.includes(gone));
+}
+// 2026-11-10 業主要求：後台首頁（今日待辦）是側欄第一項。
+check("側欄第一項是 /admin（今日待辦）", NAV_TARGETS[0], "/admin");
+checkTrue(
+  "第一項標籤是「今日待辦」、staff: false（門市人員進 /admin 會被導去櫃檯，不給他這一項）",
+  /\{ to: "\/admin", label: "今日待辦", icon: LayoutDashboard, staff: false \}/.test(navSlice),
+);
 // 2026-10-29 業主要求移除後台「頁面文案」；側欄不該再有 /admin/pages。
 checkTrue("清單裡已經沒有「頁面文案」/admin/pages", !NAV_TARGETS.includes("/admin/pages"));
 
@@ -359,8 +375,8 @@ function activeItemsAt(pathname) {
 check("🔴 /admin/events/abc 時剛好一項亮，而且是「活動」", activeItemsAt("/admin/events/abc"), [
   "/admin/events",
 ]);
-check("🔴 /admin/news/abc 時剛好一項亮，而且是「最新消息」", activeItemsAt("/admin/news/abc"), [
-  "/admin/news",
+check("🔴 /admin/orders/abc 時「今日待辦」不跟著亮", activeItemsAt("/admin/orders/abc"), [
+  "/admin/orders",
 ]);
 check("/admin 時剛好一項亮，而且是「儀表板」", activeItemsAt("/admin"), ["/admin"]);
 check("/admin/events 時剛好一項亮", activeItemsAt("/admin/events"), ["/admin/events"]);
@@ -900,12 +916,13 @@ check(
   ["這場活動的商品"],
 );
 for (const [label, to] of [
-  ["講者", "/admin/artists"],
   ["報名名單", "/admin/registrations"],
   ["這場活動的商品", "/admin/products"],
 ]) {
   check(`「${label}」連到 ${to}`, mirrorNotes.find((m) => m.label === label)?.to, to);
 }
+// 2026-11-10 講者管理頁移除：講者那一塊不再連到任何後台頁（下拉仍可選講者）。
+check("「講者」不再連到後台頁", mirrorNotes.find((m) => m.label === "講者")?.to ?? null, null);
 // 「活動地點」的真相是最近一場場次，所以它的資料要來自 listSessionsForEvent。
 checkTrue(
   "「活動地點」的值取自場次（listSessionsForEvent）",

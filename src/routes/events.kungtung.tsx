@@ -25,6 +25,7 @@ import {
   WISH_SOURCES,
   WISH_SUBMIT_ERROR_TEXT,
   wishSchema,
+  JOURNEY_WISH_FORM_ENABLED,
 } from "@/lib/journey-wish";
 import { getWishFormToken, submitWishForm } from "@/lib/journey-wish-fns";
 import {
@@ -76,7 +77,7 @@ import kungtungCss from "@/components/kungtung/kungtung.css?url";
  * 與稿不同的地方（刻意的）：
  *   - 報名區右欄換成場次／票種／人數與「前往結帳」，付款說明寫站上真的有的三種方式。
  *   - 「下次，我想這樣玩」願望募集：送出存進 public.journey_wishes（0046，通用表，
- *     source='kungtung'）並寄通知信給店家，後台 /admin/journey-wishes 看得到。
+ *     source='kungtung'）並寄通知信給店家（2026-11-10 起後台收件匣移除、表單停用，見 JOURNEY_WISH_FORM_ENABLED）。
  *   - 付款說明不印匯款帳號（原站公開印在費用段與 FAQ）：站上的匯款帳戶只在結帳完成頁
  *     與匯款資訊信出現，這一頁照那個實際行為寫。
  *   - 原站的 favicon 不搬，沿用全站的。
@@ -205,7 +206,7 @@ function KungtungJourney() {
         <Price />
         <Faq />
         <Registration now={now} bookingClosed={bookingClosed} />
-        <NextJourney />
+        {JOURNEY_WISH_FORM_ENABLED ? <NextJourney /> : null}
         <TripNotice />
         <SiteFooter />
         <MobileReserve formVisible={formVisible} bookingClosed={bookingClosed} />
@@ -499,7 +500,7 @@ const WISH_OPTIONS = WISH_SOURCES[WISH_SOURCE].interests;
  * 「下次，我想這樣玩」願望募集。版面與欄位照稿。
  *
  * 送出存進官網後台（public.journey_wishes，0046，source='kungtung'），並寄一封通知信給
- * site_settings.notify_emails；後台 /admin/journey-wishes 看得到。驗證是
+ * site_settings.notify_emails（2026-11-10 起停用，見 JOURNEY_WISH_FORM_ENABLED）。驗證是
  * src/lib/journey-wish.ts 的 wishSchema（前後台同一份），防濫用照 /partnership：蜜罐、
  * 伺服器簽的表單 token（≥3 秒）、限流、server fn same-origin。
  */

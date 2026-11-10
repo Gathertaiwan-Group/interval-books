@@ -8,7 +8,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { Lang } from "@/i18n/types";
 import { singleLine } from "@/lib/partnership";
-import { WISH_LIMITS, type WishSubmitResult } from "@/lib/journey-wish";
+import { JOURNEY_WISH_FORM_ENABLED, WISH_LIMITS, type WishSubmitResult } from "@/lib/journey-wish";
 
 /** 畫面出現時拿一張表單 token（發行時間＋簽章）。 */
 export const getWishFormToken = createServerFn({ method: "GET" }).handler(async () => {
@@ -60,6 +60,8 @@ function coerceInput(raw: unknown) {
 export const submitWishForm = createServerFn({ method: "POST" })
   .inputValidator(coerceInput)
   .handler(async ({ data }): Promise<WishSubmitResult> => {
+    // 表單已停用（見 JOURNEY_WISH_FORM_ENABLED）：不存、不寄通知信。
+    if (!JOURNEY_WISH_FORM_ENABLED) return { ok: false, error: "disabled" };
     const { submitWish } = await import("@/server/journey-wish");
     try {
       return await submitWish(data);

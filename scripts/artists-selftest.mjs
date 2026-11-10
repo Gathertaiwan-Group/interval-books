@@ -326,13 +326,17 @@ const artistSchemaSrc = schemaBlock(schemasSrc, "artistSchema");
 const repoSrcRaw = readFile(join(ROOT, "src/server/repos/artists.ts"));
 const repoSrc = stripTs(repoSrcRaw);
 const fnsSrc = stripTs(readFile(join(ROOT, "src/lib/admin/fns/artists.ts")));
-// 2026-10-26 第 3 批：新增／編輯從彈窗改成內頁，表單本體搬到 src/components/admin/ArtistForm.tsx。
-// 「講者後台」＝列表＋表單兩個檔，下面每一條規矩兩邊都要守。
-const routeSrcRaw =
-  readFile(join(ROOT, "src/routes/admin/_shell.artists.tsx")) +
-  "\n" +
-  readFile(join(ROOT, "src/components/admin/ArtistForm.tsx"));
+// 2026-11-10 業主要求移除後台「講者」管理頁：_shell.artists*.tsx 只剩轉址回 /admin，
+// ArtistForm.tsx 刪除，fns/artists.ts 只剩活動編輯頁講者下拉用的 listArtistOptions。
+// 下面還留著的「講者後台沒有 X」否定斷言對轉址檔照樣成立；只對表單成立的正向斷言拿掉。
+const routeSrcRaw = ["", "_.$id", "_.new"]
+  .map((suffix) => readFile(join(ROOT, `src/routes/admin/_shell.artists${suffix}.tsx`)))
+  .join("\n");
 const routeSrc = stripTs(routeSrcRaw);
+checkTrue(
+  "講者後台三個路由都只剩轉址回 /admin",
+  (routeSrc.match(/throw redirect\(\{ to: "\/admin", replace: true \}\)/g) ?? []).length === 3,
+);
 
 checkTrue("artistSchema 存在", artistSchemaSrc.length > 0);
 check("artistSchema 沒有 vendor_id", artistSchemaSrc.includes("vendor_id"), false);
@@ -357,15 +361,6 @@ check(
   false,
 );
 check('講者後台沒有 name="vendor_id" 的輸入框', routeSrc.includes('name="vendor_id"'), false);
-// 反過來也要驗：它**有**唯讀顯示。少了這一條，把整段刪掉也會通過上面每一條。
-checkTrue("講者後台仍然唯讀顯示綁定狀態（讀 vendor_id 但不寫）", routeSrc.includes("vendor_id"));
-
-// server fn 那一層：inputValidator 掛的是 artistSchema，所以就算有人直接
-// POST /_serverFn/… 塞 vendor_id，zod 也會把它剝掉。
-checkTrue(
-  "upsertArtist 的 inputValidator 是 artistSchema",
-  fnsSrc.includes("inputValidator(artistSchema)"),
-);
 check("artists 的 server fn 檔案裡沒有 vendor_id", fnsSrc.includes("vendor_id"), false);
 checkTrue(
   "artists 的每一支 server fn 都掛 adminFnMiddleware",
@@ -400,13 +395,6 @@ check("講者後台沒有 import LocalizedField", routeSrc.includes("LocalizedFi
 check("講者後台沒有用三語 helper loc(", /\bloc\(/.test(routeSrc), false);
 check("講者後台沒有 EMPTY_LOCALIZED 這種三語預設值", routeSrc.includes("EMPTY_LOCALIZED"), false);
 
-for (const f of ["bio", "long_bio", "discipline"]) {
-  const block = formFieldBlock(routeSrc, f);
-  checkTrue(`講者後台有 ${f} 的欄位`, block.length > 0);
-  check(`${f} 沒有被包進 <LocalizedField>`, block.includes("LocalizedField"), false);
-  check(`${f} 沒有 .zh / .en / .ja 這種三語路徑`, /\.(zh|en|ja)\b/.test(block), false);
-}
-
 // repo 的型別必須說出「這是字串」。寫成 Localized 就是這一整條防線的破口。
 checkTrue(
   "repo 的 ArtistRow 把 bio 宣告成 string | null",
@@ -424,14 +412,6 @@ check(
 
 // 自動翻譯：人名與單語 bio 都不該被機器翻譯。
 check("講者後台沒有接自動翻譯", routeSrc.includes("translate"), false);
-
-// UI 要**明講**哪些欄位不分語言 —— 型別擋得住程式碼寫錯，擋不住店家以為自己
-// 填的是中文版。這一條驗的是那句話真的在畫面上。
-checkTrue("講者後台有寫出「不分語言」的欄位說明", routeSrcRaw.includes("不分語言"));
-checkTrue(
-  "那句說明有講清楚三種語系會顯示同一份內容",
-  /三種語系都會顯示同一份內容/.test(routeSrcRaw),
-);
 
 // =============================================================================
 // [6] 活動後台：主講人是下拉，不是自由輸入
@@ -537,30 +517,10 @@ const navSrc =
   navStart === -1 ? "" : shellSrc.slice(navStart, shellSrc.indexOf("] as const;", navStart));
 
 checkTrue("NAV_GROUPS 切得出來", navSrc.length > 0);
-checkTrue("側欄有 /admin/artists 這一項", navSrc.includes('to: "/admin/artists"'));
-
-/** 把 NAV_GROUPS 切成「label -> 該組的原始碼片段」。 */
-function navGroupSlice(label) {
-  const at = navSrc.indexOf(`label: "${label}"`);
-  if (at === -1) return "";
-  // 下一個 `label: "…"` 之前都算這一組（items 內的鍵是 `label:` 但值不同行，
-  // 所以改用 group 專用的 `\n    label: "` 縮排來切）。
-  const groupHeads = [...navSrc.matchAll(/\n {4}label: "/g)].map((m) => m.index);
-  const start = groupHeads.filter((i) => i <= at).pop() ?? at;
-  const end = groupHeads.find((i) => i > at) ?? navSrc.length;
-  return navSrc.slice(start, end);
-}
-
-const cmsGroup = navGroupSlice("內容管理");
-const invGroup = navGroupSlice("進銷存");
-checkTrue("切得出「內容管理」那一組", cmsGroup.length > 0);
-checkTrue("切得出「進銷存」那一組", invGroup.length > 0);
-checkTrue("/admin/artists 在「內容管理」組裡", cmsGroup.includes('to: "/admin/artists"'));
-check("/admin/artists 不在「進銷存」組裡", invGroup.includes('to: "/admin/artists"'), false);
-// 講者是 CMS，不是店員每天用的東西 —— 不放行給 staff。
-checkTrue(
-  "/admin/artists 這一項是 staff: false",
-  /to: "\/admin\/artists",[^}]*staff: false/.test(cmsGroup),
+check(
+  "側欄不再有 /admin/artists（講者管理頁 2026-11-10 移除）",
+  navSrc.includes('to: "/admin/artists"'),
+  false,
 );
 
 // =============================================================================

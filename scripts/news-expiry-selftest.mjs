@@ -125,25 +125,16 @@ check(
     !newsPage.includes("component"),
   true,
 );
-const adminList = readFile("src/routes/admin/_shell.news.tsx");
-check(
-  "後台列表用 isNewsExpired 標記",
-  adminList.includes("isNewsExpired(n.display_date, today)"),
-  true,
-);
-check("後台列表徽章文字", adminList.includes("已過期・前台不顯示"), true);
-check(
-  "後台列表 loader 不過濾（仍是 listNews 全部）",
-  stripComments(adminList).includes("liveNews"),
-  false,
-);
-const form = readFile("src/components/admin/NewsForm.tsx");
-check("表單規則說明", form.includes("結束日期過後，前台自動隱藏；日期無法辨識時一律顯示"), true);
-check(
-  "表單即時預覽用 parseNewsEndDate(text)",
-  form.includes("parseNewsEndDate(text)") && form.includes("<EndDatePreview text={field.value} />"),
-  true,
-);
+// 2026-11-10 業主要求移除後台「最新消息」：列表／新增／內頁只剩轉址回 /admin，NewsForm 刪除。
+for (const f of ["_shell.news.tsx", "_shell.news_.new.tsx", "_shell.news_.$id.tsx"]) {
+  check(
+    `後台 ${f} 只剩轉址回 /admin`,
+    stripComments(readFile(`src/routes/admin/${f}`)).includes(
+      'throw redirect({ to: "/admin", replace: true })',
+    ),
+    true,
+  );
+}
 const mcp = readFile("src/server/mcp/tools.ts");
 check("MCP 讀取不套用過期過濾", mcp.includes("news-expiry"), false);
 

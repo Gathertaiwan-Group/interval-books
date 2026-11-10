@@ -147,23 +147,15 @@ check(
 
 // -----------------------------------------------------------------------------
 console.log("\n[3] 接線");
-// 2026-10-26 第 3 批：新增／編輯從彈窗改成內頁 —— 排序數字在 /new 的 loader 算，表單在 NewsForm。
-const news = stripComments(read("src/routes/admin/_shell.news_.new.tsx"));
-const newsForm = stripComments(read("src/components/admin/NewsForm.tsx"));
-checkTrue(
-  "最新消息新增時用 newFirstSortOrder(listNews 的結果)",
-  /newFirstSortOrder\(await listNews\(\)\)/.test(news),
-);
-checkTrue("最新消息不再用 max + 1", !/Math\.max\(max, n\.sort_order\)/.test(news + newsForm));
-checkTrue(
-  "排序欄位收進 <AdvancedSection>",
-  /<AdvancedSection[\s\S]*name="sort_order"[\s\S]*<\/AdvancedSection>/.test(newsForm),
-);
-const collab = stripComments(read("src/routes/admin/_shell.collaborations_.new.tsx"));
-checkTrue(
-  "合作案例新增時用 newFirstSortOrder",
-  /newFirstSortOrder\(await listCollaborations\(\)\)/.test(collab),
-);
+// 2026-11-10 最新消息、合作兩頁移除（只剩轉址回 /admin），原本驗 /new 排序的斷言跟著拿掉。
+for (const f of ["_shell.news_.new.tsx", "_shell.collaborations_.new.tsx"]) {
+  checkTrue(
+    `${f} 只剩轉址`,
+    stripComments(read(`src/routes/admin/${f}`)).includes(
+      'redirect({ to: "/admin", replace: true })',
+    ),
+  );
+}
 
 const index = stripComments(read("src/routes/admin/_shell.index.tsx"));
 checkTrue(
@@ -189,15 +181,12 @@ checkTrue(
   !/\.(insert|update|upsert|delete|rpc)\(/.test(repo),
 );
 
+// 2026-11-10 後台「全站設定」頁已移除（只剩轉址），原本驗「進階」區塊欄位的斷言跟著拿掉。
 const settings = stripComments(read("src/routes/admin/_shell.settings.tsx"));
-const adv = settings.slice(
-  settings.indexOf("<AdvancedSection"),
-  settings.indexOf("</AdvancedSection>"),
+checkTrue(
+  "全站設定：/admin/settings 只剩轉址",
+  settings.includes('redirect({ to: "/admin", replace: true })'),
 );
-for (const name of ["map_embed", "meta_author", "meta_twitter_card", "meta_og_type"]) {
-  checkTrue(`全站設定：${name} 在「進階」裡`, adv.includes(`name="${name}"`));
-  check(`全站設定：${name} 只出現一次`, settings.split(`name="${name}"`).length - 1, 1);
-}
 
 const jargon = [
   ["src/routes/admin/_shell.pos.tsx", "channel=pos）"],

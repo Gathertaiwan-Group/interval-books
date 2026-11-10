@@ -118,7 +118,20 @@ export type WishFormValues = z.output<typeof wishSchema>;
 // 送出結果（server fn 的回傳形狀）
 // -----------------------------------------------------------------------------
 
-export type WishSubmitError = "invalid" | "expired" | "too_fast" | "rate_limited" | "send_failed";
+/**
+ * 策旅願望表單開關。2026-11-10 業主移除後台「旅程願望」收件匣（/admin/journey-wishes 只剩轉址），
+ * 後台看不到就沒人處理，所以前台表單一起停用：/events/kungtung 不渲染「下次，我想這樣玩」區塊，
+ * submitWishForm 直接回 disabled（不存、不寄通知信）。public.journey_wishes 既有資料與 MCP 工具保留。
+ */
+export const JOURNEY_WISH_FORM_ENABLED = false;
+
+export type WishSubmitError =
+  | "invalid"
+  | "expired"
+  | "too_fast"
+  | "rate_limited"
+  | "send_failed"
+  | "disabled";
 
 export type WishSubmitResult =
   | { ok: true }
@@ -130,4 +143,5 @@ export const WISH_SUBMIT_ERROR_TEXT: Record<WishSubmitError, string> = {
   too_fast: "送出得有點快，請稍候幾秒再試一次。",
   rate_limited: "短時間內送出太多次了，請稍後再試，或直接來信與我們聯繫。",
   send_failed: "很抱歉，願望暫時無法送出。請稍後再試，或直接來信與我們聯繫。",
+  disabled: "願望募集已暫停，歡迎直接來信與我們聯繫。",
 };

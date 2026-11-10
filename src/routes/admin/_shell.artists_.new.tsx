@@ -1,37 +1,18 @@
 /**
- * /admin/artists/new —— 新增講者（2026-10-26 後台第 3 批：從列表裡的新增 Dialog 改成內頁）。
+ * /admin/artists/new —— 只剩轉址，回 /admin。
  *
- * loader 叫 listArtists（與列表同一支，GET，adminFnMiddleware）只為了算預設排序（max + 1，
- * 與原本的彈窗相同）；30 秒內從列表點進來會直接沿用列表的快取。
+ * 2026-11-10 業主要求移除後台「講者」。只拿掉後台的編輯介面；public.artists 資料不動；前台活動頁顯示講者照常（events.speaker_id）；後台活動編輯頁的「講者」下拉仍可選（fns/artists.ts 的 listArtistOptions 保留）；MCP 的 list_speakers、get_speaker、update_speaker 保留。
+ * 不新增 migration。
+ *
+ * 舊網址（書籤、對話紀錄）留一個轉址。掛在 _shell 底下，所以沒登入的人先被 _shell 的
+ * beforeLoad 帶去 /admin/login。
+ *
+ * 沒有 component —— beforeLoad 先丟出去，元件永遠不會被畫出來。
  */
-import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { ArtistForm } from "@/components/admin/ArtistForm";
-import { backIfPreviousIs } from "@/lib/admin/detail-nav";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/admin/_shell/artists_/new")({
-  loader: async () => {
-    const { listArtists } = await import("@/lib/admin/fns/artists");
-    const artists = await listArtists();
-    return { nextSortOrder: artists.reduce((max, a) => Math.max(max, a.sort_order), 0) + 1 };
+  beforeLoad: () => {
+    throw redirect({ to: "/admin", replace: true });
   },
-  head: () => ({ meta: [{ title: "新增講者｜小時光書店後台" }] }),
-  component: ArtistNewPage,
 });
-
-function ArtistNewPage() {
-  const { nextSortOrder } = Route.useLoaderData();
-  const router = useRouter();
-  const navigate = Route.useNavigate();
-
-  return (
-    <ArtistForm
-      artist={null}
-      nextSortOrder={nextSortOrder}
-      onSaved={async () => {
-        await router.invalidate({ sync: true });
-        if (backIfPreviousIs(router.history, ["/admin/artists"])) return;
-        await navigate({ to: "/admin/artists", replace: true });
-      }}
-    />
-  );
-}

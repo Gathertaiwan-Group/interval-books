@@ -67,24 +67,6 @@ const R = (f) => `src/routes/admin/${f}`;
 console.log("\n[1] 新內頁：loader 一支 fn、授權不放寬、pending、存檔後等新資料");
 const PAGES = [
   // [route 檔, fns 檔, loader 要叫的 fn, 期望的 method+middleware, 是不是 $id 頁]
-  [R("_shell.news_.$id.tsx"), "news", "getNewsById", "GET adminFnMiddleware", true],
-  [R("_shell.news_.new.tsx"), "news", "listNews", "GET adminFnMiddleware", false],
-  [R("_shell.artists_.$id.tsx"), "artists", "getArtistById", "GET adminFnMiddleware", true],
-  [R("_shell.artists_.new.tsx"), "artists", "listArtists", "GET adminFnMiddleware", false],
-  [
-    R("_shell.collaborations_.$id.tsx"),
-    "collaborations",
-    "getCollaborationById",
-    "GET adminFnMiddleware",
-    true,
-  ],
-  [
-    R("_shell.collaborations_.new.tsx"),
-    "collaborations",
-    "listCollaborations",
-    "GET adminFnMiddleware",
-    false,
-  ],
   [
     R("_shell.staff_.$id.tsx"),
     "staff-accounts",
@@ -155,7 +137,9 @@ for (const [route, fnsFile, fn, mw, isDetail] of PAGES) {
   }
 }
 // 所有新 fn 都先掛 middleware（沒有漏網的）。
-for (const f of ["news", "artists", "collaborations", "staff-accounts", "referrals", "pos"]) {
+// 2026-11-10 最新消息／講者／合作三頁移除（只剩轉址），news、collaborations 的 fns 檔一起刪；
+// artists 只剩活動編輯頁講者下拉用的 listArtistOptions。
+for (const f of ["artists", "staff-accounts", "referrals", "pos"]) {
   const fns = code(`src/lib/admin/fns/${f}.ts`);
   const decls = [...fns.matchAll(/export const (\w+) = createServerFn\([^)]*\)\s*(\.\w+)/g)];
   check(
@@ -187,9 +171,6 @@ for (const f of ["news", "artists", "collaborations", "staff-accounts", "referra
 // ─────────────────────────────────────────────────────────────────────────────
 console.log("\n[2] 表單：未存變更防呆、成功先 allowLeave");
 const FORMS = [
-  "src/components/admin/NewsForm.tsx",
-  "src/components/admin/ArtistForm.tsx",
-  "src/components/admin/CollaborationForm.tsx",
   "src/components/admin/StaffAccountForm.tsx",
   "src/components/admin/ReferrerForm.tsx",
   "src/components/inventory/PurchaseForm.tsx",
@@ -222,9 +203,6 @@ for (const f of FORMS) {
 // ─────────────────────────────────────────────────────────────────────────────
 console.log("\n[3] 列表：詳情／編輯的對話框拿掉了，確認與快速動作留著");
 const LISTS = {
-  [R("_shell.news.tsx")]: { link: "/admin/news/$id", keepAlert: true },
-  [R("_shell.artists.tsx")]: { link: "/admin/artists/$id", keepAlert: true },
-  [R("_shell.collaborations.tsx")]: { link: "/admin/collaborations/$id", keepAlert: true },
   [R("_shell.referrals.tsx")]: { link: "/admin/referrals/$id", keepAlert: false },
   [R("_shell.sales.tsx")]: { link: "/admin/sales/$saleId", keepAlert: false },
 };
@@ -329,9 +307,6 @@ console.log("\n[4] 列上的詳情／編輯連結：那一列有動作進行中�
     "src/components/inventory/ComboSetRowActions.tsx": 2,
     "src/components/inventory/ProductTable.tsx": 2,
     "src/components/inventory/PurchaseTable.tsx": 1,
-    [R("_shell.news.tsx")]: 1,
-    [R("_shell.artists.tsx")]: 1,
-    [R("_shell.collaborations.tsx")]: 1,
     [R("_shell.staff.tsx")]: 1,
     [R("_shell.journeys.tsx")]: 1,
     [R("_shell.registrations.tsx")]: 2,

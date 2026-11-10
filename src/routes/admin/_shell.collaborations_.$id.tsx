@@ -1,77 +1,18 @@
 /**
- * /admin/collaborations/$id —— 編輯合作夥伴（2026-10-26 後台第 3 批：從列表裡的編輯 Dialog 改成內頁）。
+ * /admin/collaborations/$id —— 只剩轉址，回 /admin。
  *
- * loader 只叫一支 getCollaborationById（GET，adminFnMiddleware —— 與列表的 listCollaborations、
- * 寫入的 upsertCollaboration 相同）。存檔成功 → allowLeave → invalidate → 從列表進來就按上一頁
- * 回列表，否則 replace 到列表。
+ * 2026-11-10 業主要求移除後台「合作」。只拿掉後台的編輯介面；public.collaborations 資料與前台讀取（/partnership、/curation 的合作案例）不動；MCP 的 list_collaborations、get_collaboration、update_collaboration 保留。
+ * 不新增 migration。
+ *
+ * 舊網址（書籤、對話紀錄）留一個轉址。掛在 _shell 底下，所以沒登入的人先被 _shell 的
+ * beforeLoad 帶去 /admin/login。
+ *
+ * 沒有 component —— beforeLoad 先丟出去，元件永遠不會被畫出來。
  */
-import { createFileRoute, useRouter } from "@tanstack/react-router";
-import {
-  ADMIN_DETAIL_PENDING,
-  AdminDetailNotFound,
-  AdminDetailPending,
-} from "@/components/admin/AdminDetailPage";
-import { CollaborationForm } from "@/components/admin/CollaborationForm";
-import { backIfPreviousIs, TEXT_ROW_ID } from "@/lib/admin/detail-nav";
-import { readAdminPeek } from "@/lib/admin/list-memory";
-import type { CollaborationRow } from "@/server/repos/collaborations";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/admin/_shell/collaborations_/$id")({
-  loader: async ({ params }) => {
-    if (!TEXT_ROW_ID.test(params.id)) return { collaboration: null };
-    const { getCollaborationById } = await import("@/lib/admin/fns/collaborations");
-    return { collaboration: await getCollaborationById({ data: { id: params.id } }) };
+  beforeLoad: () => {
+    throw redirect({ to: "/admin", replace: true });
   },
-  head: ({ loaderData }) => ({
-    meta: [
-      {
-        title: loaderData?.collaboration
-          ? `編輯合作：${loaderData.collaboration.title.zh}｜小時光書店後台`
-          : "合作｜小時光書店後台",
-      },
-    ],
-  }),
-  ...ADMIN_DETAIL_PENDING,
-  pendingComponent: CollaborationPending,
-  component: CollaborationEditPage,
 });
-
-function CollaborationPending() {
-  const { id } = Route.useParams();
-  const peek = readAdminPeek<CollaborationRow>("collaboration", id);
-  return (
-    <AdminDetailPending
-      backTo="/admin/collaborations"
-      backLabel="回合作列表"
-      title={peek ? `編輯合作：${peek.title.zh}` : undefined}
-    />
-  );
-}
-
-function CollaborationEditPage() {
-  const { collaboration } = Route.useLoaderData();
-  const router = useRouter();
-  const navigate = Route.useNavigate();
-
-  if (!collaboration) {
-    return (
-      <AdminDetailNotFound
-        backTo="/admin/collaborations"
-        backLabel="回合作列表"
-        message="找不到這個合作夥伴，可能已被刪除或網址有誤。"
-      />
-    );
-  }
-
-  return (
-    <CollaborationForm
-      key={collaboration.id}
-      collaboration={collaboration}
-      onSaved={async () => {
-        await router.invalidate({ sync: true });
-        if (backIfPreviousIs(router.history, ["/admin/collaborations"])) return;
-        await navigate({ to: "/admin/collaborations", replace: true });
-      }}
-    />
-  );
-}

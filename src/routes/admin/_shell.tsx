@@ -21,8 +21,6 @@ import {
   Landmark,
   LayoutDashboard,
   LogOut,
-  Mic,
-  Newspaper,
   Package,
   Package2,
   PackageSearch,
@@ -30,12 +28,9 @@ import {
   Receipt,
   ScanLine,
   SlidersHorizontal,
-  Sparkles,
   TruckIcon,
-  Settings,
   Tent,
   TriangleAlert,
-  Type,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -154,6 +149,13 @@ export const Route = createFileRoute("/admin/_shell")({
  */
 const NAV_GROUPS = [
   {
+    // 後台首頁（今日待辦）放在側欄第一項（2026-11-10 業主要求）。只在完全等於 /admin 時亮
+    // （isNavItemActive 的 ADMIN_ROOT_PATH 特例）。staff: false——門市人員進 /admin 會被
+    // 導去櫃檯（見 login.tsx／_shell.index.tsx），所以他們看不到這一項，第一項仍是「櫃檯結帳」。
+    label: "總覽",
+    items: [{ to: "/admin", label: "今日待辦", icon: LayoutDashboard, staff: false }],
+  },
+  {
     label: "門市",
     items: [
       { to: "/admin/pos", label: "櫃檯結帳", icon: ScanLine, staff: true },
@@ -205,20 +207,11 @@ const NAV_GROUPS = [
   {
     label: "內容管理",
     items: [
-      { to: "/admin", label: "儀表板", icon: LayoutDashboard, staff: false },
-      { to: "/admin/news", label: "最新消息", icon: Newspaper, staff: false },
       { to: "/admin/events", label: "活動", icon: CalendarDays, staff: false },
-      // 講者（public.artists）緊接在活動後面，因為它就是活動的一部分：一場講座
-      // 的主體是「誰來講」。放在內容管理而不是進銷存，是因為這一頁編的是門面
-      // 資料 —— 同一張表的 vendor_id 那一半（統編、匯款）在「廠商」頁，
-      // 那是另一個授權面，見 src/server/repos/artists.ts 檔頭。
-      { to: "/admin/artists", label: "講者", icon: Mic, staff: false },
       // lucide's `Route` icon would collide with this file's `export const Route`.
       { to: "/admin/journeys", label: "策旅", icon: Tent, staff: false },
-      // 策旅頁「下次，我想這樣玩」願望表單的收件匣（0046），緊接在策旅後面。staff: false，
-      // 真正擋人的是 src/lib/admin/fns/journey-wishes.ts 的 adminFnMiddleware。
-      { to: "/admin/journey-wishes", label: "旅程願望", icon: Sparkles, staff: false },
-      { to: "/admin/collaborations", label: "合作", icon: Handshake, staff: false },
+      // 2026-11-10 業主要求移除後台「最新消息」「講者」「旅程願望」「合作」四頁（只剩轉址回
+      // /admin，資料與 MCP 工具保留），側欄項目一起拿掉。
       // /partnership 表單的收件匣（0042）。staff: false，真正擋人的是
       // src/lib/admin/fns/partnerships.ts 的 adminFnMiddleware。
       { to: "/admin/partnerships", label: "異業合作", icon: Inbox, staff: false },
@@ -257,17 +250,13 @@ const NAV_GROUPS = [
   },
   {
     label: "站台設定",
-    items: [
-      { to: "/admin/settings", label: "全站設定", icon: Settings, staff: false },
-      { to: "/admin/strings", label: "介面文字", icon: Type, staff: false },
-      { to: "/admin/phones", label: "聯絡電話", icon: Phone, staff: false },
-    ],
+    items: [{ to: "/admin/phones", label: "聯絡電話", icon: Phone, staff: false }],
   },
   {
     label: "系統管理",
     items: [
       // 獨立成一組而不是塞進「站台設定」：那一組管的是網站內容長什麼樣
-      // （site_settings／ui_strings／聯絡電話），這裡管的是「誰能用這個
+      // （聯絡電話；全站設定與介面文字 2026-11-10 已移除，改由 MCP 代改），這裡管的是「誰能用這個
       // 後台」——來源不一樣（public.profiles／public.staff_permissions，
       // 見 supabase/migrations/0033_admin_staff_management.sql），跟本檔
       // 開頭「不同系統分開成不同群組」的原則一致。

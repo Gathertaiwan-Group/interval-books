@@ -1,77 +1,18 @@
 /**
- * /admin/news/$id —— 編輯一則最新消息（2026-10-26 後台第 3 批：從列表裡的編輯 Dialog 改成內頁）。
+ * /admin/news/$id —— 只剩轉址，回 /admin。
  *
- * loader 只叫一支 getNewsById（GET，adminFnMiddleware —— 與列表的 listNews、寫入的 upsertNews
- * 相同）。存檔成功 → allowLeave → invalidate → 從列表進來就按上一頁回列表，否則 replace 到列表。
+ * 2026-11-10 業主要求移除後台「最新消息」。只拿掉後台的編輯介面；public.news 資料、前台讀取（目前 /news 已轉回首頁）不動；MCP 的 list_news、get_news、create_news、update_news、delete_news 保留。
+ * 不新增 migration。
+ *
+ * 舊網址（書籤、對話紀錄）留一個轉址。掛在 _shell 底下，所以沒登入的人先被 _shell 的
+ * beforeLoad 帶去 /admin/login。
+ *
+ * 沒有 component —— beforeLoad 先丟出去，元件永遠不會被畫出來。
  */
-import { createFileRoute, useRouter } from "@tanstack/react-router";
-import {
-  ADMIN_DETAIL_PENDING,
-  AdminDetailNotFound,
-  AdminDetailPending,
-} from "@/components/admin/AdminDetailPage";
-import { NewsForm } from "@/components/admin/NewsForm";
-import { backIfPreviousIs, TEXT_ROW_ID } from "@/lib/admin/detail-nav";
-import { readAdminPeek } from "@/lib/admin/list-memory";
-import type { NewsRow } from "@/server/repos/news";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/admin/_shell/news_/$id")({
-  loader: async ({ params }) => {
-    if (!TEXT_ROW_ID.test(params.id)) return { news: null };
-    const { getNewsById } = await import("@/lib/admin/fns/news");
-    return { news: await getNewsById({ data: { id: params.id } }) };
+  beforeLoad: () => {
+    throw redirect({ to: "/admin", replace: true });
   },
-  head: ({ loaderData }) => ({
-    meta: [
-      {
-        title: loaderData?.news
-          ? `編輯消息：${loaderData.news.title.zh}｜小時光書店後台`
-          : "最新消息｜小時光書店後台",
-      },
-    ],
-  }),
-  ...ADMIN_DETAIL_PENDING,
-  pendingComponent: NewsPending,
-  component: NewsEditPage,
 });
-
-function NewsPending() {
-  const { id } = Route.useParams();
-  const peek = readAdminPeek<NewsRow>("news", id);
-  return (
-    <AdminDetailPending
-      backTo="/admin/news"
-      backLabel="回最新消息列表"
-      title={peek ? `編輯消息：${peek.title.zh}` : undefined}
-    />
-  );
-}
-
-function NewsEditPage() {
-  const { news } = Route.useLoaderData();
-  const router = useRouter();
-  const navigate = Route.useNavigate();
-
-  if (!news) {
-    return (
-      <AdminDetailNotFound
-        backTo="/admin/news"
-        backLabel="回最新消息列表"
-        message="找不到這則消息，可能已被刪除或網址有誤。"
-      />
-    );
-  }
-
-  return (
-    <NewsForm
-      // 換一則＝重新掛載，表單不會跨筆殘留。
-      key={news.id}
-      news={news}
-      onSaved={async () => {
-        await router.invalidate({ sync: true });
-        if (backIfPreviousIs(router.history, ["/admin/news"])) return;
-        await navigate({ to: "/admin/news", replace: true });
-      }}
-    />
-  );
-}

@@ -809,7 +809,11 @@ function AdminEventAssemblerPage() {
               </FormItem>
             )}
           />
-          <MirrorNote label="講者" source="講者" to="/admin/artists">
+          <MirrorNote
+            label="講者"
+            source="講者資料"
+            hint="講者管理頁已移除；新增或修改講者介紹請透過 MCP 或工程代改。"
+          >
             {current
               ? `目前指定：${allArtists.find((a) => a.id === current)?.name ?? current}`
               : "這場不顯示講者介紹。"}

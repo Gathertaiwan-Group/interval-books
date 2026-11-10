@@ -458,7 +458,8 @@ checkTrue(
 );
 check("側欄：「地方刊物展」拿掉了", shell.includes('"/admin/publications"'), false);
 check("側欄：「選品」拿掉了", shell.includes('"/admin/curated"'), false);
-checkTrue("側欄：「合作」不是商品，留在原處", shell.includes('to: "/admin/collaborations"'));
+// 2026-11-10「合作」後台頁移除（只剩轉址），側欄跟著拿掉。
+check("側欄：「合作」已移除", shell.includes('to: "/admin/collaborations"'), false);
 checkTrue("側欄：進銷存的「商品管理」不動", shell.includes('to: "/admin/inventory-products"'));
 
 for (const [from, tab] of Object.entries(up.LEGACY_ADMIN_REDIRECTS)) {

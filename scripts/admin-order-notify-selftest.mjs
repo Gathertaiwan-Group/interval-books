@@ -637,14 +637,18 @@ checkTrue(
   /notify_emails:\s*input\.notify_emails,/.test(repoCode),
 );
 
+// 2026-11-10 業主要求移除後台「全站設定」頁：_shell.settings.tsx 只剩轉址回 /admin，
+// notify_emails 不再有後台表單（資料、寄信流程、repo 的讀寫都不動，上面兩段照驗）。
 const routeTsx = readFile(join(ROOT, "src/routes/admin/_shell.settings.tsx"));
 const routeCode = stripTs(routeTsx);
 checkTrue(
-  "toFormValues() 映射 notify_emails",
-  /notify_emails:\s*settings\.notify_emails,/.test(routeCode),
+  "/admin/settings 只剩轉址回 /admin",
+  /throw redirect\(\{ to: "\/admin", replace: true \}\)/.test(routeCode),
 );
-checkTrue('表單裡有 name="notify_emails" 的 FormField', /name="notify_emails"/.test(routeCode));
-checkTrue("說明文字有提到逗號分隔", /逗號分隔/.test(routeCode));
+checkTrue(
+  "/admin/settings 不再有表單元件",
+  !/component:/.test(routeCode) && !/name="notify_emails"/.test(routeCode),
+);
 
 // =============================================================================
 // [9] 排版：直接 import src/lib/email-templates.ts 本人
