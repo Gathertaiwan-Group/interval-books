@@ -192,6 +192,38 @@ check(
   ].every((s) => home.includes(s)),
   true,
 );
+// 2026-11-10 收尾段（休止符＋INTERVAL）搬到 /about：故事之後、「我們做的事」之前
+check(
+  "首頁不再渲染收尾段",
+  ["<RestMark", "<IntervalCoda", "closingBody", 'p.block("hero.intro"'].filter((k) =>
+    home.includes(k),
+  ),
+  [],
+);
+{
+  const about = readFile("src/routes/about.tsx");
+  const story = about.indexOf('data-testid="about-story"');
+  const coda = about.indexOf("<IntervalCoda");
+  const work = about.indexOf('data-testid="about-work"');
+  check(
+    "/about 的店名由來在故事之後、我們做的事之前",
+    story > 0 && coda > story && coda < work,
+    true,
+  );
+  check(
+    "/about 的句子仍讀 pages/'index' 的 hero.intro",
+    about.includes('pageText(indexPage).block("hero.intro", INTERVAL_COPY.motto)'),
+    true,
+  );
+  const coda2 = readFile("src/components/IntervalCoda.tsx");
+  check(
+    "英文不再把 interval 說成休止符",
+    coda2.includes("An interval is the pause between two acts") &&
+      !coda2.includes("INTERVAL is the rest in a musical score"),
+    true,
+  );
+  check("日文不再寫「INTERVAL は楽譜の休符のこと」", coda2.includes("楽譜の休符のこと"), false);
+}
 check("hero 下方的「三個數字」已拿掉", /HOME\.fact[A-Z]/.test(home), false);
 check("近期活動與策旅在 hero 之後", posHeroEnd > 0 && posUpcoming > posHeroEnd, true);
 check("近期活動與策旅在地方刊物典藏之前", posUpcoming > 0 && posUpcoming < posArchive, true);

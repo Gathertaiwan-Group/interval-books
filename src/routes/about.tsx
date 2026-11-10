@@ -28,6 +28,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { PageShell, PageHeader } from "@/components/PageShell";
+import { INTERVAL_COPY, IntervalCoda } from "@/components/IntervalCoda";
 import { useT } from "@/i18n/LanguageContext";
 import type { Localized } from "@/i18n/types";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
@@ -45,8 +46,14 @@ import exhibitionImg from "@/assets/exhibition-corner.jpg";
 
 export const Route = createFileRoute("/about")({
   loader: async () => {
-    const [page, visitPage] = await Promise.all([fetchPage("about"), fetchPage("visit")]);
-    return { page, visitPage };
+    // indexPage：「店名的由來」那句（hero.intro）一直存在 pages/'index'，後台在那一格改。
+    // 2026-11-10 那一段從首頁搬到這裡，句子仍讀同一格（見 src/components/IntervalCoda.tsx）。
+    const [page, visitPage, indexPage] = await Promise.all([
+      fetchPage("about"),
+      fetchPage("visit"),
+      fetchPage("index"),
+    ]);
+    return { page, visitPage, indexPage };
   },
   head: ({ loaderData, matches, match }) => {
     const page = loaderData?.page ?? null;
@@ -280,7 +287,7 @@ const INSIDE: Localized[] = [
 
 function About() {
   const t = useT();
-  const { page, visitPage } = Route.useLoaderData();
+  const { page, visitPage, indexPage } = Route.useLoaderData();
   const p = pageText(page);
   /** pages/'visit' 那一列。來店資訊整段的文案與清單都從這裡來。 */
   const pv = pageText(visitPage);
@@ -339,6 +346,17 @@ function About() {
           </p>
         </div>
       </section>
+
+      {/* 1.5) 店名的由來（2026-11-10 從首頁收尾段搬來）。放在故事之後、「我們做的事」之前：
+          先講這間店怎麼開始，再講「小時光／INTERVAL」這個名字的意思，最後才是做什麼。
+          下方「我們做的事」的標題自帶上框線，這裡不再加線。 */}
+      <IntervalCoda
+        className="pb-24"
+        testId="about-interval"
+        kicker={t(INTERVAL_COPY.kicker)}
+        motto={t(pageText(indexPage).block("hero.intro", INTERVAL_COPY.motto))}
+        body={t(INTERVAL_COPY.body)}
+      />
 
       {/* 2) 我們做的事 */}
       <section className="container-editorial pb-24" data-testid="about-work">

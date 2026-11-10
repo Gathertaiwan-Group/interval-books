@@ -582,7 +582,12 @@ walk(aboutLoader, (n) => {
   }
 });
 // 只讀 about 那一列的話，對 page_slug='visit' 的每一次修改都會變成靜默無效。
-check("/about loader 同時讀 about 與 visit 兩列", sorted(aboutSlugs), ["about", "visit"]);
+// 2026-11-10 起多讀 index 那一列：「店名的由來」的句子是 pages/'index' 的 hero.intro。
+check("/about loader 同時讀 about、visit 與 index 三列", sorted(aboutSlugs), [
+  "about",
+  "index",
+  "visit",
+]);
 
 const aboutLoaderNames = new Set();
 walk(ast.about.program, (n) => {
@@ -593,7 +598,11 @@ walk(ast.about.program, (n) => {
   for (const p of n.id.properties)
     if (p.type === "ObjectProperty") aboutLoaderNames.add(propKey(p));
 });
-check("/about 解構出 page 與 visitPage", sorted(aboutLoaderNames), ["page", "visitPage"]);
+check("/about 解構出 page、visitPage 與 indexPage", sorted(aboutLoaderNames), [
+  "indexPage",
+  "page",
+  "visitPage",
+]);
 
 // pv = pageText(visitPage)
 let pvSource = null;

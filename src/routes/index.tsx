@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { PageShell } from "@/components/PageShell";
 import { CoverImage } from "@/components/CoverImage";
 import { PastShelf } from "@/components/PastShelf";
-import { RestMark } from "@/components/RestMark";
 import { HomeProductShelf } from "@/components/shop/HomeProductShelf";
 import { useLocalizeHref, useT } from "@/i18n/LanguageContext";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
@@ -79,7 +78,7 @@ const HERO = {
  * 全部走 p.block("home.*", 這裡的預設值)：pages/'index' 目前**沒有**這些 key，所以畫面上
  * 就是這裡的字；之後在 DB 補上同名 block，後台就能改字，不用動程式。
  * 舊的 hero.titleSub（留一點時間給真正重要的事）與 hero.intro（留一段屬於自己的＿＿＿小時光）
- * 繼續沿用 DB 那兩格——前者 2026-11-10 起不在首屏印出、只當 og:title 預設值，後者是頁尾收尾句。
+ * 繼續沿用 DB 那兩格——前者 2026-11-10 起不在首屏印出、只當 og:title 預設值，後者 2026-11-10 起搬到 /about 的「店名的由來」（IntervalCoda）。
  *
  * ⚠️ 英文與日文是改版提案，待業主確認。
  */
@@ -217,13 +216,6 @@ const HOME = {
   visitHoursLabel: { zh: "營業時間", en: "Hours", ja: "営業時間" },
   visitWhereLabel: { zh: "地址", en: "Address", ja: "所在地" },
   visitHowLabel: { zh: "交通", en: "Getting here", ja: "アクセス" },
-
-  closingKicker: { zh: "INTERVAL", en: "INTERVAL", ja: "INTERVAL" },
-  closingBody: {
-    zh: "INTERVAL 是樂譜上的休止符。休止不是空白，是讓音樂呼吸的地方。那一格留給你——讀的、聊的，或出發的。",
-    en: "INTERVAL is the rest in a musical score. A rest is not silence left empty; it is where the music breathes. That space is yours — for reading, for talking, or for setting out.",
-    ja: "INTERVAL は楽譜の休符のこと。休符は空白ではなく、音楽が息をつく場所。その一拍はあなたのために——読むために、語るために、出かけるために。",
-  },
 };
 
 const ENTRIES = {
@@ -240,9 +232,6 @@ const ENTRIES = {
   curatedCta: { zh: "走進選品櫥窗", en: "Enter the window", ja: "選品の窓辺へ" },
   visitFull: { zh: "完整來訪資訊", en: "Full visit info", ja: "ご案内" },
 };
-
-/** 「＿＿＿」：hero.intro 裡刻意的留白。畫成一段細線，螢幕閱讀器略過不唸。 */
-const BLANK_RE = /[＿_]{2,}/;
 
 function fill(template: string, values: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (m, k: string) => (k in values ? String(values[k]) : m));
@@ -330,8 +319,6 @@ function Index() {
   const { ui, site, map } = useSiteContent();
   const heroSrc = imageFor(page?.ogImageKey, heroImg);
   const counts = archive.counts;
-  const motto = t(p.block("hero.intro", HERO.intro));
-  const [mottoBefore, mottoAfter] = BLANK_RE.test(motto) ? motto.split(BLANK_RE) : [motto, null];
 
   useDocumentMeta({
     title: p.metaTitle(PAGE_META.title),
@@ -929,30 +916,8 @@ function Index() {
         </div>
       </section>
 
-      {/* ── 收尾：休止符 ────────────────────────────────────────────────────
-          hero.intro（後台可改）裡的「＿＿＿」是刻意的留白——保留，畫成一段細線，
-          讓它成為這一頁的休止符。螢幕閱讀器略過那段線，唸成一句完整的話。 */}
-      <section className="container-editorial pt-8 pb-4 text-center" aria-label="INTERVAL">
-        <RestMark className="mx-auto text-clay" />
-        <p className="mt-6 text-xs tracking-[0.4em] text-clay">
-          {t(p.block("home.closingKicker", HOME.closingKicker))}
-        </p>
-        <p className="display mx-auto mt-6 max-w-3xl text-3xl leading-[1.5] md:text-[2.6rem]">
-          {mottoBefore}
-          {mottoAfter !== null ? (
-            <>
-              <span
-                aria-hidden="true"
-                className="mx-2 inline-block w-[3.5em] translate-y-[-0.2em] border-b border-clay align-baseline"
-              />
-              {mottoAfter}
-            </>
-          ) : null}
-        </p>
-        <p className="mx-auto mt-8 max-w-xl text-[0.95rem] leading-[1.95] text-muted-foreground">
-          {t(p.block("home.closingBody", HOME.closingBody))}
-        </p>
-      </section>
+      {/* 2026-11-10：原本這裡的收尾段（休止符＋INTERVAL＋「留一段屬於自己的＿＿＿小時光。」）
+          搬到 /about 當「店名的由來」，見 src/components/IntervalCoda.tsx。 */}
     </PageShell>
   );
 }
