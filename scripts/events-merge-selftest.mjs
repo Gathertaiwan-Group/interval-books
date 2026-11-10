@@ -513,6 +513,35 @@ console.log(
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+console.log("\n[7] LCP：只有首屏第一張卡優先載入（2026-11-10 Lighthouse mobile）");
+{
+  const cover = strip(readFile("src/components/CoverImage.tsx"));
+  checkTrue("CoverImage priority 預設 false（其他頁不變）", cover.includes("priority = false,"));
+  checkTrue(
+    "priority → eager＋fetchPriority high；否則照 loading",
+    cover.includes('const load = priority ? "eager" : loading;') &&
+      cover.includes('fetchPriority={priority ? "high" : undefined}'),
+  );
+  check(
+    "模糊底與前景同一個 loading（不會晚畫成 LCP）",
+    (cover.match(/loading=\{load\}/g) ?? []).length,
+    2,
+  );
+  const ev = strip(readFile("src/routes/events.index.tsx"));
+  checkTrue("策旅段第一張 priority", ev.includes("priority={listPriority && i === 0}"));
+  checkTrue(
+    "活動段第一張只在沒有策旅段時 priority（一頁一張）",
+    ev.includes("priority={listPriority && journeyList.length === 0 && i === 0}"),
+  );
+  checkTrue("明確選月曆時不給", ev.includes('const listPriority = view !== "calendar";'));
+  const jc = strip(readFile("src/components/events/JourneyCard.tsx"));
+  checkTrue(
+    "JourneyCard 把 priority 傳給 CoverImage、預設 false",
+    jc.includes("priority = false,") && jc.includes("priority={priority}"),
+  );
+}
+
 console.log("\n────────────────────────────────────────────────────");
 console.log(`##SELFTEST## file=${SELF} pass=${pass} fail=${fail}`);
 if (fail === 0) {

@@ -25,6 +25,14 @@ type CoverImageProps = {
   loading?: ImgHTMLAttributes<HTMLImageElement>["loading"];
   width?: number;
   height?: number;
+  /**
+   * 首屏的那一張（例：/events 第一張卡片）：前景圖 eager＋fetchPriority="high"（React 19 會在
+   * <head> 自動輸出 preload），模糊底也改 eager——兩層是同一個網址、同一次下載，模糊底不會
+   * 晚於前景圖才畫出來，於是不再以 lazy 的身分成為很晚才完成的 LCP。
+   * 預設 false：其他頁、其他卡片行為完全不變（照 loading 參數，通常是 lazy）。
+   * 一頁最多給一張，給多了等於沒有優先順序。
+   */
+  priority?: boolean;
 };
 
 export function CoverImage({
@@ -35,7 +43,9 @@ export function CoverImage({
   loading,
   width,
   height,
+  priority = false,
 }: CoverImageProps) {
+  const load = priority ? "eager" : loading;
   return (
     <div className={cn("relative overflow-hidden bg-muted", className)}>
       {/* 模糊底：純裝飾（alt=""、aria-hidden），只負責把 contain 留下的空白補滿。
@@ -44,13 +54,15 @@ export function CoverImage({
         src={src}
         alt=""
         aria-hidden="true"
-        loading={loading}
-        className="absolute inset-0 h-full w-full scale-110 object-cover opacity-60 blur-2xl"
+        loading={load}
+        decoding="async"
+        className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-60 blur-2xl"
       />
       <img
         src={src}
         alt={alt}
-        loading={loading}
+        loading={load}
+        fetchPriority={priority ? "high" : undefined}
         width={width}
         height={height}
         className={cn("relative h-full w-full object-contain", imgClassName)}

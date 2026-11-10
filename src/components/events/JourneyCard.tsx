@@ -36,6 +36,7 @@ export function JourneyCard({
   layout,
   pastBadge,
   className = "",
+  priority = false,
 }: {
   journey: JourneyCardData;
   /** 卡片指著的那場活動（日期、封面）。指不到 → null。 */
@@ -46,6 +47,8 @@ export function JourneyCard({
   pastBadge: string | null;
   /** 外層再加的 class（/events 手機橫滑列的寬度與 snap，見 src/lib/card-rail.ts）。 */
   className?: string;
+  /** 首屏第一張卡：封面圖優先載入（見 CoverImage 的 priority）。 */
+  priority?: boolean;
 }) {
   const t = useT();
   const localizeHref = useLocalizeHref();
@@ -59,6 +62,7 @@ export function JourneyCard({
         src={imageFor(linked?.imageKey, journeyImg)}
         alt={t(j.title)}
         loading="lazy"
+        priority={priority}
         className={`aspect-[4/3] ${layout.image}`}
         imgClassName="transition-transform duration-500 group-hover:scale-[1.03]"
       />

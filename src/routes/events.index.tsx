@@ -361,6 +361,10 @@ function Events() {
   const eventLayout = featureLayout(eventList.length);
   const journeyLayout = featureLayout(journeyList.length);
   const eventRail = cardRail(eventList.length);
+  // LCP（2026-11-10 Lighthouse mobile 7–13 秒：LCP 是第一張卡片 lazy 的模糊底）：首屏只有
+  // 「第一段的第一張卡」看得到（策旅段在前；沒有策旅才是活動段），只給它 priority，一頁一張。
+  // 第二段的第一張在手機首屏之下，給了只會跟它搶頻寬。明確選月曆時列表不畫，就不給。
+  const listPriority = view !== "calendar";
   const journeyRail = cardRail(journeyList.length);
 
   // 過往區：依類型挑來源，「全部」時依結束日合併。先列 PAST_SHELF_LIMIT 張，其餘按「看全部」展開。
@@ -540,7 +544,7 @@ function Events() {
                 >
                   {sectioned ? <SectionHeading label={t(SECTION_LABELS.journey)} /> : null}
                   <div className={`${journeyLayout.grid} ${journeyRail.track}`}>
-                    {journeyList.map((j) => {
+                    {journeyList.map((j, i) => {
                       const linked = linkedEventFor(j.externalUrl, journeyEvents);
                       return (
                         <JourneyCard
@@ -559,6 +563,7 @@ function Events() {
                           layout={journeyLayout}
                           pastBadge={null}
                           className={journeyRail.item}
+                          priority={listPriority && i === 0}
                         />
                       );
                     })}
@@ -575,7 +580,7 @@ function Events() {
                 >
                   {sectioned ? <SectionHeading label={t(SECTION_LABELS.event)} /> : null}
                   <div className={`${eventLayout.grid} ${eventRail.track}`}>
-                    {eventList.map((e) => (
+                    {eventList.map((e, i) => (
                       // 整張卡片不是連結（唯一的連結是底下那顆「活動詳情」），所以不加 CARD_HOVER。
                       <article
                         key={e.id}
@@ -589,6 +594,7 @@ function Events() {
                             src={imageFor(e.imageKey, eventImg)}
                             alt={t(e.title)}
                             loading="lazy"
+                            priority={listPriority && journeyList.length === 0 && i === 0}
                             className={`aspect-[4/3] ${eventLayout.image}`}
                           />
                         ) : null}
