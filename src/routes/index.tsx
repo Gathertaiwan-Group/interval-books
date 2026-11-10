@@ -646,52 +646,6 @@ function Index() {
         </div>
       </section>
 
-      {/* ── 三個支柱：讀．聚．行 ─────────────────────────────────────────── */}
-      <section className="container-editorial section-y" aria-labelledby="home-pillars">
-        <div className="max-w-2xl">
-          <p className="kicker">{t(p.block("home.pillarsKicker", HOME.pillarsKicker))}</p>
-          <h2 id="home-pillars" className="display mt-5 text-3xl md:text-5xl">
-            {t(p.block("home.pillarsTitle", HOME.pillarsTitle))}
-          </h2>
-        </div>
-        <ul className="mt-14 grid gap-12 md:grid-cols-3 md:gap-8 lg:gap-12">
-          {pillars.map((pl) => (
-            <li key={pl.key}>
-              <Link
-                to={pl.to}
-                search={pl.to === "/events" ? { type: pl.type } : undefined}
-                className="group block"
-              >
-                <div className="aspect-[5/4] overflow-hidden bg-muted">
-                  <img
-                    src={pl.img}
-                    srcSet={srcSetFor(pl.img)}
-                    sizes="(min-width: 768px) 30vw, 100vw"
-                    alt={pl.alt}
-                    loading="lazy"
-                    className="img-zoom h-full w-full object-cover"
-                  />
-                </div>
-                <div className="mt-6 flex items-baseline gap-4">
-                  <span className="text-xs tracking-[0.2em] text-clay">{pl.no}</span>
-                  <span className="display text-4xl md:text-5xl" aria-hidden="true">
-                    {pl.char}
-                  </span>
-                </div>
-                <h3 className="mt-4 font-serif text-2xl">{pl.title}</h3>
-                <p className="mt-3 text-[0.95rem] leading-[1.9] text-foreground/75">{pl.body}</p>
-                <span className="link-arrow mt-5 text-sm">
-                  {pl.cta}
-                  <span className="arrow" aria-hidden="true">
-                    →
-                  </span>
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
-
       {/* ── 地方刊物典藏 ─────────────────────────────────────────────────────
           這間店最獨特的東西，給它一整條色帶與一個大數字。份數與封面來自 publications 表；
           讀不到就不印數字（不顯示 0），封面區整塊不畫。 */}
@@ -869,6 +823,61 @@ function Index() {
           </Link>
         }
       />
+
+      {/* ── 三個支柱：讀．聚．行 ───────────────────────────────────────────
+          2026-11-10 業主要求移到「來小時光坐坐」（來訪資訊）正上方，內容不變。
+          上一區通常是「回顧」（PastShelf：container 內一條上框線＋pb-24），這裡用同一個做法——
+          container 內畫上框線、上方不再疊 section-y 的留白，免得兩區之間空一大段卻沒有分隔；
+          下方的來訪資訊自帶整寬上框線。 */}
+      <section
+        className="container-editorial pb-[var(--space-section)]"
+        aria-labelledby="home-pillars"
+      >
+        <div className="border-t border-border pt-16">
+          <div className="max-w-2xl">
+            <p className="kicker">{t(p.block("home.pillarsKicker", HOME.pillarsKicker))}</p>
+            <h2 id="home-pillars" className="display mt-5 text-3xl md:text-5xl">
+              {t(p.block("home.pillarsTitle", HOME.pillarsTitle))}
+            </h2>
+          </div>
+          <ul className="mt-14 grid gap-12 md:grid-cols-3 md:gap-8 lg:gap-12">
+            {pillars.map((pl) => (
+              <li key={pl.key}>
+                <Link
+                  to={pl.to}
+                  search={pl.to === "/events" ? { type: pl.type } : undefined}
+                  className="group block"
+                >
+                  <div className="aspect-[5/4] overflow-hidden bg-muted">
+                    <img
+                      src={pl.img}
+                      srcSet={srcSetFor(pl.img)}
+                      sizes="(min-width: 768px) 30vw, 100vw"
+                      alt={pl.alt}
+                      loading="lazy"
+                      className="img-zoom h-full w-full object-cover"
+                    />
+                  </div>
+                  <div className="mt-6 flex items-baseline gap-4">
+                    <span className="text-xs tracking-[0.2em] text-clay">{pl.no}</span>
+                    <span className="display text-4xl md:text-5xl" aria-hidden="true">
+                      {pl.char}
+                    </span>
+                  </div>
+                  <h3 className="mt-4 font-serif text-2xl">{pl.title}</h3>
+                  <p className="mt-3 text-[0.95rem] leading-[1.9] text-foreground/75">{pl.body}</p>
+                  <span className="link-arrow mt-5 text-sm">
+                    {pl.cta}
+                    <span className="arrow" aria-hidden="true">
+                      →
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
 
       {/* ── 來訪資訊 ─────────────────────────────────────────────────────── */}
       <section className="border-t border-border" aria-labelledby="home-visit">

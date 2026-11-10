@@ -164,10 +164,22 @@ const posHeroEnd = home.indexOf("{t(HOME.heroCaption)}");
 const posUpcoming = home.indexOf('id="upcoming"');
 const posPillars = home.indexOf('aria-labelledby="home-pillars"');
 const posArchive = home.indexOf('aria-labelledby="home-archive"');
+const posPast = home.indexOf("<PastShelf");
+const posVisit = home.indexOf('aria-labelledby="home-visit"');
 check("hero 下方的「三個數字」已拿掉", /HOME\.fact[A-Z]/.test(home), false);
 check("近期活動與策旅在 hero 之後", posHeroEnd > 0 && posUpcoming > posHeroEnd, true);
-check("近期活動與策旅在「讀．聚．行」之前", posUpcoming > 0 && posUpcoming < posPillars, true);
-check("「讀．聚．行」仍在地方刊物典藏之前", posPillars < posArchive, true);
+check("近期活動與策旅在地方刊物典藏之前", posUpcoming > 0 && posUpcoming < posArchive, true);
+// 2026-11-10 業主：讀．聚．行移到來訪資訊（來小時光坐坐）正上方
+check(
+  "「讀．聚．行」在回顧之後、來訪資訊正上方",
+  posPast > 0 && posPillars > posPast && posPillars < posVisit,
+  true,
+);
+check(
+  "「讀．聚．行」與來訪資訊之間沒有別的區塊",
+  home.slice(posPillars, posVisit).split("<section").length - 1,
+  1,
+);
 check(
   "listing 與其他讀取同一個 Promise.all",
   /Promise\.all\(\[[^\]]*fetchListingFacts\(\)/.test(home),
