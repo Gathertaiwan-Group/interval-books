@@ -349,6 +349,8 @@ const posFiles = [
   "src/routes/admin/_shell.pos.tsx",
   "src/routes/admin/_shell.sales.tsx",
   "src/routes/admin/_shell.stock-alerts.tsx",
+  // 2026-11-10 賣超告警併進後台首頁，本體搬到 StockAlertsPanel。
+  "src/components/admin/StockAlertsPanel.tsx",
   "src/components/pos/ScannerInput.tsx",
   "src/components/pos/CartPanel.tsx",
   "src/components/pos/CheckoutPanel.tsx",

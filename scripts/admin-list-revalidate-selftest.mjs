@@ -44,7 +44,8 @@ const PAGES = {
   "_shell.inventory-adjustments.tsx": { key: "inventory-adjustments", writes: true },
   "_shell.inventory-count.tsx": { key: "inventory-count", writes: true },
   "_shell.sales.tsx": { key: "sales", writes: false },
-  "_shell.stock-alerts.tsx": { key: "stock-alerts", writes: true },
+  // 2026-11-10 賣超告警併進後台首頁的 StockAlertsPanel（待處理那一份來自首頁 loader，
+  // 寫入後 router.invalidate() 重跑），不再是獨立列表頁，所以不在這份清單裡；它自己的規矩見 [2]。
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -149,9 +150,9 @@ console.log("\n[2] 進行中的編輯留在頁面自己的 state");
       !/setFilter\(\(f\)/.test(sales),
   );
 
-  const al = stripComments(read("src/routes/admin/_shell.stock-alerts.tsx"));
+  const al = stripComments(read("src/components/admin/StockAlertsPanel.tsx"));
   checkTrue(
-    "告警：正在標記的那一列與說明是頁面 state",
+    "告警：正在標記的那一列與說明是元件 state",
     /useState<StockAlertRow \| null>\(null\)/.test(al) && /useState\(""\)/.test(al),
   );
   check(
@@ -160,8 +161,8 @@ console.log("\n[2] 進行中的編輯留在頁面自己的 state");
     false,
   );
   checkTrue(
-    "告警：分頁籤就是 hook 的篩選",
-    /onValueChange=\{\(v\) => list\.setFilter\(v as Status\)\}/.test(al),
+    "告警：標記成功後 router.invalidate() 讓 loader 重抓待處理那一份",
+    /resolveStockAlert\([\s\S]*await router\.invalidate\(\)/.test(al),
   );
 }
 

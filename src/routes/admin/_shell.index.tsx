@@ -3,6 +3,7 @@ import { AlertTriangle, CalendarDays, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InvoiceProblemBanner } from "@/components/admin/InvoiceProblemBanner";
 import { McpVoidRequestBanner } from "@/components/admin/McpVoidRequestBanner";
+import { StockAlertsPanel } from "@/components/admin/StockAlertsPanel";
 import { buildTodoCards, sortTodoCards, type TodoCard } from "@/lib/admin/todo";
 import { formatTaipeiDateTime } from "@/lib/taipei-time";
 
@@ -22,8 +23,22 @@ export const Route = createFileRoute("/admin/_shell/")({
     }
   },
   loader: async () => {
-    const { getAdminTodo } = await import("@/lib/admin/fns/dashboard");
-    return await getAdminTodo();
+    const [{ getAdminTodo }, { listStockAlerts }] = await Promise.all([
+      import("@/lib/admin/fns/dashboard"),
+      import("@/lib/admin/fns/pos"),
+    ]);
+    // 賣超告警（原 /admin/stock-alerts，2026-11-10 併進首頁）與待辦數字並行讀。告警讀失敗＝null，
+    // 卡片說讀取失敗，不讓整個首頁掛掉。
+    const [todo, stockAlerts] = await Promise.all([
+      getAdminTodo(),
+      listStockAlerts({ data: { status: "open" } }).catch((err: unknown) => {
+        console.error(
+          `[dashboard] 賣超告警讀取失敗：${err instanceof Error ? err.message : String(err)}`,
+        );
+        return null;
+      }),
+    ]);
+    return { ...todo, stockAlerts };
   },
   head: () => ({
     meta: [{ title: "今日待辦｜小時光書店後台" }],
@@ -32,8 +47,8 @@ export const Route = createFileRoute("/admin/_shell/")({
 });
 
 function AdminDashboard() {
-  const { admin } = Route.useRouteContext();
-  const { counts, sessions, invoiceProblems, mcpVoidRequests } = Route.useLoaderData();
+  const { admin, user } = Route.useRouteContext();
+  const { counts, sessions, invoiceProblems, mcpVoidRequests, stockAlerts } = Route.useLoaderData();
   const cards = sortTodoCards(buildTodoCards(counts));
 
   return (
@@ -54,6 +69,11 @@ function AdminDashboard() {
           ))}
         </div>
       </section>
+
+      <StockAlertsPanel
+        openAlerts={stockAlerts}
+        canResolve={user.permissions.includes("approve_stock_adjustments")}
+      />
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
@@ -160,7 +180,7 @@ function TodoCardLink({ card }: { card: TodoCard }) {
     );
   }
   return (
-    <Link preload="intent" to={card.href} className="block">
+    <Link preload="intent" to={card.href} hash={card.hash} className="block">
       {body}
     </Link>
   );

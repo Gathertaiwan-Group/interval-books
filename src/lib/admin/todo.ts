@@ -14,7 +14,7 @@ export type AdminTodoCounts = {
   transferPending: number | null;
   /** 已付款、處理中、宅配或超商、未封存（與 /admin/orders?scope=to_ship 同一個條件）。 */
   toShip: number | null;
-  /** 還沒標記處理的賣超告警（與 /admin/stock-alerts 預設分頁同一個條件）。 */
+  /** 還沒標記處理的賣超告警（與首頁「賣超告警」卡片的待處理同一個條件）。 */
   stockAlertsOpen: number | null;
   /** 待審核的商品。 */
   productsPending: number | null;
@@ -28,13 +28,11 @@ export type TodoCard = {
   key: keyof AdminTodoCounts;
   title: string;
   /** 點下去要去的後台頁。 */
-  href:
-    | "/admin/orders"
-    | "/admin/stock-alerts"
-    | "/admin/inventory-products"
-    | "/admin/inventory-purchases";
+  href: "/admin/orders" | "/admin" | "/admin/inventory-products" | "/admin/inventory-purchases";
   /** 點下去要帶的 search（目前只有「待出貨」用：/admin/orders?scope=to_ship）。 */
   search?: { scope: "to_ship" };
+  /** 點下去要帶的錨點（「未處理的賣超」→ 同一頁的賣超告警卡片，#stock-alerts）。 */
+  hash?: string;
   count: number | null;
   /** 有幾筆時的說明，例如「筆訂單等你對帳」。 */
   unit: string;
@@ -66,7 +64,9 @@ export function buildTodoCards(c: AdminTodoCounts): TodoCard[] {
     {
       key: "stockAlertsOpen",
       title: "未處理的賣超",
-      href: "/admin/stock-alerts",
+      // 2026-11-10 賣超告警併進首頁：連到同一頁的卡片錨點（StockAlertsPanel 會自動展開）。
+      href: "/admin",
+      hash: "stock-alerts",
       count: c.stockAlertsOpen,
       unit: "筆賣超還沒處理",
       emptyText: "沒有未處理的賣超",

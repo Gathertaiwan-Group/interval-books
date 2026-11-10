@@ -97,7 +97,8 @@ check(
   [
     ["transferPending", "/admin/orders"],
     ["toShip", "/admin/orders"],
-    ["stockAlertsOpen", "/admin/stock-alerts"],
+    // 2026-11-10 賣超告警併進首頁：連到同一頁的 #stock-alerts 卡片。
+    ["stockAlertsOpen", "/admin"],
     ["productsPending", "/admin/inventory-products"],
     ["priceChangesPending", "/admin/inventory-products"],
     ["purchasesPending", "/admin/inventory-purchases"],
@@ -107,6 +108,11 @@ check(
   "「待出貨」卡片帶 ?scope=to_ship（點進去落在待出貨分頁），其餘卡片不帶 search",
   cards.map((c) => c.search ?? null),
   [null, { scope: "to_ship" }, null, null, null, null],
+);
+check(
+  "「未處理的賣超」卡片帶 #stock-alerts 錨點，其餘不帶",
+  cards.map((c) => c.hash ?? null),
+  [null, null, "stock-alerts", null, null, null],
 );
 check(
   "count 原樣帶過去（null 不被改成 0）",
@@ -164,7 +170,7 @@ checkTrue(
 );
 checkTrue(
   "首頁 loader 動態 import fns/dashboard",
-  /await import\("@\/lib\/admin\/fns\/dashboard"\)/.test(index),
+  /import\("@\/lib\/admin\/fns\/dashboard"\)/.test(index),
 );
 checkTrue(
   "首頁沒有 toLocaleString（React #418）",
@@ -190,7 +196,8 @@ checkTrue(
 
 const jargon = [
   ["src/routes/admin/_shell.pos.tsx", "channel=pos）"],
-  ["src/routes/admin/_shell.stock-alerts.tsx", "需要 approve_stock_adjustments 權限"],
+  // 2026-11-10 賣超告警的畫面搬到首頁卡片 StockAlertsPanel。
+  ["src/components/admin/StockAlertsPanel.tsx", "需要 approve_stock_adjustments 權限"],
   ["src/components/inventory/VendorTable.tsx", "需要「inv.vendor.pii.read」權限"],
   ["src/components/inventory/VendorSensitiveDialog.tsx", "需要「inv.vendor.pii.read」權限"],
   ["src/components/inventory/VendorSensitiveDialog.tsx", "approve_* 是不同維度"],

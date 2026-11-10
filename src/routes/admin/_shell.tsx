@@ -160,7 +160,16 @@ const NAV_GROUPS = [
     items: [
       { to: "/admin/pos", label: "櫃檯結帳", icon: ScanLine, staff: true },
       { to: "/admin/sales", label: "銷售紀錄", icon: Receipt, staff: true },
-      { to: "/admin/stock-alerts", label: "賣超告警", icon: TriangleAlert, staff: true },
+      // 2026-11-10 賣超告警併進後台首頁（今日待辦）的卡片；admin 打這個網址會轉去
+      // /admin#stock-alerts，所以側欄只對門市人員顯示（staffOnly）——他們進不了首頁，
+      // 這一頁是他們看告警、標記已處理的唯一入口。
+      {
+        to: "/admin/stock-alerts",
+        label: "賣超告警",
+        icon: TriangleAlert,
+        staff: true,
+        staffOnly: true,
+      },
       // 兼職排班規劃（只讀，內容在 src/lib/admin/staff-schedule.ts）。staff: false——
       // 這是給管理員排班用的頁面；頁面本身的 beforeLoad 也把門市人員導回櫃檯。
       { to: "/admin/staff-schedule", label: "門市排班", icon: CalendarClock, staff: false },
@@ -291,7 +300,7 @@ function AdminShell() {
   const groups = NAV_GROUPS.map((group) => ({
     label: group.label,
     items: group.items.filter((item) => {
-      if (isAdmin) return true;
+      if (isAdmin) return !("staffOnly" in item && item.staffOnly);
       if (!item.staff) return false;
       const needed = "permission" in item ? item.permission : null;
       return !needed || user.permissions.includes(needed);
