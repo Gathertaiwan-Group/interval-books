@@ -160,10 +160,11 @@ check("沒有 Supabase → 空物件（不拋錯）", await fetchListingFacts(),
 
 // ── 首頁靜態檢查 ────────────────────────────────────────────────────────
 const home = readFile("src/routes/index.tsx");
-const posHeroEnd = home.indexOf("{/* 三個數字");
+const posHeroEnd = home.indexOf("{t(HOME.heroCaption)}");
 const posUpcoming = home.indexOf('id="upcoming"');
 const posPillars = home.indexOf('aria-labelledby="home-pillars"');
 const posArchive = home.indexOf('aria-labelledby="home-archive"');
+check("hero 下方的「三個數字」已拿掉", /HOME\.fact[A-Z]/.test(home), false);
 check("近期活動與策旅在 hero 之後", posHeroEnd > 0 && posUpcoming > posHeroEnd, true);
 check("近期活動與策旅在「讀．聚．行」之前", posUpcoming > 0 && posUpcoming < posPillars, true);
 check("「讀．聚．行」仍在地方刊物典藏之前", posPillars < posArchive, true);

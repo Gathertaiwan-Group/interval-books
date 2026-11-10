@@ -118,27 +118,6 @@ const HOME = {
     en: "Huashan 1914 Creative Park, Red Brick Courtyard, West 7-3.",
     ja: "華山1914文化創意産業園区、紅煉瓦六合院 西7-3館。",
   },
-  factArchiveUnit: { zh: "份地方刊物", en: "local publications", ja: "冊の地域刊行物" },
-  factArchiveNote: {
-    zh: "一本一本從各地收來，歡迎到店翻閱",
-    en: "Gathered one by one, open to browse in store",
-    ja: "一冊ずつ各地から集めて、店頭で閲覧できます",
-  },
-  factGatherValue: { zh: "每月", en: "Monthly", ja: "毎月" },
-  factGatherUnit: { zh: "讀書會與講座", en: "reading circles & talks", ja: "読書会とトーク" },
-  factGatherNote: {
-    zh: "作家分享、手作工作坊",
-    en: "Author talks and workshops",
-    ja: "作家の話、手しごとのワークショップ",
-  },
-  factJourneyValue: { zh: "台灣", en: "Taiwan", ja: "台湾" },
-  factJourneyUnit: { zh: "文化策旅", en: "cultural journeys", ja: "文化の旅" },
-  factJourneyNote: {
-    zh: "跟著書與作者，走進土地的現場",
-    en: "Following books and their authors to the places they describe",
-    ja: "本と作家に導かれ、土地の現場へ",
-  },
-
   pillarsKicker: { zh: "我們做的事", en: "What we do", ja: "私たちのこと" },
   pillarsTitle: {
     zh: "讀懂一片土地，有三種方式。",
@@ -482,43 +461,12 @@ function Index() {
           </figure>
         </div>
 
-        {/* 三個數字：一眼看懂這裡有什麼。 */}
-        <dl className="mt-16 grid gap-px overflow-hidden border-y border-border md:mt-24 md:grid-cols-3">
-          {[
-            {
-              value: countText,
-              unit: t(HOME.factArchiveUnit),
-              note: t(HOME.factArchiveNote),
-            },
-            {
-              value: t(HOME.factGatherValue),
-              unit: t(HOME.factGatherUnit),
-              note: t(HOME.factGatherNote),
-            },
-            {
-              value: t(HOME.factJourneyValue),
-              unit: t(HOME.factJourneyUnit),
-              note: t(HOME.factJourneyNote),
-            },
-          ].map((f, i) => (
-            <div
-              key={f.unit}
-              className={`py-6 md:px-8 md:py-8 ${i > 0 ? "border-t border-border md:border-t-0 md:border-l" : "md:pl-0"}`}
-            >
-              <dt className="flex items-baseline gap-3">
-                <span className="display text-4xl md:text-5xl [font-variant-numeric:lining-nums]">
-                  {f.value}
-                </span>
-                <span className="text-sm tracking-[0.08em] text-foreground/80">{f.unit}</span>
-              </dt>
-              <dd className="mt-2 text-sm text-muted-foreground">{f.note}</dd>
-            </div>
-          ))}
-        </dl>
+        {/* 2026-11-10 業主要求拿掉 hero 下方的「三個數字」（刊物份數／每月讀書會／台灣策旅）。
+            文案原本就寫在程式裡（HOME.fact*），一併刪掉；刊物份數仍用在上面的 lede {n}。 */}
       </section>
 
       {/* ── 近期活動與策旅 ───────────────────────────────────────────────────
-          2026-11-10 從「讀．聚．行」之後移到 hero 正後方：hero（店名、定位句、首圖、三個數字）
+          2026-11-10 從「讀．聚．行」之後移到 hero 正後方：hero（店名、定位句、首圖）
           已經把「這是哪裡、在做什麼」講完，支柱區是同一段敘事的展開，可以晚一點讀；
           活動與策旅才是有時效、要報名的東西，手機上原本要滑過支柱區近 2000px 才看得到。
           已結束的不顯示（活動 isEventPast、策旅 splitJourneys）。兩邊都沒有時留一句話與入口，
