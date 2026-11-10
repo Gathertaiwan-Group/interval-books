@@ -244,17 +244,6 @@ function Events() {
         intro={t(p.intro(PAGE.intro))}
       />
 
-      <section className="container-editorial pb-12">
-        <div className="mx-auto w-4/5 aspect-[3/4] md:aspect-[16/10] overflow-hidden bg-muted">
-          <img
-            src={heroSrc}
-            alt={t(p.title(PAGE.title))}
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
-        </div>
-      </section>
-
       <nav
         aria-label={t(p.block("view.aria", VIEW_LABELS.aria))}
         className="container-editorial pb-8"
