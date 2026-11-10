@@ -50,6 +50,7 @@ export async function collectCalendarInput(now: Date = new Date()): Promise<Cale
         updatedAt: e.updated_at,
         productId: product?.id ?? null,
         price: product?.price ?? null,
+        isoDate: e.iso_date ?? null,
       };
     }),
     sessions: sessions.map((s) => ({

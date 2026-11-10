@@ -85,3 +85,65 @@ export async function readPrivateSessionTimes(
   }
   return out;
 }
+
+/**
+ * /events 月曆用：上架中活動（包場與一般活動都算）的**已關閉**場次時間。
+ *
+ * 為什麼：anon 的 RLS 只放行 open 場次（0020），報名截止（後台把場次關掉）但活動照常舉辦
+ * 的場次在月曆上會消失，而 /calendar.ics（service role）照樣列著——兩處對不起來
+ * （2026-11-10 業主決定：月曆繼續顯示，標「報名截止」）。open 場次前台本來就讀得到，
+ * 這裡只補 closed 的，呼叫端以場次 id 去重。
+ *
+ * 範圍與 readPrivateSessionTimes 一樣窄：
+ *   · 只回 events.status = 'live' 的活動（草稿、下架的場次不會漏出去）。
+ *   · 只回 event_sessions.status = 'closed' 的場次。
+ *   · 只取 id、名稱、地點、開始、結束（沒有 capacity／seats_taken、沒有名單、沒有訂單）。
+ *   · 代稱先過 sanitizePrivateSlugs（格式、最多 MAX_PRIVATE_SLUGS 個）——由呼叫端的 server fn 做。
+ */
+export async function readClosedSessionTimes(
+  slugs: string[],
+): Promise<Record<string, PrivateSessionTime[]>> {
+  if (slugs.length === 0) return {};
+  const db = supabaseAdmin();
+  const { data: events, error } = await db
+    .from("events")
+    .select("id, slug")
+    .in("slug", slugs)
+    .eq("status", "live");
+  if (error) throw new Error(`[calendar-closed] events：${error.message}`);
+  const liveEvents = (events ?? []) as { id: string; slug: string }[];
+  if (liveEvents.length === 0) return {};
+
+  const slugById = new Map(liveEvents.map((e) => [e.id, e.slug]));
+  const { data: products, error: productError } = await db
+    .from("products")
+    .select("source_id, event_sessions(id, title, location, starts_at, ends_at, status)")
+    .eq("source_type", "event")
+    .in("source_id", [...slugById.keys()]);
+  if (productError) throw new Error(`[calendar-closed] products：${productError.message}`);
+
+  const out: Record<string, PrivateSessionTime[]> = {};
+  for (const p of (products ?? []) as { source_id: string; event_sessions?: unknown }[]) {
+    const slug = slugById.get(p.source_id);
+    if (!slug) continue;
+    const rows = Array.isArray(p.event_sessions)
+      ? (p.event_sessions as Record<string, unknown>[])
+      : [];
+    const list: PrivateSessionTime[] = [];
+    for (const s of rows) {
+      if (s.status !== "closed") continue;
+      if (typeof s.id !== "string" || typeof s.starts_at !== "string") continue;
+      list.push({
+        id: s.id,
+        title: loc(s.title),
+        location: loc(s.location),
+        startsAt: s.starts_at,
+        endsAt: typeof s.ends_at === "string" ? s.ends_at : null,
+      });
+    }
+    if (list.length === 0) continue;
+    list.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
+    out[slug] = list;
+  }
+  return out;
+}

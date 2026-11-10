@@ -12,6 +12,10 @@
  *   · 策旅 = 有一張上架中的策旅卡片指著的活動（journeyEventMatcher，與 /events、/journeys 同一支
  *     判準）→ SUMMARY 加「策旅｜」。
  *   · 過去的場次留最近 90 天（以結束時間算，多日策旅進行中不會被丟掉），未來的全放。
+ *   · 場次不分 open／closed 都放（報名截止、包場的場次活動照常舉辦）——與 /events 月曆同一個範圍。
+ *   · 上架活動沒有票券商品（外部報名）或沒有任何場次、但有 iso_date → 一筆全天事件
+ *     （DTSTART;VALUE=DATE、DTEND 次日，UID = event-<events.id>@intervalbooks.tw），
+ *     與月曆「讀不到場次就用活動日期畫全天」同一個規則。
  *   · UID = <場次 id>@intervalbooks.tw：場次改期時 UID 不變，日曆更新同一筆而不是多一筆。
  *   · 時間一律輸出 UTC（…Z），不需要 VTIMEZONE；X-WR-TIMEZONE 讓 Google 用台北顯示。
  *   · DTSTAMP／LAST-MODIFIED 用資料列的 updated_at（不用「現在」）：內容沒變，輸出就逐位元相同。
@@ -172,6 +176,8 @@ export type CalEvent = {
   productId: string | null;
   /** 商品單價（沒有任何票種方案時用）。 */
   price: number | null;
+  /** events.iso_date（"YYYY-MM-DD"）：沒有商品或沒有場次時，用它輸出一筆全天事件。 */
+  isoDate?: string | null;
 };
 
 export type CalSession = {
@@ -275,13 +281,20 @@ export function buildVevents(input: CalendarInput): BuiltVevent[] {
 
   const out: BuiltVevent[] = [];
   for (const event of input.events) {
-    if (event.status !== "live" || !event.productId) continue;
-    const sessions = sessionsByProduct.get(event.productId) ?? [];
+    if (event.status !== "live") continue;
+    const sessions = event.productId ? (sessionsByProduct.get(event.productId) ?? []) : [];
     const journey = isJourney({
       slug: event.slug,
       externalUrl: event.registrationType === "external" ? event.externalUrl : null,
     });
     const url = eventUrl(event);
+
+    // 沒有商品／沒有任何可用的場次時間 → 有 iso_date 就輸出一筆全天事件。
+    if (!sessions.some((s) => parseMs(s.startsAt) !== null)) {
+      const allDay = buildAllDayVevent(event, journey, url, cutoff);
+      if (allDay) out.push(allDay);
+      continue;
+    }
 
     for (const s of sessions) {
       const startMs = parseMs(s.startsAt);
@@ -342,6 +355,67 @@ export function buildVevents(input: CalendarInput): BuiltVevent[] {
   }
   out.sort((a, b) => a.startMs - b.startMs || (a.uid < b.uid ? -1 : a.uid > b.uid ? 1 : 0));
   return out;
+}
+
+const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** "YYYY-MM-DD" → 台北那一天 00:00 的 UTC ms；格式不對 → null。 */
+function taipeiMidnightMs(isoDate: string | null | undefined): number | null {
+  const m = ISO_DATE_RE.exec((isoDate ?? "").trim());
+  if (!m) return null;
+  const utc = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const d = new Date(utc);
+  // 2026-02-31 這種會被 Date.UTC 進位成別天的，視為無效。
+  if (d.getUTCMonth() !== Number(m[2]) - 1 || d.getUTCDate() !== Number(m[3])) return null;
+  return utc - TAIPEI_OFFSET_MS;
+}
+
+/** UTC ms（某個台北午夜）→ "YYYYMMDD"（台北日期）。 */
+function formatTaipeiDate(ms: number): string {
+  return formatUtc(ms + TAIPEI_OFFSET_MS).slice(0, 8);
+}
+
+/** 沒有場次的上架活動 → 一筆全天事件（iso_date 那一天）。沒有 iso_date／太舊 → null。 */
+function buildAllDayVevent(
+  event: CalEvent,
+  journey: boolean,
+  url: string,
+  cutoff: number,
+): BuiltVevent | null {
+  const startMs = taipeiMidnightMs(event.isoDate);
+  if (startMs === null) return null;
+  const endMs = startMs + DAY_MS;
+  if (endMs < cutoff) return null;
+
+  const desc: string[] = [];
+  const brief = stripHtml(event.summaryZh);
+  if (brief) desc.push(brief);
+  const price = priceText(event, []);
+  if (price) desc.push(`票價：${price}`);
+  desc.push(
+    `${event.registrationType === "external" && event.externalUrl ? "報名連結：" + event.externalUrl + "\n活動頁：" : "報名／詳情："}${url}`,
+  );
+
+  const stampMs = parseMs(event.updatedAt) ?? startMs;
+  const uid = `event-${event.id}@${UID_DOMAIN}`;
+  const props: Array<[string, string]> = [
+    ["UID", uid],
+    ["DTSTAMP", formatUtc(stampMs)],
+    ["LAST-MODIFIED", formatUtc(stampMs)],
+    ["DTSTART;VALUE=DATE", formatTaipeiDate(startMs)],
+    ["DTEND;VALUE=DATE", formatTaipeiDate(endMs)],
+    ["SUMMARY", escapeText(`${journey ? JOURNEY_PREFIX : ""}${event.titleZh.trim()}`)],
+    ["URL", url],
+    ["DESCRIPTION", escapeText(truncate(desc.join("\n"), DESCRIPTION_MAX_CHARS))],
+    ["STATUS", "CONFIRMED"],
+    // 全天事件不佔用行事曆的忙碌時段。
+    ["TRANSP", "TRANSPARENT"],
+  ];
+  return {
+    uid,
+    startMs,
+    lines: ["BEGIN:VEVENT", ...props.map(([k, v]) => `${k}:${v}`), "END:VEVENT"],
+  };
 }
 
 /** 整份 .ics 全文（CRLF、已折行）。 */

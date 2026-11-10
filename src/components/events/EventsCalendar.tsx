@@ -40,6 +40,8 @@ const COPY = {
   next: { zh: "下個月", en: "Next month", ja: "次の月" },
   thisMonth: { zh: "本月", en: "This month", ja: "今月" },
   full: { zh: "額滿", en: "Full", ja: "満席" },
+  // 一般活動的場次被後台關閉（活動照常舉辦）。包場不用這個字，標「包場」。
+  registrationClosed: { zh: "報名截止", en: "Registration closed", ja: "受付終了" },
   // 包場（src/lib/private-booking.ts）：與活動頁、卡片同一份字。
   privateBooking: PRIVATE_BOOKING_COPY.badge,
   ended: { zh: "已結束", en: "Ended", ja: "終了" },
@@ -89,6 +91,7 @@ function statusWords(entry: CalendarEntry, t: (l: Record<Lang, string>) => strin
   if (entry.kind === "journey") words.push(t(COPY.journey));
   if (entry.privateBooking) words.push(t(COPY.privateBooking));
   if (entry.ended) words.push(t(COPY.ended));
+  else if (entry.registrationClosed) words.push(t(COPY.registrationClosed));
   else if (entry.full) words.push(t(COPY.full));
   return words;
 }
@@ -347,7 +350,12 @@ function GridItem({ item, date }: { item: DayItem; date: string }) {
         {entry.privateBooking && !continued ? (
           <Badge tone="ink">{t(COPY.privateBooking)}</Badge>
         ) : null}
-        {!entry.ended && entry.full && !continued ? <Badge tone="ink">{t(COPY.full)}</Badge> : null}
+        {!entry.ended && entry.registrationClosed && !continued ? (
+          <Badge tone="muted">{t(COPY.registrationClosed)}</Badge>
+        ) : null}
+        {!entry.ended && !entry.registrationClosed && entry.full && !continued ? (
+          <Badge tone="ink">{t(COPY.full)}</Badge>
+        ) : null}
       </span>
       <span className="mt-0.5 line-clamp-2 break-words">
         {t(entry.title)}
@@ -433,6 +441,8 @@ function Agenda({
                           ) : null}
                           {entry.ended ? (
                             <Badge tone="muted">{t(COPY.ended)}</Badge>
+                          ) : entry.registrationClosed ? (
+                            <Badge tone="muted">{t(COPY.registrationClosed)}</Badge>
                           ) : entry.full ? (
                             <Badge tone="ink">{t(COPY.full)}</Badge>
                           ) : null}

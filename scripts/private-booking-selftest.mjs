@@ -186,10 +186,12 @@ const n = entries.find((e) => e.slug === "normal");
 check("一般活動：額滿照舊、不是包場", [n?.full, n?.privateBooking], [true, false]);
 const calData = readFile("src/lib/events-calendar-data.ts");
 checkTrue(
-  "月曆資料：讀 notes、包場才呼叫 server fn 補場次時間",
-  calData.includes('.select("slug,title,external_url,iso_date,notes")') &&
+  "月曆資料：讀 notes、包場代稱排前面交給 server fn 補關閉場次時間",
+  calData.includes('.select("id,slug,title,external_url,iso_date,notes")') &&
     calData.includes("privateBooking: isPrivateBooking(r.notes)") &&
-    /if \(privateSlugs\.length > 0\)[\s\S]*fetchPrivateSessionTimes\(privateSlugs\)/.test(calData),
+    /\.\.\.events\.filter\(\(e\) => e\.privateBooking\)[\s\S]*fetchClosedSessionTimes\(closedSlugs\)/.test(
+      calData,
+    ),
 );
 const calUi = readFile("src/components/events/EventsCalendar.tsx");
 checkTrue(

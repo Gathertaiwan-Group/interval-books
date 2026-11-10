@@ -175,9 +175,16 @@ export type CalendarEntry = {
   full: boolean;
   /** 包場，不開放報名（src/lib/private-booking.ts）。月曆標「包場」，不標額滿。 */
   privateBooking: boolean;
+  /**
+   * 報名截止：一般活動（非包場）的場次被後台關閉（event_sessions.status = closed），
+   * 活動照常舉辦。月曆照列時間、標「報名截止」，不標額滿。包場一律 false（標包場）。
+   */
+  registrationClosed: boolean;
 };
 
 export type RawCalendarEvent = {
+  /** events.id：用來對票券商品的 products.source_id（見 eventSlugForProduct）。 */
+  id?: string;
   slug: string;
   title: CalLocalized;
   externalUrl: string;
@@ -196,7 +203,28 @@ export type RawCalendarSession = {
   endsAt: string | null;
   /** 🔴 呼叫端用 remainingForSession(session) <= 0 算，不要在這裡算。 */
   full: boolean;
+  /** 場次已關閉（由 service role 的 server fn 補讀回來的那幾筆）。 */
+  closed?: boolean;
 };
+
+/**
+ * 票券商品屬於哪一場活動（回 events.slug）。
+ *   1. products.source_id = events.id（0026 起一場活動一件商品的唯一對應）—— 優先。
+ *   2. 對不上（source_id 空、指到沒上架的活動）→ 退回 products.slug = `event-<events.slug>`。
+ * 都不是 → null。
+ */
+export function eventSlugForProduct(
+  product: { slug: string; sourceId: string | null },
+  slugByEventId: ReadonlyMap<string, string>,
+): string | null {
+  if (product.sourceId) {
+    const hit = slugByEventId.get(product.sourceId);
+    if (hit) return hit;
+  }
+  return product.slug.startsWith("event-") && product.slug.length > "event-".length
+    ? product.slug.slice("event-".length)
+    : null;
+}
 
 export type CalendarInput = {
   events: RawCalendarEvent[];
@@ -224,6 +252,8 @@ function distinctLocalized(session: CalLocalized, event: CalLocalized): CalLocal
  *   · 有場次的活動：一個場次一筆（同一活動多場次各自出現）。日期以 starts_at 的台北日期為準。
  *   · 跨日場次（策旅三天兩夜）：endDate 取 ends_at 的台北日期；ends_at 剛好落在午夜 00:00
  *     的視為前一天結束（不多塗一天）。最多 MAX_SPAN_DAYS 天。
+ *   · 場次不分 open／closed（closed 由 server fn 補讀，見 events-calendar-data.ts）——與
+ *     /calendar.ics 同一個範圍。一般活動的 closed 場次標「報名截止」，包場標「包場」。
  *   · 讀不到任何場次、但有 iso_date 的活動：一筆整天的（沒有時間），讓「有這場活動」仍看得到。
  *   · 策旅：events 表裡被策旅卡片連到的那幾列（journeyEventMatcher，與 /calendar.ics、
  *     fetchEvents() 同一個判準）。
@@ -273,8 +303,10 @@ export function buildCalendarEntries(input: CalendarInput): CalendarEntry[] {
         sortMs: startMs,
         ended: endMs <= input.nowMs,
         // 包場不賣位子：名額（capacity 多半只是佔位）不代表「額滿」。
-        full: privateBooking ? false : s.full,
+        // 報名截止的場次也不標額滿（標「報名截止」）。
+        full: privateBooking || s.closed === true ? false : s.full,
         privateBooking,
+        registrationClosed: !privateBooking && s.closed === true,
       });
       added++;
     }
@@ -295,6 +327,7 @@ export function buildCalendarEntries(input: CalendarInput): CalendarEntry[] {
         ended: event.isoDate < taipeiDateAt(input.nowMs),
         full: false,
         privateBooking,
+        registrationClosed: false,
       });
     }
   }

@@ -28,6 +28,7 @@ import {
   monthLabel,
   dayLabel,
   rangeLabel,
+  eventSlugForProduct,
 } from "../src/lib/events-calendar.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -417,6 +418,200 @@ check("月份標題 en", monthLabel("2027-01", "en"), "January 2027");
 check("月份標題 ja", monthLabel("2026-11", "ja"), "2026年11月");
 check("日期標籤 zh", dayLabel("2026-11-24", "zh"), "11月24日（二）");
 check("日期標籤 en", dayLabel("2026-11-24", "en"), "Tue, Nov 24");
+
+// ── 已關閉場次（報名截止）與包場（2026-11-10）──────────────────────────
+{
+  const NOWC = Date.parse("2026-11-10T04:00:00Z");
+  const es = buildCalendarEntries({
+    events: [
+      { slug: "talk", title: L("講座"), externalUrl: "", isoDate: "2026-11-20" },
+      {
+        slug: "tea",
+        title: L("木柵茶"),
+        externalUrl: "",
+        isoDate: "2026-11-17",
+        privateBooking: true,
+      },
+    ],
+    sessions: [
+      // anon 讀得到的 open 場次（額滿）
+      {
+        id: "open-1",
+        productSlug: "event-talk",
+        title: L("第一場"),
+        location: L("書店"),
+        startsAt: "2026-11-20T06:00:00Z",
+        endsAt: "2026-11-20T08:00:00Z",
+        full: true,
+      },
+      // server fn 補回來的 closed 場次（一般活動 → 報名截止）
+      {
+        id: "closed-1",
+        productSlug: "event-talk",
+        title: L("第二場"),
+        location: L("書店"),
+        startsAt: "2026-11-21T06:00:00Z",
+        endsAt: "2026-11-21T08:00:00Z",
+        full: false,
+        closed: true,
+      },
+      // 已結束的 closed 場次
+      {
+        id: "closed-old",
+        productSlug: "event-talk",
+        title: L("第零場"),
+        location: L("書店"),
+        startsAt: "2026-11-01T06:00:00Z",
+        endsAt: "2026-11-01T08:00:00Z",
+        full: false,
+        closed: true,
+      },
+      // 包場的 closed 場次
+      {
+        id: "closed-tea",
+        productSlug: "event-tea",
+        title: L("2026.11.17"),
+        location: L("書店"),
+        startsAt: "2026-11-17T07:30:00Z",
+        endsAt: "2026-11-17T09:00:00Z",
+        full: false,
+        closed: true,
+      },
+    ],
+    journeyUrls: [],
+    nowMs: NOWC,
+  });
+  const by = Object.fromEntries(es.map((e) => [e.key, e]));
+  check(
+    "關閉場次出現在月曆、時間正確（不是全天）",
+    [by["closed-1"]?.startDate, by["closed-1"]?.startTime, by["closed-1"]?.endTime],
+    ["2026-11-21", "14:00", "16:00"],
+  );
+  check(
+    "一般活動的關閉場次：標報名截止、不標額滿、不是包場",
+    [by["closed-1"]?.registrationClosed, by["closed-1"]?.full, by["closed-1"]?.privateBooking],
+    [true, false, false],
+  );
+  check(
+    "open 場次：額滿照舊、不是報名截止",
+    [by["open-1"]?.full, by["open-1"]?.registrationClosed],
+    [true, false],
+  );
+  check(
+    "包場的關閉場次：仍標包場、不標報名截止",
+    [
+      by["closed-tea"]?.privateBooking,
+      by["closed-tea"]?.registrationClosed,
+      by["closed-tea"]?.full,
+    ],
+    [true, false, false],
+  );
+  checkTrue("已結束的關閉場次照舊是 ended（淡化）", by["closed-old"]?.ended === true);
+  check("有關閉場次就不再退回 iso_date 全天", es.filter((e) => e.key === "event:talk").length, 0);
+  const allDay = buildCalendarEntries({
+    events: [{ slug: "x", title: L("x"), externalUrl: "", isoDate: "2026-11-30" }],
+    sessions: [],
+    journeyUrls: [],
+    nowMs: NOWC,
+  });
+  check("全天條目：registrationClosed = false", allDay[0]?.registrationClosed, false);
+}
+
+// ── 商品對活動：source_id 優先、slug 後備 ───────────────────────────────
+{
+  const ids = new Map([
+    ["ev-1", "kungtung"],
+    ["ev-2", "soul-dinner"],
+  ]);
+  check(
+    "source_id 對得上 → 用活動代稱（即使商品 slug 舊了）",
+    eventSlugForProduct({ slug: "event-old-name", sourceId: "ev-1" }, ids),
+    "kungtung",
+  );
+  check(
+    "source_id 空 → 退回 event-<slug>",
+    eventSlugForProduct({ slug: "event-soul-dinner", sourceId: null }, ids),
+    "soul-dinner",
+  );
+  check(
+    "source_id 對不上 → 退回 event-<slug>",
+    eventSlugForProduct({ slug: "event-other", sourceId: "ev-9" }, ids),
+    "other",
+  );
+  check("都對不上 → null", eventSlugForProduct({ slug: "book-123", sourceId: "ev-9" }, ids), null);
+  check("只有前綴 → null", eventSlugForProduct({ slug: "event-", sourceId: null }, ids), null);
+  // 端到端：舊 slug 的商品，經 source_id 對到活動後，場次出現在那場活動上。
+  const slug = eventSlugForProduct({ slug: "event-old-name", sourceId: "ev-1" }, ids);
+  const es = buildCalendarEntries({
+    events: [{ id: "ev-1", slug: "kungtung", title: L("公東"), externalUrl: "", isoDate: null }],
+    sessions: [
+      {
+        id: "kt-1",
+        productSlug: `event-${slug}`,
+        title: L("梯次"),
+        location: L("台東"),
+        startsAt: "2026-12-04T08:30:00Z",
+        endsAt: "2026-12-06T08:55:00Z",
+        full: false,
+      },
+    ],
+    journeyUrls: ["/events/kungtung"],
+    nowMs: Date.parse("2026-11-10T04:00:00Z"),
+  });
+  check(
+    "source_id 對應後場次掛到活動上（跨日 12/4–12/6、策旅）",
+    [es[0]?.slug, es[0]?.startDate, es[0]?.endDate, es[0]?.kind],
+    ["kungtung", "2026-12-04", "2026-12-06", "journey"],
+  );
+}
+
+// ── 資料層／畫面接線（靜態）──────────────────────────────────────────────
+{
+  const data = read("src/lib/events-calendar-data.ts");
+  checkTrue(
+    "資料層：商品用 source_id 對活動（eventSlugForProduct）、查 source_type=event",
+    data.includes("source_id,event_sessions(") &&
+      data.includes('.eq("source_type", "event")') &&
+      /eventSlugForProduct\(/.test(data),
+  );
+  checkTrue(
+    "資料層：所有上架活動都補讀關閉場次（fetchClosedSessionTimes），補回來的標 closed",
+    /fetchClosedSessionTimes\(closedSlugs\)/.test(data) && data.includes("closed: true,"),
+  );
+  const ui = read("src/components/events/EventsCalendar.tsx");
+  checkTrue(
+    "畫面：「報名截止」三語",
+    ui.includes(
+      'registrationClosed: { zh: "報名截止", en: "Registration closed", ja: "受付終了" }',
+    ),
+  );
+  checkTrue(
+    "畫面：格子與議程都畫「報名截止」",
+    (ui.match(/<Badge tone="muted">\{t\(COPY\.registrationClosed\)\}<\/Badge>/g) ?? []).length ===
+      2,
+  );
+  const srv = read("src/server/private-booking.ts");
+  const fn = srv.slice(srv.indexOf("export async function readClosedSessionTimes"));
+  const code = fn.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  checkTrue(
+    "🔴 server：只讀 live 活動、只回 closed 場次、不讀名額",
+    code.includes('.eq("status", "live")') &&
+      code.includes('if (s.status !== "closed") continue;') &&
+      !/capacity|seats_taken|registrations|orders/.test(code),
+  );
+  const fns = read("src/lib/private-booking-fns.ts");
+  checkTrue(
+    "server fn：輸入先截 50、再過 sanitizePrivateSlugs",
+    /getClosedSessionTimes[\s\S]*slice\(0, 50\)[\s\S]*readClosedSessionTimes\(sanitizePrivateSlugs\(data\.slugs\)\)/.test(
+      fns,
+    ),
+  );
+  checkTrue(
+    "service role 只在 server 端（fns 動態 import server 模組）",
+    !/supabase-admin|supabaseAdmin/.test(fns) &&
+      read("src/server/private-booking.ts").includes('import "@tanstack/react-start/server-only";'),
+  );
+}
 
 // ── 原始碼守門 ──────────────────────────────────────────────────────────
 {

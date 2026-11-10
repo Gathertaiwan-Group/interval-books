@@ -6,10 +6,14 @@
  * 三個查詢平行打（與 loader 裡既有的 fetchEvents 等並行，不串接）：
  *   1. events：上架中的活動（含策旅那幾列 —— 月曆要標「策旅」，所以這裡不排除）
  *   2. journeys：上架中策旅卡片的 external_url（判斷哪幾列 events 是策旅）
- *   3. products（slug 以 `event-` 開頭）連同 event_sessions embed：場次時間、地點、名額
+ *   3. products（source_type = event）連同 event_sessions embed：場次時間、地點、名額。
+ *      商品對活動用 products.source_id = events.id，對不上才退回 slug `event-<slug>`
+ *      （eventSlugForProduct）。
  *
- * anon 的 RLS 只放行「active 商品的 open 場次」（0020），所以後台關掉的場次不會出現在
- * 月曆上——與活動詳情頁看到的一致。/calendar.ics 用 service role 另讀，是不同的需求。
+ * anon 的 RLS 只放行「active 商品的 open 場次」（0020）。已關閉的場次（報名截止、包場）
+ * 由 server fn（fetchClosedSessionTimes → src/server/private-booking.ts#readClosedSessionTimes，
+ * service role、只回 live 活動、只有時間與地點）補回來，標「報名截止」／「包場」——
+ * 所以月曆與 /calendar.ics 收的是同一批場次。
  *
  * ── 🔴 額滿 ───────────────────────────────────────────────────────────────
  * 一律用 remainingForSession()（與 SessionPicker 的「已額滿」同一支）。這裡不自己
@@ -22,9 +26,10 @@
 import { supabase } from "@/lib/supabase";
 import { remainingForSession, type ShopSession } from "@/lib/shop";
 import { isPrivateBooking } from "@/lib/private-booking";
-import { fetchPrivateSessionTimes } from "@/lib/private-booking-fns";
+import { fetchClosedSessionTimes } from "@/lib/private-booking-fns";
 import {
   buildCalendarEntries,
+  eventSlugForProduct,
   type CalLocalized,
   type CalendarEntry,
   type RawCalendarEvent,
@@ -56,14 +61,16 @@ export async function fetchCalendarEntries(nowMs: number): Promise<CalendarData>
     const [eventsRes, journeysRes, productsRes] = await Promise.all([
       db
         .from("events")
-        .select("slug,title,external_url,iso_date,notes")
+        .select("id,slug,title,external_url,iso_date,notes")
         .eq("is_published", true)
         .order("sort_order", { ascending: true }),
       db.from("journeys").select("external_url").eq("is_published", true),
       db
         .from("products")
-        .select("id,slug,event_sessions(id,title,location,starts_at,ends_at,capacity,seats_taken)")
-        .like("slug", "event-%"),
+        .select(
+          "id,slug,source_id,event_sessions(id,title,location,starts_at,ends_at,capacity,seats_taken)",
+        )
+        .eq("source_type", "event"),
     ]);
     if (eventsRes.error || journeysRes.error || productsRes.error) {
       const msg = (eventsRes.error ?? journeysRes.error ?? productsRes.error)?.message;
@@ -77,6 +84,7 @@ export async function fetchCalendarEntries(nowMs: number): Promise<CalendarData>
       const slug = str(r.slug);
       if (!title || !slug) continue;
       events.push({
+        id: str(r.id) || undefined,
         slug,
         title,
         externalUrl: str(r.external_url),
@@ -85,9 +93,17 @@ export async function fetchCalendarEntries(nowMs: number): Promise<CalendarData>
       });
     }
 
+    const slugByEventId = new Map<string, string>();
+    for (const e of events) if (e.id) slugByEventId.set(e.id, e.slug);
+
     const sessions: RawCalendarSession[] = [];
     for (const p of (productsRes.data ?? []) as Row[]) {
-      const productSlug = str(p.slug);
+      const eventSlug = eventSlugForProduct(
+        { slug: str(p.slug), sourceId: str(p.source_id) || null },
+        slugByEventId,
+      );
+      if (!eventSlug) continue;
+      const productSlug = `event-${eventSlug}`;
       const rows = Array.isArray(p.event_sessions) ? (p.event_sessions as Row[]) : [];
       for (const s of rows) {
         const id = str(s.id);
@@ -121,11 +137,15 @@ export async function fetchCalendarEntries(nowMs: number): Promise<CalendarData>
       }
     }
 
-    // 包場：場次維持 closed（anon 讀不到），時間另由 server fn 用 service role 讀回來
-    // （只回包場活動、只有時間與地點）。沒有包場活動就不多這一趟。
-    const privateSlugs = events.filter((e) => e.privateBooking).map((e) => e.slug);
-    if (privateSlugs.length > 0) {
-      const times = await fetchPrivateSessionTimes(privateSlugs);
+    // 已關閉的場次（報名截止、包場）：anon 讀不到，時間另由 server fn 用 service role 讀回來
+    // （只回 live 活動的 closed 場次、只有時間與地點）。包場的代稱排前面——server fn 最多收
+    // MAX_PRIVATE_SLUGS 個，超過時優先保住包場（它們的場次一定是 closed）。
+    const closedSlugs = [
+      ...events.filter((e) => e.privateBooking).map((e) => e.slug),
+      ...events.filter((e) => !e.privateBooking).map((e) => e.slug),
+    ];
+    if (closedSlugs.length > 0) {
+      const times = await fetchClosedSessionTimes(closedSlugs);
       const seen = new Set(sessions.map((s) => s.id));
       for (const [slug, list] of Object.entries(times)) {
         for (const s of list) {
@@ -138,6 +158,7 @@ export async function fetchCalendarEntries(nowMs: number): Promise<CalendarData>
             startsAt: s.startsAt,
             endsAt: s.endsAt,
             full: false,
+            closed: true,
           });
         }
       }

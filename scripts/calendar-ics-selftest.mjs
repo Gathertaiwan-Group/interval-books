@@ -350,6 +350,122 @@ checkTrue(
   checkTrue("草稿／下架標題不在檔案裡", !ics.includes("草稿活動") && !ics.includes("下架活動"));
 }
 
+// ── 沒有商品／沒有場次 → iso_date 全天事件（2026-11-10）────────────────────
+{
+  const allDay = {
+    ...base,
+    events: [
+      // 外部報名：沒有票券商品
+      ev({
+        id: "ev-ext",
+        slug: "ext",
+        titleZh: "外部報名講座",
+        registrationType: "external",
+        externalUrl: "https://example.com/signup",
+        productId: null,
+        price: null,
+        isoDate: "2026-12-12",
+      }),
+      // 有商品但沒有場次
+      ev({
+        id: "ev-nosess",
+        slug: "nosess",
+        titleZh: "只有日期",
+        productId: "p-none",
+        isoDate: "2026-11-30",
+      }),
+      // 沒有場次也沒有 iso_date → 不輸出
+      ev({
+        id: "ev-nodate",
+        slug: "nodate",
+        titleZh: "沒日期",
+        productId: "p-none2",
+        isoDate: null,
+      }),
+      // 草稿不輸出
+      ev({
+        id: "ev-draft2",
+        slug: "draft2",
+        status: "draft",
+        titleZh: "草稿全天",
+        productId: null,
+        isoDate: "2026-12-01",
+      }),
+      // 太舊（超過 90 天）不輸出
+      ev({
+        id: "ev-old2",
+        slug: "old2",
+        titleZh: "很久的全天",
+        productId: null,
+        isoDate: "2026-06-01",
+      }),
+      // 有場次的照舊用場次，不另出全天
+      ev({
+        id: "ev-has",
+        slug: "has",
+        titleZh: "有場次",
+        productId: "p-has",
+        isoDate: "2026-11-28",
+      }),
+      // 外部網址策旅（卡片連同一個外部網址）→ 策旅前綴
+      ev({
+        id: "ev-extj",
+        slug: "extj",
+        titleZh: "外部策旅",
+        registrationType: "external",
+        externalUrl: "https://tour.example.com/trip",
+        productId: null,
+        isoDate: "2026-12-20",
+      }),
+    ],
+    sessions: [ses({ id: "sess-has", productId: "p-has" })],
+    journeyUrls: ["https://tour.example.com/trip"],
+  };
+  const out = buildVevents(allDay);
+  const uids = out.map((v) => v.uid);
+  check(
+    "全天：外部報名、沒場次、外部策旅各一筆；有場次的照舊；草稿／沒日期／太舊不出",
+    uids.sort(),
+    [
+      "event-ev-ext@intervalbooks.tw",
+      "event-ev-extj@intervalbooks.tw",
+      "event-ev-nosess@intervalbooks.tw",
+      "sess-has@intervalbooks.tw",
+    ].sort(),
+  );
+  const ext = out.find((v) => v.uid === "event-ev-ext@intervalbooks.tw")?.lines ?? [];
+  checkTrue("全天：DTSTART;VALUE=DATE 是 iso_date", ext.includes("DTSTART;VALUE=DATE:20261212"));
+  checkTrue("全天：DTEND;VALUE=DATE 是次日", ext.includes("DTEND;VALUE=DATE:20261213"));
+  checkTrue("全天：沒有帶時間的 DTSTART", !ext.some((l) => l.startsWith("DTSTART:")));
+  checkTrue(
+    "全天：外部報名帶報名連結",
+    ext.some((l) => l.includes("https://example.com/signup")),
+  );
+  const nosess = out.find((v) => v.uid === "event-ev-nosess@intervalbooks.tw")?.lines ?? [];
+  checkTrue("全天：跨月次日 11/30 → 12/01", nosess.includes("DTEND;VALUE=DATE:20261201"));
+  const extj = out.find((v) => v.uid === "event-ev-extj@intervalbooks.tw")?.lines ?? [];
+  checkTrue("全天：外部策旅加「策旅｜」", extj.includes("SUMMARY:策旅｜外部策旅"));
+  const icsAll = buildCalendarIcs(allDay);
+  checkTrue("全天：整份輸出含 VALUE=DATE", icsAll.includes("DTSTART;VALUE=DATE:20261212\r\n"));
+  check(
+    "全天：iso_date 格式錯（2026-02-31）不輸出",
+    buildVevents({
+      ...allDay,
+      events: [ev({ id: "ev-bad", slug: "bad", productId: null, isoDate: "2026-02-31" })],
+    }).length,
+    0,
+  );
+  // 已關閉的場次照樣輸出（ics 不看 status；月曆也補讀 closed）—— 範圍一致的那一半。
+  const srv = read("src/server/calendar.ts");
+  checkTrue("ics 讀 iso_date 傳給組裝", srv.includes("isoDate: e.iso_date ?? null"));
+  checkTrue(
+    "ics 不依場次 status 過濾（closed 也收）",
+    !/\.status\s*===?\s*["']open["']/.test(
+      read("src/lib/calendar-ics.ts").replace(/p\.status === "open"/g, ""),
+    ),
+  );
+}
+
 // ── 接線（靜態）──────────────────────────────────────────────────────────
 const server = read("src/server.ts");
 checkTrue("server.ts 攔截 /calendar.ics", /pathname === "\/calendar\.ics"/.test(server));
