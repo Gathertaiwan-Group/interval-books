@@ -26,6 +26,7 @@ import eventReadingImg from "@/assets/event-reading.jpg";
 import exhibitionImg from "@/assets/exhibition-corner.jpg";
 import { journeyLinkProps } from "@/lib/journey-link";
 import { fitDescription } from "@/lib/seo/core";
+import { splitAtComma } from "@/lib/title-break";
 import { pageHead } from "@/lib/seo/head";
 import { pageRowTranslation } from "@/lib/seo/pages";
 import { linkedEventFor, newestEndedFirst, splitJourneys } from "@/lib/past-shelf";
@@ -78,39 +79,22 @@ const HERO = {
  * 全部走 p.block("home.*", 這裡的預設值)：pages/'index' 目前**沒有**這些 key，所以畫面上
  * 就是這裡的字；之後在 DB 補上同名 block，後台就能改字，不用動程式。
  * 舊的 hero.titleSub（留一點時間給真正重要的事）與 hero.intro（留一段屬於自己的＿＿＿小時光）
- * 繼續沿用 DB 那兩格——前者是首屏的署名句，後者是頁尾收尾句。
+ * 繼續沿用 DB 那兩格——前者 2026-11-10 起不在首屏印出、只當 og:title 預設值，後者是頁尾收尾句。
  *
  * ⚠️ 英文與日文是改版提案，待業主確認。
  */
 const HOME = {
   place: {
-    zh: "華山 1914．紅磚六合院 西7-3館",
-    en: "Huashan 1914 · Red Brick Courtyard, West 7-3",
-    ja: "華山1914・紅煉瓦六合院 西7-3館",
+    zh: "華山紅磚六合院 西7-3館",
+    en: "Huashan Red Brick Courtyard, West 7-3",
+    ja: "華山・紅煉瓦六合院 西7-3館",
   },
-  brandLine: {
-    zh: "小時光書店",
-    en: "Interval Books — a bookstore of place",
-    ja: "小時光書店",
-  },
+  /** 首屏大標（2026-11-10 業主指定）。逗號後換行由 splitAtComma 處理，這裡不放 \n。 */
   headline: {
-    zh: "從一份地方刊物，\n讀懂一片土地。",
-    en: "Read a place\nin its own words.",
-    ja: "一冊の地域誌から、\nひとつの土地を読む。",
+    zh: "以書店為載體，讓更多人認識台灣的美好。",
+    en: "A bookstore as a vessel, sharing the good things of Taiwan.",
+    ja: "本屋を器に、台湾の素晴らしさを届ける。",
   },
-  /** 首屏說明句（業主 11/2 指定精簡、只提台灣）。若有 {n} 會換成刊物份數。 */
-  lede: {
-    zh: "華山紅磚六合院裡，一間以風土誌選書的書店。以土地為線索，典藏台灣各地的地方刊物。",
-    en: "A bookstore of place in Huashan’s Red Brick Courtyard — books chosen by the land they come from, and an archive of local publications from across Taiwan.",
-    ja: "華山・紅煉瓦六合院にある、風土誌を軸に本を選ぶ書店。土地を手がかりに、台湾各地の地域刊行物を所蔵しています。",
-  },
-  countFallback: { zh: "逾百", en: "over 100", ja: "百以上の" },
-  ctaPrimary: {
-    zh: "看近期活動與策旅",
-    en: "Upcoming events & journeys",
-    ja: "近日のイベントと旅",
-  },
-  ctaSecondary: { zh: "認識地方刊物", en: "Browse local publications", ja: "地域の刊行物を見る" },
   heroInsetAlt: {
     zh: "書店裡攤開在木桌上的台灣與日本地方刊物",
     en: "Local publications from Taiwan and Japan laid out on wooden tables in the store",
@@ -346,7 +330,6 @@ function Index() {
   const { ui, site, map } = useSiteContent();
   const heroSrc = imageFor(page?.ogImageKey, heroImg);
   const counts = archive.counts;
-  const countText = counts ? String(counts.total) : t(HOME.countFallback);
   const motto = t(p.block("hero.intro", HERO.intro));
   const [mottoBefore, mottoAfter] = BLANK_RE.test(motto) ? motto.split(BLANK_RE) : [motto, null];
 
@@ -402,47 +385,28 @@ function Index() {
   return (
     <PageShell>
       {/* ── Hero ────────────────────────────────────────────────────────────
-          一進來要看懂三件事：這是哪裡（華山、書店）、在做什麼（風土誌、地方刊物、活動、策旅）、
-          下一步去哪（兩個行動）。h1 同時放店名與定位句，全頁只有這一個 h1。 */}
+          2026-11-10 業主精簡：一句話讀懂定位——地點 eyebrow＋定位句大標＋首圖。
+          拿掉小字店名、說明段落、兩顆按鈕與「留一點時間給真正重要的事」斜體句
+          （那句仍是 hero.titleSub，繼續當 og:title 的預設值，只是不在首屏印出）。
+          h1 仍是全頁唯一的 h1；店名只給螢幕閱讀器與搜尋引擎（sr-only），畫面上不重複。
+          大標在逗號後換行：splitAtComma（src/lib/title-break.ts）切兩段各包 inline-block，
+          寬度不夠時只會在逗號後斷，不會斷在詞中間；三語同一套。
+          字級依「逗號後那一段（中文 12 字）在一行放得下」來定：手機 7.2vw（375 寬約 27px×12＜327px），
+          lg／xl 兩欄時以日文逗號後 13 字放得下為準 → 2.05rem／2.5rem；手機上日文第二段 13 字，另以 :lang(ja) 縮到 6.4vw。 */}
       <section className="container-editorial pt-10 md:pt-16 pb-16 md:pb-20">
-        <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-16">
+        <div className="grid items-center gap-10 lg:grid-cols-12 lg:gap-16">
           <div className="lg:col-span-6">
             <p className="kicker">{t(p.block("home.place", HOME.place))}</p>
-            <h1 className="mt-8">
-              <span className="block font-serif text-xl md:text-2xl tracking-[0.08em] text-foreground/80">
-                {t(p.block("home.brandLine", HOME.brandLine))}
-              </span>
-              <span className="display mt-4 block whitespace-pre-line text-[2.35rem] leading-[1.18] sm:text-5xl md:text-6xl lg:text-[3.5rem] xl:text-[3.9rem]">
-                {t(p.block("home.headline", HOME.headline))}
+            <h1 className="mt-6 md:mt-8">
+              <span className="sr-only">{t(p.block("hero.titleMain", HERO.titleMain))}｜</span>
+              <span className="display block text-[clamp(1.5rem,7.2vw,3rem)] leading-[1.3] max-md:[:lang(ja)_&]:text-[6.4vw] lg:text-[2.05rem] xl:text-[2.5rem]">
+                {splitAtComma(t(p.block("home.headline", HOME.headline))).map((part, i) => (
+                  <span key={i} className="inline-block">
+                    {part}
+                  </span>
+                ))}
               </span>
             </h1>
-            <p className="mt-8 max-w-xl text-base md:text-[1.0625rem] leading-[1.95] text-foreground/80">
-              {fill(t(p.block("home.lede", HOME.lede)), { n: countText })}
-            </p>
-            <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              {hasUpcoming ? (
-                <a href="#upcoming" className="btn-solid">
-                  {t(p.block("home.ctaPrimary", HOME.ctaPrimary))}
-                  <span className="arrow" aria-hidden="true">
-                    →
-                  </span>
-                </a>
-              ) : (
-                <Link to="/events" className="btn-solid">
-                  {t(p.block("home.ctaPrimary", HOME.ctaPrimary))}
-                  <span className="arrow" aria-hidden="true">
-                    →
-                  </span>
-                </Link>
-              )}
-              <PublicationsLink className="btn-line">
-                {t(p.block("home.ctaSecondary", HOME.ctaSecondary))}
-              </PublicationsLink>
-            </div>
-            <p className="mt-10 font-serif text-lg italic text-muted-foreground">
-              <span aria-hidden="true">— </span>
-              {t(p.block("hero.titleSub", HERO.titleSub))}
-            </p>
           </div>
 
           <figure className="lg:col-span-6">
@@ -481,7 +445,7 @@ function Index() {
         </div>
 
         {/* 2026-11-10 業主要求拿掉 hero 下方的「三個數字」（刊物份數／每月讀書會／台灣策旅）。
-            文案原本就寫在程式裡（HOME.fact*），一併刪掉；刊物份數仍用在上面的 lede {n}。 */}
+            文案原本就寫在程式裡（HOME.fact*），一併刪掉；刊物份數只留在下方「地方刊物典藏」的大數字。 */}
       </section>
 
       {/* ── 近期活動與策旅 ───────────────────────────────────────────────────

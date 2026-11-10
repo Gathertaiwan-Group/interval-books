@@ -338,10 +338,12 @@ checkTrue(
   "「讀．聚．行」的「行」→ /events?type=journey",
   /to: "\/events" as const,\s*type: "journey" as const/.test(home),
 );
+// 2026-11-10 業主精簡 hero：拿掉兩顆按鈕（含「看近期活動與策旅 → #upcoming」），
+// 近期活動與策旅區就緊接在 hero 下方。這裡改成確認按鈕真的沒有了。
 checkTrue(
-  "首頁 hero 主按鈕：有近期場次時捲到正下方的 #upcoming，沒有時去 /events",
-  home.includes('<a href="#upcoming" className="btn-solid">') &&
-    home.includes('<Link to="/events" className="btn-solid">'),
+  "首頁 hero 不再放按鈕（業主 2026-11-10 精簡）",
+  !home.includes('<a href="#upcoming" className="btn-solid">') &&
+    !home.includes('<Link to="/events" className="btn-solid">'),
 );
 const strip2 = strip(readFile("src/components/shop/ShopCategoryStrip.tsx"));
 checkTrue(

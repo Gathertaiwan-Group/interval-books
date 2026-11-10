@@ -166,6 +166,32 @@ const posPillars = home.indexOf('aria-labelledby="home-pillars"');
 const posArchive = home.indexOf('aria-labelledby="home-archive"');
 const posPast = home.indexOf("<PastShelf");
 const posVisit = home.indexOf('aria-labelledby="home-visit"');
+// 2026-11-10 業主精簡 hero：只留地點 eyebrow、定位句大標（逗號後換行）與首圖
+check(
+  "hero 不再印小字店名／說明段落／按鈕／斜體句",
+  [
+    "HOME.brandLine",
+    "HOME.lede",
+    "HOME.ctaPrimary",
+    "HOME.ctaSecondary",
+    'p.block("hero.titleSub"',
+  ].filter((k) => home.includes(k)),
+  [],
+);
+check(
+  "hero 大標用 splitAtComma 在逗號後換行",
+  home.includes('splitAtComma(t(p.block("home.headline", HOME.headline)))'),
+  true,
+);
+check(
+  "hero 大標三語是業主指定文案",
+  [
+    "以書店為載體，讓更多人認識台灣的美好。",
+    "A bookstore as a vessel, sharing the good things of Taiwan.",
+    "本屋を器に、台湾の素晴らしさを届ける。",
+  ].every((s) => home.includes(s)),
+  true,
+);
 check("hero 下方的「三個數字」已拿掉", /HOME\.fact[A-Z]/.test(home), false);
 check("近期活動與策旅在 hero 之後", posHeroEnd > 0 && posUpcoming > posHeroEnd, true);
 check("近期活動與策旅在地方刊物典藏之前", posUpcoming > 0 && posUpcoming < posArchive, true);
