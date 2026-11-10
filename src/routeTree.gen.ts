@@ -75,6 +75,7 @@ import { Route as AdminShellRegistrationsRouteImport } from './routes/admin/_she
 import { Route as AdminShellSalesRouteImport } from './routes/admin/_shell.sales'
 import { Route as AdminShellSettingsRouteImport } from './routes/admin/_shell.settings'
 import { Route as AdminShellStaffRouteImport } from './routes/admin/_shell.staff'
+import { Route as AdminShellStaffScheduleRouteImport } from './routes/admin/_shell.staff-schedule'
 import { Route as AdminShellStockAlertsRouteImport } from './routes/admin/_shell.stock-alerts'
 import { Route as AdminShellStringsRouteImport } from './routes/admin/_shell.strings'
 import { Route as VendorShellIndexRouteImport } from './routes/vendor/_shell.index'
@@ -465,6 +466,11 @@ const AdminShellStaffRoute = AdminShellStaffRouteImport.update({
   path: '/staff',
   getParentRoute: () => AdminShellRoute,
 } as any)
+const AdminShellStaffScheduleRoute = AdminShellStaffScheduleRouteImport.update({
+  id: '/staff-schedule',
+  path: '/staff-schedule',
+  getParentRoute: () => AdminShellRoute,
+} as any)
 const AdminShellStockAlertsRoute = AdminShellStockAlertsRouteImport.update({
   id: '/stock-alerts',
   path: '/stock-alerts',
@@ -814,6 +820,7 @@ export interface FileRoutesByFullPath {
   '/admin/sales': typeof AdminShellSalesRoute
   '/admin/settings': typeof AdminShellSettingsRoute
   '/admin/staff': typeof AdminShellStaffRoute
+  '/admin/staff-schedule': typeof AdminShellStaffScheduleRoute
   '/admin/stock-alerts': typeof AdminShellStockAlertsRoute
   '/admin/strings': typeof AdminShellStringsRoute
   '/vendor/products': typeof VendorShellProductsRoute
@@ -930,6 +937,7 @@ export interface FileRoutesByTo {
   '/admin/sales': typeof AdminShellSalesRoute
   '/admin/settings': typeof AdminShellSettingsRoute
   '/admin/staff': typeof AdminShellStaffRoute
+  '/admin/staff-schedule': typeof AdminShellStaffScheduleRoute
   '/admin/stock-alerts': typeof AdminShellStockAlertsRoute
   '/admin/strings': typeof AdminShellStringsRoute
   '/vendor/products': typeof VendorShellProductsRoute
@@ -1045,6 +1053,7 @@ export interface FileRoutesById {
   '/admin/_shell/sales': typeof AdminShellSalesRoute
   '/admin/_shell/settings': typeof AdminShellSettingsRoute
   '/admin/_shell/staff': typeof AdminShellStaffRoute
+  '/admin/_shell/staff-schedule': typeof AdminShellStaffScheduleRoute
   '/admin/_shell/stock-alerts': typeof AdminShellStockAlertsRoute
   '/admin/_shell/strings': typeof AdminShellStringsRoute
   '/vendor/_shell/products': typeof VendorShellProductsRoute
@@ -1165,6 +1174,7 @@ export interface FileRouteTypes {
     | '/admin/sales'
     | '/admin/settings'
     | '/admin/staff'
+    | '/admin/staff-schedule'
     | '/admin/stock-alerts'
     | '/admin/strings'
     | '/vendor/products'
@@ -1281,6 +1291,7 @@ export interface FileRouteTypes {
     | '/admin/sales'
     | '/admin/settings'
     | '/admin/staff'
+    | '/admin/staff-schedule'
     | '/admin/stock-alerts'
     | '/admin/strings'
     | '/vendor/products'
@@ -1395,6 +1406,7 @@ export interface FileRouteTypes {
     | '/admin/_shell/sales'
     | '/admin/_shell/settings'
     | '/admin/_shell/staff'
+    | '/admin/_shell/staff-schedule'
     | '/admin/_shell/stock-alerts'
     | '/admin/_shell/strings'
     | '/vendor/_shell/products'
@@ -1954,6 +1966,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminShellStaffRouteImport
       parentRoute: typeof AdminShellRoute
     }
+    '/admin/_shell/staff-schedule': {
+      id: '/admin/_shell/staff-schedule'
+      path: '/staff-schedule'
+      fullPath: '/admin/staff-schedule'
+      preLoaderRoute: typeof AdminShellStaffScheduleRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
     '/admin/_shell/stock-alerts': {
       id: '/admin/_shell/stock-alerts'
       path: '/stock-alerts'
@@ -2440,6 +2459,7 @@ interface AdminShellRouteChildren {
   AdminShellSalesRoute: typeof AdminShellSalesRoute
   AdminShellSettingsRoute: typeof AdminShellSettingsRoute
   AdminShellStaffRoute: typeof AdminShellStaffRoute
+  AdminShellStaffScheduleRoute: typeof AdminShellStaffScheduleRoute
   AdminShellStockAlertsRoute: typeof AdminShellStockAlertsRoute
   AdminShellStringsRoute: typeof AdminShellStringsRoute
   AdminShellIndexRoute: typeof AdminShellIndexRoute
@@ -2507,6 +2527,7 @@ const AdminShellRouteChildren: AdminShellRouteChildren = {
   AdminShellSalesRoute: AdminShellSalesRoute,
   AdminShellSettingsRoute: AdminShellSettingsRoute,
   AdminShellStaffRoute: AdminShellStaffRoute,
+  AdminShellStaffScheduleRoute: AdminShellStaffScheduleRoute,
   AdminShellStockAlertsRoute: AdminShellStockAlertsRoute,
   AdminShellStringsRoute: AdminShellStringsRoute,
   AdminShellIndexRoute: AdminShellIndexRoute,
