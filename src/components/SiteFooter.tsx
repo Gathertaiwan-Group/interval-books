@@ -1,5 +1,14 @@
 import { Link } from "@tanstack/react-router";
-import { Clock, Facebook, Instagram, Mail, Map as MapIcon, MapPin, Phone } from "lucide-react";
+import {
+  Clock,
+  Facebook,
+  Instagram,
+  Mail,
+  Map as MapIcon,
+  MapPin,
+  Phone,
+  TrainFront,
+} from "lucide-react";
 import { useLang } from "@/i18n/LanguageContext";
 import { useSiteContent } from "@/lib/site-content";
 import { DAILY, dailyHours } from "@/lib/daily-hours";
@@ -10,6 +19,14 @@ const ICON_BTN =
 
 // footer 專用的小字串（三語），不進 CMS。「每日」與抽屜共用，在 lib/daily-hours.ts。
 const CALL = { zh: "致電", en: "Call", ja: "電話" };
+// 交通（2026-11-10）：首頁「來小時光坐坐」區塊移除後，這行只剩頁尾有。首頁那區的交通文字
+// 是 index.tsx 的本地常數、不在 CMS，所以這裡放三語常數（業主指定的短版）。
+const TRANSIT = {
+  zh: "捷運忠孝新生站 1 號出口，步行約 3 分鐘",
+  en: "MRT Zhongxiao Xinsheng Exit 1, about 3 min walk",
+  ja: "MRT忠孝新生駅1番出口から徒歩約3分",
+};
+const VISIT_INFO = { zh: "來訪資訊", en: "Visit", ja: "アクセス" };
 
 export function SiteFooter() {
   const { t, lang } = useLang();
@@ -44,6 +61,10 @@ export function SiteFooter() {
           <p className="flex items-start gap-2.5">
             <Clock className="mt-[0.2em] h-4 w-4 shrink-0 text-clay" aria-hidden="true" />
             <span>{dailyHours(t(site.hours), t(DAILY))}</span>
+          </p>
+          <p className="flex items-start gap-2.5">
+            <TrainFront className="mt-[0.2em] h-4 w-4 shrink-0 text-clay" aria-hidden="true" />
+            <span>{t(TRANSIT)}</span>
           </p>
 
           <div className="pt-3 flex flex-wrap items-center gap-2 text-muted-foreground">
@@ -122,6 +143,9 @@ export function SiteFooter() {
             © {new Date().getFullYear()} {t(ui.footer.rights)}
           </p>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
+            <Link to="/about" className="hover-underline">
+              {t(VISIT_INFO)}
+            </Link>
             <Link to="/account" className="hover-underline">
               {t(ui.footer.account)}
             </Link>
