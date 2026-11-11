@@ -38,9 +38,9 @@ const PAGE = {
     ja: "小時光 魂の食卓｜上映作品",
   },
   metaDescription: {
-    zh: "週二 19:30–21:30，光中心周介偉老師與 Alice老師共同主講。簡單輕食晚餐・電影賞析・交流。",
-    en: "Tuesdays 19:30–21:30, co-hosted by Chou Chieh-Wei of Light Center and Alice. A light dinner, a guided film discussion, and conversation.",
-    ja: "火曜 19:30–21:30、光中心の周介偉先生と Alice 先生による共同進行。軽めの夕食・映画鑑賞と解説・語り合い。",
+    zh: "週二・週五 19:30–21:30，光中心周介偉老師與快樂手Alice老師共同主講。簡單輕食晚餐・電影賞析・交流。",
+    en: "Tuesdays and Fridays 19:30–21:30, co-hosted by Chou Chieh-Wei of Light Center and Alice. A light dinner, a guided film discussion, and conversation.",
+    ja: "火曜・金曜 19:30–21:30、光中心の周介偉先生と Alice 先生による共同進行。軽めの夕食・映画鑑賞と解説・語り合い。",
   },
 };
 
@@ -65,7 +65,7 @@ function filmDescription(f: Film | null, base: Localized): Localized {
   if (!f) return base;
   return {
     ...base,
-    zh: `《${fullTitle(f)}》電影賞析與共餐分享會，${f.date} 19:30–21:30，台北華山文創園區小時光書店，光中心周介偉老師與 Alice老師帶領。${f.blurb}單場飯票 NT$500，含輕食晚餐。`,
+    zh: `《${fullTitle(f)}》電影賞析與共餐分享會，${f.date} 19:30–21:30，台北華山文創園區小時光書店，光中心周介偉老師與快樂手Alice老師帶領。${f.blurb}單場飯票 NT$500 含輕食晚餐，也有線上票 NT$250。`,
   };
 }
 
@@ -144,10 +144,7 @@ function FilmPage() {
         </h1>
         <dl className="paper-card mt-6 grid grid-cols-[5rem_1fr] gap-y-2 p-5 text-sm">
           <dt className="text-muted-foreground">日期</dt>
-          <dd>
-            {film.date}
-            <span className="ml-2 text-xs text-clay">暫訂</span>
-          </dd>
+          <dd>{film.date}</dd>
           <dt className="text-muted-foreground">時間</dt>
           <dd>{SCHEDULE}（晚餐時間與觀影流程待公布）</dd>
           <dt className="text-muted-foreground">地點</dt>

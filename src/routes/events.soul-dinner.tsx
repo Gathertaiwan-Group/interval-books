@@ -36,7 +36,9 @@ import {
   FILMS,
   FONTS_HREF,
   HERO_KEY,
+  ONLINE_PRICE,
   SCHEDULE,
+  TICKET_PRICE,
 } from "@/components/soul-dinner/data";
 import soulCss from "@/components/soul-dinner/soul-dinner.css?url";
 
@@ -69,18 +71,16 @@ import soulCss from "@/components/soul-dinner/soul-dinner.css?url";
 /** 三語 meta。⚠️ 必須是頂層靜態常數、每一句都是字面值——check-meta.mjs 靜態解析這個物件。 */
 const PAGE = {
   metaTitle: {
-    zh: "靈魂飯桌｜週二電影共餐分享會・周介偉 × Alice｜台北華山 小時光書店",
-    en: "Soul Dinner Table｜Tuesday film & dinner gatherings with Chou Chieh-Wei and Alice｜Interval Books, Huashan, Taipei",
-    ja: "魂の食卓｜火曜の映画と食事の会・周介偉 × Alice｜台北・華山 小時光書店",
+    zh: "靈魂飯桌｜週二・週五電影共餐分享會・周介偉 × Alice｜台北華山 小時光書店",
+    en: "Soul Dinner Table｜Tuesday & Friday film-and-dinner gatherings with Chou Chieh-Wei and Alice｜Interval Books, Huashan, Taipei",
+    ja: "魂の食卓｜火曜・金曜の映画と食事の会・周介偉 × Alice｜台北・華山 小時光書店",
   },
   metaDescription: {
-    zh: "一起吃飯，看電影，遇見懂你的人。台北華山文創園區小時光書店，週二晚上 19:30 的心靈電影共餐分享會，光中心周介偉老師與 Alice老師帶領：光之行者、創造生命的奇蹟、靈魂伴侶、聖境預言書。單場飯票 NT$500，含輕食晚餐，開放報名。",
-    en: "Share a meal, watch a film, and meet people who understand you. Tuesday 19:30 film-and-dinner gatherings at Interval Books, Huashan 1914 Creative Park, Taipei, led by Chou Chieh-Wei of Light Center and Alice: Light Walker, Creating the Miracle of Life, Soulmate, The Celestine Prophecy. NT$500 per night including a light dinner.",
-    ja: "一緒に食べて、映画を観て、わかり合える人に出会う。台北・華山1914文化創意産業園区の小時光書店で、火曜19:30から開く映画と食事の会。光中心の周介偉先生と Alice 先生が案内します。上映作品：光の旅人、生命の奇跡を創る、ソウルメイト、聖なる予言。1回 NT$500（軽食付き）。",
+    zh: "一起吃飯，看電影，遇見懂你的人。台北華山文創園區小時光書店，週二・週五晚上 19:30 的心靈電影共餐分享會，光中心周介偉老師與快樂手Alice老師帶領：光之行者、創造生命的奇蹟、靈魂伴侶、聖境預言書。單場飯票 NT$500 含輕食晚餐，線上票 NT$250，開放報名。",
+    en: "Share a meal, watch a film, and meet people who understand you. Tuesday and Friday 19:30 film-and-dinner gatherings at Interval Books, Huashan 1914 Creative Park, Taipei, led by Chou Chieh-Wei of Light Center and Alice: Light Walker, Creating the Miracle of Life, Soulmate, The Celestine Prophecy. NT$500 per night including a light dinner; online tickets NT$250.",
+    ja: "一緒に食べて、映画を観て、わかり合える人に出会う。台北・華山1914文化創意産業園区の小時光書店で、火曜・金曜19:30から開く映画と食事の会。光中心の周介偉先生と Alice 先生が案内します。上映作品：光の旅人、生命の奇跡を創る、ソウルメイト、聖なる予言。1回 NT$500（軽食付き）、オンライン参加 NT$250。",
   },
 };
-
-const TICKET_PRICE = 500;
 
 /** 第五場。後台加好 12/22 的場次之前，data.ts 裡的 bookable 是 false。 */
 const FIFTH = FILMS[FILMS.length - 1];
@@ -97,11 +97,15 @@ const FAQ: readonly { q: string; a: string }[] = [
   { q: "活動地點在哪裡？", a: "在小時光書店（台北華山文創園區 紅磚六合院 西 7-3 館）。" },
   {
     q: "晚餐是什麼時候？流程如何？",
-    a: "活動時間為週二 19:30–21:30，晚餐時間與實際觀影流程待公布。",
+    a: "活動時間為週二・週五 19:30–21:30，晚餐時間與實際觀影流程待公布。",
   },
   {
     q: "第五場是什麼電影？",
     a: "第五場是《聖境預言書》（The Celestine Prophecy），改編自 1990 年代美國最暢銷的靈性小說。",
+  },
+  {
+    q: "可以線上參加嗎？",
+    a: "可以。報名時選「線上票」（NT$250），線上加入電影賞析與交流，不含晚餐；活動前我們會以 Email 寄送線上連結。",
   },
   { q: "有飲食限制怎麼辦？", a: "可在結帳頁的備註填寫飲食需求，我們會盡量協助安排。" },
 ];
@@ -206,7 +210,7 @@ function SoulDinner() {
           </div>
           <p className="mt-4 text-xs text-muted-foreground">晚餐時間、菜色與實際觀影流程待公布。</p>
         </Section>
-        <Section id="films" eyebrow="五場片單" title="五個週二，五張飯桌">
+        <Section id="films" eyebrow="五場片單" title="五個夜晚，五張飯桌">
           <ol className="space-y-4">
             {FILMS.map((f) => (
               <li key={f.slug}>
@@ -221,7 +225,7 @@ function SoulDinner() {
                       {f.title}
                       {f.episode ? <span className="text-clay">｜{f.episode}</span> : null}
                     </h3>
-                    <p className="text-xs text-muted-foreground">{f.date}・暫訂</p>
+                    <p className="text-xs text-muted-foreground">{f.date}</p>
                     <p className="mt-1 text-sm text-foreground/75">{f.blurb}</p>
                   </div>
                   <span className="text-xs text-primary group-hover:underline">詳情 →</span>
@@ -229,13 +233,13 @@ function SoulDinner() {
               </li>
             ))}
           </ol>
-          <p className="mt-4 text-xs text-muted-foreground">所有日期皆為暫訂；地點在小時光書店。</p>
+          <p className="mt-4 text-xs text-muted-foreground">地點｜小時光書店</p>
         </Section>
         <Section eyebrow="共同主講" title="兩位老師，陪你看見">
           <div className="grid gap-4 sm:grid-cols-2">
             {[
               ["光中心", "周介偉老師"],
-              ["共同主講", "Alice老師"],
+              ["共同主講", "快樂手Alice老師"],
             ].map(([role, name]) => (
               <div key={name} className="paper-card flex items-center gap-4 p-5">
                 <div aria-hidden="true" className="sd-avatar h-14 w-14 shrink-0 rounded-full" />
@@ -257,8 +261,18 @@ function SoulDinner() {
               <p className="mt-2 text-sm text-muted-foreground">
                 含簡單輕食晚餐、電影賞析與交流。
                 {FIFTH.bookable
-                  ? "五場皆可單場預約。"
-                  : `五場皆可單場預約（第五場《${FIFTH.title}》即將開放報名）。`}
+                  ? "五場皆可選擇。"
+                  : `五場皆可選擇（第五場《${FIFTH.title}》即將開放報名）。`}
+              </p>
+            </div>
+            <div className="paper-card p-6">
+              <h3 className="text-lg text-primary">線上票</h3>
+              <p className="mt-2 font-serif text-4xl text-primary">
+                NT${ONLINE_PRICE.toLocaleString("en-US")}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                不方便到場也能參與：線上加入電影賞析與交流（不含晚餐），活動前以 Email
+                寄送線上連結。五場皆可選擇。
               </p>
             </div>
           </div>
@@ -302,8 +316,9 @@ function Hero({ bookingClosed }: { bookingClosed: boolean }) {
       <div className="mx-auto max-w-5xl px-5">
         <p className="mt-4 text-lg text-foreground/80">一起吃飯，看電影，遇見懂你的人。</p>
         <p className="mt-3 text-sm text-muted-foreground">
-          {SCHEDULE}・五場・光中心 周介偉老師 × Alice老師 共同主講
+          {SCHEDULE}・五場・光中心 周介偉老師 × 快樂手Alice老師 共同主講
         </p>
+        <p className="mt-1 text-sm text-muted-foreground">地點｜小時光書店</p>
         <div className="mt-6 flex flex-wrap gap-3">
           {bookingClosed ? null : (
             <a href="#reserve" className={`${BUTTON_CLAY} h-12 rounded-md px-8 text-sm`}>

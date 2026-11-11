@@ -8,9 +8,13 @@ export const EVENT_SLUG = "soul-dinner";
 export const EVENT_PATH = "/events/soul-dinner";
 export const BRAND = "小時光｜靈魂飯桌";
 export const TAGLINE = "給靈魂一張飯票，也給相遇一個位置。";
-export const SCHEDULE = "週二 19:30–21:30";
+export const SCHEDULE = "週二・週五 19:30–21:30";
 export const VENUE = "小時光書店（華山文創園區 紅磚六合院 西 7-3 館）";
-export const HOSTS_LINE = "光中心 周介偉老師、Alice老師";
+export const HOSTS_LINE = "光中心 周介偉老師、快樂手Alice老師";
+
+/** 單場飯票與線上票的票價（顯示用；結帳以後台票種為準）。 */
+export const TICKET_PRICE = 500;
+export const ONLINE_PRICE = 250;
 
 /** 原站載入的字重（Noto Sans TC 400/500、Noto Serif TC 500/600）。 */
 export const FONTS_HREF =
@@ -55,7 +59,7 @@ export const FILMS: readonly Film[] = [
     n: 1,
     title: "光之行者",
     episode: "第一集",
-    date: "2026/11/24（二）",
+    date: "2026-11-24（二）",
     blurb: "從一段旅程的起點出發，看見自己一路走來的光。",
     intro: LIGHT_WALKER_INTRO,
     bookable: true,
@@ -65,7 +69,7 @@ export const FILMS: readonly Film[] = [
     n: 2,
     title: "光之行者",
     episode: "第二集",
-    date: "2026/12/1（二）",
+    date: "2026-11-27（五）",
     blurb: "延續第一集的足跡，聊聊那些讓我們繼續前行的力量。",
     intro: LIGHT_WALKER_INTRO,
     bookable: true,
@@ -75,7 +79,7 @@ export const FILMS: readonly Film[] = [
     n: 3,
     title: "創造生命的奇蹟",
     episode: null,
-    date: "2026/12/8（二）",
+    date: "2026-12-1（二）",
     blurb: "在日常裡練習覺察，重新感受生命本身的可能。",
     intro: [
       { kind: "lead", text: "被譽為重要性甚於\u201c祕密\u201d的心靈療癒片，" },
@@ -91,7 +95,7 @@ export const FILMS: readonly Film[] = [
     n: 4,
     title: "靈魂伴侶",
     episode: null,
-    date: "2026/12/15（二）",
+    date: "2026-12-4（五）",
     blurb: "談關係、談相遇，也談先成為自己的那份溫柔。",
     intro: [
       { kind: "li", text: "你/妳可曾遇見或渴望一位靈魂伴侶？天作之合？或曾遇見到許多靈魂伴侶？" },
@@ -108,8 +112,8 @@ export const FILMS: readonly Film[] = [
     n: 5,
     title: "聖境預言書",
     episode: null,
-    date: "2026/12/22（二）",
-    blurb: "1990 年代美國最暢銷的靈性小說搬上銀幕，跟著主角領受九個覺悟。",
+    date: "2026-12-8（二）",
+    blurb: "在最後一張飯桌，分享五個夜晚留下的感受與連結。",
     intro: [
       { kind: "lead", text: "*1990 年代美國最暢銷靈性小說搬上銀幕!!" },
       {
