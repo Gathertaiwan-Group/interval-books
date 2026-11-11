@@ -35,7 +35,8 @@
  */
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { registerHooks } from "node:module";
 import { dirname, join } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -1047,6 +1048,187 @@ checkTrue(
       schemasCode.slice(schemasCode.indexOf("export const VENDOR_SENSITIVE_FIELDS")),
     ),
   ),
+);
+
+// -----------------------------------------------------------------------------
+// [14b] 國內個人的身分證字號選填（0061）
+// -----------------------------------------------------------------------------
+//
+// 業主有些供貨者是個人戶，沒有統編、也不方便提供身分證字號。0019 讓這類廠商建不起來。
+// 0061 只放寬國內個人那一條；有填仍驗格式，國內公司的統編照舊必填。
+// 這一段**真的跑 vendorSchema**（不是看原始碼），再加上對 0061 SQL 的靜態斷言。
+
+console.log("\n[14b] 國內個人的身分證字號選填（0061）");
+
+registerHooks({
+  resolve(spec, ctx, next) {
+    if (spec.startsWith("@/")) {
+      const base = join(ROOT, "src", spec.slice(2));
+      for (const cand of [base, `${base}.ts`, `${base}.tsx`, join(base, "index.ts")]) {
+        if (existsSync(cand)) return { url: pathToFileURL(cand).href, shortCircuit: true };
+      }
+    }
+    return next(spec, ctx);
+  },
+});
+const { vendorSchema, isValidTaiwanIdNumber } = await import(pathToFileURL(SRC_SCHEMAS).href);
+
+/** 一份除了識別碼以外都合法的 payload（形狀照 VendorFormState.toVendorPayload）。 */
+function vendorPayload(over) {
+  return {
+    id: null,
+    entity_type: "domestic_individual",
+    category_id: null,
+    name: "自檢個人戶",
+    name_en: null,
+    short_name: null,
+    representative: null,
+    is_preferred: false,
+    notes: null,
+    tax_id: null,
+    id_number: null,
+    foreign_id: null,
+    foreign_id_type: null,
+    residence_permit_number: null,
+    taiwan_residency_status: null,
+    country_code: null,
+    phone: null,
+    fax: null,
+    email: null,
+    address: null,
+    address_en: null,
+    invoice_address: null,
+    default_tax_type_id: null,
+    default_withholding_category_id: null,
+    is_nhi_applicable: false,
+    voucher_category: "receipt",
+    einvoice_type: "none",
+    payment_terms: "immediate",
+    payment_terms_note: null,
+    settlement_type: "invoice_date",
+    settlement_start_day: null,
+    settlement_interval_days: null,
+    bill_due_day: null,
+    is_consignment: true,
+    cash_fee_rate: 0.08,
+    domestic_card_fee_rate: 0.101,
+    foreign_card_fee_rate: 0.1115,
+    commission_rate: 0.3,
+    status: "active",
+    ...over,
+  };
+}
+function issuesAt(over, field) {
+  const r = vendorSchema.safeParse(vendorPayload(over));
+  if (r.success) return [];
+  return r.error.issues.filter((i) => i.path[0] === field).map((i) => i.message);
+}
+
+check(
+  "🔴 國內個人、身分證字號不填（null）→ 可以建立",
+  vendorSchema.safeParse(vendorPayload({ id_number: null })).success,
+  true,
+);
+check(
+  "國內個人、身分證字號空白字串 → 也可以建立",
+  vendorSchema.safeParse(vendorPayload({ id_number: "   " })).success,
+  true,
+);
+check(
+  "國內個人、身分證字號填對（A123456789）→ 可以建立",
+  vendorSchema.safeParse(vendorPayload({ id_number: "A123456789" })).success,
+  true,
+);
+check(
+  "小寫與前後空白不計（DB 端也是 upper + btrim）",
+  vendorSchema.safeParse(vendorPayload({ id_number: " a123456789 " })).success,
+  true,
+);
+for (const bad of ["A12345678", "1234567890", "A323456789", "A123456788", "AB12345678"]) {
+  check(
+    `🔴 國內個人、身分證字號填錯（${bad}）→ 擋在 id_number 欄位`,
+    issuesAt({ id_number: bad }, "id_number").length > 0,
+    true,
+  );
+}
+check(
+  "🔴 國內公司沒有統編 → 照舊擋在 tax_id 欄位",
+  issuesAt({ entity_type: "domestic_company", tax_id: null }, "tax_id")[0] ?? null,
+  "國內公司必須填統一編號",
+);
+check(
+  "國內公司有統編 → 可以建立",
+  vendorSchema.safeParse(vendorPayload({ entity_type: "domestic_company", tax_id: "12345675" }))
+    .success,
+  true,
+);
+check(
+  "國外法人沒有國外識別碼 → 照舊擋",
+  issuesAt({ entity_type: "foreign", foreign_id: null }, "foreign_id").length > 0,
+  true,
+);
+check("檢查碼：新式居留證統一證號（A800000014）通過", isValidTaiwanIdNumber("A800000014"), true);
+
+// DB 那一側：0061 重建的 inv_save_vendor() 必須是**最後一個**定義它的 migration，
+// 而且國內個人不再 RAISE、有填驗形狀、國內公司照舊必填。
+const migFilesAll = readdirSync(MIG_DIR)
+  .filter((f) => /^\d{4}_.*\.sql$/.test(f))
+  .sort();
+const definers = migFilesAll.filter((f) =>
+  /create\s+or\s+replace\s+function\s+public\.inv_save_vendor\s*\(/i.test(
+    strip(read(join(MIG_DIR, f))),
+  ),
+);
+check(
+  "最後一個定義 inv_save_vendor() 的 migration 是 0061",
+  definers.at(-1),
+  "0061_vendor_individual_optional_id.sql",
+);
+const mig0061 = strip(read(join(MIG_DIR, "0061_vendor_individual_optional_id.sql")));
+checkTrue(
+  "🔴 0061：國內個人不再因為沒填身分證字號而 RAISE",
+  !/domestic_individual'\s+AND\s+v_id_number\s+IS\s+NULL/i.test(mig0061) &&
+    !/VENDOR_NEED_ID_NUMBER/.test(mig0061),
+);
+checkTrue(
+  "0061：有填身分證字號時驗形狀（VENDOR_BAD_ID_NUMBER）",
+  /v_id_number IS NOT NULL AND v_id_number !~ '\^\[A-Z\]\[1289\]\[0-9\]\{8\}\$'/.test(mig0061) &&
+    /VENDOR_BAD_ID_NUMBER/.test(mig0061),
+);
+checkTrue(
+  "🔴 0061：國內公司照舊必填統編",
+  /v_entity = 'domestic_company'\s+AND v_tax_id\s+IS NULL THEN\s+RAISE EXCEPTION 'VENDOR_NEED_TAX_ID/.test(
+    mig0061,
+  ),
+);
+checkTrue(
+  "0061：國外法人／國外個人的必填照舊",
+  /VENDOR_NEED_FOREIGN_ID/.test(mig0061) && /VENDOR_NEED_FOREIGN_OR_PERMIT/.test(mig0061),
+);
+checkTrue(
+  "0061：仍只 grant service_role",
+  /grant\s+execute on function public\.inv_save_vendor\(uuid, uuid, jsonb\) to service_role/.test(
+    mig0061,
+  ) &&
+    /revoke execute on function public\.inv_save_vendor\(uuid, uuid, jsonb\) from anon, authenticated/.test(
+      mig0061,
+    ),
+);
+checkTrue(
+  "0061：approval_status 仍由 inv.initial_approval_status 決定（不從 payload 拿）",
+  /inv\.initial_approval_status\('vendors'\)/.test(mig0061) &&
+    !/p_payload->>'approval_status'/.test(mig0061),
+);
+
+// 畫面：國內個人時標「（選填）」與說明，不畫必填星號。
+const identitySection = read(join(ROOT, "src/components/inventory/VendorIdentitySection.tsx"));
+checkTrue(
+  "表單：國內個人的身分證字號標「（選填）」",
+  /SENSITIVE_LABELS\.id_number\}（選填）/.test(identitySection),
+);
+checkTrue(
+  "表單：說明「個人戶可不填，日後需開立扣繳憑單時再補」",
+  identitySection.includes("個人戶可不填，日後需開立扣繳憑單時再補"),
 );
 
 // -----------------------------------------------------------------------------

@@ -95,7 +95,7 @@ export function VendorIdentitySection({
 
       <div className="grid gap-4 sm:grid-cols-2">
         {/* 顯示條件見上面的 visible：entity_type 用得到的 ∪ 這家已經有值的。
-            四條必填規則在 vendorSchema 與 inv_save_vendor() 各守一次，
+            必填規則在 vendorSchema 與 inv_save_vendor() 各守一次（國內個人的身分證字號自 0061 起選填），
             這裡的 required 只是把星號畫在對的地方。 */}
         {visible.tax_id ? (
           <IdentityField
@@ -118,12 +118,22 @@ export function VendorIdentitySection({
         {visible.id_number ? (
           <IdentityField
             id="vendor-id-number"
-            label={SENSITIVE_LABELS.id_number}
+            label={
+              entity === "domestic_individual"
+                ? `${SENSITIVE_LABELS.id_number}（選填）`
+                : SENSITIVE_LABELS.id_number
+            }
             masked={masks.id_number}
             changing={changing.id_number}
             value={form.id_number}
             disabled={busy}
-            required={entity === "domestic_individual"}
+            // 國內個人的身分證字號選填（0061）：個人戶可能不方便提供。
+            required={false}
+            hint={
+              entity === "domestic_individual"
+                ? "個人戶可不填，日後需開立扣繳憑單時再補"
+                : undefined
+            }
             onStartChange={() => setChanging((p) => ({ ...p, id_number: true }))}
             onCancelChange={() => {
               setChanging((p) => ({ ...p, id_number: false }));

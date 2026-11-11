@@ -208,7 +208,10 @@ assertMigrationDependencies(check, MIG_DIR, {
   // order_total 兩欄；既有欄位與其他付款方式的語意不變——這支的斷言照樣成立。
   // 0059 重審：admin_event_roster 只在最後加 ticket_price 等四欄（left join order_items／
   // event_session_plans），既有十八欄與 on_roster 定義不動——這支的斷言照樣成立。
-  reviewedThrough: "0059_roster_ticket_price.sql",
+  // 0061 重審：只 create or replace public.inv_save_vendor()（廠商存檔；國內個人的身分證字號改
+  // 選填、有填驗形狀），簽章／grant 不變，沒有碰訂單、名單、場次、票種或庫存保留的任何表或函式——
+  // 這支的斷言照樣成立。
+  reviewedThrough: "0061_vendor_individual_optional_id.sql",
 });
 
 // =============================================================================

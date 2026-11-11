@@ -32,6 +32,7 @@ export function IdentityField({
   value,
   disabled,
   required,
+  hint,
   onStartChange,
   onCancelChange,
   onChange,
@@ -44,6 +45,8 @@ export function IdentityField({
   value: string;
   disabled: boolean;
   required: boolean;
+  /** 輸入框下方的一行說明（例如「個人戶可不填」）。 */
+  hint?: string;
   onStartChange: () => void;
   onCancelChange: () => void;
   onChange: (next: string) => void;
@@ -107,6 +110,7 @@ export function IdentityField({
           </Button>
         ) : null}
       </div>
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
       {masked !== null ? (
         <p className="text-xs text-amber-700">
           要輸入<strong>完整</strong>號碼。系統讀不回原值，這一格會直接覆寫資料庫。

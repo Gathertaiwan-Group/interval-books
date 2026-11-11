@@ -951,6 +951,13 @@ export const MIGRATION_LEDGER = Object.freeze([
     // to_regprocedure）。其他區域的識別字一個都沒有出現。
     touches: ["cron_jobs"],
   },
+  {
+    file: "0061_vendor_individual_optional_id.sql",
+    note: "國內個人廠商的身分證字號改為選填（個人戶可不填，日後要開扣繳憑單再補）：public.inv_save_vendor(uuid, uuid, jsonb) 以 create or replace 重建，與 0019 §5.1 逐字相同，只把 domestic_individual 的 VENDOR_NEED_ID_NUMBER 換成「有填才驗形狀」的 VENDOR_BAD_ID_NUMBER（^[A-Z][1289][0-9]{8}$，upper／btrim 之後，任何 entity_type 帶進來的 id_number 都套用）。國內公司統編、國外法人國外識別碼、國外個人識別碼或居留證擇一照舊必填。comment on function 更新、重申只 grant service_role。沒有碰任何表、view 或其他函式",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：只有 inventory（inv.vendors、
+    // vendors、inv.initial_approval_status、inv.assert_rate／assert_day_of_month）。
+    touches: ["inventory"],
+  },
 ]);
 
 /**

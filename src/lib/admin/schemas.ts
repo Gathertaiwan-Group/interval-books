@@ -1643,6 +1643,23 @@ const dayOfMonthSchema = z
 
 const trimmedNullable = (max: number) => z.string().trim().max(max).nullable();
 
+/** 字母對應碼：這個字串裡的位置 + 10（A=10 … Z=33、I=34、O=35）。 */
+const TW_ID_LETTER_ORDER = "ABCDEFGHJKLMNPQRSTUVXYWZIO";
+/**
+ * 台灣身分證字號／新式居留證統一證號（1 個英文字母 + 1／2／8／9 + 8 碼數字）的形狀與檢查碼。
+ * 大小寫與前後空白不計（inv_save_vendor() 存檔前也是 upper + btrim）。
+ * DB 那一側（0061）只守形狀；檢查碼只在這裡驗，讓打錯一碼的錯誤出現在欄位旁邊。
+ */
+export function isValidTaiwanIdNumber(raw: string): boolean {
+  const id = raw.trim().toUpperCase();
+  if (!/^[A-Z][1289]\d{8}$/.test(id)) return false;
+  const code = TW_ID_LETTER_ORDER.indexOf(id[0]) + 10;
+  let sum = Math.floor(code / 10) + (code % 10) * 9;
+  for (let i = 1; i <= 8; i++) sum += Number(id[i]) * (9 - i);
+  sum += Number(id[9]);
+  return sum % 10 === 0;
+}
+
 export const vendorSchema = z
   .object({
     id: z.string().trim().uuid().nullable(),
@@ -1700,8 +1717,10 @@ export const vendorSchema = z
     message: "國內公司必須填統一編號",
     path: ["tax_id"],
   })
-  .refine((v) => v.entity_type !== "domestic_individual" || !!v.id_number?.trim(), {
-    message: "國內個人必須填身分證字號",
+  // 國內個人的身分證字號**選填**（0061）：個人戶可不填，日後需開立扣繳憑單時再補。
+  // 有填就要通過形狀與檢查碼 —— 不分 entity_type，因為 id_number 這一欄只裝台灣身分證。
+  .refine((v) => !v.id_number?.trim() || isValidTaiwanIdNumber(v.id_number), {
+    message: "身分證字號格式不正確（應為 1 個英文字母加 9 碼數字，例如 A123456789）",
     path: ["id_number"],
   })
   .refine((v) => v.entity_type !== "foreign" || !!v.foreign_id?.trim(), {
