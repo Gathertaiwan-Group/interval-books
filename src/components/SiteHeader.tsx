@@ -64,7 +64,7 @@ export function SiteHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur-md">
+      <header className="site-header-vt sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur-md">
         <div className="container-editorial flex items-center justify-between py-4 gap-6">
           <Link to="/" className="flex shrink-0 flex-col leading-tight">
             <span className="font-serif text-[1.35rem] tracking-tight">{t(ui.brand)}</span>

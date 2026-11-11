@@ -370,6 +370,7 @@ function Partnership() {
       <section
         className="container-editorial pb-24 grid items-center gap-12 md:grid-cols-2"
         data-testid="partnership-space"
+        data-reveal-stagger
       >
         <div className="aspect-[4/3] overflow-hidden bg-muted">
           <img
@@ -391,10 +392,10 @@ function Partnership() {
 
       {/* 2) 合作形式 */}
       <section className="container-editorial pb-24" data-testid="partnership-types">
-        <h2 className="display border-t border-border pt-12 text-3xl md:text-4xl">
+        <h2 data-reveal className="display border-t border-border pt-12 text-3xl md:text-4xl">
           {t(p.block("typesTitle", PAGE.typesTitle))}
         </h2>
-        <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+        <div data-reveal-stagger className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
           {types.map((row, i) => (
             <article key={i} className={CARD}>
               <div className="flex flex-1 flex-col p-6">
@@ -413,10 +414,10 @@ function Partnership() {
 
       {/* 3) 合作流程 */}
       <section className="container-editorial pb-24" data-testid="partnership-steps">
-        <h2 className="display border-t border-border pt-12 text-3xl md:text-4xl">
+        <h2 data-reveal className="display border-t border-border pt-12 text-3xl md:text-4xl">
           {t(p.block("stepsTitle", PAGE.stepsTitle))}
         </h2>
-        <ol className="mt-12 grid gap-10 md:grid-cols-2 lg:grid-cols-4">
+        <ol data-reveal-stagger className="mt-12 grid gap-10 md:grid-cols-2 lg:grid-cols-4">
           {steps.map((row, i) => (
             <li key={i}>
               <p className="font-serif text-4xl text-clay">{String(i + 1).padStart(2, "0")}</p>
@@ -433,7 +434,10 @@ function Partnership() {
       {/* 4) 合作案例（社會證明，完整清單在 /curation） */}
       {cases.length > 0 && (
         <section className="container-editorial pb-24" data-testid="partnership-cases">
-          <div className="flex flex-col gap-4 border-t border-border pt-12 md:flex-row md:items-end md:justify-between">
+          <div
+            data-reveal
+            className="flex flex-col gap-4 border-t border-border pt-12 md:flex-row md:items-end md:justify-between"
+          >
             <h2 className="display text-3xl md:text-4xl">
               {t(p.block("casesTitle", PAGE.casesTitle))}
             </h2>
@@ -485,10 +489,10 @@ function Partnership() {
 
       {/* 5) 常見問題 */}
       <section className="container-editorial pb-24" data-testid="partnership-faq">
-        <h2 className="display border-t border-border pt-12 text-3xl md:text-4xl">
+        <h2 data-reveal className="display border-t border-border pt-12 text-3xl md:text-4xl">
           {t(p.block("faqTitle", PAGE.faqTitle))}
         </h2>
-        <div className="mt-10 max-w-3xl divide-y divide-border border-y border-border">
+        <div data-reveal className="mt-10 max-w-3xl divide-y divide-border border-y border-border">
           {faq.map((row, i) => (
             <details key={i} className="group py-5">
               <summary className="flex cursor-pointer list-none items-start justify-between gap-6 font-serif text-lg">

@@ -282,6 +282,7 @@ export function PublicationsPanel({
             <section
               className="container-editorial pb-32 grid grid-cols-1 gap-6 sm:grid-cols-2 md:gap-8 lg:grid-cols-3"
               data-testid="publication-grid"
+              data-reveal-stagger
             >
               {visible.map((entry) => (
                 <PublicationCard

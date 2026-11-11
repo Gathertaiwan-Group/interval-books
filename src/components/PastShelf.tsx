@@ -52,14 +52,20 @@ export function PastShelf({ eyebrow, title, badge, items, cta, testId }: PastShe
   if (items.length === 0) return null;
   return (
     <section className="container-editorial pb-24" data-testid={testId}>
-      <div className="border-t border-border pt-16 flex flex-col gap-6 md:flex-row md:items-end md:justify-between md:gap-12">
+      <div
+        data-reveal
+        className="border-t border-border pt-16 flex flex-col gap-6 md:flex-row md:items-end md:justify-between md:gap-12"
+      >
         <div>
           <p className="eyebrow text-2xl">{eyebrow}</p>
           <h2 className="display mt-4 text-3xl md:text-4xl">{title}</h2>
         </div>
         {cta ? <div className="shrink-0 self-start md:self-end">{cta}</div> : null}
       </div>
-      <ul className="relative mt-12 -mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-6 px-6 pb-2 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-2 md:gap-6 md:overflow-visible md:px-0 md:pb-0 lg:grid-cols-3 xl:grid-cols-4 [&::-webkit-scrollbar]:hidden">
+      <ul
+        data-reveal-stagger
+        className="relative mt-12 -mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-6 px-6 pb-2 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-2 md:gap-6 md:overflow-visible md:px-0 md:pb-0 lg:grid-cols-3 xl:grid-cols-4 [&::-webkit-scrollbar]:hidden"
+      >
         {items.map((item) => (
           <li key={item.key} className="flex w-[76%] shrink-0 snap-start sm:w-[42%] md:w-auto">
             <PastCard item={item} badge={badge} />

@@ -72,6 +72,7 @@ export function HomeProductShelf({ products }: { products: ShopProductCard[] }) 
     <ul
       aria-label={t(COPY.listLabel)}
       data-testid="home-product-shelf"
+      data-reveal-stagger
       className="relative -mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-6 px-6 pb-2 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-4 md:gap-6 md:overflow-visible md:px-0 md:pb-0 [&::-webkit-scrollbar]:hidden"
     >
       {products.map((product) => {

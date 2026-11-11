@@ -129,7 +129,7 @@ export function CuratedPanel({
         <section className="container-editorial pb-24 space-y-32" data-testid="curated-themes">
           {shownThemes.map((theme, i) => (
             <div key={theme.id}>
-              <div className="grid md:grid-cols-12 gap-10 items-end mb-12">
+              <div data-reveal className="grid md:grid-cols-12 gap-10 items-end mb-12">
                 <div className="md:col-span-5">
                   <p className="eyebrow text-2xl">
                     {t(p.block("windowLabel", COPY.windowLabel))} {String(i + 1).padStart(2, "0")}
@@ -150,7 +150,10 @@ export function CuratedPanel({
               ) : (
                 // 一件一張獨立卡片，外框用前台共用的 CARD（src/lib/feature-layout.ts）；
                 // 卡片本身不是連結，所以不加 CARD_HOVER（可以點的是裡面的購買鈕與商品連結）。
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:gap-8 lg:grid-cols-3">
+                <div
+                  data-reveal-stagger
+                  className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:gap-8 lg:grid-cols-3"
+                >
                   {theme.items.map((item, idx) => {
                     const product = linkedProduct(item.productId);
                     const soldOut = product !== null && isSoldOut(product);

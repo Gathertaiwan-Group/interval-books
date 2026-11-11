@@ -248,6 +248,66 @@
   }
 }
 
+/*
+ * 前台動效（2026-11）：捲動浮現＋換頁過場。觸發邏輯在 src/lib/motion.ts。
+ *
+ * 🔴 隱藏規則只在 html[data-motion="on"] 底下生效——那個屬性只有瀏覽器端 JS 跑起來、且使用者
+ * 沒開「減少動態效果」才會加。SSR／爬蟲／不跑 JS 的環境看到的永遠是完整顯示的內容。
+ * 只動 opacity 與 transform，不改尺寸，不會造成版面位移（CLS）。
+ * 動畫用 fill-mode: backwards：延遲期間維持起始狀態，播完回到元素本來的樣式，
+ * 不會蓋掉卡片自己的 hover 效果。
+ */
+@media screen and (prefers-reduced-motion: no-preference) {
+  html[data-motion="on"] :is([data-reveal], [data-reveal-stagger] > *):not([data-revealed]) {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  html[data-motion="on"] :is([data-reveal], [data-reveal-stagger] > *)[data-revealed="fade"] {
+    animation: reveal-rise 680ms var(--ease-quiet) var(--reveal-delay, 0ms) backwards;
+  }
+
+  /* 換頁：舊頁淡出、新頁淡入並輕輕上移 5px。頁首有自己的 view-transition-name，原地不動。 */
+  ::view-transition-old(root) {
+    animation: vt-fade-out 220ms var(--ease-quiet) both;
+  }
+  ::view-transition-new(root) {
+    animation: vt-rise-in 280ms var(--ease-quiet) 40ms both;
+  }
+  ::view-transition-group(site-header),
+  ::view-transition-new(site-header) {
+    animation: none;
+  }
+  ::view-transition-old(site-header) {
+    display: none;
+  }
+}
+
+@keyframes reveal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+
+.site-header-vt {
+  view-transition-name: site-header;
+}
+
 @layer components {
   .container-editorial {
     width: 100%;

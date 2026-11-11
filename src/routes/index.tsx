@@ -453,7 +453,10 @@ function Index() {
         aria-labelledby="home-upcoming"
       >
         <div className="container-editorial section-y max-md:py-12">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div
+            data-reveal
+            className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"
+          >
             <div>
               <p className="kicker">{t(p.block("home.upcomingKicker", HOME.upcomingKicker))}</p>
               <h2 id="home-upcoming" className="display mt-4 text-3xl md:mt-5 md:text-5xl">
@@ -490,6 +493,7 @@ function Index() {
                   目的地，外部售票連結留在詳情頁上，由那一頁自己決定要不要顯示。 */}
               <div
                 data-home-events
+                data-reveal-stagger
                 className={`${eventsLayout.grid} ${railFor(featuredEvents.length).track}`}
               >
                 {featuredEvents.map((e) => (
@@ -561,6 +565,7 @@ function Index() {
               />
               <div
                 data-home-journeys
+                data-reveal-stagger
                 className={`${journeysLayout.grid} ${railFor(featuredJourneys.length).track}`}
               >
                 {featuredJourneys.map((j) => {
@@ -651,7 +656,7 @@ function Index() {
           讀不到就不印數字（不顯示 0），封面區整塊不畫。 */}
       <section className="bg-oat/80 border-y border-border" aria-labelledby="home-archive">
         <div className="container-editorial section-y grid gap-14 lg:grid-cols-12 lg:gap-16 lg:items-center">
-          <div className="lg:col-span-5">
+          <div data-reveal className="lg:col-span-5">
             <p className="kicker">{t(p.block("home.archiveKicker", HOME.archiveKicker))}</p>
             {counts ? (
               <p className="mt-8 flex items-baseline gap-4">
@@ -677,7 +682,10 @@ function Index() {
             </PublicationsLink>
           </div>
           {archive.covers.length > 0 ? (
-            <ul className="-mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-6 px-6 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-6 sm:overflow-visible sm:px-0 lg:col-span-7 [&::-webkit-scrollbar]:hidden">
+            <ul
+              data-reveal-stagger
+              className="-mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-6 px-6 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-6 sm:overflow-visible sm:px-0 lg:col-span-7 [&::-webkit-scrollbar]:hidden"
+            >
               {archive.covers.map((c, i) => (
                 <li
                   key={c.slug}
@@ -727,7 +735,10 @@ function Index() {
           讀不到任何一件（讀取失敗或全部售完）時退回原本的單張意象圖，不開天窗。 */}
       {shelfProducts.length > 0 ? (
         <section className="container-editorial section-y" data-testid="home-curated">
-          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between md:gap-12">
+          <div
+            data-reveal
+            className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between md:gap-12"
+          >
             <div>
               <p className="kicker">{t(ui.nav.curated)}</p>
               <h2 className="display mt-5 text-3xl md:text-[2.6rem] leading-[1.3] whitespace-pre-line">
@@ -756,7 +767,7 @@ function Index() {
         </section>
       ) : (
         <section className="container-editorial section-y">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
+          <div data-reveal-stagger className="grid md:grid-cols-2 gap-12 items-center">
             <div>
               <p className="kicker">{t(ui.nav.curated)}</p>
               <h2 className="display mt-5 text-3xl md:text-[2.6rem] leading-[1.3] whitespace-pre-line">
@@ -832,13 +843,13 @@ function Index() {
           不再疊整段 section 留白（疊起來桌機會空約 230px）。 */}
       <section className="container-editorial pb-12 md:pb-16" aria-labelledby="home-pillars">
         <div className="border-t border-border pt-16">
-          <div className="max-w-2xl">
+          <div data-reveal className="max-w-2xl">
             <p className="kicker">{t(p.block("home.pillarsKicker", HOME.pillarsKicker))}</p>
             <h2 id="home-pillars" className="display mt-5 text-3xl md:text-5xl">
               {t(p.block("home.pillarsTitle", HOME.pillarsTitle))}
             </h2>
           </div>
-          <ul className="mt-14 grid gap-12 md:grid-cols-3 md:gap-8 lg:gap-12">
+          <ul data-reveal-stagger className="mt-14 grid gap-12 md:grid-cols-3 md:gap-8 lg:gap-12">
             {pillars.map((pl) => (
               <li key={pl.key}>
                 <Link

@@ -514,6 +514,7 @@ function Events() {
         <section
           className={`container-editorial pb-32 ${view === null ? "hidden md:block" : ""}`}
           data-testid="events-calendar-section"
+          data-reveal
         >
           <EventsCalendar
             entries={filterByKind(calendar.entries, type)}
@@ -543,7 +544,7 @@ function Events() {
                   aria-label={t(SECTION_LABELS.journey)}
                 >
                   {sectioned ? <SectionHeading label={t(SECTION_LABELS.journey)} /> : null}
-                  <div className={`${journeyLayout.grid} ${journeyRail.track}`}>
+                  <div data-reveal-stagger className={`${journeyLayout.grid} ${journeyRail.track}`}>
                     {journeyList.map((j, i) => {
                       const linked = linkedEventFor(j.externalUrl, journeyEvents);
                       return (
@@ -579,7 +580,7 @@ function Events() {
                   aria-label={t(SECTION_LABELS.event)}
                 >
                   {sectioned ? <SectionHeading label={t(SECTION_LABELS.event)} /> : null}
-                  <div className={`${eventLayout.grid} ${eventRail.track}`}>
+                  <div data-reveal-stagger className={`${eventLayout.grid} ${eventRail.track}`}>
                     {eventList.map((e, i) => (
                       // 整張卡片不是連結（唯一的連結是底下那顆「活動詳情」），所以不加 CARD_HOVER。
                       <article
@@ -672,7 +673,10 @@ function Events() {
       {/* 策旅合作共創（原 /journeys 頁尾）。只在看策旅時出現；文案讀 pages/'journeys' 的區塊。 */}
       {type === "journey" ? (
         <section className="container-editorial pb-32" data-testid="events-journey-cocreate">
-          <div className="border-t border-border pt-16 grid md:grid-cols-2 gap-10">
+          <div
+            data-reveal-stagger
+            className="border-t border-border pt-16 grid md:grid-cols-2 gap-10"
+          >
             <div>
               <p className="eyebrow text-2xl">
                 {t(jp.block("coCreateEyebrow", JOURNEY_COPY.coCreateEyebrow))}

@@ -18,6 +18,7 @@ import { applyAdminRouteCacheDefaults, registerAdminCacheRouter } from "@/lib/ad
 import { registerAdminDetailNav } from "@/lib/admin/detail-nav";
 import { createLangRewrite, registerClientLangRewrite } from "@/lib/i18n-rewrite";
 import { localizeHref, publicLangOf } from "@/lib/seo/i18n";
+import { prefersReducedMotion, shouldPageTransition } from "@/lib/motion";
 
 /**
  * 部署之後還開著的分頁會壞：頁面記得的是上一版的程式檔名，而 Vercel 每次部署都是一整組新的
@@ -194,6 +195,17 @@ export const getRouter = () => {
     registerAdminCacheRouter(router);
     // 後台內頁「← 回到列表」判斷能不能直接按上一頁（見 src/lib/admin/detail-nav.ts）。
     registerAdminDetailNav(router);
+    // 換頁過場（View Transitions，規則見 src/lib/motion.ts）：每次換頁前依「從哪裡到哪裡」決定這次
+    // 播不播。router 在 onBeforeNavigate 之後才讀 defaultViewTransition；瀏覽器不支援
+    // document.startViewTransition（舊版 Safari、Firefox）時 router 自己會直接換頁，不做 polyfill。
+    // router.invalidate()（只重跑 loader）會把這次設成 false，不會在同一頁閃一下。
+    router.subscribe("onBeforeNavigate", ({ fromLocation, toLocation }) => {
+      router.options.defaultViewTransition = shouldPageTransition({
+        fromPath: fromLocation?.pathname,
+        toPath: toLocation.pathname,
+        reducedMotion: prefersReducedMotion(),
+      });
+    });
   }
 
   return router;

@@ -69,6 +69,7 @@ export function SwipeRail({ count, label, children, className = "" }: Props) {
     <div className={className}>
       <div
         ref={ref}
+        data-reveal-stagger
         role="region"
         aria-label={t(label)}
         tabIndex={state.scrollable ? 0 : -1}

@@ -170,6 +170,7 @@ export function ProductsPanel({
           id="product-grid"
           className="container-editorial pb-24 md:pb-32 grid grid-cols-2 gap-x-3 gap-y-5 scroll-mt-28 md:gap-8 lg:grid-cols-3"
           data-testid="product-grid"
+          data-reveal-stagger
         >
           {list.map((prod) => {
             const soldOut = isSoldOut(prod);

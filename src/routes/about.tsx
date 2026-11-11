@@ -338,6 +338,7 @@ function About() {
       <section
         className="container-editorial pb-24 grid md:grid-cols-2 gap-12 items-center"
         data-testid="about-story"
+        data-reveal-stagger
       >
         <div className="aspect-[4/5] overflow-hidden bg-muted">
           {/* 首屏圖：不 lazy（lazy 會拖慢 LCP）、WebP srcset（2026-11 SEO 健檢 M5）。 */}
@@ -372,7 +373,7 @@ function About() {
       />
 
       {/* 2) 我們做的事 */}
-      <section className="container-editorial pb-24" data-testid="about-work">
+      <section className="container-editorial pb-24" data-testid="about-work" data-reveal>
         <h2 className="display text-3xl md:text-4xl border-t border-border pt-12">
           {t(p.block("workTitle", PAGE.workTitle))}
         </h2>
@@ -396,7 +397,7 @@ function About() {
       </section>
 
       {/* 3) 空間 */}
-      <section className="container-editorial pb-24" data-testid="about-space">
+      <section className="container-editorial pb-24" data-testid="about-space" data-reveal>
         <p className="eyebrow text-2xl border-t border-border pt-12">
           {t(p.block("spaceTitle", PAGE.spaceTitle))}
         </p>
@@ -422,7 +423,7 @@ function About() {
       </section>
 
       {/* 3.5) 異業合作入口 */}
-      <section className="container-editorial pb-24" data-testid="about-partnership">
+      <section className="container-editorial pb-24" data-testid="about-partnership" data-reveal>
         <div className="border border-border bg-[oklch(0.97_0.012_82)] p-8 md:p-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div className="max-w-xl">
             <p className="eyebrow text-2xl">{t(p.block("partnerEyebrow", PAGE.partnerEyebrow))}</p>
@@ -445,7 +446,7 @@ function About() {
       {/* ─── 以下整段來自舊的 /visit ───────────────────────────────────── */}
 
       {/* 4) 地圖 */}
-      <section className="container-editorial pb-16 pt-12" data-testid="about-map">
+      <section className="container-editorial pb-16 pt-12" data-testid="about-map" data-reveal>
         <div className="aspect-[16/9] bg-muted">
           <iframe src={map.embed} className="h-full w-full border-0" loading="lazy" title="Map" />
         </div>
@@ -455,6 +456,7 @@ function About() {
       <section
         className="container-editorial pb-16 grid gap-12 md:grid-cols-2"
         data-testid="about-address"
+        data-reveal-stagger
       >
         <div>
           <p className="eyebrow text-2xl">{t(pv.block("address", VISIT.address))}</p>
@@ -469,7 +471,7 @@ function About() {
       </section>
 
       {/* 6) 一鍵導航 */}
-      <section className="container-editorial pb-20">
+      <section className="container-editorial pb-20" data-reveal>
         <div className="border border-border bg-[oklch(0.97_0.012_82)] p-8 md:p-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div className="max-w-md">
             <p className="eyebrow text-2xl">
@@ -503,10 +505,10 @@ function About() {
 
       {/* 7) 交通方式 */}
       <section className="container-editorial pb-24" data-testid="about-transport">
-        <p className="eyebrow text-2xl border-t border-border pt-12">
+        <p data-reveal className="eyebrow text-2xl border-t border-border pt-12">
           {t(pv.block("transport", VISIT.transport))}
         </p>
-        <div className="mt-10 grid gap-12 md:grid-cols-2 lg:grid-cols-4">
+        <div data-reveal-stagger className="mt-10 grid gap-12 md:grid-cols-2 lg:grid-cols-4">
           {/* Metro */}
           <div>
             <h3 className="font-serif text-xl">{t(pv.block("metro", VISIT.metro))}</h3>
@@ -565,6 +567,7 @@ function About() {
       <section
         className="container-editorial pb-32 grid gap-12 md:grid-cols-2"
         data-testid="about-contact"
+        data-reveal-stagger
       >
         <div>
           <p className="eyebrow text-2xl border-t border-border pt-12">

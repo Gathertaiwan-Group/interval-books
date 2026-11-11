@@ -17,6 +17,7 @@ import { fetchSiteContent, FALLBACK_SITE_CONTENT } from "@/lib/cms";
 import { isBackOfficePath } from "@/lib/admin/back-office-path";
 import { SiteContentProvider, useSiteContent } from "@/lib/site-content";
 import { ReferralCapture } from "@/components/ReferralCapture";
+import { MotionController } from "@/components/MotionController";
 import { absoluteUrl, isNoindexPath, siteGraphLd } from "@/lib/seo/core";
 import { ld } from "@/lib/seo/head";
 import { LANG_AUTODETECT_SCRIPT } from "@/lib/lang-autodetect";
@@ -224,6 +225,7 @@ function RootComponent() {
     <SiteContentProvider value={site}>
       <LanguageProvider urlLang={urlLang}>
         <ReferralCapture />
+        <MotionController />
         <GaPageViews />
         <LanguageHint />
         <Outlet />
