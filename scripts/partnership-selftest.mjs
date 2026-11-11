@@ -494,6 +494,46 @@ console.log("\n[8] 收件匣（0042 partnership_inquiries、/admin/partnerships�
   check("預算標籤：空字串＝未填", inbox.inquiryBudgetLabel(""), "未填");
 }
 
+console.log("\n[9] 合作類型卡片：圖片＋橫滑（2026-11-11）");
+{
+  const imgs = await import(join(ROOT, "src/lib/collaboration-images.ts"));
+  const rail = await import(join(ROOT, "src/lib/card-rail.ts"));
+  const isKey = (k) =>
+    /^storage:[0-9a-f-]{36}\.(webp|jpg|jpeg|png)$/.test(k) || /^[a-z-]+\.jpg$/.test(k);
+  for (const id of ["co-1", "co-2", "co-3", "co-4"]) {
+    const m = imgs.COLLABORATION_IMAGES[id];
+    checkTrue(`${id}：有對照圖`, Boolean(m));
+    checkTrue(`${id}：imageKey 是內建檔名或 storage:`, isKey(m.imageKey));
+    checkTrue(
+      `${id}：alt 三語都有`,
+      ["zh", "en", "ja"].every((l) => typeof m.alt[l] === "string" && m.alt[l].trim().length >= 4),
+    );
+  }
+  check("沒對照的 id → 後備圖", imgs.collaborationImage("nope"), imgs.COLLABORATION_IMAGE_FALLBACK);
+  checkTrue(
+    "沒有熱連結外站圖",
+    !Object.values(imgs.COLLABORATION_IMAGES).some((m) => /^https?:/.test(m.imageKey)),
+  );
+  check("swipeRail：一張不滑", rail.swipeRail(1), { track: "", item: "" });
+  const r = rail.swipeRail(3);
+  checkTrue(
+    "swipeRail：桌機也橫滑（沒有 max-md: 前綴）",
+    r.track.includes(" flex ") && !r.track.includes("max-md:"),
+  );
+  checkTrue(
+    "swipeRail：手機 82%、snap",
+    r.item.includes("w-[82%]") && r.item.includes("snap-start"),
+  );
+  checkTrue(
+    "route：合作類型用 SwipeRail＋collaborationImage",
+    route.includes("<SwipeRail") && route.includes("collaborationImage(c.id)"),
+  );
+  checkTrue(
+    "route：合作類型的圖 lazy",
+    /collaborationImage[\s\S]{0,800}loading="lazy"/.test(route),
+  );
+}
+
 console.log(`\n${"─".repeat(52)}`);
 console.log(`##SELFTEST## file=${SELF} pass=${pass} fail=${fail}`);
 process.exit(fail === 0 ? 0 : 1);

@@ -31,7 +31,10 @@ import { pageRowTranslation } from "@/lib/seo/pages";
 import { fetchCollaborations, fetchPage, pageText, eyebrowOf } from "@/lib/cms";
 import type { PageListEntry } from "@/lib/cms";
 import { CARD } from "@/lib/feature-layout";
-import { imageFor } from "@/lib/images";
+import { imageFor, srcSetFor, storefront as storefrontImg } from "@/lib/images";
+import { collaborationImage } from "@/lib/collaboration-images";
+import { swipeRail } from "@/lib/card-rail";
+import { SwipeRail } from "@/components/SwipeRail";
 import { useSiteContent } from "@/lib/site-content";
 import {
   EMPTY_PARTNERSHIP_FORM,
@@ -343,6 +346,7 @@ function Partnership() {
   const steps = p.rows("steps", STEPS_FALLBACK);
   const faq = p.rows("faq", FAQ_FALLBACK);
   const cases = collaborations.slice(0, 3);
+  const caseRail = swipeRail(cases.length);
   const blank: Localized = { zh: "", en: "", ja: "" };
 
   return (
@@ -440,18 +444,42 @@ function Partnership() {
               {t(p.block("casesMore", PAGE.casesMore))} →
             </Link>
           </div>
-          <div className="mt-12 grid gap-8 md:grid-cols-3">
-            {cases.map((c) => (
-              <article key={c.id} className={CARD}>
-                <div className="flex flex-1 flex-col p-6">
-                  <h3 className="display text-xl leading-snug">{t(c.title)}</h3>
-                  <p className="mt-4 line-clamp-4 text-sm leading-relaxed text-foreground/75">
-                    {t(c.description)}
-                  </p>
-                </div>
-              </article>
-            ))}
-          </div>
+          {/* 2026-11-11 業主：卡片加圖、左右滑動。圖片對照在 src/lib/collaboration-images.ts
+              （collaborations 表沒有圖片欄位）；這一區在頁面中段，圖一律 lazy，不搶 LCP。 */}
+          <SwipeRail
+            count={cases.length}
+            label={p.block("casesTitle", PAGE.casesTitle)}
+            className="mt-12"
+          >
+            {cases.map((c) => {
+              const img = collaborationImage(c.id);
+              const src = imageFor(img.imageKey, storefrontImg);
+              return (
+                <article key={c.id} className={`${CARD} ${caseRail.item}`}>
+                  <div className="aspect-[4/3] overflow-hidden bg-muted">
+                    <img
+                      src={src}
+                      srcSet={srcSetFor(src)}
+                      sizes="(min-width: 1024px) 420px, (min-width: 768px) 44vw, 82vw"
+                      alt={t(img.alt)}
+                      loading="lazy"
+                      decoding="async"
+                      width={800}
+                      height={600}
+                      className="h-full w-full object-cover"
+                      style={img.position ? { objectPosition: img.position } : undefined}
+                    />
+                  </div>
+                  <div className="flex flex-1 flex-col p-6">
+                    <h3 className="display text-xl leading-snug">{t(c.title)}</h3>
+                    <p className="mt-4 line-clamp-4 text-sm leading-relaxed text-foreground/75">
+                      {t(c.description)}
+                    </p>
+                  </div>
+                </article>
+              );
+            })}
+          </SwipeRail>
         </section>
       )}
 
