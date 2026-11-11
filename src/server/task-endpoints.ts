@@ -247,3 +247,43 @@ export async function handleNotifyTask(req: Request): Promise<Response> {
 
   return json({ ok: true, backlog, reminders, flushed, purged });
 }
+
+// ---------------------------------------------------------------------------
+// POST /api/tasks/google-calendar —— 活動同步進業主的 Google 日曆（0060）
+// ---------------------------------------------------------------------------
+/**
+ * 發起者是資料庫：pg_cron 每 15 分鐘、以及後台存檔後，經 request_google_calendar_sync() 用
+ * pg_net 打這裡。那支 SQL 函式在「沒連結」時根本不送請求，所以功能停用時這條路徑不會被打到。
+ *
+ * 安全性與上面三條相同：密鑰在 `?k=`，缺密鑰 503、不符 404、常數時間比對。這條會**寫業主的
+ * Google 日曆**，所以一樣先擋掉掃描式請求才載入任何東西。
+ *
+ * 冪等：同步只會把日曆收斂到網站現況；同時被打兩次，第二次拿不到鎖、回 busy。
+ */
+export const GOOGLE_CALENDAR_TASK_PATH = "/api/tasks/google-calendar";
+
+export async function handleGoogleCalendarTask(req: Request): Promise<Response> {
+  if (req.method !== "POST" && req.method !== "GET") return text("method not allowed", 405);
+
+  const secret = process.env.TASKS_SECRET;
+  if (!secret) return text("service unavailable", 503);
+
+  let url: URL;
+  try {
+    url = new URL(req.url);
+  } catch {
+    return text("bad request", 400);
+  }
+  if (!secretMatches(url.searchParams.get("k"), secret)) return text("not found", 404);
+
+  const { runGoogleCalendarSync } = await import("@/server/google-calendar");
+  try {
+    const outcome = await runGoogleCalendarSync("cron");
+    return json({ ok: true, ...outcome });
+  } catch (err) {
+    console.warn(
+      `[tasks] google-calendar 失敗：${err instanceof Error ? err.message : String(err)}`,
+    );
+    return json({ ok: false, error: "sync failed" }, 500);
+  }
+}

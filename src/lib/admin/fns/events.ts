@@ -34,7 +34,10 @@ export const upsertEvent = createServerFn({ method: "POST" })
   .inputValidator(eventSchema)
   .handler(async ({ data }) => {
     const { upsertEvent } = await import("@/server/repos/events");
-    return await upsertEvent(data);
+    const result = await upsertEvent(data);
+    // 活動內容變了 → 請 Google 日曆同步跟上（非阻塞、永不 throw；見 src/server/google-calendar.ts）。
+    await (await import("@/server/google-calendar")).nudgeGoogleCalendarSync();
+    return result;
   });
 
 /**
@@ -63,7 +66,10 @@ export const upsertEventWithProduct = createServerFn({ method: "POST" })
       EVENT_LIST_FIELDS.filter((f) => rest[f] !== undefined).map((f) => [f, rest[f]]),
     );
     const event = { ...rest, lists };
-    return await upsertEventWithProduct(event, product ?? null);
+    const result = await upsertEventWithProduct(event, product ?? null);
+    // 活動內容變了 → 請 Google 日曆同步跟上（非阻塞、永不 throw；見 src/server/google-calendar.ts）。
+    await (await import("@/server/google-calendar")).nudgeGoogleCalendarSync();
+    return result;
   });
 
 /**
@@ -77,7 +83,10 @@ export const createEventQuick = createServerFn({ method: "POST" })
   .inputValidator(eventQuickCreateSchema)
   .handler(async ({ data }) => {
     const { createEventQuick } = await import("@/server/event-quick-create");
-    return await createEventQuick(data);
+    const result = await createEventQuick(data);
+    // 活動內容變了 → 請 Google 日曆同步跟上（非阻塞、永不 throw；見 src/server/google-calendar.ts）。
+    await (await import("@/server/google-calendar")).nudgeGoogleCalendarSync();
+    return result;
   });
 
 /**
@@ -128,7 +137,10 @@ export const removeEvent = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { removeEvent } = await import("@/server/repos/events");
     await removeEvent(data.id);
-    return { ok: true };
+    const result = { ok: true };
+    // 活動內容變了 → 請 Google 日曆同步跟上（非阻塞、永不 throw；見 src/server/google-calendar.ts）。
+    await (await import("@/server/google-calendar")).nudgeGoogleCalendarSync();
+    return result;
   });
 
 /**
@@ -197,5 +209,8 @@ export const setEventStatus = createServerFn({ method: "POST" })
   .inputValidator(z.object({ id: z.string().trim().min(1), status: listingStatusSchema }))
   .handler(async ({ data }) => {
     const { setEventStatus } = await import("@/server/repos/events");
-    return await setEventStatus(data.id, data.status);
+    const result = await setEventStatus(data.id, data.status);
+    // 活動內容變了 → 請 Google 日曆同步跟上（非阻塞、永不 throw；見 src/server/google-calendar.ts）。
+    await (await import("@/server/google-calendar")).nudgeGoogleCalendarSync();
+    return result;
   });

@@ -262,8 +262,48 @@ export function distinctSessionTitle(sessionTitle: string, eventTitle: string): 
 
 export type BuiltVevent = { uid: string; startMs: number; lines: string[] };
 
-/** 組出所有要輸出的 VEVENT（已排序）。 */
-export function buildVevents(input: CalendarInput): BuiltVevent[] {
+/**
+ * 一筆要上日曆的事件 —— /calendar.ics 與 Google 日曆同步（src/lib/google-calendar-sync.ts）
+ * 共用的中間形狀。哪些活動／場次要出現、標題、時間、地點、描述的規則**只寫在
+ * buildCalendarEntries() 這一份**；兩個輸出端只負責換成自己的格式。
+ */
+export type CalendarEntry = {
+  /** 穩定對應鍵："session:<event_sessions.id>" 或 "event:<events.id>"（沒有場次的全天事件）。 */
+  key: string;
+  /** iCalendar UID（"<場次 id>@intervalbooks.tw"／"event-<活動 id>@intervalbooks.tw"）。 */
+  uid: string;
+  /** true = 全天事件（startMs 是台北那一天 00:00，endMs 是次日 00:00）。 */
+  allDay: boolean;
+  startMs: number;
+  endMs: number;
+  /** 未跳脫的純文字。 */
+  summary: string;
+  /** 空字串 = 不輸出地點。 */
+  location: string;
+  /** 已截斷（DESCRIPTION_MAX_CHARS）、未跳脫的純文字。 */
+  description: string;
+  url: string;
+  /** 內容最後異動時間（DTSTAMP／LAST-MODIFIED）。 */
+  stampMs: number;
+  /** true = 不佔忙碌時段（全天事件）。 */
+  transparent: boolean;
+};
+
+export type CalendarEntryOptions = {
+  /** 名額那一行「截至 X 時尚餘 N 位」的 X。/calendar.ics 用「訂閱更新」，Google 同步用「同步」。 */
+  seatsAsOf?: string;
+};
+
+function registrationLine(event: CalEvent, url: string): string {
+  return `${event.registrationType === "external" && event.externalUrl ? "報名連結：" + event.externalUrl + "\n活動頁：" : "報名／詳情："}${url}`;
+}
+
+/** 組出所有要上日曆的事件（已排序）。規則見檔頭。 */
+export function buildCalendarEntries(
+  input: CalendarInput,
+  options: CalendarEntryOptions = {},
+): CalendarEntry[] {
+  const seatsAsOf = options.seatsAsOf ?? "訂閱更新";
   const isJourney = journeyEventMatcher(input.journeyUrls);
   const cutoff = input.now.getTime() - PAST_DAYS * DAY_MS;
   const sessionsByProduct = new Map<string, CalSession[]>();
@@ -279,7 +319,7 @@ export function buildVevents(input: CalendarInput): BuiltVevent[] {
     plansBySession.set(p.sessionId, list);
   }
 
-  const out: BuiltVevent[] = [];
+  const out: CalendarEntry[] = [];
   for (const event of input.events) {
     if (event.status !== "live") continue;
     const sessions = event.productId ? (sessionsByProduct.get(event.productId) ?? []) : [];
@@ -291,7 +331,7 @@ export function buildVevents(input: CalendarInput): BuiltVevent[] {
 
     // 沒有商品／沒有任何可用的場次時間 → 有 iso_date 就輸出一筆全天事件。
     if (!sessions.some((s) => parseMs(s.startsAt) !== null)) {
-      const allDay = buildAllDayVevent(event, journey, url, cutoff);
+      const allDay = buildAllDayEntry(event, journey, url, cutoff);
       if (allDay) out.push(allDay);
       continue;
     }
@@ -322,39 +362,58 @@ export function buildVevents(input: CalendarInput): BuiltVevent[] {
       if (price) desc.push(`票價：${price}`);
       if (event.registrationType === "internal" && s.capacity > 0) {
         const left = Math.max(0, s.capacity - s.seatsTaken);
-        desc.push(`名額：${s.capacity} 位（截至訂閱更新時尚餘 ${left} 位）`);
+        desc.push(`名額：${s.capacity} 位（截至${seatsAsOf}時尚餘 ${left} 位）`);
       }
-      desc.push(
-        `${event.registrationType === "external" && event.externalUrl ? "報名連結：" + event.externalUrl + "\n活動頁：" : "報名／詳情："}${url}`,
-      );
+      desc.push(registrationLine(event, url));
 
       const lastMod = maxIso([event.updatedAt, s.updatedAt, ...plans.map((p) => p.updatedAt)]);
-      const stampMs = lastMod ?? startMs;
-      const location = s.locationZh.trim() || input.storeAddress.trim();
-
-      const uid = `${s.id}@${UID_DOMAIN}`;
-      const props: Array<[string, string]> = [
-        ["UID", uid],
-        ["DTSTAMP", formatUtc(stampMs)],
-        ["LAST-MODIFIED", formatUtc(stampMs)],
-        ["DTSTART", formatUtc(startMs)],
-        ["DTEND", formatUtc(endMs)],
-        ["SUMMARY", escapeText(summary)],
-      ];
-      if (location) props.push(["LOCATION", escapeText(location)]);
-      props.push(["URL", url]);
-      props.push(["DESCRIPTION", escapeText(truncate(desc.join("\n"), DESCRIPTION_MAX_CHARS))]);
-      props.push(["STATUS", "CONFIRMED"], ["TRANSP", "OPAQUE"]);
-
       out.push({
-        uid,
+        key: `session:${s.id}`,
+        uid: `${s.id}@${UID_DOMAIN}`,
+        allDay: false,
         startMs,
-        lines: ["BEGIN:VEVENT", ...props.map(([k, v]) => `${k}:${v}`), "END:VEVENT"],
+        endMs,
+        summary,
+        location: s.locationZh.trim() || input.storeAddress.trim(),
+        description: truncate(desc.join("\n"), DESCRIPTION_MAX_CHARS),
+        url,
+        stampMs: lastMod ?? startMs,
+        transparent: false,
       });
     }
   }
   out.sort((a, b) => a.startMs - b.startMs || (a.uid < b.uid ? -1 : a.uid > b.uid ? 1 : 0));
   return out;
+}
+
+/** 組出所有要輸出的 VEVENT（已排序）。 */
+export function buildVevents(input: CalendarInput): BuiltVevent[] {
+  return buildCalendarEntries(input).map((e) => {
+    const props: Array<[string, string]> = [
+      ["UID", e.uid],
+      ["DTSTAMP", formatUtc(e.stampMs)],
+      ["LAST-MODIFIED", formatUtc(e.stampMs)],
+    ];
+    if (e.allDay) {
+      props.push(
+        ["DTSTART;VALUE=DATE", formatTaipeiDate(e.startMs)],
+        ["DTEND;VALUE=DATE", formatTaipeiDate(e.endMs)],
+      );
+    } else {
+      props.push(["DTSTART", formatUtc(e.startMs)], ["DTEND", formatUtc(e.endMs)]);
+    }
+    props.push(["SUMMARY", escapeText(e.summary)]);
+    if (e.location) props.push(["LOCATION", escapeText(e.location)]);
+    props.push(["URL", e.url]);
+    props.push(["DESCRIPTION", escapeText(e.description)]);
+    // 全天事件不佔用行事曆的忙碌時段。
+    props.push(["STATUS", "CONFIRMED"], ["TRANSP", e.transparent ? "TRANSPARENT" : "OPAQUE"]);
+    return {
+      uid: e.uid,
+      startMs: e.startMs,
+      lines: ["BEGIN:VEVENT", ...props.map(([k, v]) => `${k}:${v}`), "END:VEVENT"],
+    };
+  });
 }
 
 const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -371,17 +430,17 @@ function taipeiMidnightMs(isoDate: string | null | undefined): number | null {
 }
 
 /** UTC ms（某個台北午夜）→ "YYYYMMDD"（台北日期）。 */
-function formatTaipeiDate(ms: number): string {
+export function formatTaipeiDate(ms: number): string {
   return formatUtc(ms + TAIPEI_OFFSET_MS).slice(0, 8);
 }
 
 /** 沒有場次的上架活動 → 一筆全天事件（iso_date 那一天）。沒有 iso_date／太舊 → null。 */
-function buildAllDayVevent(
+function buildAllDayEntry(
   event: CalEvent,
   journey: boolean,
   url: string,
   cutoff: number,
-): BuiltVevent | null {
+): CalendarEntry | null {
   const startMs = taipeiMidnightMs(event.isoDate);
   if (startMs === null) return null;
   const endMs = startMs + DAY_MS;
@@ -392,29 +451,20 @@ function buildAllDayVevent(
   if (brief) desc.push(brief);
   const price = priceText(event, []);
   if (price) desc.push(`票價：${price}`);
-  desc.push(
-    `${event.registrationType === "external" && event.externalUrl ? "報名連結：" + event.externalUrl + "\n活動頁：" : "報名／詳情："}${url}`,
-  );
+  desc.push(registrationLine(event, url));
 
-  const stampMs = parseMs(event.updatedAt) ?? startMs;
-  const uid = `event-${event.id}@${UID_DOMAIN}`;
-  const props: Array<[string, string]> = [
-    ["UID", uid],
-    ["DTSTAMP", formatUtc(stampMs)],
-    ["LAST-MODIFIED", formatUtc(stampMs)],
-    ["DTSTART;VALUE=DATE", formatTaipeiDate(startMs)],
-    ["DTEND;VALUE=DATE", formatTaipeiDate(endMs)],
-    ["SUMMARY", escapeText(`${journey ? JOURNEY_PREFIX : ""}${event.titleZh.trim()}`)],
-    ["URL", url],
-    ["DESCRIPTION", escapeText(truncate(desc.join("\n"), DESCRIPTION_MAX_CHARS))],
-    ["STATUS", "CONFIRMED"],
-    // 全天事件不佔用行事曆的忙碌時段。
-    ["TRANSP", "TRANSPARENT"],
-  ];
   return {
-    uid,
+    key: `event:${event.id}`,
+    uid: `event-${event.id}@${UID_DOMAIN}`,
+    allDay: true,
     startMs,
-    lines: ["BEGIN:VEVENT", ...props.map(([k, v]) => `${k}:${v}`), "END:VEVENT"],
+    endMs,
+    summary: `${journey ? JOURNEY_PREFIX : ""}${event.titleZh.trim()}`,
+    location: "",
+    description: truncate(desc.join("\n"), DESCRIPTION_MAX_CHARS),
+    url,
+    stampMs: parseMs(event.updatedAt) ?? startMs,
+    transparent: true,
   };
 }
 

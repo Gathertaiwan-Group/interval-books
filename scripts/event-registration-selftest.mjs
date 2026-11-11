@@ -417,7 +417,12 @@ assertMigrationDependencies(check, MIG_DIR, {
   // order_total 兩欄；既有欄位與其他付款方式的語意不變——這支的斷言照樣成立。
   // 0059 重審：admin_event_roster 只在最後加 ticket_price 等四欄（left join order_items／
   // event_session_plans），既有十八欄與 on_roster 定義不動——這支的斷言照樣成立。
-  reviewedThrough: "0059_roster_ticket_price.sql",
+  // 0060（Google 日曆同步）重審：cron_jobs 區只**新增**一個 job sync-google-calendar（'9-54/15'，
+  //   不存在才建，to_regprocedure 守衛），指令是 request_google_calendar_sync()——沒連結時直接
+  //   return null。既有 expire-unpaid-orders、dispatch-invoice-task、dispatch-notify-task、
+  //   ib_mcp_oauth_used_codes_purge 的名稱、排程、指令都沒動；分鐘 9,24,39,54 不在 */5、3-53/10、
+  //   6-56/10、17 任何一個 tick 上。其他區域一個都沒碰——這支的斷言照樣成立。
+  reviewedThrough: "0060_google_calendar_sync.sql",
 });
 for (const f of [
   "0004_commerce_products.sql",

@@ -59,6 +59,9 @@
  *   /calendar.ics          iCalendar 訂閱網址（書店的 Google 日曆「透過網址訂閱」）。呼叫者是
  *                          Google 日曆的伺服器，要的是 text/calendar；內容即時從資料庫組出
  *                          （src/server/calendar.ts），CDN 快取 15 分鐘。不進 sitemap。
+ *   GOOGLE_CALENDAR_TASK_PATH  活動同步進業主的 Google 日曆（0060）。發起者同樣是資料庫
+ *                          （pg_cron 每 15 分鐘＋後台存檔後的 request_google_calendar_sync()），
+ *                          帶共享密鑰、沒有 cookie。src/server/google-calendar.ts。
  *   /robots.txt、/sitemap.xml  搜尋引擎要的兩個檔（2026-11 SEO 健檢 H1）。呼叫者是爬蟲，
  *                          要的是純文字／XML 而不是 HTML 頁面；sitemap 要即時從資料庫列出
  *                          所有公開網址（src/server/sitemap.ts）。
@@ -79,6 +82,7 @@ import { isOAuthDiscoveryPath, MCP_PATH } from "@/server/mcp/core";
 import { OAUTH_ENDPOINT_PATHS } from "@/server/mcp/oauth-paths";
 import { PAYUNI_WEBHOOK_PATH } from "@/server/payuni";
 import {
+  GOOGLE_CALENDAR_TASK_PATH,
   INVOICE_TASK_PATH,
   NOTIFY_TASK_PATH,
   PURGE_SCANS_TASK_PATH,
@@ -157,6 +161,11 @@ export default {
     if (OAUTH_ENDPOINT_PATHS.includes(pathname)) {
       const { handleOAuthEndpoint } = await import("@/server/mcp/oauth");
       return handleOAuthEndpoint(request, pathname);
+    }
+
+    if (pathname === GOOGLE_CALENDAR_TASK_PATH) {
+      const { handleGoogleCalendarTask } = await import("@/server/task-endpoints");
+      return handleGoogleCalendarTask(request);
     }
 
     if (pathname === NOTIFY_TASK_PATH) {

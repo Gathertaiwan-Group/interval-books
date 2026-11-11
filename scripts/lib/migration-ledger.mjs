@@ -944,6 +944,13 @@ export const MIGRATION_LEDGER = Object.freeze([
       "session_plans",
     ],
   },
+  {
+    file: "0060_google_calendar_sync.sql",
+    note: "活動同步進業主的 Google 日曆：新表 public.google_calendar_sync（單列 id=1：AES-GCM 加密的 refresh token、寫入的日曆、同步鎖、最後一次結果；RLS 開、無 policy、只 grant service_role）；三支 security definer 函式 claim_google_calendar_sync／finish_google_calendar_sync／request_google_calendar_sync（後者沒連結就 return null 不送 HTTP，有連結才以 vault 的 google_calendar_sync_endpoint_url＋tasks_secret 經 pg_net 打 /api/tasks/google-calendar），只 grant service_role；vault 端點網址不存在才建；pg_cron 'sync-google-calendar' 9-54/15 不存在才建（to_regprocedure 守衛）。沒有碰任何既有的表或函式",
+    // touches 是用 AREAS 的識別字實際掃過剝掉註解的 SQL 算出來的：cron_jobs（cron.schedule、cron.job、
+    // to_regprocedure）。其他區域的識別字一個都沒有出現。
+    touches: ["cron_jobs"],
+  },
 ]);
 
 /**

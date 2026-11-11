@@ -72,7 +72,10 @@ export const upsertEventSession = createServerFn({ method: "POST" })
   .inputValidator(eventSessionSchema)
   .handler(async ({ data }) => {
     const { upsertEventSession } = await import("@/server/repos/event-sessions");
-    return await upsertEventSession(data);
+    const result = await upsertEventSession(data);
+    // 活動內容變了 → 請 Google 日曆同步跟上（非阻塞、永不 throw；見 src/server/google-calendar.ts）。
+    await (await import("@/server/google-calendar")).nudgeGoogleCalendarSync();
+    return result;
   });
 
 /**
@@ -89,7 +92,10 @@ export const removeEventSession = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { removeEventSession } = await import("@/server/repos/event-sessions");
     await removeEventSession(data.id);
-    return { ok: true };
+    const result = { ok: true };
+    // 活動內容變了 → 請 Google 日曆同步跟上（非阻塞、永不 throw；見 src/server/google-calendar.ts）。
+    await (await import("@/server/google-calendar")).nudgeGoogleCalendarSync();
+    return result;
   });
 
 // -----------------------------------------------------------------------------
@@ -118,7 +124,10 @@ export const upsertEventSessionPlan = createServerFn({ method: "POST" })
   .inputValidator(eventSessionPlanSchema)
   .handler(async ({ data }) => {
     const { upsertEventSessionPlan } = await import("@/server/repos/event-sessions");
-    return await upsertEventSessionPlan(data);
+    const result = await upsertEventSessionPlan(data);
+    // 活動內容變了 → 請 Google 日曆同步跟上（非阻塞、永不 throw；見 src/server/google-calendar.ts）。
+    await (await import("@/server/google-calendar")).nudgeGoogleCalendarSync();
+    return result;
   });
 
 /**
@@ -134,7 +143,10 @@ export const removeEventSessionPlan = createServerFn({ method: "POST" })
   .inputValidator(z.object({ id: z.string().trim().min(1) }))
   .handler(async ({ data }) => {
     const { removeEventSessionPlan } = await import("@/server/repos/event-sessions");
-    return await removeEventSessionPlan(data.id);
+    const result = await removeEventSessionPlan(data.id);
+    // 活動內容變了 → 請 Google 日曆同步跟上（非阻塞、永不 throw；見 src/server/google-calendar.ts）。
+    await (await import("@/server/google-calendar")).nudgeGoogleCalendarSync();
+    return result;
   });
 
 // ---------------------------------------------------------------------------

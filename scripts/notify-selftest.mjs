@@ -397,7 +397,12 @@ assertMigrationDependencies(check, MIG_DIR, {
   // order_total 兩欄；既有欄位與其他付款方式的語意不變——這支的斷言照樣成立。
   // 0059 重審：admin_event_roster 只在最後加 ticket_price 等四欄（left join order_items／
   // event_session_plans），既有十八欄與 on_roster 定義不動——這支的斷言照樣成立。
-  reviewedThrough: "0059_roster_ticket_price.sql",
+  // 0060（Google 日曆同步）重審：cron_jobs 區只**新增**一個 job sync-google-calendar（'9-54/15'，
+  //   不存在才建，to_regprocedure 守衛），指令是 request_google_calendar_sync()——沒連結時直接
+  //   return null。既有 expire-unpaid-orders、dispatch-invoice-task、dispatch-notify-task、
+  //   ib_mcp_oauth_used_codes_purge 的名稱、排程、指令都沒動；分鐘 9,24,39,54 不在 */5、3-53/10、
+  //   6-56/10、17 任何一個 tick 上。其他區域一個都沒碰——這支的斷言照樣成立。
+  reviewedThrough: "0060_google_calendar_sync.sql",
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -978,6 +983,9 @@ const paths = [
   // 遠端 MCP server（/api/mcp）。呼叫者是 AI 客戶端，說 MCP 的 JSON-RPC、帶 Bearer
   // token 不帶 cookie —— 一樣是「沒有瀏覽器 session 的呼叫者」，createServerFn 表達不了。
   "MCP_PATH",
+  // 活動同步進業主的 Google 日曆（0060）。發起者是資料庫（pg_cron＋存檔後的
+  // request_google_calendar_sync()，經 pg_net），帶共享密鑰、沒有 cookie。
+  "GOOGLE_CALENDAR_TASK_PATH",
 ];
 for (const p of paths) {
   checkTrue(`${p} 有被攔`, new RegExp(`pathname === ${p}`).test(serverCode));

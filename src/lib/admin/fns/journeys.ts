@@ -29,7 +29,10 @@ export const upsertJourney = createServerFn({ method: "POST" })
   .inputValidator(journeySchema)
   .handler(async ({ data }) => {
     const { upsertJourney } = await import("@/server/repos/journeys");
-    return await upsertJourney(data);
+    const result = await upsertJourney(data);
+    // 活動內容變了 → 請 Google 日曆同步跟上（非阻塞、永不 throw；見 src/server/google-calendar.ts）。
+    await (await import("@/server/google-calendar")).nudgeGoogleCalendarSync();
+    return result;
   });
 
 export const removeJourney = createServerFn({ method: "POST" })
@@ -38,7 +41,10 @@ export const removeJourney = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { removeJourney } = await import("@/server/repos/journeys");
     await removeJourney(data.id);
-    return { ok: true };
+    const result = { ok: true };
+    // 活動內容變了 → 請 Google 日曆同步跟上（非阻塞、永不 throw；見 src/server/google-calendar.ts）。
+    await (await import("@/server/google-calendar")).nudgeGoogleCalendarSync();
+    return result;
   });
 
 /**
@@ -84,7 +90,10 @@ export const setJourneyStatus = createServerFn({ method: "POST" })
   .inputValidator(z.object({ id: z.string().trim().min(1), status: listingStatusSchema }))
   .handler(async ({ data }) => {
     const { setJourneyStatus } = await import("@/server/repos/journeys");
-    return await setJourneyStatus(data.id, data.status);
+    const result = await setJourneyStatus(data.id, data.status);
+    // 活動內容變了 → 請 Google 日曆同步跟上（非阻塞、永不 throw；見 src/server/google-calendar.ts）。
+    await (await import("@/server/google-calendar")).nudgeGoogleCalendarSync();
+    return result;
   });
 
 /** 0052：策旅編輯頁——卡片本身，加上它跟著哪一場活動（顯示「狀態跟著活動」用）。 */

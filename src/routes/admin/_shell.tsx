@@ -18,6 +18,7 @@ import {
   Handshake,
   Inbox,
   KeyRound,
+  CalendarSync,
   Landmark,
   LayoutDashboard,
   LogOut,
@@ -219,6 +220,8 @@ const NAV_GROUPS = [
       { to: "/admin/events", label: "活動", icon: CalendarDays, staff: false },
       // lucide's `Route` icon would collide with this file's `export const Route`.
       { to: "/admin/journeys", label: "策旅", icon: Tent, staff: false },
+      // 活動同步進業主的 Google 日曆（0060）。連結授權、選日曆、立即同步；只有 admin。
+      { to: "/admin/google-calendar", label: "Google 日曆同步", icon: CalendarSync, staff: false },
       // 2026-11-10 業主要求移除後台「最新消息」「講者」「旅程願望」「合作」四頁（只剩轉址回
       // /admin，資料與 MCP 工具保留），側欄項目一起拿掉。
       // /partnership 表單的收件匣（0042）。staff: false，真正擋人的是

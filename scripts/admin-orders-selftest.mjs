@@ -601,9 +601,10 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
     // 0058（名單含現場付款未收款）：只重建 admin_event_roster view。
     // 0059（名單 view 加每位的票價）：只重建 admin_event_roster view。
     //   四支都沒碰 admin_delete_order／admin_archive_order／admin_mark_order_paid（現場收款就是呼叫它）。
-    "supabase/migrations 剛好 59 個 .sql 檔（0001–0055 + 0056–0059 現場付款）",
+    // 0060（Google 日曆同步）：新表＋三支新函式＋一個新排程，沒碰任何訂單函式。
+    "supabase/migrations 剛好 60 個 .sql 檔（0001–0055 + 0056–0059 現場付款 + 0060 Google 日曆）",
     migFiles.length,
-    59,
+    60,
   );
 }
 

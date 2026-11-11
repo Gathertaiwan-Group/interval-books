@@ -52,6 +52,7 @@ import { Route as AdminShellCategoriesRouteImport } from './routes/admin/_shell.
 import { Route as AdminShellCollaborationsRouteImport } from './routes/admin/_shell.collaborations'
 import { Route as AdminShellCuratedRouteImport } from './routes/admin/_shell.curated'
 import { Route as AdminShellEventsRouteImport } from './routes/admin/_shell.events'
+import { Route as AdminShellGoogleCalendarRouteImport } from './routes/admin/_shell.google-calendar'
 import { Route as AdminShellInventoryAdjustmentsRouteImport } from './routes/admin/_shell.inventory-adjustments'
 import { Route as AdminShellInventoryCombosRouteImport } from './routes/admin/_shell.inventory-combos'
 import { Route as AdminShellInventoryCountRouteImport } from './routes/admin/_shell.inventory-count'
@@ -85,6 +86,7 @@ import { Route as AdminShellArtistsNewRouteImport } from './routes/admin/_shell.
 import { Route as AdminShellCollaborationsIdRouteImport } from './routes/admin/_shell.collaborations_.$id'
 import { Route as AdminShellCollaborationsNewRouteImport } from './routes/admin/_shell.collaborations_.new'
 import { Route as AdminShellEventsIdRouteImport } from './routes/admin/_shell.events.$id'
+import { Route as AdminShellGoogleCalendarCallbackRouteImport } from './routes/admin/_shell.google-calendar_.callback'
 import { Route as AdminShellInventoryAdjustmentsIdRouteImport } from './routes/admin/_shell.inventory-adjustments_.$id'
 import { Route as AdminShellInventoryCombosIdRouteImport } from './routes/admin/_shell.inventory-combos_.$id'
 import { Route as AdminShellInventoryCombosNewRouteImport } from './routes/admin/_shell.inventory-combos_.new'
@@ -343,6 +345,12 @@ const AdminShellEventsRoute = AdminShellEventsRouteImport.update({
   path: '/events',
   getParentRoute: () => AdminShellRoute,
 } as any)
+const AdminShellGoogleCalendarRoute =
+  AdminShellGoogleCalendarRouteImport.update({
+    id: '/google-calendar',
+    path: '/google-calendar',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
 const AdminShellInventoryAdjustmentsRoute =
   AdminShellInventoryAdjustmentsRouteImport.update({
     id: '/inventory-adjustments',
@@ -518,6 +526,12 @@ const AdminShellEventsIdRoute = AdminShellEventsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AdminShellEventsRoute,
 } as any)
+const AdminShellGoogleCalendarCallbackRoute =
+  AdminShellGoogleCalendarCallbackRouteImport.update({
+    id: '/google-calendar_/callback',
+    path: '/google-calendar/callback',
+    getParentRoute: () => AdminShellRoute,
+  } as any)
 const AdminShellInventoryAdjustmentsIdRoute =
   AdminShellInventoryAdjustmentsIdRouteImport.update({
     id: '/inventory-adjustments_/$id',
@@ -797,6 +811,7 @@ export interface FileRoutesByFullPath {
   '/admin/collaborations': typeof AdminShellCollaborationsRoute
   '/admin/curated': typeof AdminShellCuratedRoute
   '/admin/events': typeof AdminShellEventsRouteWithChildren
+  '/admin/google-calendar': typeof AdminShellGoogleCalendarRoute
   '/admin/inventory-adjustments': typeof AdminShellInventoryAdjustmentsRoute
   '/admin/inventory-combos': typeof AdminShellInventoryCombosRoute
   '/admin/inventory-count': typeof AdminShellInventoryCountRoute
@@ -831,6 +846,7 @@ export interface FileRoutesByFullPath {
   '/admin/collaborations/$id': typeof AdminShellCollaborationsIdRoute
   '/admin/collaborations/new': typeof AdminShellCollaborationsNewRoute
   '/admin/events/$id': typeof AdminShellEventsIdRoute
+  '/admin/google-calendar/callback': typeof AdminShellGoogleCalendarCallbackRoute
   '/admin/inventory-adjustments/$id': typeof AdminShellInventoryAdjustmentsIdRoute
   '/admin/inventory-combos/$id': typeof AdminShellInventoryCombosIdRouteWithChildren
   '/admin/inventory-combos/new': typeof AdminShellInventoryCombosNewRoute
@@ -914,6 +930,7 @@ export interface FileRoutesByTo {
   '/admin/collaborations': typeof AdminShellCollaborationsRoute
   '/admin/curated': typeof AdminShellCuratedRoute
   '/admin/events': typeof AdminShellEventsRouteWithChildren
+  '/admin/google-calendar': typeof AdminShellGoogleCalendarRoute
   '/admin/inventory-adjustments': typeof AdminShellInventoryAdjustmentsRoute
   '/admin/inventory-combos': typeof AdminShellInventoryCombosRoute
   '/admin/inventory-count': typeof AdminShellInventoryCountRoute
@@ -948,6 +965,7 @@ export interface FileRoutesByTo {
   '/admin/collaborations/$id': typeof AdminShellCollaborationsIdRoute
   '/admin/collaborations/new': typeof AdminShellCollaborationsNewRoute
   '/admin/events/$id': typeof AdminShellEventsIdRoute
+  '/admin/google-calendar/callback': typeof AdminShellGoogleCalendarCallbackRoute
   '/admin/inventory-adjustments/$id': typeof AdminShellInventoryAdjustmentsIdRoute
   '/admin/inventory-combos/new': typeof AdminShellInventoryCombosNewRoute
   '/admin/inventory-products/new': typeof AdminShellInventoryProductsNewRoute
@@ -1030,6 +1048,7 @@ export interface FileRoutesById {
   '/admin/_shell/collaborations': typeof AdminShellCollaborationsRoute
   '/admin/_shell/curated': typeof AdminShellCuratedRoute
   '/admin/_shell/events': typeof AdminShellEventsRouteWithChildren
+  '/admin/_shell/google-calendar': typeof AdminShellGoogleCalendarRoute
   '/admin/_shell/inventory-adjustments': typeof AdminShellInventoryAdjustmentsRoute
   '/admin/_shell/inventory-combos': typeof AdminShellInventoryCombosRoute
   '/admin/_shell/inventory-count': typeof AdminShellInventoryCountRoute
@@ -1064,6 +1083,7 @@ export interface FileRoutesById {
   '/admin/_shell/collaborations_/$id': typeof AdminShellCollaborationsIdRoute
   '/admin/_shell/collaborations_/new': typeof AdminShellCollaborationsNewRoute
   '/admin/_shell/events/$id': typeof AdminShellEventsIdRoute
+  '/admin/_shell/google-calendar_/callback': typeof AdminShellGoogleCalendarCallbackRoute
   '/admin/_shell/inventory-adjustments_/$id': typeof AdminShellInventoryAdjustmentsIdRoute
   '/admin/_shell/inventory-combos_/$id': typeof AdminShellInventoryCombosIdRouteWithChildren
   '/admin/_shell/inventory-combos_/new': typeof AdminShellInventoryCombosNewRoute
@@ -1151,6 +1171,7 @@ export interface FileRouteTypes {
     | '/admin/collaborations'
     | '/admin/curated'
     | '/admin/events'
+    | '/admin/google-calendar'
     | '/admin/inventory-adjustments'
     | '/admin/inventory-combos'
     | '/admin/inventory-count'
@@ -1185,6 +1206,7 @@ export interface FileRouteTypes {
     | '/admin/collaborations/$id'
     | '/admin/collaborations/new'
     | '/admin/events/$id'
+    | '/admin/google-calendar/callback'
     | '/admin/inventory-adjustments/$id'
     | '/admin/inventory-combos/$id'
     | '/admin/inventory-combos/new'
@@ -1268,6 +1290,7 @@ export interface FileRouteTypes {
     | '/admin/collaborations'
     | '/admin/curated'
     | '/admin/events'
+    | '/admin/google-calendar'
     | '/admin/inventory-adjustments'
     | '/admin/inventory-combos'
     | '/admin/inventory-count'
@@ -1302,6 +1325,7 @@ export interface FileRouteTypes {
     | '/admin/collaborations/$id'
     | '/admin/collaborations/new'
     | '/admin/events/$id'
+    | '/admin/google-calendar/callback'
     | '/admin/inventory-adjustments/$id'
     | '/admin/inventory-combos/new'
     | '/admin/inventory-products/new'
@@ -1383,6 +1407,7 @@ export interface FileRouteTypes {
     | '/admin/_shell/collaborations'
     | '/admin/_shell/curated'
     | '/admin/_shell/events'
+    | '/admin/_shell/google-calendar'
     | '/admin/_shell/inventory-adjustments'
     | '/admin/_shell/inventory-combos'
     | '/admin/_shell/inventory-count'
@@ -1417,6 +1442,7 @@ export interface FileRouteTypes {
     | '/admin/_shell/collaborations_/$id'
     | '/admin/_shell/collaborations_/new'
     | '/admin/_shell/events/$id'
+    | '/admin/_shell/google-calendar_/callback'
     | '/admin/_shell/inventory-adjustments_/$id'
     | '/admin/_shell/inventory-combos_/$id'
     | '/admin/_shell/inventory-combos_/new'
@@ -1805,6 +1831,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminShellEventsRouteImport
       parentRoute: typeof AdminShellRoute
     }
+    '/admin/_shell/google-calendar': {
+      id: '/admin/_shell/google-calendar'
+      path: '/google-calendar'
+      fullPath: '/admin/google-calendar'
+      preLoaderRoute: typeof AdminShellGoogleCalendarRouteImport
+      parentRoute: typeof AdminShellRoute
+    }
     '/admin/_shell/inventory-adjustments': {
       id: '/admin/_shell/inventory-adjustments'
       path: '/inventory-adjustments'
@@ -2035,6 +2068,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/events/$id'
       preLoaderRoute: typeof AdminShellEventsIdRouteImport
       parentRoute: typeof AdminShellEventsRoute
+    }
+    '/admin/_shell/google-calendar_/callback': {
+      id: '/admin/_shell/google-calendar_/callback'
+      path: '/google-calendar/callback'
+      fullPath: '/admin/google-calendar/callback'
+      preLoaderRoute: typeof AdminShellGoogleCalendarCallbackRouteImport
+      parentRoute: typeof AdminShellRoute
     }
     '/admin/_shell/inventory-adjustments_/$id': {
       id: '/admin/_shell/inventory-adjustments_/$id'
@@ -2436,6 +2476,7 @@ interface AdminShellRouteChildren {
   AdminShellCollaborationsRoute: typeof AdminShellCollaborationsRoute
   AdminShellCuratedRoute: typeof AdminShellCuratedRoute
   AdminShellEventsRoute: typeof AdminShellEventsRouteWithChildren
+  AdminShellGoogleCalendarRoute: typeof AdminShellGoogleCalendarRoute
   AdminShellInventoryAdjustmentsRoute: typeof AdminShellInventoryAdjustmentsRoute
   AdminShellInventoryCombosRoute: typeof AdminShellInventoryCombosRoute
   AdminShellInventoryCountRoute: typeof AdminShellInventoryCountRoute
@@ -2467,6 +2508,7 @@ interface AdminShellRouteChildren {
   AdminShellArtistsNewRoute: typeof AdminShellArtistsNewRoute
   AdminShellCollaborationsIdRoute: typeof AdminShellCollaborationsIdRoute
   AdminShellCollaborationsNewRoute: typeof AdminShellCollaborationsNewRoute
+  AdminShellGoogleCalendarCallbackRoute: typeof AdminShellGoogleCalendarCallbackRoute
   AdminShellInventoryAdjustmentsIdRoute: typeof AdminShellInventoryAdjustmentsIdRoute
   AdminShellInventoryCombosIdRoute: typeof AdminShellInventoryCombosIdRouteWithChildren
   AdminShellInventoryCombosNewRoute: typeof AdminShellInventoryCombosNewRoute
@@ -2504,6 +2546,7 @@ const AdminShellRouteChildren: AdminShellRouteChildren = {
   AdminShellCollaborationsRoute: AdminShellCollaborationsRoute,
   AdminShellCuratedRoute: AdminShellCuratedRoute,
   AdminShellEventsRoute: AdminShellEventsRouteWithChildren,
+  AdminShellGoogleCalendarRoute: AdminShellGoogleCalendarRoute,
   AdminShellInventoryAdjustmentsRoute: AdminShellInventoryAdjustmentsRoute,
   AdminShellInventoryCombosRoute: AdminShellInventoryCombosRoute,
   AdminShellInventoryCountRoute: AdminShellInventoryCountRoute,
@@ -2535,6 +2578,7 @@ const AdminShellRouteChildren: AdminShellRouteChildren = {
   AdminShellArtistsNewRoute: AdminShellArtistsNewRoute,
   AdminShellCollaborationsIdRoute: AdminShellCollaborationsIdRoute,
   AdminShellCollaborationsNewRoute: AdminShellCollaborationsNewRoute,
+  AdminShellGoogleCalendarCallbackRoute: AdminShellGoogleCalendarCallbackRoute,
   AdminShellInventoryAdjustmentsIdRoute: AdminShellInventoryAdjustmentsIdRoute,
   AdminShellInventoryCombosIdRoute:
     AdminShellInventoryCombosIdRouteWithChildren,
