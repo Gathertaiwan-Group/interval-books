@@ -319,6 +319,7 @@ function Configured({ status }: { status: Extract<GoogleCalendarStatus, { config
                   <span className="ml-2">
                     共 {s.desired} 筆：新增 {s.inserted}、更新 {s.updated}、刪除 {s.removed}、未變{" "}
                     {s.unchanged}
+                    {s.kept ? `、保留歷史 ${s.kept}` : ""}
                   </span>
                 )}
               </dd>

@@ -226,7 +226,7 @@ export function createCalendarClient(
           privateExtendedProperty: `${GCAL_MANAGED_PROP}=1`,
           maxResults: "2500",
           showDeleted: "false",
-          fields: "items(id,status,extendedProperties),nextPageToken",
+          fields: "items(id,status,end,extendedProperties),nextPageToken",
         });
         if (pageToken) q.set("pageToken", pageToken);
         const res = await req(`${cal(calendarId)}?${q}`);

@@ -33,6 +33,7 @@ import {
 import {
   buildDesiredGoogleEvents,
   GoogleApiError,
+  historyCutoffMs,
   syncCalendar,
   type SyncResult,
 } from "@/lib/google-calendar-sync";
@@ -421,8 +422,12 @@ export async function runGoogleCalendarSync(
       if (!current.refresh_token_enc || !current.calendar_id) throw new Error("連結已被中斷");
       const token = await accessTokenFor(cfg, current);
       const { collectCalendarInput } = await import("@/server/calendar");
-      const desired = buildDesiredGoogleEvents(await collectCalendarInput());
-      const result = await syncCalendar(createCalendarClient(token), current.calendar_id, desired);
+      const input = await collectCalendarInput();
+      const desired = buildDesiredGoogleEvents(input);
+      // 90 天前的自有事件是歷史紀錄：保留在業主日曆，不刪（業主 2026-11-11 決定）。
+      const result = await syncCalendar(createCalendarClient(token), current.calendar_id, desired, {
+        keepEndedBeforeMs: historyCutoffMs(input.now),
+      });
       summary = result;
       ok = result.errors.length === 0;
       if (!ok) errorText = `${result.errors.length} 筆事件寫入失敗：${result.errors[0].message}`;

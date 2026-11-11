@@ -25,7 +25,12 @@
  * 留著已取消的那筆）就改成 patch 把它恢復。內容雜湊存在 intervalbooksHash，沒變就不打 API。
  */
 import { createHash } from "node:crypto";
-import { buildCalendarEntries, type CalendarEntry, type CalendarInput } from "./calendar-ics.ts";
+import {
+  buildCalendarEntries,
+  PAST_DAYS,
+  type CalendarEntry,
+  type CalendarInput,
+} from "./calendar-ics.ts";
 
 export const GCAL_MANAGED_PROP = "intervalbooksManaged";
 export const GCAL_KEY_PROP = "intervalbooksKey";
@@ -58,8 +63,33 @@ export type GoogleEventResource = {
 export type ExistingGoogleEvent = {
   id: string;
   status?: string;
+  /** 結束時間：判斷「已經是 90 天前的歷史」要用（見 planSync 的 keepEndedBeforeMs）。 */
+  end?: { dateTime?: string; date?: string };
   extendedProperties?: { private?: Record<string, string> };
 };
+
+/**
+ * 歷史保留的分界（業主 2026-11-11 決定）：結束時間早於「現在 − 90 天」的事件是歷史紀錄，
+ * **留在業主日曆上，既不新增也不刪除、也不再更新**。90 天與 /calendar.ics 的 PAST_DAYS 同一個數。
+ */
+export function historyCutoffMs(now: Date): number {
+  return now.getTime() - PAST_DAYS * 24 * 3600 * 1000;
+}
+
+/** Google 事件的結束時間（ms）。全天事件的 date 以台北午夜算；讀不出來 → null。 */
+export function eventEndMs(ev: ExistingGoogleEvent): number | null {
+  const dt = ev.end?.dateTime;
+  if (dt) {
+    const t = Date.parse(dt);
+    return Number.isNaN(t) ? null : t;
+  }
+  const d = ev.end?.date;
+  if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    const t = Date.parse(`${d}T00:00:00+08:00`);
+    return Number.isNaN(t) ? null : t;
+  }
+  return null;
+}
 
 /** 假 client 與真 client 共用的介面（src/server/google-calendar-api.ts 實作）。 */
 export interface CalendarClient {
@@ -181,15 +211,24 @@ export type SyncPlan = {
   unchanged: number;
   /** 帶了我們的屬性、但不符合 isOwnEvent 的事件數（不碰，只回報）。 */
   foreign: number;
+  /** 已經是歷史（結束早於 keepEndedBeforeMs）而保留不動的自有事件數。 */
+  kept: number;
 };
 
+/**
+ * keepEndedBeforeMs：結束時間早於它、又不在 desired 裡的自有事件 → 保留（歷史），不刪。
+ * 只有「範圍內」的自有事件不在 desired 裡（活動下架、場次被刪、活動被刪）才刪。
+ * 不給（換日曆、中斷連結的清空）→ 自有事件全部可刪。結束時間讀不出來 → 當成範圍內。
+ */
 export function planSync(
   desired: GoogleEventResource[],
   existing: ExistingGoogleEvent[],
+  options: { keepEndedBeforeMs?: number } = {},
 ): SyncPlan {
   const want = new Map(desired.map((d) => [d.id, d]));
   const seen = new Set<string>();
-  const plan: SyncPlan = { insert: [], update: [], remove: [], unchanged: 0, foreign: 0 };
+  const plan: SyncPlan = { insert: [], update: [], remove: [], unchanged: 0, foreign: 0, kept: 0 };
+  const keepBefore = options.keepEndedBeforeMs;
 
   for (const ev of existing) {
     if (!isOwnEvent(ev)) {
@@ -199,7 +238,9 @@ export function planSync(
     if (ev.status === "cancelled") continue; // 已取消：當作不存在（需要的話下面會重新 insert）
     const target = want.get(ev.id);
     if (!target) {
-      plan.remove.push(ev.id);
+      const end = eventEndMs(ev);
+      if (keepBefore !== undefined && end !== null && end < keepBefore) plan.kept++;
+      else plan.remove.push(ev.id);
       continue;
     }
     seen.add(ev.id);
@@ -223,6 +264,7 @@ export type SyncResult = {
   removed: number;
   unchanged: number;
   foreign: number;
+  kept: number;
   errors: Array<{ op: "insert" | "update" | "remove"; id: string; message: string }>;
 };
 
@@ -253,10 +295,10 @@ export async function syncCalendar(
   client: CalendarClient,
   calendarId: string,
   desired: GoogleEventResource[],
-  options: { concurrency?: number } = {},
+  options: { concurrency?: number; keepEndedBeforeMs?: number } = {},
 ): Promise<SyncResult> {
   const existing = await client.listManaged(calendarId);
-  const plan = planSync(desired, existing);
+  const plan = planSync(desired, existing, { keepEndedBeforeMs: options.keepEndedBeforeMs });
   const result: SyncResult = {
     calendarId,
     desired: desired.length,
@@ -265,6 +307,7 @@ export async function syncCalendar(
     removed: 0,
     unchanged: plan.unchanged,
     foreign: plan.foreign,
+    kept: plan.kept,
     errors: [],
   };
   const fail = (op: SyncResult["errors"][number]["op"], id: string, err: unknown) => {

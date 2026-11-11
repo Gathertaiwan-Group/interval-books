@@ -15,6 +15,8 @@ import {
   isValidGoogleEventId,
   isOwnEvent,
   planSync,
+  historyCutoffMs,
+  eventEndMs,
   syncCalendar,
   GoogleApiError,
   GCAL_MANAGED_PROP,
@@ -347,6 +349,7 @@ function fakeCalendar(initial = []) {
           .map((e) => ({
             id: e.id,
             status: e.status,
+            end: structuredClone(e.end),
             extendedProperties: structuredClone(e.extendedProperties),
           }));
       },
@@ -445,7 +448,9 @@ const forged = {
   const removed = fixture();
   removed.events = removed.events.map((e) => (e.id === "e2" ? { ...e, status: "archived" } : e));
   removed.sessions = removed.sessions.filter((s) => s.id !== "s2");
-  const r4 = await syncCalendar(cal.client, "cal-1", buildDesiredGoogleEvents(removed));
+  const r4 = await syncCalendar(cal.client, "cal-1", buildDesiredGoogleEvents(removed), {
+    keepEndedBeforeMs: historyCutoffMs(removed.now),
+  });
   check("下架＋場次刪除：刪兩筆", r4.removed, 2);
   checkTrue(
     "刪的正是那兩筆",
@@ -457,17 +462,74 @@ const forged = {
     cal.store.has(manual1.id) && cal.store.has(manual2.id) && cal.store.has(forged.id),
   );
 
-  // 超出範圍：時間往後推，s5（10/01）超過 90 天
+  // 超出範圍（業主 2026-11-11 決定：歷史保留）：時間往後推到 2027-01-05，分界 2026-10-07。
+  //   s5（10/01 結束）已是歷史 → 保留、不刪、不更新；
+  //   s1（11/28，仍在範圍內）同時被刪掉場次 → 照刪。
   const later = fixture({ now: new Date("2027-01-05T00:00:00Z") });
-  later.sessions = later.sessions.filter((s) => s.id !== "s2");
+  later.sessions = later.sessions.filter((s) => s.id !== "s2" && s.id !== "s1");
   later.events = later.events.map((e) => (e.id === "e2" ? { ...e, status: "archived" } : e));
-  const r5 = await syncCalendar(cal.client, "cal-1", buildDesiredGoogleEvents(later));
+  const s5Before = JSON.stringify(cal.store.get(googleEventIdForKey("session:s5")));
+  const callsBefore = cal.calls.length;
+  const r5 = await syncCalendar(cal.client, "cal-1", buildDesiredGoogleEvents(later), {
+    keepEndedBeforeMs: historyCutoffMs(later.now),
+  });
+  check(
+    "歷史分界 = now − 90 天",
+    new Date(historyCutoffMs(later.now)).toISOString(),
+    "2026-10-07T00:00:00.000Z",
+  );
+  checkTrue("超出 90 天的場次保留在日曆（歷史）", cal.store.has(googleEventIdForKey("session:s5")));
+  check(
+    "歷史事件內容一個字沒動",
+    JSON.stringify(cal.store.get(googleEventIdForKey("session:s5"))),
+    s5Before,
+  );
   checkTrue(
-    "超出 90 天的場次被刪",
-    !cal.store.has(googleEventIdForKey("session:s5")) && r5.removed >= 1,
+    "沒有對歷史事件發任何寫入",
+    !cal.calls
+      .slice(callsBefore)
+      .some(([op, id]) => op !== "list" && id === googleEventIdForKey("session:s5")),
+  );
+  // inserted 1：e1 的場次全被刪光 → 退回 iso_date 全天事件（與 /calendar.ics 同一規則）。
+  check("範圍內被刪的場次照刪、歷史計 kept", [r5.removed, r5.kept, r5.inserted], [1, 1, 1]);
+  checkTrue("e1 場次刪光 → 改成全天事件", cal.store.has(googleEventIdForKey("event:e1")));
+  checkTrue("範圍內被刪的 s1 不在了", !cal.store.has(googleEventIdForKey("session:s1")));
+
+  // 歷史事件之後被下架（活動 e4 archived）：照樣保留，不刪
+  const later2 = structuredClone(later);
+  later2.now = later.now;
+  later2.events = later2.events.map((e) => (e.id === "e4" ? { ...e, status: "archived" } : e));
+  const r5b = await syncCalendar(cal.client, "cal-1", buildDesiredGoogleEvents(later2), {
+    keepEndedBeforeMs: historyCutoffMs(later2.now),
+  });
+  checkTrue(
+    "歷史事件的活動下架 → 仍保留",
+    cal.store.has(googleEventIdForKey("session:s5")) && r5b.removed === 0,
   );
 
-  // 清空（換日曆／中斷連結）：desired = [] 只刪自己的
+  // 沒給 keepEndedBeforeMs（舊行為）→ 歷史也會被刪：證明保留是那個選項造成的，不是巧合
+  const plan0 = planSync([], [structuredClone(cal.store.get(googleEventIdForKey("session:s5")))]);
+  check("不給分界 → 可刪", plan0.remove.length, 1);
+  const plan1 = planSync([], [structuredClone(cal.store.get(googleEventIdForKey("session:s5")))], {
+    keepEndedBeforeMs: historyCutoffMs(later.now),
+  });
+  check("給分界 → 保留", [plan1.remove.length, plan1.kept], [0, 1]);
+  const ownNoEnd = {
+    ...structuredClone(cal.store.get(googleEventIdForKey("session:s5"))),
+    end: undefined,
+  };
+  check(
+    "結束時間讀不出來 → 當成範圍內（可刪）",
+    planSync([], [ownNoEnd], { keepEndedBeforeMs: historyCutoffMs(later.now) }).remove.length,
+    1,
+  );
+  check(
+    "全天事件 end.date 以台北午夜算",
+    eventEndMs({ id: "x", end: { date: "2026-12-11" } }),
+    Date.parse("2026-12-10T16:00:00Z"),
+  );
+
+  // 清空（換日曆／中斷連結）：desired = [] 只刪自己的——歷史事件也一起清（不給分界）
   const r6 = await syncCalendar(cal.client, "cal-1", []);
   check(
     "清空：剩下的都是業主的與偽造的",
@@ -727,6 +789,14 @@ console.log("[6] 設定");
     ),
   );
   checkTrue(
+    "定期同步帶歷史分界（90 天前的事件保留）",
+    /keepEndedBeforeMs: historyCutoffMs\(input\.now\)/.test(run),
+  );
+  checkTrue(
+    "清空（換日曆／中斷連結）不帶分界",
+    /syncCalendar\(createCalendarClient\(accessToken\), calendarId, \[\]\)/.test(gc),
+  );
+  checkTrue(
     "中斷連結在同步鎖裡清事件並刪列",
     /withSyncLock\("disconnect"[\s\S]*await work\(\);\s*await deleteRow\(\);/.test(
       fnBody("disconnectGoogleCalendar"),
@@ -792,6 +862,10 @@ console.log("[7] API");
     "list 用 privateExtendedProperty 篩選",
     listUrl.searchParams.get("privateExtendedProperty"),
     "intervalbooksManaged=1",
+  );
+  checkTrue(
+    "list 有取 end（歷史判斷要用）",
+    /items\(id,status,end,extendedProperties\)/.test(listUrl.searchParams.get("fields")),
   );
   checkTrue(
     "list 的日曆 id 有 URL 編碼",
