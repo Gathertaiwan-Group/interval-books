@@ -44,9 +44,9 @@ const PAGE = {
     ja: "セレクト｜小時光書店",
   },
   metaDescription: {
-    zh: "線上帶走一本台灣地方刊物：每一本都標上製作單位、價格與剩餘數量。更多刊物與主理人的選品，歡迎到華山的店裡翻閱。",
-    en: "Take home a local publication from Taiwan online — each listed with its maker, price and copies left. More titles and the owner's picks are waiting in our Huashan shop.",
-    ja: "台湾の地域の刊行物を、オンラインで一冊お持ち帰りに。発行元・価格・残り冊数を表示しています。そのほかの刊行物や店主の選品は、華山の店頭でどうぞ。",
+    zh: "線上帶走一本台灣地方刊物，或屏東潮州的冷壓麻油、花生醬等地方好物：每一件都標上價格與剩餘數量。更多刊物與主理人的選品，歡迎到華山的店裡翻閱。",
+    en: "Take home a local publication from Taiwan, or local goods like cold-pressed sesame oil and peanut butter from Chaozhou, Pingtung — each with price and stock left. More in our Huashan shop.",
+    ja: "台湾の地域の刊行物や、屏東・潮州の低温圧搾ごま油、ピーナッツバターなど土地の品をオンラインで。価格と残り数を表示しています。そのほかは華山の店頭でどうぞ。",
   },
   eyebrowSuffix: { zh: "選物", en: "Selection", ja: "セレクト" },
   title: {
@@ -55,11 +55,12 @@ const PAGE = {
     ja: "ひとときを、持ち帰る",
   },
   intro: {
-    zh: "線上可以帶走的，目前是台灣各地的地方刊物與選書；更多刊物與主理人的選品，歡迎到店翻閱。",
-    en: "What you can take home online, for now, is local publications and books from around Taiwan. For more titles and the owner's picks, come and browse in the shop.",
-    ja: "オンラインでお求めいただけるのは、いまのところ台湾各地の地域の刊行物と選書です。そのほかの刊行物や店主の選品は、ぜひ店頭で手に取ってご覧ください。",
+    zh: "線上可以帶走的，有台灣各地的地方刊物與選書，也有我們挑選的地方好物，例如屏東潮州的冷壓麻油與花生醬。更多刊物與主理人的選品，歡迎到店翻閱。",
+    en: "Online you can take home local publications and books from around Taiwan, along with local goods we've chosen — like cold-pressed sesame oil and peanut butter from Chaozhou, Pingtung. For more titles and the owner's picks, come and browse in the shop.",
+    ja: "オンラインでは、台湾各地の地域の刊行物や選書のほか、私たちが選んだ土地の品もお求めいただけます。たとえば屏東・潮州の低温圧搾ごま油やピーナッツバター。そのほかの刊行物や店主の選品は、ぜひ店頭で手に取ってご覧ください。",
   },
-  tabProducts: { zh: "書刊", en: "Books & zines", ja: "本と冊子" },
+  // 2026-11-11：這個分頁也有地方好物（goods），不再只叫「書刊」；分頁內用「全部／地方好物／書籍」篩選。
+  tabProducts: { zh: "書刊與好物", en: "Books & goods", ja: "本と土地の品" },
   tabPublications: { zh: "地方刊物", en: "Local Publications", ja: "地域の刊行物" },
   tabCurated: { zh: "主理人的選品", en: "Curated", ja: "店主の選品" },
   tabsLabel: { zh: "選物分頁", en: "Selection sections", ja: "セレクトの分類" },

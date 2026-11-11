@@ -164,7 +164,23 @@ for (const [needle, where] of [
 }
 checkTrue("策旅卡按鈕：看行程與報名", strings.includes('zh: "看行程與報名"'));
 checkTrue("首頁選品區標題：帶一本地方刊物回家", files.index.includes('zh: "帶一本地方刊物回家"'));
-checkTrue("/shop 分頁「商品」改成「書刊」", files.shop.includes('tabProducts: { zh: "書刊"'));
+checkTrue(
+  "/shop 分頁「商品」改成「書刊與好物」（2026-11-11 開始賣地方好物）",
+  files.shop.includes('tabProducts: { zh: "書刊與好物"'),
+);
+checkTrue("/shop 頁首介紹提到地方好物", files.shop.includes("也有我們挑選的地方好物"));
+{
+  const strip = readFile("src/components/shop/ShopCategoryStrip.tsx");
+  const panel = readFile("src/components/shop/ProductsPanel.tsx");
+  checkTrue(
+    "入口卡：書刊只算書，地方好物另一張卡",
+    panel.includes("bookCount={books.length}") && panel.includes("goodsCount={goods.length}"),
+  );
+  checkTrue(
+    "入口卡點了會切到對應篩選",
+    panel.includes("onPickType={setFilter}") && strip.includes("onPickType?.(entry.productType)"),
+  );
+}
 checkTrue(
   "/curation 卡片區標題與 /partnership 同一句",
   files.curation.includes('zh: "我們做過的合作類型"') &&

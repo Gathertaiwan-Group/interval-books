@@ -29,7 +29,8 @@ export const SEATS_LEFT_LABEL: Localized = { zh: "尚餘名額", en: "Places lef
 
 /** Display labels for products.product_type. */
 export const PRODUCT_TYPE_LABELS: Record<ShopProductType, Localized> = {
-  goods: { zh: "選物", en: "Goods", ja: "セレクト品" },
+  // 2026-11-11：目前線上的 goods 是地方好物（屏東潮州金弘的冷壓麻油、花生醬）。
+  goods: { zh: "地方好物", en: "Local goods", ja: "地域の品" },
   book: { zh: "書籍", en: "Books", ja: "書籍" },
   event: { zh: "活動", en: "Events", ja: "イベント" },
   journey: { zh: "策旅", en: "Journeys", ja: "旅" },

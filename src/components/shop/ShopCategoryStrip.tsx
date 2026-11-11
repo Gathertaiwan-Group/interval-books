@@ -31,6 +31,9 @@ const COPY = {
   heading: { zh: "逛逛店裡的選物", en: "Browse the shop", ja: "店内のセレクトを見る" },
   books: { zh: "書刊", en: "Books & zines", ja: "本と冊子" },
   booksSub: { zh: "本可線上購買", en: "to buy online", ja: "冊をオンラインで" },
+  // 2026-11-11：/shop 開始賣地方好物（金弘冷壓麻油、花生醬；product_type = goods）。
+  goods: { zh: "地方好物", en: "Local goods", ja: "地域の品" },
+  goodsSub: { zh: "件可線上購買", en: "to buy online", ja: "点をオンラインで" },
   publications: { zh: "地方刊物展", en: "Local publications", ja: "地域の刊行物" },
   publicationsSub: { zh: "本・到店翻閱", en: "titles · browse in store", ja: "冊・店頭で" },
   curated: { zh: "主理人的選品", en: "Curated goods", ja: "店主の選品" },
@@ -50,8 +53,10 @@ type Entry = {
   title: string;
   sub: string;
   img: string;
-  /** 書刊那一格捲到下方清單；其他連到各自的頁面。 */
+  /** 書刊／地方好物那兩格捲到下方清單（並切到對應的篩選）；其他連到各自的頁面。 */
   to: "#product-grid" | "/publications" | "/shop" | "/events";
+  /** to = "#product-grid" 時，點了要切到哪一個商品類型篩選。 */
+  productType?: "book" | "goods";
   /** /events 的類型篩選（2026-11-10 /journeys 併入 /events?type=journey）。 */
   type?: "event" | "journey";
 };
@@ -62,11 +67,19 @@ const CARD_CLASS =
 export function ShopCategoryStrip({
   bookCount,
   bookCover,
+  goodsCount = 0,
+  goodsCover,
+  onPickType,
   publicationCount,
   curatedThemes,
 }: {
+  /** 只算 product_type = book 的件數（地方好物另外算，不混進「N 本」）。 */
   bookCount: number;
   bookCover: string;
+  goodsCount?: number;
+  goodsCover?: string;
+  /** 點書刊／地方好物卡時，讓下方清單切到對應的篩選（ProductsPanel 的 setFilter）。 */
+  onPickType?: (type: "book" | "goods") => void;
   publicationCount: number;
   curatedThemes: CuratedThemeEntry[];
 }) {
@@ -93,6 +106,19 @@ export function ShopCategoryStrip({
             sub: `${bookCount} ${t(COPY.booksSub)}`,
             img: bookCover,
             to: "#product-grid" as const,
+            productType: "book" as const,
+          },
+        ]
+      : []),
+    ...(goodsCount > 0
+      ? [
+          {
+            key: "goods",
+            title: t(COPY.goods),
+            sub: `${goodsCount} ${t(COPY.goodsSub)}`,
+            img: goodsCover ?? bookCover,
+            to: "#product-grid" as const,
+            productType: "goods" as const,
           },
         ]
       : []),
@@ -156,12 +182,15 @@ export function ShopCategoryStrip({
       <h2 className="eyebrow mb-3 md:mb-5">{t(COPY.heading)}</h2>
       {/* 手機：橫向滑動＋snap，卡寬 5.75rem 讓 375 寬露出約 3.4 張、390 寬約 3.5 張，提示還有更多；md 以上：一排五格。
           -mx/px 讓卡片可以滑到螢幕邊緣，不被 container 的內距切掉。 */}
-      <ul className="-mx-6 flex snap-x snap-mandatory scroll-px-6 gap-3 overflow-x-auto px-6 pb-2 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-5 md:scroll-px-0 md:gap-6 md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden">
+      <ul className="-mx-6 flex snap-x snap-mandatory scroll-px-6 gap-3 overflow-x-auto px-6 pb-2 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-6 md:scroll-px-0 md:gap-6 md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden">
         {entries.map((entry) => (
           <li key={entry.key} className="contents">
             {entry.to === "#product-grid" ? (
               <a
                 href="#product-grid"
+                onClick={() => {
+                  if (entry.productType) onPickType?.(entry.productType);
+                }}
                 className={CARD_CLASS}
                 data-testid={`shop-category-${entry.key}`}
               >

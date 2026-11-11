@@ -95,6 +95,9 @@ export function ProductsPanel({
   // Products are already ordered by sort_order (then id) in the query — see
   // fetchActiveProducts — and .filter preserves that order.
   const list = filter === "all" ? products : products.filter((prod) => prod.productType === filter);
+  // 入口卡分開算：書刊只算書，地方好物（goods，例如金弘的麻油、花生醬）另一張卡。
+  const books = products.filter((prod) => prod.productType === "book");
+  const goods = products.filter((prod) => prod.productType === "goods");
 
   return (
     <>
@@ -107,8 +110,11 @@ export function ProductsPanel({
       </section>
 
       <ShopCategoryStrip
-        bookCount={products.length}
-        bookCover={products[0] ? imageFor(products[0].imageKey, curatedImg) : curatedImg}
+        bookCount={books.length}
+        bookCover={books[0] ? imageFor(books[0].imageKey, curatedImg) : curatedImg}
+        goodsCount={goods.length}
+        goodsCover={goods[0] ? imageFor(goods[0].imageKey, curatedImg) : undefined}
+        onPickType={setFilter}
         publicationCount={publications.publications.length}
         curatedThemes={displayableCuratedThemes(curatedThemes, catalogue.products)}
       />
