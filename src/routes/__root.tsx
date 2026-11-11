@@ -1,3 +1,4 @@
+import { ChatLauncher } from "@/components/chat/ChatLauncher";
 import { useEffect } from "react";
 import {
   Outlet,
@@ -226,6 +227,7 @@ function RootComponent() {
         <GaPageViews />
         <LanguageHint />
         <Outlet />
+        <ChatLauncher />
       </LanguageProvider>
     </SiteContentProvider>
   );
