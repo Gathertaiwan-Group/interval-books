@@ -50,33 +50,39 @@ export function SiteHeader() {
    * 2026-11-10 再從五格收成四格：「活動」「策旅」兩個列表頁合併成 /events「活動與策旅」
    * （?type=event|journey 篩選）。舊的 /journeys 301 到 /events?type=journey。標籤用新 key
    * nav.eventsJourneys —— 理由同上：ui_strings 若已有 ('nav','events') 那一列會蓋掉改寫的值。
+   *
+   * 2026-11-11 業主：加第五格「異業合作」（/partnership），放在「關於小時光」之後。沿用
+   * 2026-10-26 就有的 nav.partnership（footer 早就在用，三語已備齊）。
    */
   const NAV = [
     { to: "/", label: t(ui.nav.home), exact: true },
     { to: "/shop", label: t(ui.nav.select), exact: false },
     { to: "/events", label: t(ui.nav.eventsJourneys), exact: false },
     { to: "/about", label: t(ui.nav.aboutStore), exact: false },
+    { to: "/partnership", label: t(ui.nav.partnership), exact: false },
   ] as const;
 
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur-md">
         <div className="container-editorial flex items-center justify-between py-4 gap-6">
-          <Link to="/" className="flex flex-col leading-tight">
+          <Link to="/" className="flex shrink-0 flex-col leading-tight">
             <span className="font-serif text-[1.35rem] tracking-tight">{t(ui.brand)}</span>
             <span className="eyebrow mt-1 text-[0.6875rem] tracking-[0.24em]">
               {t(ui.brandSub)}
             </span>
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-7 text-[0.875rem] tracking-[0.06em] text-foreground/75">
+          {/* 五格之後 1024–1279 寬會擠（英文、日文換行、店名被壓）：只在 lg 這一段縮小字級／字距／
+              間距與語言鈕寬度，xl（≥1280）以上維持原樣。連結一律不換行。 */}
+          <nav className="hidden lg:flex items-center gap-4 xl:gap-7 text-[0.8125rem] xl:text-[0.875rem] tracking-[0.03em] xl:tracking-[0.06em] text-foreground/75">
             {NAV.map((n) => (
               <Link
                 key={n.to}
                 to={n.to}
                 activeOptions={{ exact: n.exact }}
                 activeProps={{ className: "text-foreground after:w-full" }}
-                className="hover-underline py-1 transition-colors hover:text-foreground"
+                className="hover-underline whitespace-nowrap py-1 transition-colors hover:text-foreground"
               >
                 {n.label}
               </Link>
@@ -401,7 +407,7 @@ function AccountLink({ label }: { label: string }) {
  * 語言切換：分段按鈕「中｜EN｜日」（2026-11 業主：「換成按鈕狀、簡潔」）。
  *
  *   · 細線外框、三格等寬、目前語言實心（深咖啡底＋米白字），配合首頁改版的頁首。
- *   · 每格高 40px、寬 44px（點擊範圍 ≥ 40px）；鍵盤 Tab 進得來，focus-visible 有外框。
+ *   · 每格高 40px、寬 44px（1024–1279 寬為 36px，五格導覽擠；點擊範圍 ≥ 36px）；鍵盤 Tab 進得來，focus-visible 有外框。
  *   · 公開頁：連到**同一頁的另一個語言網址**的 <a href>（整頁載入；搜尋引擎也看得到這三個
  *     連結，hreflang／lang 屬性照舊），按下時記住選擇——
  *       writeStoredLang：之後的購物車、結帳介面跟著換；
@@ -458,7 +464,7 @@ function LangText() {
 }
 
 const SEGMENT_BASE =
-  "relative inline-flex h-10 w-11 items-center justify-center text-xs leading-none tracking-[0.08em] transition-colors focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground";
+  "relative inline-flex h-10 w-9 xl:w-11 items-center justify-center text-xs leading-none tracking-[0.08em] transition-colors focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground";
 const SEGMENT_ON = "bg-foreground text-primary-foreground";
 const SEGMENT_OFF = "text-foreground/70 hover:bg-foreground/[0.06] hover:text-foreground";
 const TEXT_BASE =

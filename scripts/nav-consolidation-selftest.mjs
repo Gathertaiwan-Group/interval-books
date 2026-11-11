@@ -256,7 +256,7 @@ for (const key of Object.keys(FILES)) {
 // =============================================================================
 // [1] 導覽列剛好五格
 // =============================================================================
-console.log("\n[1] SiteHeader —— 四格，順序與目標正確");
+console.log("\n[1] SiteHeader —— 五格，順序與目標正確");
 
 const navArray = topLevelInit(ast.header, "NAV");
 checkTrue("SiteHeader 裡找得到 NAV 陣列", navArray?.type === "ArrayExpression");
@@ -270,12 +270,14 @@ const navEntries = (navArray?.elements ?? []).map((el) => {
 });
 
 // 2026-11-10：「活動」「策旅」合成一格「活動與策旅」（/events），五格 → 四格。
-check("NAV 剛好 4 格", navEntries.length, 4);
+// 2026-11-11：業主加第五格「異業合作」（/partnership），在「關於小時光」之後。
+check("NAV 剛好 5 格", navEntries.length, 5);
 check("NAV 的順序、網址與字串 key 全部正確", navEntries, [
   { to: "/", label: "ui.nav.home" },
   { to: "/shop", label: "ui.nav.select" },
   { to: "/events", label: "ui.nav.eventsJourneys" },
   { to: "/about", label: "ui.nav.aboutStore" },
+  { to: "/partnership", label: "ui.nav.partnership" },
 ]);
 
 // 被收掉的四個網址不可以還留在導覽列裡。
@@ -298,6 +300,7 @@ check("SiteHeader 只用這幾個 nav key", sorted(headerNavKeys), [
   "cart",
   "eventsJourneys",
   "home",
+  "partnership",
   "select",
 ]);
 // 與 about / shop 同一條理由：用新 key，ui_strings 的舊列蓋不到。

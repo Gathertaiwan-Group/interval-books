@@ -40,8 +40,8 @@ export const UI = {
     // （見 SiteHeader.tsx），這個字串目前只當作該圖示的 aria-label／title。
     account: { zh: "我的帳號", en: "My Account", ja: "マイページ" },
 
-    // ── 異業合作頁（2026-10-26）—— 新 key，理由同上。不進主導覽列，只在 footer、
-    //    /about 與 /curation 出現。
+    // ── 異業合作頁（2026-10-26）—— 新 key，理由同上。原本只在 footer、/about 與
+    //    /curation 出現；2026-11-11 業主要求進主導覽列（「關於小時光」之後）。
     partnership: { zh: "異業合作", en: "Partnership", ja: "協働のご相談" },
 
     // ── 活動與策旅合併（2026-11-10）—— /events 與 /journeys 兩個列表頁併成一頁，導覽列
