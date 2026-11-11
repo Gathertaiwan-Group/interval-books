@@ -994,6 +994,11 @@ console.log("[8] 接線");
   );
   checkTrue("0060：to_regprocedure 守衛（不是 to_regproc）", !/to_regproc\(/.test(sql));
   checkTrue(
+    "0060：vault.create_secret 守衛寫完整四參數簽章（正式庫是 text,text,text,uuid）",
+    sql.includes("to_regprocedure('vault.create_secret(text,text,text,uuid)')") &&
+      !sql.includes("vault.create_secret(text,text,text)'"),
+  );
+  checkTrue(
     "0060：函式只 grant service_role",
     (sql.match(/grant  execute on function %s to service_role/g) ?? []).length === 1 &&
       /revoke execute on function %s from anon, authenticated/.test(sql),

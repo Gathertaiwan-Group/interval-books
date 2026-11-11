@@ -174,7 +174,9 @@ commit;
 -- ---------------------------------------------------------------------------
 do $$
 begin
-  if to_regprocedure('vault.create_secret(text,text,text)') is null then
+  -- 正式庫的簽章是 vault.create_secret(text,text,text,uuid)（第四個 new_key_id 有預設值），
+  -- to_regprocedure 要寫完整的四個參數，寫三個會永遠回 null、靜默跳過（套用前實查過）。
+  if to_regprocedure('vault.create_secret(text,text,text,uuid)') is null then
     raise warning '[0060] 這個資料庫沒有 vault，跳過端點網址（本機測試庫是正常的）';
   elsif not exists (select 1 from vault.secrets where name = 'google_calendar_sync_endpoint_url') then
     perform vault.create_secret(
