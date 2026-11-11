@@ -419,3 +419,55 @@
     }
   }
 }
+
+/* ── AI 小幫手泡泡的注意力動畫（src/components/chat/ChatLauncher.tsx）──────────────
+   只動 transform／opacity、元素都是 position: fixed，不影響 LCP／CLS。 */
+@keyframes ib-chat-pop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ib-chat-ring {
+  from {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+@keyframes ib-chat-hint-in {
+  from {
+    opacity: 0;
+    transform: translateX(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.ib-chat-pop {
+  animation: ib-chat-pop 300ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+.ib-chat-ring {
+  animation: ib-chat-ring 1.2s ease-out forwards;
+}
+.ib-chat-hint-in {
+  animation: ib-chat-hint-in 300ms ease-out backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ib-chat-pop,
+  .ib-chat-ring,
+  .ib-chat-hint-in {
+    animation: none !important;
+  }
+  .ib-chat-ring {
+    display: none;
+  }
+}

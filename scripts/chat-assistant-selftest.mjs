@@ -526,6 +526,105 @@ checkTrue(
 );
 checkTrue("根元件掛上泡泡", readFile("src/routes/__root.tsx").includes("<ChatLauncher />"));
 
+// ── [7] 泡泡注意力動畫 ─────────────────────────────────────────────────────
+console.log("\n[7] 泡泡注意力動畫");
+{
+  const base = {
+    reducedMotion: false,
+    dismissedAt: null,
+    shownThisSession: false,
+    panelOpened: false,
+    now: NOW,
+  };
+  check("第一次來：提示＋動畫＋脈衝 3 次", ca.nudgePlan(base), {
+    showHint: true,
+    animate: true,
+    pulses: 3,
+  });
+  check(
+    "這個分頁顯示過 → 只顯示一次",
+    ca.nudgePlan({ ...base, shownThisSession: true }).showHint,
+    false,
+  );
+  check(
+    "reduced-motion：動畫與脈衝全關、提示仍靜態顯示",
+    ca.nudgePlan({ ...base, reducedMotion: true }),
+    { showHint: true, animate: false, pulses: 0 },
+  );
+  check("開過面板：不提示、不脈衝", ca.nudgePlan({ ...base, panelOpened: true }), {
+    showHint: false,
+    animate: true,
+    pulses: 0,
+  });
+  check(
+    "關閉記憶：1 天前關過 → 不提示",
+    ca.nudgePlan({ ...base, dismissedAt: String(NOW - 86_400_000) }).showHint,
+    false,
+  );
+  check(
+    "關閉記憶：6 天 23 小時前 → 仍不提示",
+    ca.nudgeSuppressed(String(NOW - ca.NUDGE_SUPPRESS_MS + 3_600_000), NOW),
+    true,
+  );
+  check(
+    "關閉記憶：滿 7 天 → 再提示",
+    ca.nudgeSuppressed(String(NOW - ca.NUDGE_SUPPRESS_MS), NOW),
+    false,
+  );
+  check(
+    "壞值／未來時間不算記錄",
+    [
+      ca.nudgeSuppressed("abc", NOW),
+      ca.nudgeSuppressed(String(NOW + 86_400_000), NOW),
+      ca.nudgeSuppressed(null, NOW),
+    ],
+    [false, false, false],
+  );
+  check(
+    "時間參數：3 秒後出現、停 6 秒、每 8 秒脈衝最多 3 次",
+    [ca.NUDGE_DELAY_MS, ca.NUDGE_VISIBLE_MS, ca.PULSE_INTERVAL_MS, ca.PULSE_MAX],
+    [3000, 6000, 8000, 3],
+  );
+  check(
+    "三語提示",
+    [ca.NUDGE_TEXT.zh, ca.NUDGE_TEXT.en, ca.NUDGE_TEXT.ja],
+    ["有問題可以問我 👋", "Questions? Ask me 👋", "ご質問はこちら 👋"],
+  );
+  const lsrc2 = readFile("src/components/chat/ChatLauncher.tsx");
+  checkTrue(
+    "storage 讀寫都包 try/catch",
+    (lsrc2.match(/try \{/g) ?? []).length >= 2 &&
+      lsrc2.includes("localStorage") &&
+      lsrc2.includes("sessionStorage"),
+  );
+  checkTrue(
+    "開面板或按 ✕ 會記住（engage 寫 localStorage）",
+    lsrc2.includes('writeStore("local", NUDGE_STORAGE_KEY'),
+  );
+  checkTrue(
+    "提示寬度 ≤ 240px、沿用避讓 lift",
+    lsrc2.includes("max-w-[240px]") && lsrc2.includes("BASE_GAP + lift + 8"),
+  );
+  checkTrue("讀 prefers-reduced-motion", lsrc2.includes("(prefers-reduced-motion: reduce)"));
+  const css = readFile("src/styles.css");
+  const block = css.slice(css.indexOf("@keyframes ib-chat-pop"));
+  checkTrue(
+    "CSS：彈出 300ms、光圈 1.2s",
+    block.includes("ib-chat-pop 300ms") && block.includes("ib-chat-ring 1.2s"),
+  );
+  checkTrue(
+    "CSS：reduced-motion 關掉三種動畫",
+    /prefers-reduced-motion: reduce[\s\S]*\.ib-chat-pop[\s\S]*animation: none/.test(block),
+  );
+  const kfProps = [...block.matchAll(/@keyframes ib-chat-[a-z-]+ \{([\s\S]*?)\n\}/g)].flatMap((m) =>
+    [...m[1].matchAll(/([a-z-]+):/g)].map((x) => x[1]),
+  );
+  check("CSS：keyframes 只動 transform／opacity", [...new Set(kfProps)].sort(), [
+    "opacity",
+    "transform",
+  ]);
+}
+
 console.log("\n────────────────────────────────────────────────────");
 console.log(`##SELFTEST## file=${SELF} pass=${pass} fail=${fail}`);
 if (fail === 0) {

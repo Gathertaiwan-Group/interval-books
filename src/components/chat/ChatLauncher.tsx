@@ -14,16 +14,42 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { useRouterState } from "@tanstack/react-router";
 import { MessageCircle, X } from "lucide-react";
 import { useLang } from "@/i18n/LanguageContext";
-import { chatHiddenFor } from "@/lib/chat-assistant";
+import {
+  chatHiddenFor,
+  NUDGE_DELAY_MS,
+  NUDGE_SESSION_KEY,
+  NUDGE_STORAGE_KEY,
+  NUDGE_TEXT,
+  NUDGE_VISIBLE_MS,
+  nudgePlan,
+  PULSE_INTERVAL_MS,
+  type NudgePlan,
+} from "@/lib/chat-assistant";
 
 const loadPanel = () => import("./ChatPanel");
 const ChatPanel = lazy(loadPanel);
 
 const LABEL = {
-  zh: { open: "開啟 AI 小幫手", close: "關閉 AI 小幫手" },
-  en: { open: "Open AI assistant", close: "Close AI assistant" },
-  ja: { open: "AI アシスタントを開く", close: "AI アシスタントを閉じる" },
+  zh: { open: "開啟 AI 小幫手", close: "關閉 AI 小幫手", dismiss: "關閉提示" },
+  en: { open: "Open AI assistant", close: "Close AI assistant", dismiss: "Dismiss" },
+  ja: { open: "AI アシスタントを開く", close: "AI アシスタントを閉じる", dismiss: "閉じる" },
 } as const;
+
+/** storage 讀寫一律 try/catch：無痕視窗、封鎖網站資料時會丟例外。 */
+function readStore(kind: "local" | "session", key: string): string | null {
+  try {
+    return (kind === "local" ? localStorage : sessionStorage).getItem(key);
+  } catch {
+    return null;
+  }
+}
+function writeStore(kind: "local" | "session", key: string, value: string): void {
+  try {
+    (kind === "local" ? localStorage : sessionStorage).setItem(key, value);
+  } catch {
+    /* 記不住就算了：最多下次再提示一次 */
+  }
+}
 
 const BASE_GAP = 16; // px，泡泡與底邊／障礙物的距離
 const SIZE = 56;
@@ -74,6 +100,11 @@ export function ChatLauncher() {
   const [lift, setLift] = useState(0);
   const btnRef = useRef<HTMLButtonElement>(null);
   const hidden = chatHiddenFor(pathname);
+  // 注意力動畫：出現時彈出、3 秒後提示氣泡（停 6 秒）、每 8 秒脈衝光圈最多 3 次
+  const [plan, setPlan] = useState<NudgePlan | null>(null);
+  const [hint, setHint] = useState<"off" | "on" | "leaving">("off");
+  const [pulse, setPulse] = useState(0); // 第幾次脈衝（當 key 用，換了就重播）
+  const [engaged, setEngaged] = useState(false); // 開過面板或關過提示
 
   // load + idle 之後才出現
   useEffect(() => {
@@ -123,6 +154,54 @@ export function ChatLauncher() {
     };
   }, [ready, hidden, pathname, remeasure]);
 
+  // 動畫計畫：泡泡出現的那一刻決定一次
+  useEffect(() => {
+    if (!ready || plan) return;
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    setPlan(
+      nudgePlan({
+        reducedMotion,
+        dismissedAt: readStore("local", NUDGE_STORAGE_KEY),
+        shownThisSession: readStore("session", NUDGE_SESSION_KEY) === "1",
+        panelOpened: false,
+      }),
+    );
+  }, [ready, plan]);
+
+  // 提示氣泡：3 秒後出現、停 6 秒後淡出；每個分頁最多一次
+  useEffect(() => {
+    if (!plan?.showHint || hidden || engaged) return;
+    const timers: number[] = [];
+    timers.push(
+      window.setTimeout(() => {
+        writeStore("session", NUDGE_SESSION_KEY, "1");
+        setHint("on");
+        timers.push(
+          window.setTimeout(() => {
+            if (!plan.animate) return setHint("off");
+            setHint("leaving");
+            timers.push(window.setTimeout(() => setHint("off"), 300));
+          }, NUDGE_VISIBLE_MS),
+        );
+      }, NUDGE_DELAY_MS),
+    );
+    return () => timers.forEach((t) => window.clearTimeout(t));
+    // 只排一次：hint 狀態變化不重排
+  }, [plan, hidden, engaged]);
+
+  // 脈衝光圈：每 8 秒一次、最多 plan.pulses 次；開過面板就停
+  useEffect(() => {
+    if (!plan || plan.pulses === 0 || hidden || engaged || pulse >= plan.pulses) return;
+    const t = window.setTimeout(() => setPulse((n) => n + 1), PULSE_INTERVAL_MS);
+    return () => window.clearTimeout(t);
+  }, [plan, hidden, engaged, pulse]);
+
+  const engage = useCallback(() => {
+    setEngaged(true);
+    setHint("off");
+    writeStore("local", NUDGE_STORAGE_KEY, String(Date.now()));
+  }, []);
+
   // 換到不顯示的頁面時收起來
   useEffect(() => {
     if (hidden) setOpen(false);
@@ -136,6 +215,13 @@ export function ChatLauncher() {
 
   if (!ready || hidden) return null;
   const l = LABEL[lang] ?? LABEL.zh;
+  const animate = plan?.animate ?? false;
+  const bottom = `calc(${BASE_GAP + lift}px + env(safe-area-inset-bottom, 0px))`;
+  const openPanel = () => {
+    engage();
+    setMounted(true);
+    setOpen(true);
+  };
 
   return (
     <div data-chat-root="">
@@ -154,22 +240,48 @@ export function ChatLauncher() {
         onPointerEnter={() => void loadPanel()}
         onFocus={() => void loadPanel()}
         onClick={() => {
-          setMounted(true);
-          setOpen((o) => !o);
+          if (open) setOpen(false);
+          else openPanel();
         }}
-        style={{
-          bottom: `calc(${BASE_GAP + lift}px + env(safe-area-inset-bottom, 0px))`,
-          width: SIZE,
-          height: SIZE,
-        }}
-        className={`fixed right-4 z-40 flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-1 ring-black/5 transition-[transform,bottom] duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:right-6 ${open ? "max-sm:hidden" : ""}`}
+        style={{ bottom, width: SIZE, height: SIZE }}
+        className={`${animate ? "ib-chat-pop " : ""}fixed right-4 z-40 flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-1 ring-black/5 transition-[transform,bottom] duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:right-6 ${open ? "max-sm:hidden" : ""}`}
       >
+        {pulse > 0 && !engaged && (
+          <span
+            key={pulse}
+            aria-hidden
+            className="ib-chat-ring pointer-events-none absolute inset-0 rounded-full bg-primary"
+          />
+        )}
         {open ? (
           <X className="h-6 w-6" aria-hidden />
         ) : (
           <MessageCircle className="h-6 w-6" aria-hidden />
         )}
       </button>
+      {hint !== "off" && !open && (
+        <div
+          role="status"
+          style={{ bottom: `calc(${BASE_GAP + lift + 8}px + env(safe-area-inset-bottom, 0px))` }}
+          className={`fixed right-[84px] z-40 flex max-w-[240px] items-center gap-1 rounded-2xl border border-border bg-background py-2 pr-1 pl-3 text-sm text-foreground shadow-lg transition-opacity duration-300 sm:right-[92px] ${animate ? "ib-chat-hint-in" : ""} ${hint === "leaving" ? "opacity-0" : "opacity-100"}`}
+        >
+          <button
+            type="button"
+            onClick={openPanel}
+            className="min-w-0 text-left focus-visible:outline-none focus-visible:underline"
+          >
+            {NUDGE_TEXT[lang] ?? NUDGE_TEXT.zh}
+          </button>
+          <button
+            type="button"
+            onClick={engage}
+            aria-label={l.dismiss}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-sand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

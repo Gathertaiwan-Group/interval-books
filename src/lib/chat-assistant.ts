@@ -553,3 +553,58 @@ export class ChatRateLimiter {
 export function cleanSessionId(v: unknown): string | null {
   return typeof v === "string" && /^[A-Za-z0-9_-]{8,64}$/.test(v) ? v : null;
 }
+
+// ---------------------------------------------------------------------------
+// 7. 泡泡的注意力動畫（ChatLauncher 用；純邏輯，自檢直接驗）
+// ---------------------------------------------------------------------------
+
+/** localStorage：訪客關掉提示或開過面板的時間（ms）。 */
+export const NUDGE_STORAGE_KEY = "ib-chat-nudge-dismissed-at";
+/** sessionStorage：這個分頁已經顯示過提示（只顯示一次）。 */
+export const NUDGE_SESSION_KEY = "ib-chat-nudge-shown";
+export const NUDGE_SUPPRESS_MS = 7 * 86_400_000;
+export const NUDGE_DELAY_MS = 3_000;
+export const NUDGE_VISIBLE_MS = 6_000;
+export const PULSE_INTERVAL_MS = 8_000;
+export const PULSE_MAX = 3;
+
+export const NUDGE_TEXT: Record<ChatLang, string> = {
+  zh: "有問題可以問我 👋",
+  en: "Questions? Ask me 👋",
+  ja: "ご質問はこちら 👋",
+};
+
+/** 7 天內關過／開過 → 不再提示。壞值、未來的時間一律當作沒記錄。 */
+export function nudgeSuppressed(
+  stored: string | null | undefined,
+  now: number = Date.now(),
+): boolean {
+  if (!stored || !/^\d{10,16}$/.test(stored)) return false;
+  const at = Number(stored);
+  if (at > now + 60_000) return false;
+  return now - at < NUDGE_SUPPRESS_MS;
+}
+
+export type NudgePlan = {
+  /** 要不要顯示提示氣泡（每個分頁最多一次）。 */
+  showHint: boolean;
+  /** 出現／淡出等動畫（reduced-motion 時關閉，提示仍可靜態顯示一次）。 */
+  animate: boolean;
+  /** 脈衝光圈次數。 */
+  pulses: number;
+};
+
+export function nudgePlan(input: {
+  reducedMotion: boolean;
+  dismissedAt: string | null | undefined;
+  shownThisSession: boolean;
+  panelOpened: boolean;
+  now?: number;
+}): NudgePlan {
+  const suppressed = nudgeSuppressed(input.dismissedAt, input.now ?? Date.now());
+  return {
+    showHint: !suppressed && !input.shownThisSession && !input.panelOpened,
+    animate: !input.reducedMotion,
+    pulses: input.reducedMotion || input.panelOpened ? 0 : PULSE_MAX,
+  };
+}
