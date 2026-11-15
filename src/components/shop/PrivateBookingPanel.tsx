@@ -9,7 +9,11 @@
  */
 import { useT } from "@/i18n/LanguageContext";
 import { SessionList } from "@/components/shop/SessionPicker";
-import { PRIVATE_BOOKING_COPY, type PrivateSessionTime } from "@/lib/private-booking";
+import {
+  ONLINE_REGISTRATION_CLOSED_COPY,
+  PRIVATE_BOOKING_COPY,
+  type PrivateSessionTime,
+} from "@/lib/private-booking";
 import type { ShopSession } from "@/lib/shop";
 
 /** 包場的場次（只有時間與地點）→ SessionList 吃的形狀。名額填 0：包場不賣位子，也不會被印出來。 */
@@ -55,6 +59,42 @@ export function PrivateBookingPanel({
         <p className="eyebrow text-2xl">{heading}</p>
         <p className="mt-6 text-sm leading-relaxed text-foreground/80">
           {t(PRIVATE_BOOKING_COPY.notice)}
+        </p>
+      </div>
+    </>
+  );
+}
+
+/**
+ * 每一場都不開放線上報名的活動（src/lib/private-booking.ts#onlineRegistrationClosedSessions）：
+ * 左邊照列場次時間與地點（不印票價、名額、「已額滿」），右邊只有「本場不開放線上報名，
+ * 詳情請見活動介紹。」。與包場同一個版型，差在不標「包場」。
+ *
+ * 🔴 這裡同樣沒有 SessionPicker／PlanPicker／QuantityStepper，也沒有任何 /checkout 連結。
+ */
+export function ClosedRegistrationPanel({
+  sessions,
+  now,
+  heading,
+}: {
+  sessions: PrivateSessionTime[];
+  now: number;
+  heading: string;
+}) {
+  const t = useT();
+  return (
+    <>
+      <SessionList
+        sessions={sessions.map(toShopSession)}
+        showSeatsRemaining={false}
+        basePrice={null}
+        registrationClosed
+        now={now}
+      />
+      <div data-registration-closed="true">
+        <p className="eyebrow text-2xl">{heading}</p>
+        <p className="mt-6 text-sm leading-relaxed text-foreground/80">
+          {t(ONLINE_REGISTRATION_CLOSED_COPY.notice)}
         </p>
       </div>
     </>

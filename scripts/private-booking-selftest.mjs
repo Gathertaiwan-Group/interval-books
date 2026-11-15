@@ -12,6 +12,8 @@
  *   [7] 寫入：repo 合併 notes（不洗掉注意事項／不洗掉旗標）、後台與 MCP 都接上；
  *       server 讀場次只回 live 且是包場的活動
  *   [8] 策旅主題留空：不再拿分類名稱補；卡片只印天數
+ *   [11] 不開放線上報名：每一個場次都 closed（非包場）→ 場次照列、報名區「本場不開放線上報名」，
+ *        不印「已額滿」「沒有公開的場次時間」；仍有 open 場次（即使額滿）→ 維持「已額滿」
  *
  * 不碰資料庫（@/lib/supabase 換成 null 的替身）。
  */
@@ -601,6 +603,77 @@ console.log("\n[10] 卡片：下一場報名截止");
     evp.includes("const closedNext = nextSessionClosedSlugs(calendar.entries);") &&
       evp.includes("<RegistrationClosedBadge />") &&
       evp.includes("closedNext.has(linked.slug)"),
+  );
+}
+
+// ── [11] 不開放線上報名（每一個場次都 closed） ─────────────────────────
+console.log("\n[11] 活動頁：全部場次不開放 → 場次照列＋不開放線上報名");
+{
+  const closedTime = (id, startsAt) => ({
+    id,
+    title: { zh: "2026.12.05（六）14:30–16:30", en: "x", ja: "x" },
+    location: { zh: "小時光書店", en: "x", ja: "x" },
+    startsAt,
+    endsAt: null,
+  });
+  const late = closedTime("s2", "2026-12-12T06:30:00+00:00");
+  const early = closedTime("s1", "2026-12-05T06:30:00+00:00");
+  check(
+    "零個 open 場次＋closed 場次 → 回 closed 場次（依開始時間排序）",
+    pb.onlineRegistrationClosedSessions(0, [late, early]).map((s) => s.id),
+    ["s1", "s2"],
+  );
+  check(
+    "🔴 還有 open 場次（例如額滿）→ 空陣列，維持「已額滿」",
+    pb.onlineRegistrationClosedSessions(1, [early]),
+    [],
+  );
+  check(
+    "讀不到 closed 場次 → 空陣列（退回原畫面）",
+    pb.onlineRegistrationClosedSessions(0, undefined),
+    [],
+  );
+  check("三語文案", pb.ONLINE_REGISTRATION_CLOSED_COPY.notice, {
+    zh: "本場不開放線上報名，詳情請見活動介紹。",
+    en: "Online registration is not available for this event. Please see the event description for details.",
+    ja: "本イベントはオンラインでのお申し込みを受け付けておりません。詳しくはイベント紹介をご覧ください。",
+  });
+
+  const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  const panelCode = strip(panelSrc);
+  const fnStart = panelCode.indexOf("export function ClosedRegistrationPanel");
+  const closedPanel = fnStart >= 0 ? panelCode.slice(fnStart) : "";
+  checkTrue("有 ClosedRegistrationPanel", closedPanel.length > 100);
+  checkTrue(
+    "🔴 面板裡沒有 /checkout、選擇器、人數、票價，印「不開放線上報名」、場次標 registrationClosed",
+    !/\/checkout|<SessionPicker|<PlanPicker|<QuantityStepper|directCheckoutSearch|<Link\b|privateBooking/.test(
+      closedPanel,
+    ) &&
+      closedPanel.includes("basePrice={null}") &&
+      closedPanel.includes("showSeatsRemaining={false}") &&
+      closedPanel.includes("t(ONLINE_REGISTRATION_CLOSED_COPY.notice)") &&
+      /<SessionList[\s\S]*?registrationClosed\s/.test(closedPanel),
+  );
+  const pageCode = strip(page);
+  checkTrue(
+    "🔴 分支順序：包場 → 已結束 → 不開放線上報名 → RegistrationPanel",
+    pageCode.indexOf("{event.privateBooking ? (") > 0 &&
+      pageCode.indexOf("{event.privateBooking ? (") < pageCode.indexOf("<EventEndedNotice") &&
+      pageCode.indexOf("<EventEndedNotice") < pageCode.indexOf("<ClosedRegistrationPanel") &&
+      pageCode.indexOf("<ClosedRegistrationPanel") <
+        pageCode.indexOf("<RegistrationPanel product="),
+  );
+  checkTrue(
+    "loader：非包場、內部報名、商品零個 open 場次才讀 closed 場次",
+    /!event\.privateBooking &&\s*event\.registrationType === "internal" &&\s*booking\.product &&\s*booking\.product\.sessions\.length === 0/.test(
+      pageCode,
+    ) && pageCode.includes("await fetchClosedSessionTimes([event.slug])"),
+  );
+  checkTrue(
+    "SessionList：registrationClosed 在額滿之前判（不印「已額滿」），已結束／包場仍優先",
+    /privateBooking\s*\?\s*t\(PRIVATE_BOOKING_COPY\.badge\)\s*:\s*registrationClosed\s*\?\s*null\s*:\s*left <= 0/.test(
+      picker,
+    ),
   );
 }
 

@@ -94,3 +94,43 @@ export type PrivateSessionTime = {
   startsAt: string;
   endsAt: string | null;
 };
+
+// =============================================================================
+// 「不開放線上報名」（2026-11-15）：活動上架、但每一個場次都是 closed
+// =============================================================================
+//
+// 例：協會主辦、店裡只是場地的講座（/events/art-life-talk-1205）。後台把場次狀態設成
+// 「未開放」（event_sessions.status = 'closed'），而 anon 的 RLS 只放行 open 場次（0020），
+// 於是 fetchActiveProductForEventSlug() 拿到一件**零場次**的商品——活動頁原本把它畫成
+// 「沒有公開的場次時間」＋「每一場都已額滿」，兩句都是錯的。
+//
+// 修法：活動頁 loader 在「商品在、但讀不到任何 open 場次」時，另用 readClosedSessionTimes
+// （service role、只回 live 活動的 closed 場次時間，與月曆同一支、同一個 60 秒快取）把時間
+// 讀回來；有讀到就換成「場次照列＋本場不開放線上報名」的畫面。
+//
+// 🔴 「已額滿」維持原樣：只要還有任何一個 open 場次（即使名額用完），就不走這裡。
+//    額滿是「開放了但沒位子」，不開放是「本來就不收」，兩件事。
+// 🔴 包場優先：包場活動另有 PrivateBookingPanel，呼叫端先判包場。
+
+/**
+ * 這場活動是不是「每一個場次都不收線上報名」：讀得到的 open 場次是零個，而 closed 場次至少
+ * 一個。回 closed 場次（依開始時間排序）；不符合就回空陣列。
+ */
+export function onlineRegistrationClosedSessions(
+  openSessionCount: number,
+  closedSessions: readonly PrivateSessionTime[] | null | undefined,
+): PrivateSessionTime[] {
+  if (openSessionCount > 0) return [];
+  const list = [...(closedSessions ?? [])];
+  list.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
+  return list;
+}
+
+/** 報名區文案（三語）。 */
+export const ONLINE_REGISTRATION_CLOSED_COPY: { notice: L } = {
+  notice: {
+    zh: "本場不開放線上報名，詳情請見活動介紹。",
+    en: "Online registration is not available for this event. Please see the event description for details.",
+    ja: "本イベントはオンラインでのお申し込みを受け付けておりません。詳しくはイベント紹介をご覧ください。",
+  },
+};

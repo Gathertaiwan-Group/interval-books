@@ -190,6 +190,7 @@ export function SessionList({
   basePrice = null,
   ended = false,
   privateBooking = false,
+  registrationClosed = false,
   now,
 }: {
   sessions: ShopSession[];
@@ -212,6 +213,11 @@ export function SessionList({
    * 呼叫端也不要傳 basePrice——包場不印票價。
    */
   privateBooking?: boolean;
+  /**
+   * 每一場都不開放線上報名（src/lib/private-booking.ts#onlineRegistrationClosedSessions）：
+   * 只列時間與地點，不印名額、不印「已額滿」——這些場次本來就不收報名，不是沒位子。
+   */
+  registrationClosed?: boolean;
 }) {
   const t = useT();
 
@@ -233,11 +239,13 @@ export function SessionList({
               ? t(COPY.sessionEnded)
               : privateBooking
                 ? t(PRIVATE_BOOKING_COPY.badge)
-                : left <= 0
-                  ? t(COPY.sessionFull)
-                  : showSeatsRemaining
-                    ? `${t(SEATS_LEFT_LABEL)} ${left}`
-                    : null;
+                : registrationClosed
+                  ? null
+                  : left <= 0
+                    ? t(COPY.sessionFull)
+                    : showSeatsRemaining
+                      ? `${t(SEATS_LEFT_LABEL)} ${left}`
+                      : null;
             const prices: Array<{ key: string; label: string | null; price: number }> =
               (session.plans ?? []).length > 0
                 ? session.plans.map((p) => ({ key: p.id, label: t(p.title), price: p.price }))
@@ -250,6 +258,7 @@ export function SessionList({
                 className="border border-border p-4"
                 data-session-closed={closed ? "true" : undefined}
                 data-private-booking={privateBooking ? "true" : undefined}
+                data-registration-closed={registrationClosed ? "true" : undefined}
               >
                 <span className="block text-sm">{t(session.title)}</span>
                 <span className="mt-1 block text-xs text-muted-foreground">

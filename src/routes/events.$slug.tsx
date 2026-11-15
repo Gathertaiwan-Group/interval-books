@@ -21,9 +21,12 @@ import { useBookingNow } from "@/hooks/use-booking-now";
 import { EVENT_LIST_FIELDS } from "@/lib/event-blocks";
 import { imageFor } from "@/lib/images";
 import { fetchActiveProductForEventSlug, type ShopProduct } from "@/lib/shop";
-import type { PrivateSessionTime } from "@/lib/private-booking";
-import { PrivateBookingPanel } from "@/components/shop/PrivateBookingPanel";
-import { fetchPrivateSessionTimes } from "@/lib/private-booking-fns";
+import { onlineRegistrationClosedSessions, type PrivateSessionTime } from "@/lib/private-booking";
+import {
+  ClosedRegistrationPanel,
+  PrivateBookingPanel,
+} from "@/components/shop/PrivateBookingPanel";
+import { fetchClosedSessionTimes, fetchPrivateSessionTimes } from "@/lib/private-booking-fns";
 import { langFromMatches, pageHead } from "@/lib/seo/head";
 import {
   contentTranslation,
@@ -209,10 +212,29 @@ export const Route = createFileRoute("/events/$slug")({
       ? ((privateTimes as Record<string, PrivateSessionTime[]>)[event.slug] ?? [])
       : [];
 
+    // 不開放線上報名（src/lib/private-booking.ts#onlineRegistrationClosedSessions）：商品在、
+    // 但 anon 讀不到任何 open 場次（後台把每一場都設成「未開放」）→ 另讀 closed 場次的時間
+    // （service role、只回 live 活動、只有時間與地點、60 秒快取）。只有這種活動才多這一趟；
+    // 包場已經走上面那條，不重複讀。讀取失敗回空物件 → 退回原本的畫面。
+    let closedSessions: PrivateSessionTime[] = [];
+    if (
+      event &&
+      !event.privateBooking &&
+      event.registrationType === "internal" &&
+      booking.product &&
+      booking.product.sessions.length === 0
+    ) {
+      const closedTimes = await fetchClosedSessionTimes([event.slug]);
+      closedSessions = onlineRegistrationClosedSessions(
+        booking.product.sessions.length,
+        closedTimes[event.slug],
+      );
+    }
+
     // 「場次開始了沒」的判斷時間點（isSessionClosedForBooking 的 now）。跟著 loader 資料
     // 序列化，SSR 與第一次 hydrate 用同一個值（不會 #418）；掛載後由 useBookingNow()
     // 校正成現在並在下一個場次開始時推進。與 /checkout 的 loader 同一個做法（a61488a）。
-    return { event, unavailable, booking, privateSessions, now: Date.now() };
+    return { event, unavailable, booking, privateSessions, closedSessions, now: Date.now() };
   },
   // SEO（2026-11 健檢）：title「{活動名}｜{日期}｜小時光書店」、描述取摘要＋內文、
   // 分享圖用活動封面、JSON-LD 輸出 Event（日期地點價格來自售票商品的場次）與麵包屑。
@@ -296,7 +318,14 @@ function EventDetail() {
   // 清單區塊取出來的是字串陣列，而 t() 只吃 Localized 字串，所以這裡要拿 lang
   // 自己選語系（規則與 t() 一致：當前語系沒東西就退回 zh）。
   const { t, lang } = useLang();
-  const { event, unavailable, booking, privateSessions, now: loadedAt } = Route.useLoaderData();
+  const {
+    event,
+    unavailable,
+    booking,
+    privateSessions,
+    closedSessions,
+    now: loadedAt,
+  } = Route.useLoaderData();
   const site = useSiteContent();
   // 在任何 early return 之前（hook 規則）。
   const now = useBookingNow(loadedAt, booking.product?.sessions ?? []);
@@ -489,6 +518,13 @@ function EventDetail() {
               product={booking.product}
               heading={t(PAGE.registration)}
               eyebrowClassName="eyebrow text-2xl"
+            />
+          ) : closedSessions.length > 0 ? (
+            // 每一場都不開放線上報名：場次照列，報名區只有一句話，沒有 /checkout 連結。
+            <ClosedRegistrationPanel
+              sessions={closedSessions}
+              now={now}
+              heading={t(PAGE.registration)}
             />
           ) : cta.kind === "internal" ? (
             <RegistrationPanel product={cta.product} loadedAt={loadedAt} now={now} />
