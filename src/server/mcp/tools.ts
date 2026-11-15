@@ -40,6 +40,7 @@ import {
   McpInputError,
   pickFields,
   productContentPatch,
+  writeTimeNote,
   zodIssuesText,
   type LocalizedArg,
   type TextResult,
@@ -284,10 +285,17 @@ async function runWrite(plan: WritePlan): Promise<TextResult> {
       ...base,
       dry_run: true,
       written: false,
+      // 審查 2026-11-15：自動翻譯的欄位把定案的 {zh,en,ja} 單獨列出，正式送出原樣帶回就不會重翻。
+      ...(plan.translated && plan.translated.length
+        ? {
+            translated_values: Object.fromEntries(plan.translated.map((f) => [f, plan.after[f]])),
+          }
+        : {}),
       next_step:
         "這只是預覽，還沒有寫入。確認差異無誤後，用同樣的參數加上 dry_run=false 再呼叫一次。" +
         (plan.translated && plan.translated.length
-          ? "（英日文是自動翻譯的；若要保證寫入的譯文與這裡一字不差，請把上面 after 的 en/ja 一起帶進正式呼叫。）"
+          ? "英日文是自動翻譯的：正式送出時，請把 translated_values 裡每一欄的 {zh,en,ja} 原樣放回同名參數" +
+            "（update_page_blocks 是放回 blocks[] 裡同一個 block_key 的 value），這樣不會重新翻譯，寫入的譯文就是這份預覽。"
           : ""),
     });
   }
@@ -307,6 +315,7 @@ async function runWrite(plan: WritePlan): Promise<TextResult> {
     dry_run: false,
     written: true,
     audit: audit === "recorded" ? "recorded" : "log_only（稽核表寫入失敗，紀錄只在伺服器 log）",
+    write_note: writeTimeNote(plan.translated ?? []),
     saved: saved.row,
   });
 }

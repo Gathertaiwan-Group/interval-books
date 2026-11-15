@@ -873,6 +873,117 @@ await rejectedP(
 }
 
 // =============================================================================
+console.log("\n[6c] 預覽＝寫入：confirm_args 原樣帶回不再翻譯、不再產生代稱（審查 2026-11-15）");
+{
+  const tr = (m) => m.calls.filter((c) => c.name === "translateToEnJa").length;
+  // 活動：地點、票種名、摘要（自動截）都要鎖住。
+  const ARGS = {
+    ...EVENT_ARGS,
+    location: "書店二樓",
+    sessions: [{ ...EVENT_ARGS.sessions[0], location: "華山" }, EVENT_ARGS.sessions[1]],
+  };
+  let m = reset();
+  const pv = await call("create_event", ARGS);
+  const ca = pv.data?.confirm_args;
+  checkTrue(
+    "create_event 預覽：有 confirm_args、next_step 要求原樣帶回",
+    ca && /confirm_args/.test(pv.data?.next_step ?? ""),
+    pv.text.slice(0, 300),
+  );
+  check(
+    "create_event confirm_args：三語補齊、代稱定案、dry_run=false",
+    [
+      ca?.title,
+      ca?.summary,
+      ca?.location,
+      ca?.sessions?.[0]?.location,
+      ca?.ticket_types?.[0]?.name,
+      ca?.slug,
+      ca?.dry_run,
+    ],
+    [
+      EVENT_ARGS.title,
+      pv.data?.will_create?.event?.summary,
+      { zh: "書店二樓", en: "EN:書店二樓", ja: "JA:書店二樓" },
+      { zh: "華山", en: "EN:華山", ja: "JA:華山" },
+      { zh: "一般票", en: "EN:一般票", ja: "JA:一般票" },
+      "20991220",
+      false,
+    ],
+  );
+  checkTrue("create_event 預覽：有呼叫翻譯（中文字串）", tr(m) > 0);
+  m = reset();
+  const w = await call("create_event", ca);
+  const ev = writes(m)[0]?.args?.[0];
+  check(
+    "create_event 帶回 confirm_args：寫入內容＝預覽、0 次翻譯、沒有 write_note",
+    [
+      w.isError,
+      ev?.slug,
+      ev?.title,
+      ev?.summary,
+      ev?.description,
+      writes(m)[1]?.args?.[0]?.location,
+      tr(m),
+      w.data?.write_note,
+    ],
+    [
+      false,
+      pv.data?.will_create?.event?.slug,
+      pv.data?.will_create?.event?.title,
+      pv.data?.will_create?.event?.summary,
+      pv.data?.will_create?.event?.description,
+      pv.data?.will_create?.sessions?.[0]?.location,
+      0,
+      undefined,
+    ],
+    w.text.slice(0, 300),
+  );
+  m = reset();
+  const raw = await call("create_event", { ...ARGS, dry_run: false });
+  checkTrue(
+    "create_event 沒帶回：照建，但 write_note 講明寫入時才翻譯、代稱寫入時才產生",
+    !raw.isError &&
+      /寫入時才自動翻譯/.test(raw.data?.write_note ?? "") &&
+      /寫入時才產生/.test(raw.data?.write_note ?? ""),
+    raw.text.slice(0, 300),
+  );
+
+  // 一般商品：亂數代稱也要鎖住。
+  m = reset();
+  const gp = await call("create_shop_product", GOODS);
+  const gca = gp.data?.confirm_args;
+  check(
+    "create_shop_product confirm_args：三語＋定案代稱、dry_run=false",
+    [gca?.title, gca?.slug, gca?.dry_run],
+    [gp.data?.will_create?.product?.title, gp.data?.will_create?.product?.slug, false],
+  );
+  m = reset();
+  const gw = await call("create_shop_product", gca);
+  const gwRow = writes(m)[0]?.args?.[0];
+  check(
+    "create_shop_product 帶回 confirm_args：代稱與三語＝預覽、0 次翻譯",
+    [gw.isError, gwRow?.slug, gwRow?.title, gwRow?.summary, tr(m), gw.data?.write_note],
+    [
+      false,
+      gp.data?.will_create?.product?.slug,
+      gp.data?.will_create?.product?.title,
+      gp.data?.will_create?.product?.summary,
+      0,
+      undefined,
+    ],
+    gw.text.slice(0, 300),
+  );
+  m = reset();
+  const g2 = await call("create_shop_product", { ...GOODS, dry_run: false });
+  checkTrue(
+    "create_shop_product 沒帶回：write_note 講明翻譯與代稱是寫入時才產生的",
+    /寫入時才自動翻譯/.test(g2.data?.write_note ?? "") &&
+      /寫入時才產生/.test(g2.data?.write_note ?? ""),
+    g2.text.slice(0, 300),
+  );
+}
+
 console.log("\n[6b] zod 內建英文訊息換成中文、稽核參數有上限");
 await rejected(
   "沒送 description → 「必填」",

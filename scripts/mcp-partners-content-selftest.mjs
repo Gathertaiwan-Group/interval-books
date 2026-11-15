@@ -36,6 +36,7 @@ function check(label, actual, expected) {
     console.log(red(`      期望 ${JSON.stringify(expected)}，實得 ${JSON.stringify(actual)}`));
   }
 }
+const checkTrue = (label, cond) => check(label, Boolean(cond), true);
 const readFile = (p) => {
   if (!existsSync(p)) throw new Error(`selftest 讀不到檔案：${p}`);
   return readFileSync(p, "utf8");
@@ -119,9 +120,21 @@ function resolveTs(base) {
 const FAKE_ADMIN =
   "data:text/javascript," +
   encodeURIComponent("export const supabaseAdmin = () => globalThis.__fakeSupabase;");
+// 假的翻譯（🔴 不打真的 Gemini）：只有 [6b] 暫時設 GEMINI_API_KEY 時才會被用到。
+globalThis.__translateCalls = [];
+const FAKE_TRANSLATE =
+  "data:text/javascript," +
+  encodeURIComponent(`
+    export async function translateToEnJa({ text }) {
+      globalThis.__translateCalls.push(text);
+      return { en: "EN" + globalThis.__translateCalls.length + " " + text, ja: "JA " + text };
+    }
+  `);
 registerHooks({
   resolve(spec, ctx, next) {
     if (spec === "@/server/supabase-admin") return { url: FAKE_ADMIN, shortCircuit: true };
+    if (spec === "@/server/translate" || spec === "./translate")
+      return { url: FAKE_TRANSLATE, shortCircuit: true };
     if (spec === "@tanstack/react-start/server-only")
       return { url: "data:text/javascript,", shortCircuit: true };
     if (spec.startsWith("@/")) {
@@ -982,6 +995,130 @@ await expectError("聯絡電話 id 不存在", () =>
 );
 
 // [7] ------------------------------------------------------------------------
+console.log("\n[6b] 預覽＝寫入：confirm_args 帶回不再翻譯（審查 2026-11-15）");
+process.env.GEMINI_API_KEY = "selftest-fake-key";
+{
+  const tr = () => globalThis.__translateCalls.length;
+  const cases = [
+    [
+      "create_curated_theme",
+      { title: "冬天", description: "冬天說明" },
+      () => log.writes.find((w) => w.table === "curated_themes")?.payload,
+      (pv) => pv.will_create,
+    ],
+    [
+      "create_curated_item",
+      { theme_id: "t1", name: "丙", note: "評丙", product_id: "goods-1" },
+      () => log.writes.find((w) => w.table === "curated_items")?.payload,
+      (pv) => pv.will_create,
+    ],
+    [
+      "update_curated_theme",
+      { id: "t2", title: "冬日（改）" },
+      () => log.writes.find((w) => w.table === "curated_themes")?.payload,
+      (pv) => ({ title: pv.changes.title.after }),
+    ],
+    [
+      "update_curated_item",
+      { id: 12, note: "新評語" },
+      () => log.writes.find((w) => w.table === "curated_items")?.payload,
+      (pv) => ({ note: pv.changes.note.after }),
+    ],
+  ];
+  for (const [tool, args, written, expectedOf] of cases) {
+    resetDb(BASE_TABLES, BASE_RPC);
+    const pv = parseOut(await asOAuth(() => H[tool](args)));
+    checkTrue(
+      `${tool} 預覽：有 confirm_args、next_step 要求原樣帶回`,
+      pv.confirm_args?.dry_run === false && /confirm_args/.test(pv.next_step),
+    );
+    const n = tr();
+    resetDb(BASE_TABLES, BASE_RPC);
+    const w = parseOut(await asOAuth(() => H[tool](pv.confirm_args)));
+    const row = written();
+    const exp = expectedOf(pv);
+    check(
+      `${tool} 帶回 confirm_args：寫入的三語＝預覽、沒有再翻譯、沒有 write_note`,
+      [
+        w.written,
+        Object.fromEntries(
+          Object.keys(exp)
+            .filter((k) => ["title", "description", "name", "note"].includes(k))
+            .map((k) => [k, row?.[k]]),
+        ),
+        tr() - n,
+        w.write_note,
+      ],
+      [
+        true,
+        Object.fromEntries(
+          Object.keys(exp)
+            .filter((k) => ["title", "description", "name", "note"].includes(k))
+            .map((k) => [k, exp[k]]),
+        ),
+        0,
+        undefined,
+      ],
+    );
+  }
+  resetDb(BASE_TABLES, BASE_RPC);
+  const raw = parseOut(
+    await asOAuth(() =>
+      H.create_curated_theme({
+        title: "春天",
+        description: "春天說明",
+        dry_run: false,
+        idempotency_key: crypto.randomUUID(),
+      }),
+    ),
+  );
+  checkTrue(
+    "沒帶回（中文字串）：照寫但 write_note 講明寫入時才翻譯",
+    raw.written && /寫入時才自動翻譯/.test(raw.write_note),
+  );
+
+  const listing = {
+    slug: "red-oolong",
+    title: "紅烏龍茶餅",
+    summary: "s",
+    description: "d",
+    price: 480,
+  };
+  resetDb(BASE_TABLES, BASE_RPC);
+  const pv = parseOut(
+    await asOAuth(() =>
+      H.approve_vendor_submission({ id: SUB_PENDING, decision: "approve", listing }),
+    ),
+  );
+  check(
+    "approve_vendor_submission 預覽：confirm_args.listing 帶完整三語、idempotency_key",
+    [
+      pv.confirm_args?.listing?.title,
+      pv.confirm_args?.listing?.slug,
+      pv.confirm_args?.idempotency_key === pv.idempotency_key,
+      pv.confirm_args?.dry_run,
+    ],
+    [pv.will_list.title, "red-oolong", true, false],
+  );
+  const n = tr();
+  resetDb(BASE_TABLES, BASE_RPC);
+  await asOAuth(() => H.approve_vendor_submission(pv.confirm_args));
+  const a = log.rpc.find((r) => r.name === "inv_approve_vendor_product")?.args;
+  check(
+    "approve_vendor_submission 帶回：RPC 收到的上架三語＝預覽、沒有再翻譯",
+    [a?.p_listing?.title, a?.p_listing?.summary, a?.p_listing?.description, tr() - n],
+    [pv.will_list.title, pv.will_list.summary, pv.will_list.description, 0],
+  );
+}
+delete process.env.GEMINI_API_KEY;
+for (const n of ["approve_vendor", "approve_vendor_submission"]) {
+  checkTrue(
+    `${n} 說明：同一位管理員可核准自己建立的、核准前先給使用者看預覽`,
+    /同一位管理員可以核准自己建立的資料/.test(META[n].description) &&
+      /預覽/.test(META[n].description),
+  );
+}
+
 console.log("\n[7] 靜態");
 const srcText = readFile(join(SRC, "server/mcp/partners-content-tools.ts"));
 const code = srcText.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");

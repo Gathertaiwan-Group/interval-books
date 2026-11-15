@@ -50,8 +50,12 @@ import type { ToolAnnotations } from "@modelcontextprotocol/server";
 import type { z as z3 } from "zod";
 import { z } from "zod4";
 import {
+  assertSaleDateNotFuture,
+  assertSaleTotal,
   errText,
   jsonText,
+  MCP_MAX_SALE_TOTAL,
+  MCP_MAX_UNIT_PRICE,
   McpInputError,
   stableStringify,
   zodIssuesText,
@@ -163,9 +167,11 @@ const SETTINGS_READABLE = [...SETTINGS_LOCALIZED, ...SETTINGS_TEXT, "notify_emai
 /* ------------------------------------------------------------------ 進銷存審核 */
 
 /**
- * MCP 開放核准的模組（APPROVAL_MODULES 的子集，代號與 inv_approve_record() 的 CASE 同名）。
+ * approve_inventory_record 開放核准的模組（APPROVAL_MODULES 的子集，代號與 inv_approve_record() 的 CASE 同名）。
  * 2026-11-15 加 combo_sets（套餐，＝後台 approveComboSet，權限 approve_combo_sets）。
- * 供應商、調價、舊異動表不開放——那幾種仍到後台處理。
+ * 廠商不在這份清單，是因為它有自己的工具：approve_vendor（待審廠商）與 approve_vendor_submission
+ * （廠商送審商品），都在 partners-content-tools.ts。調價審核、舊異動表沒有開放，仍到後台處理。
+ * 業主 2026-11-15 決定：同一位管理員可以核准自己建立的資料（不做職責分離），核准前先給使用者看預覽。
  */
 const MCP_APPROVAL_MODULES = ["products", "purchases", "stock_adjustments", "combo_sets"] as const;
 type McpApprovalModule = (typeof MCP_APPROVAL_MODULES)[number];
@@ -591,8 +597,14 @@ export const OPS_WRITE_TOOL_INPUTS = {
           unit_price: z
             .number()
             .min(0)
+            .max(
+              MCP_MAX_UNIT_PRICE,
+              `單價上限 ${MCP_MAX_UNIT_PRICE} 元（防手滑）；更高請到後台 POS`,
+            )
             .optional()
-            .describe("成交單價（元）。省略＝商品售價；可改（折扣、議價）"),
+            .describe(
+              `成交單價（元，上限 ${MCP_MAX_UNIT_PRICE}）。省略＝商品售價；可改（折扣、議價）`,
+            ),
         }),
       )
       .min(1)
@@ -627,7 +639,11 @@ export const OPS_WRITE_TOOL_INPUTS = {
   }),
   create_secondhand_sale: z.object({
     item_name: z.string().trim().min(1).max(200).describe("書名（必填）"),
-    unit_price: z.number().min(0).describe("售價（元，每本）"),
+    unit_price: z
+      .number()
+      .min(0)
+      .max(MCP_MAX_UNIT_PRICE, `單價上限 ${MCP_MAX_UNIT_PRICE} 元（防手滑）；更高請到後台 POS`)
+      .describe(`售價（元，每本，上限 ${MCP_MAX_UNIT_PRICE}）`),
     quantity: z.number().int().min(1).max(999).default(1).describe("數量（預設 1）"),
     payment_method_id: z
       .string()
@@ -824,7 +840,8 @@ export const OPS_WRITE_TOOL_META: Record<
       "只動待審（pending／pending_approval）的那一筆，已處理過的回 written=false。" +
       "通過進貨後庫存由資料庫 trigger 增加；通過在庫異動後庫存依異動數量加減；通過商品後櫃檯才賣得到；通過套餐後櫃檯「套餐結帳」才賣得到。" +
       "後台審核需要 approve_products／approve_purchases／approve_stock_adjustments／approve_combo_sets 權限，MCP 的 OAuth 連線只發給管理員（每次請求重查），管理員具備這四種權限。" +
-      "資料庫沒有「建立者不能自己核准」的規則，與後台相同。需要 OAuth 管理員身分（審核必須記錄操作人員）。" +
+      "同一位管理員可以核准自己建立的資料（業主決定不做職責分離，與後台相同）；核准前請先用 dry_run 預覽，把要核准的內容給使用者看過再送出。" +
+      "需要 OAuth 管理員身分（審核必須記錄操作人員）。" +
       PREVIEW,
     annotations: WRITE,
   },
@@ -834,6 +851,11 @@ export const OPS_WRITE_TOOL_META: Record<
       "與後台 /admin/pos「單品結帳」同一支 RPC（pos_checkout，整車一個交易）：寫入門市銷售、扣庫存（FIFO 成本由資料庫算）、記付款方式。" +
       "單價可改（省略＝售價）。只能賣已核准、啟用、不是租借的商品——待審的商品請先 approve_inventory_record。" +
       "超過可售量時與後台相同：預設被資料庫拒絕；override_reservation=true（＝後台「客人就站在櫃檯，我確認架上有貨，先賣」）才照賣並記賣超告警。" +
+      "單價上限 " +
+      MCP_MAX_UNIT_PRICE.toLocaleString("en-US") +
+      " 元、單筆總額上限 " +
+      MCP_MAX_SALE_TOTAL.toLocaleString("en-US") +
+      " 元（防手滑，超過請到後台 POS）；銷售日期不能晚於今天（台北）。" +
       "需要 OAuth 管理員身分。" +
       PREVIEW,
     annotations: CREATE,
@@ -843,6 +865,11 @@ export const OPS_WRITE_TOOL_META: Record<
     description:
       "與後台 /admin/pos 右上「二手書入帳」同一支 RPC（inv_secondhand_checkout）：寫一筆門市銷售（標記二手書），" +
       "不進商品主檔、不扣任何庫存、沒有成本，金額＝數量×售價由資料庫算。賣掉一本個人藏書／二手書用這支。" +
+      "單價上限 " +
+      MCP_MAX_UNIT_PRICE.toLocaleString("en-US") +
+      " 元、單筆總額上限 " +
+      MCP_MAX_SALE_TOTAL.toLocaleString("en-US") +
+      " 元（防手滑，超過請到後台 POS）；銷售日期不能晚於今天（台北）。" +
       "需要 OAuth 管理員身分。" +
       PREVIEW,
     annotations: CREATE,
@@ -2656,6 +2683,11 @@ const IMPL: Handlers = {
       const p = byId.get(i.product_id)!;
       const unitPrice = i.unit_price ?? (p.selling_price === null ? null : Number(p.selling_price));
       if (unitPrice === null) throw new McpInputError(`「${p.name}」沒有售價，請給 unit_price。`);
+      if (unitPrice > MCP_MAX_UNIT_PRICE) {
+        throw new McpInputError(
+          `「${p.name}」單價 ${unitPrice} 元超過 MCP 上限 ${MCP_MAX_UNIT_PRICE} 元（防手滑）。金額確定沒錯的話請到後台 POS 結帳。`,
+        );
+      }
       return { inv_product_id: i.product_id, quantity: i.quantity, unit_price: unitPrice };
     });
     const payment = await resolvePaymentMethod(args.payment_method_id, args.payment_method);
@@ -2684,6 +2716,8 @@ const IMPL: Handlers = {
     });
     const over = lines.filter((l) => l.over_available > 0);
     const total = lines.reduce((n, l) => n + l.subtotal, 0);
+    assertSaleDateNotFuture(data.sale_date);
+    assertSaleTotal(total);
     const auditChanges = {
       items: data.items,
       payment_method_id: data.payment_method_id,
@@ -2769,6 +2803,8 @@ const IMPL: Handlers = {
       payment_method_id: payment?.payment_method_id ?? null,
       notes: args.notes ?? null,
     });
+    assertSaleDateNotFuture(data.sale_date);
+    assertSaleTotal((Math.round(data.unit_price * 100) / 100) * data.quantity);
     const auditChanges = { ...data };
 
     if (args.dry_run) {

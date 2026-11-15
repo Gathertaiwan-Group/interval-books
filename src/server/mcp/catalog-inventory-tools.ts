@@ -40,12 +40,15 @@ import type { ToolAnnotations } from "@modelcontextprotocol/server";
 import type { z as z3 } from "zod";
 import { z } from "zod4";
 import {
+  CONFIRM_ARGS_NEXT_STEP,
+  confirmArgs,
   errText,
   fillLocalized,
   imageKeyFromArg,
   jsonText,
   McpInputError,
   stableStringify,
+  writeTimeNote,
   zodIssuesText,
   type Localized,
   type LocalizedArg,
@@ -288,6 +291,12 @@ export const CATALOG_INV_TOOL_INPUTS = {
         .regex(/^ocr:\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}\.(webp|jpg|png)$/, "掃描圖代碼不正確")
         .optional()
         .describe("上一次辨識回傳的 scan_key（ocr:…），用同一張圖再辨識一次，不必重傳"),
+      confirm: z
+        .boolean()
+        .default(false)
+        .describe(
+          "預設 false：只檢查參數、回報「將會上傳到私有掃描區並花一次辨識額度」，不上傳、不辨識、不下載。使用者同意後再用 true 呼叫才真的上傳＋辨識。",
+        ),
     })
     .refine(
       (v) =>
@@ -476,6 +485,7 @@ export const CATALOG_INV_TOOL_META: Record<
       "再用後台同一套規則比對既有商品與廠商。**不建立任何進貨**——回傳 suggested_import，請使用者逐列確認或修改後，再呼叫 import_purchases（先 dry_run 預覽）。" +
       "圖片給其中一種：image_base64（網頁版 Claude）、image_url（公開 https）、file（ChatGPT 對話裡的照片）、upload_id（能跑 curl：create_image_upload_url 傳完直接給 upload_id，不要 finalize）、scan_key（同一張重新辨識）。" +
       "JPEG／PNG／WebP，原檔 2MB 以內。每次辨識都會花辨識額度並記稽核。" +
+      "預設 confirm=false 只檢查參數、說明將會做什麼（不上傳、不辨識、不花額度）；使用者同意後 confirm=true 才執行。" +
       OAUTH,
     annotations: RECOGNISE,
     _meta: { "openai/fileParams": ["file"] },
@@ -579,7 +589,13 @@ async function preview(
   auditChanges: unknown,
 ): Promise<TextResult> {
   await audit(tool, entity, entityId, action, auditChanges, true);
-  return jsonText({ dry_run: true, written: false, action, ...body, next_step: NEXT_STEP });
+  return jsonText({
+    dry_run: true,
+    written: false,
+    action,
+    ...body,
+    next_step: typeof body.next_step === "string" ? body.next_step : NEXT_STEP,
+  });
 }
 
 async function committed(
@@ -791,6 +807,59 @@ async function scanKeyFromArgs(
   return { scanKey: stored.key, source, detail: { ...detail, ...up.imageSummary(validated) } };
 }
 
+/**
+ * recognize_purchase_order 的 confirm=false：只檢查參數，不上傳、不辨識、不下載、不消耗 upload_id。
+ * base64 在本機就能驗格式與大小（純計算，沒有副作用），其他來源只說明將會怎麼取圖。
+ */
+async function recognisePreview(
+  tool: string,
+  args: Args<"recognize_purchase_order">,
+): Promise<TextResult> {
+  let source: string;
+  let detail: Record<string, unknown> = {};
+  if (args.scan_key) {
+    source = "scan_key";
+    detail = { scan_key: args.scan_key, will: "沿用已存好的掃描圖，不再上傳" };
+  } else if (args.upload_id) {
+    source = "upload_id";
+    detail = { will: "把這個 upload_id 暫存的照片搬進私有掃描區（upload_id 會被用掉）" };
+  } else if (args.image_base64) {
+    source = "base64";
+    const up = await import("./image-upload");
+    // 兩支都只丟 McpInputError（格式、大小不對），純計算。
+    const validated = up.validateImageBytes(
+      up.decodeBase64Image(args.image_base64.data),
+      args.image_base64.content_type ?? null,
+    );
+    detail = { ...up.imageSummary(validated), will: "存進私有掃描區" };
+  } else if (args.image_url) {
+    source = "url";
+    detail = { host: new URL(args.image_url).hostname, will: "下載這張圖並存進私有掃描區" };
+  } else if (args.file) {
+    source = "chatgpt_file";
+    detail = { file_id: args.file.file_id, will: "下載這張圖並存進私有掃描區" };
+  } else {
+    throw new McpInputError("沒有收到圖片");
+  }
+  await audit(tool, "ocr_scan", "(未上傳)", "recognise_preview", { source, ...detail }, true);
+  return jsonText({
+    dry_run: true,
+    confirm: false,
+    written: false,
+    uploaded: false,
+    recognised: false,
+    source,
+    ...detail,
+    will_do: [
+      "把照片存進私有掃描區（ocr-scans，不公開、不進網站圖片區）",
+      "呼叫辨識服務讀出廠商、日期與每一列品項——會花一次辨識額度",
+      "不會建立任何進貨（辨識結果只是建議，之後要 import_purchases）",
+    ],
+    next_step:
+      "還沒有上傳也還沒有辨識。請先跟使用者確認要花一次辨識額度，同意後用同樣的參數加上 confirm=true 再呼叫一次。",
+  });
+}
+
 /* ------------------------------------------------------------------ handlers */
 
 const IMPL: { [N in CatalogInvToolName]: (args: Args<N>) => Promise<TextResult> } = {
@@ -903,13 +972,24 @@ const IMPL: { [N in CatalogInvToolName]: (args: Args<N>) => Promise<TextResult> 
 
     const auditChanges = { ...data, translated };
     if (args.dry_run) {
+      const key = args.idempotency_key ?? randomUUID();
       return preview(
         tool,
         "product",
         "(未建立)",
         "create_listing",
         {
-          idempotency_key: args.idempotency_key ?? randomUUID(),
+          idempotency_key: key,
+          confirm_args: confirmArgs(args, {
+            title: data.title,
+            summary: data.summary,
+            description: data.description,
+            slug: data.slug,
+            price: data.price,
+            image_key: data.image_key,
+            idempotency_key: key,
+          }),
+          next_step: CONFIRM_ARGS_NEXT_STEP,
           will_create: {
             ...data,
             stock: "由進銷存決定（網站商品不存庫存）",
@@ -946,6 +1026,7 @@ const IMPL: { [N in CatalogInvToolName]: (args: Args<N>) => Promise<TextResult> 
         product_id: res.product_id,
         slug: data.slug,
         status: data.status,
+        write_note: writeTimeNote(translated, args.slug ? null : data.slug),
         ...(data.status === "draft"
           ? { next_step: "目前是草稿，網站看不到。要開賣用 update_shop_product 設 status=active。" }
           : {}),
@@ -1190,6 +1271,7 @@ const IMPL: { [N in CatalogInvToolName]: (args: Args<N>) => Promise<TextResult> 
   async recognize_purchase_order(args) {
     const tool = "recognize_purchase_order";
     await oauthUserId(tool);
+    if (!args.confirm) return recognisePreview(tool, args);
     const scan = await scanKeyFromArgs(args);
 
     const [{ recognisePurchaseOrder, OcrError }, { listPosProducts }, purchasesRepo] =

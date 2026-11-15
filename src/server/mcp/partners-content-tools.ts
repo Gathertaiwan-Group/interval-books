@@ -51,11 +51,14 @@ import type { ToolAnnotations } from "@modelcontextprotocol/server";
 import type { z as z3 } from "zod";
 import { z } from "zod4";
 import {
+  CONFIRM_ARGS_NEXT_STEP,
+  confirmArgs,
   errText,
   fillLocalized,
   jsonText,
   McpInputError,
   stableStringify,
+  writeTimeNote,
   zodIssuesText,
   type LocalizedArg,
   type TextResult,
@@ -548,6 +551,7 @@ export const PARTNERS_CONTENT_TOOL_META: Record<
       "與後台「廠商送審」的「核准」「核准並上架」「退回」三顆按鈕同一支（fns/inv-vendors.ts#approveVendorSubmission → inv_approve_vendor_product）。" +
       "給 listing＝核准並上架：同一個資料庫交易建網站商品（三語文案、網址代稱、定價；圖片沿用廠商上傳的），此時 dry_run=false 必帶 idempotency_key。" +
       "只動待審的那一筆，已處理過的回 written=false。後台需要 approve_products 權限；MCP 的 OAuth 連線只發給管理員（管理員具備全部審核權限）。" +
+      "同一位管理員可以核准自己建立的資料（業主決定不做職責分離，與後台相同）；核准前請先用 dry_run 預覽，把要核准的內容給使用者看過再送出。" +
       OAUTH +
       PREVIEW,
     annotations: CREATE,
@@ -579,6 +583,7 @@ export const PARTNERS_CONTENT_TOOL_META: Record<
     description:
       "與後台廠商清單的「核准」「退回」按鈕同一支（fns/inv-vendors.ts#approveVendor → inv_approve_record 'vendors'）。" +
       "只動待審（pending）的那一筆。後台需要 approve_vendors 權限；MCP 的 OAuth 連線只發給管理員（管理員具備全部審核權限）。" +
+      "同一位管理員可以核准自己建立的資料（業主決定不做職責分離，與後台相同）；核准前請先用 dry_run 預覽，把要核准的內容給使用者看過再送出。" +
       OAUTH +
       PREVIEW,
     annotations: WRITE,
@@ -706,6 +711,37 @@ async function fillL(field: string, arg: LocalizedArg) {
   return fillLocalized(field, arg, complete ? null : await translator());
 }
 
+/** fillL 結果裡「是自動翻譯補的」那幾欄的名字。 */
+function translatedNames(rs: Record<string, { translated: boolean }>): string[] {
+  return Object.entries(rs)
+    .filter(([, r]) => r.translated)
+    .map(([k]) => k);
+}
+
+/** 修改類：有送的三語欄位補齊（沒送＝不動），回補好的值與哪幾欄是自動翻譯。 */
+async function fillSome(
+  fields: Record<string, LocalizedArg | undefined>,
+): Promise<{ values: Record<string, unknown>; translated: string[] }> {
+  const values: Record<string, unknown> = {};
+  const translated: string[] = [];
+  for (const [k, v] of Object.entries(fields)) {
+    if (v === undefined) continue;
+    const r = await fillL(k, v);
+    values[k] = r.value;
+    if (r.translated) translated.push(k);
+  }
+  return { values, translated };
+}
+
+/** 修改類預覽：有自動翻譯才附 confirm_args（沒有翻譯＝原參數就已經是定案值）。 */
+function lockedPreview(
+  args: Record<string, unknown>,
+  filled: { values: Record<string, unknown>; translated: string[] },
+): Record<string, unknown> {
+  if (!filled.translated.length) return {};
+  return { confirm_args: confirmArgs(args, filled.values), next_step: CONFIRM_ARGS_NEXT_STEP };
+}
+
 async function audit(
   tool: string,
   entity: string,
@@ -737,7 +773,13 @@ async function preview(
   auditChanges: unknown,
 ): Promise<TextResult> {
   await audit(tool, entity, entityId, action, auditChanges, true);
-  return jsonText({ dry_run: true, written: false, action, ...body, next_step: NEXT_STEP });
+  return jsonText({
+    dry_run: true,
+    written: false,
+    action,
+    ...body,
+    next_step: typeof body.next_step === "string" ? body.next_step : NEXT_STEP,
+  });
 }
 
 async function committed(
@@ -1002,8 +1044,10 @@ const IMPL: Impl = {
       sort_order: sortOrder,
     });
     const translated = [title, description].some((r) => r.translated);
+    const translatedFields = translatedNames({ title, description });
     const auditChanges = { will_create: payload };
     if (args.dry_run) {
+      const key = await previewKey(args.idempotency_key);
       return preview(
         tool,
         "curated_theme",
@@ -1012,8 +1056,15 @@ const IMPL: Impl = {
         {
           will_create: payload,
           ...(translated ? { note: "英日文是自動翻譯的，請一併確認。" } : {}),
-          idempotency_key: await previewKey(args.idempotency_key),
+          idempotency_key: key,
           reminder: CURATED_NOTE,
+          confirm_args: confirmArgs(args, {
+            title: title.value,
+            description: description.value,
+            sort_order: sortOrder,
+            idempotency_key: key,
+          }),
+          next_step: CONFIRM_ARGS_NEXT_STEP,
         },
         auditChanges,
       );
@@ -1028,7 +1079,7 @@ const IMPL: Impl = {
       "curated_theme",
       row.id,
       "create",
-      { written: true, theme: row },
+      { written: true, theme: row, write_note: writeTimeNote(translatedFields) },
       { ...auditChanges, id: row.id },
     );
   },
@@ -1046,9 +1097,8 @@ const IMPL: Impl = {
       is_published: current.is_published,
       sort_order: current.sort_order,
     };
-    if (args.title !== undefined) next.title = (await fillL("title", args.title)).value;
-    if (args.description !== undefined)
-      next.description = (await fillL("description", args.description)).value;
+    const filled = await fillSome({ title: args.title, description: args.description });
+    Object.assign(next, filled.values);
     if (args.is_published !== undefined) next.is_published = args.is_published;
     if (args.sort_order !== undefined) next.sort_order = args.sort_order;
     const { curatedThemeSchema } = await import("@/lib/admin/schemas");
@@ -1056,7 +1106,14 @@ const IMPL: Impl = {
     const changes = diff(current, payload, ["title", "description", "is_published", "sort_order"]);
     if (Object.keys(changes).length === 0) return noChange(tool, current.id, args.dry_run);
     if (args.dry_run) {
-      return preview(tool, "curated_theme", current.id, "update", { changes }, { changes });
+      return preview(
+        tool,
+        "curated_theme",
+        current.id,
+        "update",
+        { changes, ...lockedPreview(args, filled) },
+        { changes },
+      );
     }
     const { upsertCuratedTheme } = await import("@/server/repos/curated");
     await commitOrAudit(tool, "curated_theme", current.id, "update", { changes }, () =>
@@ -1067,7 +1124,7 @@ const IMPL: Impl = {
       "curated_theme",
       current.id,
       "update",
-      { written: true, changes },
+      { written: true, changes, write_note: writeTimeNote(filled.translated) },
       { changes },
     );
   },
@@ -1100,6 +1157,7 @@ const IMPL: Impl = {
           : "⚠️ 沒有連結商品：前台不會顯示這個選品，只存在後台。";
     const auditChanges = { will_create: payload };
     if (args.dry_run) {
+      const key = await previewKey(args.idempotency_key);
       return preview(
         tool,
         "curated_item",
@@ -1113,7 +1171,13 @@ const IMPL: Impl = {
           ...(name.translated || note.translated
             ? { note: "英日文是自動翻譯的，請一併確認。" }
             : {}),
-          idempotency_key: await previewKey(args.idempotency_key),
+          idempotency_key: key,
+          confirm_args: confirmArgs(args, {
+            name: name.value,
+            note: note.value,
+            idempotency_key: key,
+          }),
+          next_step: CONFIRM_ARGS_NEXT_STEP,
         },
         auditChanges,
       );
@@ -1128,7 +1192,12 @@ const IMPL: Impl = {
       "curated_item",
       String(row.id),
       "create",
-      { written: true, item: row, visibility },
+      {
+        written: true,
+        item: row,
+        visibility,
+        write_note: writeTimeNote(translatedNames({ name, note })),
+      },
       { ...auditChanges, id: row.id },
     );
   },
@@ -1148,8 +1217,8 @@ const IMPL: Impl = {
       is_published: current.is_published,
       sort_order: current.sort_order,
     };
-    if (args.name !== undefined) next.name = (await fillL("name", args.name)).value;
-    if (args.note !== undefined) next.note = (await fillL("note", args.note)).value;
+    const filled = await fillSome({ name: args.name, note: args.note });
+    Object.assign(next, filled.values);
     if (args.is_published !== undefined) next.is_published = args.is_published;
     if (args.product_id !== undefined) next.product_id = args.product_id;
     const { curatedItemSchema } = await import("@/lib/admin/schemas");
@@ -1170,7 +1239,12 @@ const IMPL: Impl = {
         "curated_item",
         String(current.id),
         "update",
-        { changes, linked_product: linked, ...(visibility ? { visibility } : {}) },
+        {
+          changes,
+          linked_product: linked,
+          ...(visibility ? { visibility } : {}),
+          ...lockedPreview(args, filled),
+        },
         { changes },
       );
     }
@@ -1183,7 +1257,12 @@ const IMPL: Impl = {
       "curated_item",
       String(current.id),
       "update",
-      { written: true, changes, ...(visibility ? { visibility } : {}) },
+      {
+        written: true,
+        changes,
+        ...(visibility ? { visibility } : {}),
+        write_note: writeTimeNote(filled.translated),
+      },
       { changes },
     );
   },
@@ -1287,6 +1366,7 @@ const IMPL: Impl = {
     }
     let listing: Record<string, unknown> | null = null;
     let translated = false;
+    let translatedListing: string[] = [];
     if (args.listing) {
       const l = args.listing;
       const [title, summary, description] = await Promise.all([
@@ -1295,6 +1375,11 @@ const IMPL: Impl = {
         fillL("listing.description", l.description as LocalizedArg),
       ]);
       translated = [title, summary, description].some((r) => r.translated);
+      translatedListing = translatedNames({
+        "listing.title": title,
+        "listing.summary": summary,
+        "listing.description": description,
+      });
       listing = {
         slug: l.slug,
         product_type: l.product_type,
@@ -1333,11 +1418,24 @@ const IMPL: Impl = {
         {
           target,
           status: auditChanges.status,
-          ...(valid.listing
-            ? {
-                will_list: valid.listing,
-                idempotency_key: await previewKey(args.idempotency_key),
-              }
+          ...(valid.listing && listing
+            ? await (async () => {
+                const key = await previewKey(args.idempotency_key);
+                return {
+                  will_list: valid.listing,
+                  idempotency_key: key,
+                  confirm_args: confirmArgs(args, {
+                    listing: {
+                      ...(args.listing as Record<string, unknown>),
+                      title: listing.title,
+                      summary: listing.summary,
+                      description: listing.description,
+                    },
+                    idempotency_key: key,
+                  }),
+                  next_step: CONFIRM_ARGS_NEXT_STEP,
+                };
+              })()
             : {}),
           ...(translated ? { note: "英日文是自動翻譯的，請一併確認。" } : {}),
         },
@@ -1362,6 +1460,7 @@ const IMPL: Impl = {
       {
         written: res.changed,
         result: res,
+        write_note: writeTimeNote(translatedListing),
         ...(!res.changed
           ? { message: `已經有人審過了（目前：${res.previous_status ?? "未知"}）。` }
           : {}),

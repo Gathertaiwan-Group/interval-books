@@ -329,6 +329,92 @@ export async function fillLocalized(
   return { value: { zh, en: fillEn, ja: fillJa }, translated: true };
 }
 
+/* ------------------------------------------------------------------ 預覽＝寫入（三語／代稱鎖定） */
+
+/**
+ * 審查 2026-11-15：建立／修改類工具在 dry_run=false 時若重新跑翻譯、重新產生帶亂數的網址代稱，
+ * 使用者確認過的英日文／網址就不是最後寫進去的那一份。
+ *
+ * 做法（無狀態，選它而不是「用 idempotency_key 暫存預覽」的理由）：
+ *   · Vercel 是多台無狀態實例，暫存要另開資料表（＝改 DB），而且修改類工具根本沒有 idempotency_key；
+ *   · 預覽把「補齊後的完整參數」整份回給呼叫端（confirm_args：英日文已是 {zh,en,ja}、網址代稱／排序已定案、
+ *     dry_run=false），正式送出原樣帶回 —— fillLocalized 看到 en、ja 都有就不呼叫翻譯，
+ *     有 slug 就不產生代稱，所以寫入的就是預覽的那一份；
+ *   · 呼叫端沒帶回（又送了一段中文字串）時仍可寫入，但結果會用 write_note 明講「這次是寫入時重翻的」。
+ */
+export const CONFIRM_ARGS_NEXT_STEP =
+  "這只是預覽，還沒有寫入。使用者確認後，請把 confirm_args 原樣當作參數再呼叫一次（它就是這次的參數，只是 dry_run 已改成 false、英日文已補成 {zh,en,ja}、網址代稱與排序已定案）。" +
+  "原樣帶回就不會重新翻譯、也不會重新產生網址代稱，寫進去的就是這份預覽；要改任何欄位，請改完重新預覽給使用者看。";
+
+/**
+ * 組出 confirm_args：原本的參數（去掉 undefined 與 dry_run）蓋上「已定案的值」，dry_run=false。
+ * resolved 裡值為 undefined 的 key 不覆寫。
+ */
+export function confirmArgs(
+  args: Record<string, unknown>,
+  resolved: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(args)) {
+    if (v !== undefined && k !== "dry_run") out[k] = v;
+  }
+  for (const [k, v] of Object.entries(resolved)) {
+    if (v !== undefined) out[k] = v;
+  }
+  out.dry_run = false;
+  return out;
+}
+
+/** 正式寫入時才翻譯／才產生代稱（呼叫端沒帶回 confirm_args）→ 在結果裡明講。沒有就回 undefined。 */
+export function writeTimeNote(translated: readonly string[], generatedSlug?: string | null) {
+  const parts: string[] = [];
+  if (translated.length) {
+    parts.push(
+      `${translated.join("、")} 的英日文是這次寫入時才自動翻譯的（沒有帶回預覽的 {zh,en,ja}），可能與預覽看到的不同`,
+    );
+  }
+  if (generatedSlug)
+    parts.push(`網址代稱「${generatedSlug}」是這次寫入時才產生的（沒有帶回預覽的 slug）`);
+  if (!parts.length) return undefined;
+  return `注意：${parts.join("；")}。實際寫入的內容以這個結果為準，有需要請用對應的 update_* 修改。`;
+}
+
+/* ------------------------------------------------------------------ 門市金額與日期 */
+
+/**
+ * 門市結帳類工具（單品結帳、二手書入帳、套餐結帳、套餐組合價）的 MCP 層上限（審查 2026-11-15）。
+ * 小時光是書店＋選物：書、刊物、選物單價多在數百到數千元，最貴的套組也遠低於十萬。
+ *   · 單價／組合價 ≤ 100,000 元：手機上多打一個 0 或把總額當單價時擋得住；
+ *   · 單筆結帳總額 ≤ 300,000 元：大宗團購仍過得去，再大的請到後台 POS 結帳。
+ * 只是防手滑，不是業務規則：真的超過請到後台處理（後台不受這個限制）。
+ */
+export const MCP_MAX_UNIT_PRICE = 100_000;
+export const MCP_MAX_SALE_TOTAL = 300_000;
+
+/** 台北今天（YYYY-MM-DD）。Vercel 是 UTC，不用 toLocaleString。 */
+export function taipeiDate(nowMs: number = Date.now()): string {
+  return new Date(nowMs + 8 * 3_600_000).toISOString().slice(0, 10);
+}
+
+/** 銷售日期不得晚於今天（台北）。 */
+export function assertSaleDateNotFuture(date: string, nowMs: number = Date.now()): void {
+  const today = taipeiDate(nowMs);
+  if (date > today) {
+    throw new McpInputError(
+      `銷售日期 ${date} 晚於今天（台北 ${today}）。不能預先入帳未來日期的銷售。`,
+    );
+  }
+}
+
+/** 單筆結帳總額上限。 */
+export function assertSaleTotal(total: number): void {
+  if (total > MCP_MAX_SALE_TOTAL) {
+    throw new McpInputError(
+      `這一筆結帳總額 ${total} 元超過 MCP 上限 ${MCP_MAX_SALE_TOTAL.toLocaleString("en-US")} 元（防手滑）。金額確定沒錯的話請到後台 POS 結帳。`,
+    );
+  }
+}
+
 /* ------------------------------------------------------------------ 圖片 */
 
 export type ImageInfo = { format: "png" | "jpeg" | "webp"; width: number; height: number };

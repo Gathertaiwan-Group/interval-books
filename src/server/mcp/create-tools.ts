@@ -26,11 +26,14 @@
 import "@tanstack/react-start/server-only";
 import { z } from "zod4";
 import {
+  CONFIRM_ARGS_NEXT_STEP,
+  confirmArgs,
   errText,
   fillLocalized,
   imageKeyFromArg,
   jsonText,
   McpInputError,
+  writeTimeNote,
   zodIssuesText,
   type Localized,
   type LocalizedArg,
@@ -43,7 +46,10 @@ import {
   DEFAULT_JOURNEY_CAPACITY,
   DEFAULT_LOCATION,
   QUICK_LIMITS,
+  localizedOf,
   pastSessionErrors,
+  stringsToTranslate,
+  summaryOf,
   planCapacityFor,
   validateQuickCreate,
   type QuickCreateErrors,
@@ -667,6 +673,68 @@ export function toQuickCreateInput(
   return { input, preset };
 }
 
+/**
+ * create_event／create_journey 預覽的 confirm_args：每個有給的三語欄位換成這次實際會寫入的
+ * {zh,en,ja}（翻譯失敗暫用中文的那幾段也照實鎖住），網址代稱鎖成預覽算出來的那一個。
+ * 正式送出原樣帶回 → toQuickCreateInput 把 en/ja 都放進 preset → prepareEventQuick 不再翻譯。純函式。
+ */
+export function lockedEventArgs(
+  kind: QuickKind,
+  args: CreateEventArgs,
+  prepared: {
+    input: QuickCreateInput;
+    slug: string;
+    translations: Map<string, { en: string; ja: string }>;
+  },
+): Record<string, unknown> {
+  const tr = prepared.translations;
+  const lock = (v: LocalizedArg | undefined): Localized | undefined => {
+    const a = toArg(v);
+    if (!a || !a.zh) return undefined;
+    // 預設地點不送翻譯，寫入時用寫死的那組三語（buildQuickCreatePlan）：鎖成同一組。
+    if (a.zh === DEFAULT_LOCATION.zh) return { ...DEFAULT_LOCATION };
+    return localizedOf(a.zh, tr);
+  };
+  const derivedSummary = summaryOf(prepared.input);
+  const resolved: Record<string, unknown> = {
+    title: lock(args.title),
+    description: lock(args.description),
+    // 沒給摘要＝從簡介截一段：也鎖住，正式送出時 summaryOf() 會原樣用它。
+    summary:
+      args.summary !== undefined
+        ? lock(args.summary)
+        : derivedSummary
+          ? localizedOf(derivedSummary, tr)
+          : undefined,
+    location: lock(args.location),
+    slug: prepared.slug,
+  };
+  if (args.sessions) {
+    resolved.sessions = args.sessions.map((s) =>
+      s.location === undefined ? s : { ...s, location: lock(s.location) },
+    );
+  }
+  if (args.ticket_types) {
+    resolved.ticket_types = args.ticket_types.map((p) => ({ ...p, name: lock(p.name) }));
+  }
+  const theme = (args as { theme?: LocalizedArg }).theme;
+  if (kind === "journey" && theme !== undefined) resolved.theme = lock(theme);
+  return confirmArgs(args as Record<string, unknown>, resolved);
+}
+
+/** 正式寫入時才送去翻譯的那幾段（呼叫端沒帶回 confirm_args 的 en/ja）。給 write_note 用。 */
+function stringsTranslatedAtWrite(
+  prepared: { input: QuickCreateInput },
+  preset: Map<string, { en?: string; ja?: string }>,
+): string[] {
+  return stringsToTranslate(prepared.input)
+    .filter((zh) => {
+      const p = preset.get(zh);
+      return !(p?.en?.trim() && p?.ja?.trim());
+    })
+    .map((zh) => `「${[...zh].length > 20 ? `${[...zh].slice(0, 20).join("")}…` : zh}」`);
+}
+
 /** 台北時間的顯示字串（不用 toLocaleString；Vercel 是 UTC）。 */
 function taipeiText(iso: string): string {
   const d = new Date(Date.parse(iso) + 8 * 3600_000);
@@ -802,9 +870,9 @@ export async function runCreateEvent(kind: QuickKind, args: CreateEventArgs): Pr
           written: false,
           will_create: preview,
           translation_note: translationNote,
+          confirm_args: lockedEventArgs(kind, args, prepared),
           next_step:
-            `這只是預覽，還沒有寫入。確認無誤後，用同樣的參數加上 dry_run=false 再呼叫一次。` +
-            `英日文是自動翻譯的，正式呼叫時會重新翻譯；要保證一字不差，請把上面的 en/ja 以 {"zh","en","ja"} 帶進來。` +
+            CONFIRM_ARGS_NEXT_STEP +
             (input.publish
               ? ""
               : `預設建成草稿，網站上看不到；建好後可用 set_event_status（status=live）上架${kind === "journey" ? "，策旅卡片會一起上架" : ""}。`),
@@ -838,6 +906,10 @@ export async function runCreateEvent(kind: QuickKind, args: CreateEventArgs): Pr
         url: `${SITE_ORIGIN}/events/${saved.slug}`,
         published: saved.published,
         created: preview,
+        write_note: writeTimeNote(
+          stringsTranslatedAtWrite(prepared, preset),
+          args.slug ? null : saved.slug,
+        ),
         translation_note:
           saved.untranslated > 0
             ? `有 ${saved.untranslated} 段英日文暫用中文，可用 update_${kind === "journey" ? "journey" : "event"} 補。`
@@ -971,12 +1043,13 @@ export async function runCreateShopProduct(
           written: false,
           will_create: preview,
           stock_note: stockNote,
-          next_step:
-            "這只是預覽，還沒有寫入。確認無誤後，用同樣的參數加上 dry_run=false 再呼叫一次。" +
-            (translated.length
-              ? '英日文是自動翻譯的；要保證寫入的譯文與這裡一字不差，請把上面的 en/ja 以 {"zh","en","ja"} 帶進正式呼叫。'
-              : "") +
-            (args.slug ? "" : "網址代稱的亂數尾巴每次呼叫都會不同；要固定請帶 slug。"),
+          confirm_args: confirmArgs(args as Record<string, unknown>, {
+            title: valid.title,
+            summary: valid.summary,
+            description: valid.description,
+            slug: valid.slug,
+          }),
+          next_step: CONFIRM_ARGS_NEXT_STEP,
         },
       };
     }
@@ -994,6 +1067,7 @@ export async function runCreateShopProduct(
         slug: row.slug,
         status: row.status,
         created: preview,
+        write_note: writeTimeNote(translated, args.slug ? null : row.slug),
         stock_note: stockNote,
         next_step: `要上架：先請店員設定庫存，再用 update_shop_product（id=${row.id}）設 status=active。`,
       },

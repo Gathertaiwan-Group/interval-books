@@ -37,6 +37,7 @@ function check(label, actual, expected) {
     console.log(red(`      期望 ${JSON.stringify(expected)}，實得 ${JSON.stringify(actual)}`));
   }
 }
+const checkTrue = (label, cond) => check(label, Boolean(cond), true);
 const readFile = (p) => {
   if (!existsSync(p)) throw new Error(`selftest 讀不到檔案：${p}`);
   return readFileSync(p, "utf8");
@@ -156,6 +157,18 @@ const FAKE_GCAL =
     export async function nudgeGoogleCalendarSync() { globalThis.__gcalCalls.push(["nudge"]); }
   `);
 
+// 假的翻譯（🔴 不打真的 Gemini）：只記錄呼叫次數。
+globalThis.__translateCalls = [];
+const FAKE_TRANSLATE =
+  "data:text/javascript," +
+  encodeURIComponent(`
+    export async function translateToEnJa({ text }) {
+      globalThis.__translateCalls.push(text);
+      return { en: "EN" + globalThis.__translateCalls.length + " " + text, ja: "JA " + text };
+    }
+  `);
+process.env.GEMINI_API_KEY = "selftest-fake-key";
+
 function resolveTs(base) {
   for (const cand of [`${base}.ts`, `${base}.tsx`, join(base, "index.ts")]) {
     if (existsSync(cand)) return pathToFileURL(cand).href;
@@ -170,6 +183,8 @@ registerHooks({
     if (spec === "@/server/supabase-admin") return { url: FAKE_ADMIN, shortCircuit: true };
     if (spec === "@/server/notify") return { url: FAKE_NOTIFY, shortCircuit: true };
     if (spec === "@/server/google-calendar") return { url: FAKE_GCAL, shortCircuit: true };
+    if (spec === "@/server/translate" || spec === "./translate")
+      return { url: FAKE_TRANSLATE, shortCircuit: true };
     if (spec === "@tanstack/react-start/server-only")
       return { url: "data:text/javascript,", shortCircuit: true };
     if (spec.startsWith("@/")) {
@@ -828,6 +843,180 @@ check(
 );
 
 // [7] ------------------------------------------------------------------------
+console.log("\n[6b] 預覽＝寫入、票種人數、改期警告（審查 2026-11-15）");
+{
+  // 翻譯假模組每次回不同的英文（EN1、EN2…）：寫入時若重翻，結果一定跟預覽不同。
+  resetDb(BASE, RPC);
+  globalThis.__translateCalls = [];
+  const pv = parseOut(
+    await asOAuth(() =>
+      H.create_event_session({
+        ...SAMPLE.create_event_session,
+        title: "第三場",
+        location: "書店二樓",
+      }),
+    ),
+  );
+  const ca = pv.confirm_args;
+  check(
+    "create_event_session 預覽：confirm_args 帶完整三語、排序、idempotency_key、dry_run=false",
+    [
+      ca?.title,
+      ca?.location?.zh,
+      ca?.sort_order,
+      ca?.idempotency_key === pv.idempotency_key,
+      ca?.dry_run,
+    ],
+    [pv.will_create.title, "書店二樓", pv.will_create.sort_order, true, false],
+  );
+  checkTrue("create_event_session 預覽：next_step 要求原樣帶回", /confirm_args/.test(pv.next_step));
+  checkTrue("confirm_args 通過工具 schema", INPUTS.create_event_session.safeParse(ca).success);
+  const before = globalThis.__translateCalls.length;
+  resetDb(BASE, RPC);
+  const w = parseOut(await asOAuth(() => H.create_event_session(ca)));
+  const insSess = dataWrites().find((x) => x.table === "event_sessions");
+  check(
+    "create_event_session 帶回 confirm_args：寫入的三語＝預覽、沒有再呼叫翻譯、沒有 write_note",
+    [
+      w.written,
+      insSess?.payload?.title,
+      insSess?.payload?.location,
+      globalThis.__translateCalls.length - before,
+      w.write_note,
+    ],
+    [true, pv.will_create.title, pv.will_create.location, 0, undefined],
+  );
+
+  resetDb(BASE, RPC);
+  const raw = parseOut(
+    await asOAuth(() =>
+      H.create_event_session({
+        ...SAMPLE.create_event_session,
+        title: "第四場",
+        dry_run: false,
+        idempotency_key: crypto.randomUUID(),
+      }),
+    ),
+  );
+  checkTrue(
+    "沒帶回（中文字串）：照寫但 write_note 明講寫入時才翻譯",
+    raw.written && /寫入時才自動翻譯/.test(raw.write_note),
+  );
+
+  for (const [tool, args] of [
+    ["create_ticket_type", { ...SAMPLE.create_ticket_type, title: "親子票" }],
+    ["create_event_block", { ...SAMPLE.create_event_block, title: "問題", body: "回答" }],
+  ]) {
+    resetDb(BASE, RPC);
+    const p1 = parseOut(await asOAuth(() => H[tool](args)));
+    const n = globalThis.__translateCalls.length;
+    resetDb(BASE, RPC);
+    const w1 = parseOut(await asOAuth(() => H[tool](p1.confirm_args)));
+    const ins = dataWrites().find((x) => x.op === "insert");
+    check(
+      `${tool} 帶回 confirm_args：寫入標題＝預覽、沒有再翻譯`,
+      [w1.written, ins?.payload?.title, globalThis.__translateCalls.length - n],
+      [true, p1.will_create.title, 0],
+    );
+  }
+  for (const [tool, args, key] of [
+    ["update_event_session", { session_id: SESS1, title: "第一場（改）" }, "event_sessions"],
+    ["update_ticket_type", { ticket_type_id: PLAN1, title: "早鳥票" }, "event_session_plans"],
+    ["update_event_block", { event_id: EVENT1, block_id: 12, body: "新答案" }, "event_blocks"],
+  ]) {
+    resetDb(BASE, RPC);
+    const p1 = parseOut(await asOAuth(() => H[tool](args)));
+    const field = Object.keys(p1.changes).find((k) => k === "title" || k === "body");
+    const n = globalThis.__translateCalls.length;
+    resetDb(BASE, RPC);
+    const w1 = parseOut(await asOAuth(() => H[tool](p1.confirm_args)));
+    const upd = dataWrites().find((x) => x.table === key);
+    check(
+      `${tool} 帶回 confirm_args：寫入＝預覽的 after、沒有再翻譯`,
+      [w1.written, upd?.payload?.[field], globalThis.__translateCalls.length - n],
+      [true, p1.changes[field].after, 0],
+    );
+  }
+}
+await expectError(
+  "update_ticket_type 已售出後改每張佔幾個名額",
+  () => H.update_ticket_type({ ticket_type_id: PLAN1, seats_per_unit: 2, dry_run: false }),
+  /已售出 4 張/,
+);
+await expectError(
+  "update_ticket_type 已售出後改每張佔幾個名額（預覽也擋）",
+  () => H.update_ticket_type({ ticket_type_id: PLAN1, seats_per_unit: 2 }),
+  /另開一個票種/,
+);
+{
+  resetDb(BASE, RPC);
+  tables.event_session_plans[0].units_taken = 0;
+  const ok = parseOut(
+    await asOAuth(() => H.update_ticket_type({ ticket_type_id: PLAN1, seats_per_unit: 2 })),
+  );
+  check("update_ticket_type 未售出：可以改每張佔幾個名額", ok.changes?.seats_per_unit, {
+    before: 1,
+    after: 2,
+  });
+  resetDb(BASE, RPC);
+  const same = parseOut(
+    await asOAuth(() =>
+      H.update_ticket_type({ ticket_type_id: PLAN1, seats_per_unit: 1, price: 480 }),
+    ),
+  );
+  checkTrue(
+    "update_ticket_type 已售出但人數沒變（同值）：不擋",
+    !same.error && same.changes?.price,
+  );
+
+  resetDb(BASE, RPC);
+  const mv = parseOut(
+    await asOAuth(() =>
+      H.update_event_session({
+        session_id: SESS1,
+        starts_at: "2099-12-06 19:30",
+        ends_at: "2099-12-06 21:30",
+      }),
+    ),
+  );
+  checkTrue(
+    "update_event_session 有報名者改期：預覽警告（不會通知、提醒信跟著新時間）",
+    /5 位報名/.test(mv.warning) && /不會自動通知/.test(mv.warning) && /提醒信/.test(mv.warning),
+  );
+  resetDb(BASE, RPC);
+  const mvw = parseOut(
+    await asOAuth(() =>
+      H.update_event_session({
+        session_id: SESS1,
+        starts_at: "2099-12-06 19:30",
+        ends_at: "2099-12-06 21:30",
+        dry_run: false,
+      }),
+    ),
+  );
+  checkTrue(
+    "update_event_session 改期寫入：結果也帶警告",
+    mvw.written && /不會自動通知/.test(mvw.warning),
+  );
+  resetDb(BASE, RPC);
+  const cap = parseOut(
+    await asOAuth(() => H.update_event_session({ session_id: SESS1, capacity: 30 })),
+  );
+  check("update_event_session 沒改時間：沒有警告", cap.warning, undefined);
+  resetDb(BASE, RPC);
+  tables.event_sessions[0].seats_taken = 0;
+  const empty = parseOut(
+    await asOAuth(() =>
+      H.update_event_session({
+        session_id: SESS1,
+        starts_at: "2099-12-06 19:30",
+        ends_at: "2099-12-06 21:30",
+      }),
+    ),
+  );
+  check("update_event_session 沒人報名改期：沒有警告", empty.warning, undefined);
+}
+
 console.log("\n[7] 靜態");
 const srcText = readFile(join(SRC, "server/mcp/orders-events-tools.ts"));
 const code = srcText.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");

@@ -119,6 +119,8 @@ export type PreparedQuickCreate = {
   plan: QuickCreatePlan;
   journeyCard: QuickJourneyCardPayload | null;
   untranslated: number;
+  /** 這次用到的英日文（中文原文 → en/ja）。遠端 MCP 預覽拿它組 confirm_args，正式送出原樣帶回就不再翻譯。 */
+  translations: Translations;
 };
 
 /**
@@ -163,7 +165,14 @@ export async function prepareEventQuick(
       })
     : null;
 
-  return { input, slug, plan, journeyCard, untranslated: translated.failed };
+  return {
+    input,
+    slug,
+    plan,
+    journeyCard,
+    untranslated: translated.failed,
+    translations: translated.map,
+  };
 }
 
 export async function createEventQuick(input: QuickCreateInput): Promise<QuickCreateResult> {

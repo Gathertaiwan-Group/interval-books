@@ -341,6 +341,84 @@ console.log("\n[4] 三語補齊");
 }
 
 // -----------------------------------------------------------------------------
+// [4b] 預覽＝寫入（confirm_args）與門市金額／日期（審查 2026-11-15）
+// -----------------------------------------------------------------------------
+console.log("\n[4b] 預覽＝寫入、門市金額與日期");
+{
+  const L = { zh: "書", en: "Book", ja: "本" };
+  check(
+    "confirmArgs：原參數去掉 undefined 與 dry_run、蓋上定案值、dry_run=false",
+    core.confirmArgs(
+      { a: 1, b: undefined, title: "書", dry_run: true },
+      { title: L, slug: "x", c: undefined },
+    ),
+    { a: 1, title: L, slug: "x", dry_run: false },
+  );
+  let calls = 0;
+  const fake = async (zh) => ((calls += 1), { en: `EN${calls}:${zh}`, ja: `JA:${zh}` });
+  const first = await core.fillLocalized("title", "書", fake);
+  const echoed = await core.fillLocalized(
+    "title",
+    core.confirmArgs({ title: "書" }, { title: first.value }).title,
+    fake,
+  );
+  check(
+    "預覽的三語原樣帶回 → 不再翻譯、值不變",
+    [calls, echoed.translated, echoed.value],
+    [1, false, first.value],
+  );
+  check("writeTimeNote：都沒有 → undefined", core.writeTimeNote([], null), undefined);
+  checkTrue(
+    "writeTimeNote：有翻譯／有產生代稱 → 講明",
+    /寫入時才自動翻譯/.test(core.writeTimeNote(["title"], "abc")) &&
+      /abc/.test(core.writeTimeNote(["title"], "abc")),
+  );
+  checkTrue(
+    "CONFIRM_ARGS_NEXT_STEP 要求原樣帶回",
+    /confirm_args/.test(core.CONFIRM_ARGS_NEXT_STEP) &&
+      /不會重新翻譯/.test(core.CONFIRM_ARGS_NEXT_STEP),
+  );
+  // 2026-11-15 16:30Z ＝ 台北 11-16 00:30：台北已經是 16 號。
+  const t = Date.parse("2026-11-15T16:30:00Z");
+  check("taipeiDate 用台北日期", core.taipeiDate(t), "2026-11-16");
+  let ok = true;
+  try {
+    core.assertSaleDateNotFuture("2026-11-16", t);
+  } catch {
+    ok = false;
+  }
+  checkTrue("銷售日期＝台北今天 → 可以", ok);
+  let rejected = null;
+  try {
+    core.assertSaleDateNotFuture("2026-11-17", t);
+  } catch (e) {
+    rejected = e;
+  }
+  checkTrue("銷售日期晚於台北今天 → McpInputError", rejected instanceof core.McpInputError);
+  check(
+    "金額上限：單價 100,000、單筆 300,000",
+    [core.MCP_MAX_UNIT_PRICE, core.MCP_MAX_SALE_TOTAL],
+    [100_000, 300_000],
+  );
+  let over = null;
+  try {
+    core.assertSaleTotal(300_001);
+  } catch (e) {
+    over = e;
+  }
+  checkTrue(
+    "總額 300,001 → McpInputError；300,000 可以",
+    over instanceof core.McpInputError && (core.assertSaleTotal(300_000), true),
+  );
+  const toolsSrc = readFile(join(SRC, "server/mcp/tools.ts"));
+  checkTrue(
+    "tools.ts runWrite：自動翻譯的欄位預覽列 translated_values、寫入結果有 write_note",
+    /translated_values:/.test(toolsSrc) &&
+      /write_note: writeTimeNote\(plan\.translated/.test(toolsSrc),
+  );
+}
+
+// -----------------------------------------------------------------------------
 // [5] 圖片
 // -----------------------------------------------------------------------------
 console.log("\n[5] 圖片");

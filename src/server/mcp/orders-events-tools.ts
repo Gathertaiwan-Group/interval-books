@@ -40,11 +40,14 @@ import type { ToolAnnotations } from "@modelcontextprotocol/server";
 import type { z as z3 } from "zod";
 import { z } from "zod4";
 import {
+  CONFIRM_ARGS_NEXT_STEP,
+  confirmArgs,
   errText,
   fillLocalized,
   jsonText,
   McpInputError,
   stableStringify,
+  writeTimeNote,
   zodIssuesText,
   type Localized,
   type LocalizedArg,
@@ -264,7 +267,13 @@ export const ORDERS_EVENTS_TOOL_INPUTS = {
       ticket_type_id: z.string().trim().uuid().describe("票種 id（見 list_event_sessions）"),
       title: localizedArg("票種名稱", 200).optional(),
       price: z.number().int().min(0).max(10_000_000).optional().describe("票價（新台幣元）"),
-      seats_per_unit: z.number().int().min(1).max(100).optional(),
+      seats_per_unit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe("每張票佔幾個名額。已售張數 > 0 時不能改（另開票種）"),
       capacity: z
         .number()
         .int()
@@ -394,6 +403,7 @@ export const ORDERS_EVENTS_TOOL_META: Record<
     description:
       "＝後台場次編輯頁「儲存」（upsertEventSession）：日期時間、地點、名稱、名額、報名狀態（open／closed）、排序。只送要改的欄位。" +
       "名額不能低於已報名人數（資料庫也會擋）；已報名人數不能改。" +
+      "⚠️ 已有報名者時改日期／開始時間：系統不會自動通知報名者（不寄改期信），預覽會提醒；開課提醒信會依新的時間寄出。" +
       PREVIEW,
     annotations: WRITE,
   },
@@ -408,6 +418,7 @@ export const ORDERS_EVENTS_TOOL_META: Record<
     title: "修改票種",
     description:
       "＝後台場次頁方案「編輯」（upsertEventSessionPlan）。只送要改的欄位；可售張數不能低於已售張數。改票價只影響之後的訂單。" +
+      "已售出（已售張數 > 0）的票種不能改「每張票佔幾個名額」（seats_per_unit）：已成立訂單佔的名額是照舊值算的，改了會讓名額帳對不起來——要不同人數請另開一個票種。" +
       PREVIEW,
     annotations: WRITE,
   },
@@ -535,6 +546,24 @@ async function fillAll(
   return { values, translated };
 }
 
+/**
+ * 已有報名者的場次改了開始日期／時間：預覽與結果都要明講（審查 2026-11-15）。
+ * 開課提醒信（sessions_due_for_reminder）是照 starts_at 撈的，所以會跟著新時間；
+ * 去重靠 dedupe_key，改期前已寄過提醒的人不會再收到一次。
+ */
+export function rescheduleWarning(
+  seatsTaken: number,
+  beforeIso: string | null,
+  afterIso: string | null,
+): string | undefined {
+  if (seatsTaken <= 0 || beforeIso === afterIso) return undefined;
+  return (
+    `⚠️ 這一場已有 ${seatsTaken} 位報名，開始時間會從 ${taipeiText(beforeIso)} 改成 ${taipeiText(afterIso)}（台北）。` +
+    "系統不會自動通知報名者改期（不會寄改期信），請另外聯絡他們（get_session_roster 看名單）；" +
+    "開課提醒信會依新的開始時間寄出（改期前已寄過提醒的人不會再收到一次）。請先讓使用者確認再送出。"
+  );
+}
+
 /* ---- 稽核 ---- */
 
 async function audit(
@@ -568,7 +597,13 @@ async function preview(
   auditChanges: unknown,
 ): Promise<TextResult> {
   await audit(tool, entity, entityId, action, auditChanges, true);
-  return jsonText({ dry_run: true, written: false, action, ...body, next_step: NEXT_STEP });
+  return jsonText({
+    dry_run: true,
+    written: false,
+    action,
+    ...body,
+    next_step: typeof body.next_step === "string" ? body.next_step : NEXT_STEP,
+  });
 }
 
 async function committed(
@@ -1038,6 +1073,12 @@ const IMPL: Handlers = {
           will_create: willCreate,
           auto_translated: translated.length ? translated : undefined,
           idempotency_key: key,
+          confirm_args: confirmArgs(args, {
+            ...values,
+            sort_order: input.sort_order,
+            idempotency_key: key,
+          }),
+          next_step: CONFIRM_ARGS_NEXT_STEP,
         },
         { ...auditChanges, idempotency_key: key },
       );
@@ -1052,7 +1093,7 @@ const IMPL: Handlers = {
       "event_session",
       row.id,
       "create",
-      { written: true, session_id: row.id, session: row },
+      { written: true, session_id: row.id, session: row, write_note: writeTimeNote(translated) },
       { ...auditChanges, session_id: row.id, idempotency_key: args.idempotency_key },
     );
   },
@@ -1102,6 +1143,7 @@ const IMPL: Handlers = {
       seats_taken: cur.seats_taken,
       starts_at_taipei: taipeiText(input.starts_at),
     };
+    const reschedule = rescheduleWarning(cur.seats_taken, norm(cur.starts_at), input.starts_at);
     if (Object.keys(changes).length === 0) {
       return jsonText({
         ...target,
@@ -1117,7 +1159,18 @@ const IMPL: Handlers = {
         "event_session",
         cur.id,
         "update",
-        { ...target, changes, auto_translated: translated.length ? translated : undefined },
+        {
+          ...target,
+          changes,
+          ...(reschedule ? { warning: reschedule } : {}),
+          auto_translated: translated.length ? translated : undefined,
+          ...(translated.length
+            ? {
+                confirm_args: confirmArgs(args, values),
+                next_step: CONFIRM_ARGS_NEXT_STEP,
+              }
+            : {}),
+        },
         auditChanges,
       );
     }
@@ -1131,7 +1184,14 @@ const IMPL: Handlers = {
       "event_session",
       cur.id,
       "update",
-      { ...target, written: true, changes, session: row },
+      {
+        ...target,
+        written: true,
+        changes,
+        session: row,
+        ...(reschedule ? { warning: reschedule } : {}),
+        write_note: writeTimeNote(translated),
+      },
       auditChanges,
     );
   },
@@ -1175,6 +1235,12 @@ const IMPL: Handlers = {
           existing_ticket_types: plans.length,
           auto_translated: translated.length ? translated : undefined,
           idempotency_key: key,
+          confirm_args: confirmArgs(args, {
+            ...values,
+            sort_order: input.sort_order,
+            idempotency_key: key,
+          }),
+          next_step: CONFIRM_ARGS_NEXT_STEP,
         },
         { ...auditChanges, idempotency_key: key },
       );
@@ -1194,7 +1260,12 @@ const IMPL: Handlers = {
       "event_session_plan",
       row.id,
       "create",
-      { written: true, ticket_type_id: row.id, ticket_type: row },
+      {
+        written: true,
+        ticket_type_id: row.id,
+        ticket_type: row,
+        write_note: writeTimeNote(translated),
+      },
       { ...auditChanges, ticket_type_id: row.id, idempotency_key: args.idempotency_key },
     );
   },
@@ -1205,6 +1276,16 @@ const IMPL: Handlers = {
     const repo = await import("@/server/repos/event-sessions");
     const cur = (await repo.listEventSessionPlans()).find((p) => p.id === args.ticket_type_id);
     if (!cur) notFound("票種", args.ticket_type_id);
+    if (
+      args.seats_per_unit !== undefined &&
+      args.seats_per_unit !== cur.seats_per_unit &&
+      cur.units_taken > 0
+    ) {
+      throw new McpInputError(
+        `這個票種已售出 ${cur.units_taken} 張，不能把「每張票佔幾個名額」從 ${cur.seats_per_unit} 改成 ${args.seats_per_unit}：` +
+          "已成立的訂單是照舊的人數佔名額，改了會讓場次名額對不起來。要不同人數的票，請用 create_ticket_type 另開一個票種（必要時把這個票種設 closed）。",
+      );
+    }
     const { values, translated } = await fillAll({ title: args.title });
     const norm = (v: string | null) => (v ? new Date(v).toISOString() : null);
     const timeArg = (field: string, v: string | null | undefined, old: string | null) =>
@@ -1262,6 +1343,9 @@ const IMPL: Handlers = {
           changes,
           note: changes.price ? "改票價只影響之後的新訂單，已成立的訂單金額不變。" : undefined,
           auto_translated: translated.length ? translated : undefined,
+          ...(translated.length
+            ? { confirm_args: confirmArgs(args, values), next_step: CONFIRM_ARGS_NEXT_STEP }
+            : {}),
         },
         auditChanges,
       );
@@ -1280,7 +1364,13 @@ const IMPL: Handlers = {
       "event_session_plan",
       cur.id,
       "update",
-      { ...target, written: true, changes, ticket_type: row },
+      {
+        ...target,
+        written: true,
+        changes,
+        ticket_type: row,
+        write_note: writeTimeNote(translated),
+      },
       auditChanges,
     );
   },
@@ -1329,6 +1419,8 @@ const IMPL: Handlers = {
           position: `排在 ${args.kind} 的第 ${sameKind.length + 1} 個（最後）`,
           auto_translated: translated.length ? translated : undefined,
           idempotency_key: key,
+          confirm_args: confirmArgs(args, { ...values, idempotency_key: key }),
+          next_step: CONFIRM_ARGS_NEXT_STEP,
         },
         { ...auditChanges, idempotency_key: key },
       );
@@ -1347,7 +1439,7 @@ const IMPL: Handlers = {
       "event_block",
       String(row.id),
       "create",
-      { written: true, block_id: row.id, block: row },
+      { written: true, block_id: row.id, block: row, write_note: writeTimeNote(translated) },
       { ...auditChanges, block_id: row.id, idempotency_key: args.idempotency_key },
     );
   },
@@ -1385,7 +1477,14 @@ const IMPL: Handlers = {
         "event_block",
         String(cur.id),
         "update",
-        { ...target, changes, auto_translated: translated.length ? translated : undefined },
+        {
+          ...target,
+          changes,
+          auto_translated: translated.length ? translated : undefined,
+          ...(translated.length
+            ? { confirm_args: confirmArgs(args, values), next_step: CONFIRM_ARGS_NEXT_STEP }
+            : {}),
+        },
         auditChanges,
       );
     }
@@ -1409,7 +1508,7 @@ const IMPL: Handlers = {
       "event_block",
       String(cur.id),
       "update",
-      { ...target, written: true, changes, block: row },
+      { ...target, written: true, changes, block: row, write_note: writeTimeNote(translated) },
       auditChanges,
     );
   },

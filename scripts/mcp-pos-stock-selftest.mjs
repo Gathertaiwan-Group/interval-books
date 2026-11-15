@@ -692,6 +692,41 @@ await expectError("create_combo_set 同一件商品出現兩次 → 拒絕", () 
     ],
   }),
 );
+{
+  const tomorrow = new Date(Date.now() + 8 * 3_600_000 + 86_400_000).toISOString().slice(0, 10);
+  await expectError("create_combo_sale 銷售日期晚於今天（台北）→ 拒絕（審查 2026-11-15）", () =>
+    H.create_combo_sale({ combo_set_id: COMBO_OK, sale_date: tomorrow }),
+  );
+  // 組合價 300 × 100 份 = 30,000，不到上限；把組合價調高看總額上限。
+  resetDb(BASE_TABLES, BASE_RPC);
+  const big = await asOAuth(async () => {
+    const t = tables.inv_admin_combo_sets ?? tables.inv_combo_sets_admin;
+    const row = (t ?? []).find((c) => (c.combo_set_id ?? c.id) === COMBO_OK);
+    if (row) row.selling_price = 5_000;
+    return H.create_combo_sale({ combo_set_id: COMBO_OK, quantity: 61 });
+  });
+  check(
+    "create_combo_sale 總額超過 300,000 → 拒絕",
+    [big.isError === true, /300,000/.test(big.content[0].text), log.rpc.length],
+    [true, true, 0],
+  );
+  await expectError("create_combo_set 組合價超過 100,000 → 拒絕", () =>
+    H.create_combo_set({
+      name: "x",
+      selling_price: 100_001,
+      items: [{ product_id: PROD1, quantity: 1 }],
+    }),
+  );
+  await expectError("update_combo_set 組合價超過 100,000 → 拒絕", () =>
+    H.update_combo_set({ id: COMBO_OK, selling_price: 100_001 }),
+  );
+  check(
+    "create_combo_sale 說明寫明上限與日期規則",
+    /300,000/.test(META.create_combo_sale.description) &&
+      /晚於今天/.test(META.create_combo_sale.description),
+    true,
+  );
+}
 await expectError("create_combo_set 售價負數 → 拒絕", () =>
   H.create_combo_set({ name: "x", selling_price: -1, items: [{ product_id: PROD1, quantity: 1 }] }),
 );

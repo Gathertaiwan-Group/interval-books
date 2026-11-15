@@ -1680,6 +1680,48 @@ console.log("\n[5c] 新增商品／審核／門市結帳／二手書");
   await expectError("create_secondhand_sale 沒有書名", () =>
     H.create_secondhand_sale({ item_name: " ", unit_price: 1, dry_run: false }),
   );
+  // 審查 2026-11-15：金額上限與銷售日期（台北今天之後不行）。
+  const tomorrow = new Date(Date.now() + 8 * 3_600_000 + 86_400_000).toISOString().slice(0, 10);
+  const todayTpe = new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
+  await expectError("create_pos_sale 單價超過 100,000 → 拒絕（預覽也擋）", () =>
+    H.create_pos_sale({ items: [{ product_id: PROD1, quantity: 1, unit_price: 100_001 }] }),
+  );
+  const tot = await expectError("create_pos_sale 總額超過 300,000 → 拒絕", () =>
+    H.create_pos_sale({ items: [{ product_id: PROD1, quantity: 4, unit_price: 90_000 }] }),
+  );
+  check("create_pos_sale 總額超過：訊息指向後台", /後台 POS/.test(tot.content[0].text), true);
+  const fut = await expectError("create_pos_sale 銷售日期晚於今天（台北）→ 拒絕", () =>
+    H.create_pos_sale({ items: [{ product_id: PROD1, quantity: 1 }], sale_date: tomorrow }),
+  );
+  check("create_pos_sale 未來日期：訊息說明", /晚於今天/.test(fut.content[0].text), true);
+  resetDb(BASE_TABLES, BASE_RPC);
+  const okToday = await asOAuth(() =>
+    H.create_pos_sale({
+      items: [{ product_id: PROD1, quantity: 1, unit_price: 100_000 }],
+      sale_date: todayTpe,
+    }),
+  );
+  check("create_pos_sale 今天、單價剛好 100,000 → 可以預覽", okToday.isError ?? false, false);
+  await expectError("create_secondhand_sale 單價超過 100,000 → 拒絕", () =>
+    H.create_secondhand_sale({ item_name: "孤本", unit_price: 100_001 }),
+  );
+  await expectError("create_secondhand_sale 總額超過 300,000 → 拒絕", () =>
+    H.create_secondhand_sale({ item_name: "整套", unit_price: 1_000, quantity: 301 }),
+  );
+  await expectError("create_secondhand_sale 銷售日期晚於今天 → 拒絕", () =>
+    H.create_secondhand_sale({ item_name: "海邊的卡夫卡", unit_price: 200, sale_date: tomorrow }),
+  );
+  check(
+    "核准說明：同一位管理員可核准自己建立的、核准前先給使用者看預覽",
+    /同一位管理員可以核准自己建立的資料/.test(META.approve_inventory_record.description) &&
+      /預覽/.test(META.approve_inventory_record.description),
+    true,
+  );
+  check(
+    "MCP_APPROVAL_MODULES 註解不再寫「供應商仍到後台處理」",
+    /供應商、調價、舊異動表不開放/.test(readFile(join(SRC, "server/mcp/ops-write-tools.ts"))),
+    false,
+  );
   check(
     "create_secondhand_sale 輸入沒有 product_id（二手書不建商品）",
     "product_id" in (z.toJSONSchema(INPUTS.create_secondhand_sale).properties ?? {}),

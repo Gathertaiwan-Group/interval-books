@@ -498,6 +498,74 @@ reset();
     [["create_inventory_listing", true]],
   );
 
+  // 審查 2026-11-15：預覽＝寫入。confirm_args 帶回 → 不再翻譯、代稱不再產生，寫入的就是預覽那一份。
+  check(
+    "預覽：confirm_args 帶完整三語、定案代稱、idempotency_key、dry_run=false",
+    [
+      out.confirm_args.title,
+      out.confirm_args.summary,
+      out.confirm_args.slug === out.will_create.slug,
+      out.confirm_args.idempotency_key === out.idempotency_key,
+      out.confirm_args.dry_run,
+    ],
+    [
+      { zh: "地味手帖", en: "EN 地味手帖", ja: "JA 地味手帖" },
+      { zh: "日本地方生活誌", en: "EN 日本地方生活誌", ja: "JA 日本地方生活誌" },
+      true,
+      true,
+      false,
+    ],
+  );
+  checkTrue("預覽：next_step 要求原樣帶回 confirm_args", /confirm_args/.test(out.next_step));
+  checkTrue(
+    "預覽：confirm_args 通過工具自己的 schema",
+    INPUTS.create_inventory_listing.safeParse(out.confirm_args).success,
+  );
+  reset();
+  globalThis.__translateCalls = [];
+  const locked = parseOut(await asOAuth(() => H.create_inventory_listing(out.confirm_args)));
+  const lockedIns = dataWrites().find((w) => w.table === "products");
+  check(
+    "帶回 confirm_args：寫入的三語與代稱＝預覽、沒有呼叫翻譯、沒有 write_note",
+    [
+      locked.written,
+      locked.slug,
+      lockedIns?.payload?.slug,
+      lockedIns?.payload?.title,
+      lockedIns?.payload?.summary,
+      globalThis.__translateCalls.length,
+      locked.write_note,
+    ],
+    [
+      true,
+      out.will_create.slug,
+      out.will_create.slug,
+      out.will_create.title,
+      out.will_create.summary,
+      0,
+      undefined,
+    ],
+  );
+  reset();
+  globalThis.__translateCalls = [];
+  const unlocked = parseOut(
+    await asOAuth(() =>
+      H.create_inventory_listing({
+        inv_product_id: P1,
+        summary: "日本地方生活誌",
+        idempotency_key: KEY(),
+        dry_run: false,
+      }),
+    ),
+  );
+  checkTrue(
+    "沒帶回（中文字串、沒 slug）：照寫，但 write_note 明講寫入時才翻譯／才產生代稱",
+    unlocked.written &&
+      globalThis.__translateCalls.length > 0 &&
+      /寫入時才自動翻譯/.test(unlocked.write_note) &&
+      /寫入時才產生/.test(unlocked.write_note),
+  );
+
   reset();
   const noKey = await asOAuth(() =>
     H.create_inventory_listing({ inv_product_id: P1, summary: "x", dry_run: false }),
@@ -745,6 +813,67 @@ reset();
 console.log("\n[6] recognize_purchase_order（假的辨識）");
 const PNG_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+// confirm 預設 false（審查 2026-11-15）：只檢查參數，不上傳、不辨識、不下載、不消耗 upload_id。
+reset();
+globalThis.__ocrCalls = [];
+{
+  const pre = parseOut(
+    await asOAuth(() => H.recognize_purchase_order({ image_base64: { data: PNG_B64 } })),
+  );
+  check(
+    "confirm 省略：預覽，不上傳、不辨識",
+    [pre.dry_run, pre.uploaded, pre.recognised, pre.source, pre.format],
+    [true, false, false, "base64", "png"],
+  );
+  checkTrue(
+    "confirm 省略：說明會花辨識額度、要 confirm=true",
+    /額度/.test(pre.will_do.join("")) && /confirm=true/.test(pre.next_step),
+  );
+  check(
+    "confirm 省略：storage 沒有任何動作、辨識 0 次",
+    [log.storage.length, globalThis.__ocrCalls.length],
+    [0, 0],
+  );
+  check(
+    "confirm 省略：稽核記一筆 dry_run=true 的 recognise_preview",
+    audits().map((a) => [a.action, a.dry_run]),
+    [["recognise_preview", true]],
+  );
+  check(
+    "confirm 省略：schema 預設 false",
+    INPUTS.recognize_purchase_order.parse({
+      scan_key: "ocr:2026-11-15/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.png",
+    }).confirm,
+    false,
+  );
+  reset();
+  const uploadId = `${Math.floor(Date.now() / 1000)}-${crypto.randomUUID()}.png`;
+  buckets["mcp-image-uploads"] = new Map([
+    [uploadId, new Uint8Array(Buffer.from(PNG_B64, "base64"))],
+  ]);
+  const preUp = parseOut(await asOAuth(() => H.recognize_purchase_order({ upload_id: uploadId })));
+  check(
+    "confirm 省略（upload_id）：暫存檔沒被搬走、沒有任何 storage 動作",
+    [preUp.uploaded, log.storage.length, buckets["mcp-image-uploads"].get(uploadId).byteLength > 0],
+    [false, 0, true],
+  );
+  const preUrl = parseOut(
+    await asOAuth(() => H.recognize_purchase_order({ image_url: "https://example.com/a.png" })),
+  );
+  check(
+    "confirm 省略（image_url）：不下載",
+    [preUrl.uploaded, preUrl.host, log.storage.length],
+    [false, "example.com", 0],
+  );
+  const preBad = await asOAuth(() =>
+    H.recognize_purchase_order({
+      image_base64: { data: Buffer.from("<html>hi</html>").toString("base64") },
+    }),
+  );
+  checkTrue("confirm 省略：不是圖片照樣 isError", preBad.isError);
+  check("confirm 省略：辨識 0 次", globalThis.__ocrCalls.length, 0);
+}
+
 const OCR_RESULT = {
   vendor: "永樂圖書",
   purchase_date: "2026-11-14",
@@ -760,7 +889,10 @@ globalThis.__ocrCalls = [];
 {
   const out = parseOut(
     await asOAuth(() =>
-      H.recognize_purchase_order({ image_base64: { data: `data:image/png;base64,${PNG_B64}` } }),
+      H.recognize_purchase_order({
+        image_base64: { data: `data:image/png;base64,${PNG_B64}` },
+        confirm: true,
+      }),
     ),
   );
   checkTrue(
@@ -813,7 +945,7 @@ globalThis.__ocrCalls = [];
   reset();
   globalThis.__ocrCalls = [];
   const again = parseOut(
-    await asOAuth(() => H.recognize_purchase_order({ scan_key: out.scan_key })),
+    await asOAuth(() => H.recognize_purchase_order({ scan_key: out.scan_key, confirm: true })),
   );
   check(
     "scan_key 重新辨識：不重傳圖",
@@ -828,7 +960,7 @@ globalThis.__ocrCalls = [];
     [uploadId, new Uint8Array(Buffer.from(PNG_B64, "base64"))],
   ]);
   const viaUpload = parseOut(
-    await asOAuth(() => H.recognize_purchase_order({ upload_id: uploadId })),
+    await asOAuth(() => H.recognize_purchase_order({ upload_id: uploadId, confirm: true })),
   );
   checkTrue("upload_id：辨識成功", /^ocr:/.test(viaUpload.scan_key));
   check(
@@ -841,7 +973,7 @@ globalThis.__ocrCalls = [];
   reset();
   globalThis.__ocrError = { kind: "timeout", message: "逾時" };
   const failed = await asOAuth(() =>
-    H.recognize_purchase_order({ image_base64: { data: PNG_B64 } }),
+    H.recognize_purchase_order({ image_base64: { data: PNG_B64 }, confirm: true }),
   );
   checkTrue(
     "辨識失敗 → isError，並給 scan_key 可重試",

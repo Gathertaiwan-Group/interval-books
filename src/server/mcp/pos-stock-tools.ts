@@ -32,7 +32,17 @@ import { randomUUID } from "node:crypto";
 import type { ToolAnnotations } from "@modelcontextprotocol/server";
 import type { z as z3 } from "zod";
 import { z } from "zod4";
-import { errText, jsonText, McpInputError, zodIssuesText, type TextResult } from "./core";
+import {
+  assertSaleDateNotFuture,
+  assertSaleTotal,
+  errText,
+  jsonText,
+  MCP_MAX_SALE_TOTAL,
+  MCP_MAX_UNIT_PRICE,
+  McpInputError,
+  zodIssuesText,
+  type TextResult,
+} from "./core";
 import { INV_ADJUSTMENT_CATEGORIES, INV_ADJUSTMENT_STATUSES } from "@/lib/admin/schemas";
 
 /* ------------------------------------------------------------------ annotations */
@@ -149,7 +159,11 @@ export const POS_STOCK_TOOL_INPUTS = {
   get_combo_set: z.object({ id: uuidArg("套餐 id（combo_set_id）") }),
   create_combo_set: z.object({
     name: z.string().trim().min(1).max(200).describe("套餐名稱"),
-    selling_price: z.number().min(0).describe("組合價（元）"),
+    selling_price: z
+      .number()
+      .min(0)
+      .max(MCP_MAX_UNIT_PRICE, `組合價上限 ${MCP_MAX_UNIT_PRICE} 元（防手滑）；更高請到後台設定`)
+      .describe(`組合價（元，上限 ${MCP_MAX_UNIT_PRICE}）`),
     items: comboItemsArg.describe("組成品項（至少一件；同一件商品只列一次，要多件請改 quantity）"),
     notes: z.string().trim().max(2000).optional(),
     is_active: z.boolean().default(true).describe("建立後是否上架（預設 true，與後台表單相同）"),
@@ -162,8 +176,11 @@ export const POS_STOCK_TOOL_INPUTS = {
     selling_price: z
       .number()
       .min(0)
+      .max(MCP_MAX_UNIT_PRICE, `組合價上限 ${MCP_MAX_UNIT_PRICE} 元（防手滑）；更高請到後台設定`)
       .optional()
-      .describe("組合價（元）。改價錢會重新送審（審核有開的話），與後台相同"),
+      .describe(
+        `組合價（元，上限 ${MCP_MAX_UNIT_PRICE}）。改價錢會重新送審（審核有開的話），與後台相同`,
+      ),
     notes: z.string().trim().max(2000).nullable().optional().describe("備註；null＝清空"),
     is_active: z.boolean().optional(),
     items: comboItemsArg
@@ -233,6 +250,9 @@ export const POS_STOCK_TOOL_META: Record<
       "與後台 /admin/pos 第二個分頁「套餐結帳」同一支 RPC（inv_combo_checkout，一個交易）：賣幾份套餐、扣組成品項庫存、記付款方式。" +
       "組合價怎麼分攤到組成品項由資料庫算（呼叫端改不了金額）。只能賣「上架」且「已審核」的套餐。" +
       "付款方式、備註、日期、超賣行為與 create_pos_sale 相同：庫存不夠預設被資料庫拒絕；override_reservation=true 才照賣並記賣超告警。" +
+      "單筆總額（組合價×份數）上限 " +
+      MCP_MAX_SALE_TOTAL.toLocaleString("en-US") +
+      " 元（防手滑，超過請到後台 POS）；銷售日期不能晚於今天（台北）。" +
       OAUTH +
       PREVIEW,
     annotations: CREATE,
@@ -571,6 +591,8 @@ const IMPL: Handlers = {
       notes: args.notes ?? null,
       override_reservation: args.override_reservation,
     });
+    assertSaleDateNotFuture(data.sale_date);
+    assertSaleTotal(Number(set.selling_price) * data.quantity);
     const shortfall =
       set.max_sets === null ? data.quantity : Math.max(data.quantity - set.max_sets, 0);
     const auditChanges = {
