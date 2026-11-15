@@ -163,15 +163,17 @@ const SETTINGS_READABLE = [...SETTINGS_LOCALIZED, ...SETTINGS_TEXT, "notify_emai
 /* ------------------------------------------------------------------ 進銷存審核 */
 
 /**
- * MCP 開放核准的三個模組（APPROVAL_MODULES 的子集，代號與 inv_approve_record() 的 CASE 同名）。
- * 供應商、套餐、調價、舊異動表不開放——那幾種仍到後台處理。
+ * MCP 開放核准的模組（APPROVAL_MODULES 的子集，代號與 inv_approve_record() 的 CASE 同名）。
+ * 2026-11-15 加 combo_sets（套餐，＝後台 approveComboSet，權限 approve_combo_sets）。
+ * 供應商、調價、舊異動表不開放——那幾種仍到後台處理。
  */
-const MCP_APPROVAL_MODULES = ["products", "purchases", "stock_adjustments"] as const;
+const MCP_APPROVAL_MODULES = ["products", "purchases", "stock_adjustments", "combo_sets"] as const;
 type McpApprovalModule = (typeof MCP_APPROVAL_MODULES)[number];
 const APPROVAL_LABEL: Record<McpApprovalModule, string> = {
   products: "商品新增",
   purchases: "進貨",
   stock_adjustments: "在庫異動／盤點",
+  combo_sets: "套餐",
 };
 
 /* ------------------------------------------------------------------ 輸入 schema */
@@ -565,13 +567,17 @@ export const OPS_WRITE_TOOL_INPUTS = {
     module: z
       .enum(["all", ...MCP_APPROVAL_MODULES])
       .default("all")
-      .describe("all（預設）／products 商品新增／purchases 進貨／stock_adjustments 在庫異動與盤點"),
+      .describe(
+        "all（預設）／products 商品新增／purchases 進貨／stock_adjustments 在庫異動與盤點／combo_sets 套餐",
+      ),
     limit: z.number().int().min(1).max(100).default(50).describe("每一類最多列幾筆（預設 50）"),
   }),
   approve_inventory_record: z.object({
     module: z
       .enum(MCP_APPROVAL_MODULES)
-      .describe("products 商品新增／purchases 進貨／stock_adjustments 在庫異動與盤點"),
+      .describe(
+        "products 商品新增／purchases 進貨／stock_adjustments 在庫異動與盤點／combo_sets 套餐",
+      ),
     id: uuidArg("待審那一筆的 id（見 list_pending_approvals）"),
     decision: z.enum(["approve", "reject"]).describe("approve 通過／reject 退回"),
     dry_run: dryRunArg,
@@ -805,19 +811,19 @@ export const OPS_WRITE_TOOL_META: Record<
     annotations: CREATE,
   },
   list_pending_approvals: {
-    title: "待審核的商品／進貨／在庫異動",
+    title: "待審核的商品／進貨／在庫異動／套餐",
     description:
-      "與後台商品管理、進貨、在庫異動三頁的「待審核」篩選同一支查詢：列出等待核准的商品新增、進貨、在庫異動與盤點單，" +
+      "與後台商品管理、進貨、在庫異動、套餐四頁的「待審核」篩選同一支查詢：列出等待核准的商品新增、進貨、在庫異動與盤點單、套餐，" +
       "附上各模組目前是否開啟審核。拿到 id 後用 approve_inventory_record 核准或退回。唯讀。",
     annotations: READ_ONLY,
   },
   approve_inventory_record: {
-    title: "核准／退回待審的商品、進貨或在庫異動",
+    title: "核准／退回待審的商品、進貨、在庫異動或套餐",
     description:
-      "與後台商品管理／進貨／在庫異動頁的「通過」「退回」按鈕同一支 RPC（inv_approve_record）。" +
+      "與後台商品管理／進貨／在庫異動／套餐頁的「通過」「退回」按鈕同一支 RPC（inv_approve_record）。" +
       "只動待審（pending／pending_approval）的那一筆，已處理過的回 written=false。" +
-      "通過進貨後庫存由資料庫 trigger 增加；通過在庫異動後庫存依異動數量加減；通過商品後櫃檯才賣得到。" +
-      "後台審核需要 approve_products／approve_purchases／approve_stock_adjustments 權限，MCP 的 OAuth 連線只發給管理員（每次請求重查），管理員具備這三種權限。" +
+      "通過進貨後庫存由資料庫 trigger 增加；通過在庫異動後庫存依異動數量加減；通過商品後櫃檯才賣得到；通過套餐後櫃檯「套餐結帳」才賣得到。" +
+      "後台審核需要 approve_products／approve_purchases／approve_stock_adjustments／approve_combo_sets 權限，MCP 的 OAuth 連線只發給管理員（每次請求重查），管理員具備這四種權限。" +
       "資料庫沒有「建立者不能自己核准」的規則，與後台相同。需要 OAuth 管理員身分（審核必須記錄操作人員）。" +
       PREVIEW,
     annotations: WRITE,
@@ -2313,7 +2319,8 @@ const IMPL: Handlers = {
     const { listAdminProducts, listApprovalSettings } = await import("@/server/repos/inv-products");
     const { listAdminPurchases } = await import("@/server/repos/inv-purchases");
     const { listAdminAdjustments } = await import("@/server/repos/inv-adjustments");
-    const [settings, products, purchases, adjustments] = await Promise.all([
+    const { listAdminComboSets } = await import("@/server/repos/inv-combos");
+    const [settings, products, purchases, adjustments, combos] = await Promise.all([
       listApprovalSettings(),
       want("products")
         ? listAdminProducts({
@@ -2356,6 +2363,14 @@ const IMPL: Handlers = {
             sort: "created_at",
             page: 0,
             pageSize: args.limit,
+          })
+        : null,
+      want("combo_sets")
+        ? listAdminComboSets({
+            keyword: null,
+            activeStatus: "all",
+            approvalStatus: "pending",
+            sort: "created_desc",
           })
         : null,
     ]);
@@ -2423,7 +2438,24 @@ const IMPL: Handlers = {
             },
           }
         : {}),
-      note: "核准／退回用 approve_inventory_record（module＋id）。價格變更、供應商、套餐的審核仍請到後台。",
+      ...(combos
+        ? {
+            combo_sets: {
+              total: combos.length,
+              rows: combos.slice(0, args.limit).map((r) => ({
+                module: "combo_sets",
+                id: r.combo_set_id,
+                name: r.name,
+                selling_price: r.selling_price,
+                is_active: r.is_active,
+                item_count: r.item_count,
+                creator_name: r.creator_name,
+                created_at: r.created_at,
+              })),
+            },
+          }
+        : {}),
+      note: "核准／退回用 approve_inventory_record（module＋id）。價格變更、供應商的審核仍請到後台。",
     });
   },
 
@@ -2472,6 +2504,25 @@ const IMPL: Handlers = {
         stock_now: prod?.stock_quantity ?? null,
         stock_after_if_approved:
           approved && prod ? prod.stock_quantity + p.quantity : (prod?.stock_quantity ?? null),
+      };
+    } else if (args.module === "combo_sets") {
+      const { getAdminComboSet } = await import("@/server/repos/inv-combos");
+      const c = await getAdminComboSet(args.id);
+      if (!c) notFound("套餐", args.id);
+      status = c.approval_status;
+      pendingValue = "pending";
+      target = {
+        name: c.name,
+        selling_price: c.selling_price,
+        is_active: c.is_active,
+        item_count: c.item_count,
+        total_list_price: c.total_list_price,
+        creator_name: c.creator_name,
+        effect: approved
+          ? c.is_active
+            ? "核准後櫃檯「套餐結帳」就賣得到。"
+            : "核准後仍是下架，要上架（set_combo_set_active）才賣得到。"
+          : "退回後不能販售，可修改後用 resubmit_combo_set 重新送審。",
       };
     } else {
       const { getAdminAdjustment } = await import("@/server/repos/inv-adjustments");

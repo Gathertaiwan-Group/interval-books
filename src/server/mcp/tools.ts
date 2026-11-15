@@ -62,6 +62,7 @@ import {
 import { OPS_WRITE_HANDLERS, OPS_WRITE_TOOL_INPUTS, OPS_WRITE_TOOL_META } from "./ops-write-tools";
 import { OUTBOUND_HANDLERS, OUTBOUND_TOOL_INPUTS, OUTBOUND_TOOL_META } from "./outbound-tools";
 import { REPORT_HANDLERS, REPORT_TOOL_INPUTS, REPORT_TOOL_META } from "./report-tools";
+import { POS_STOCK_HANDLERS, POS_STOCK_TOOL_INPUTS, POS_STOCK_TOOL_META } from "./pos-stock-tools";
 
 /* ------------------------------------------------------------------ 共用 */
 
@@ -653,6 +654,7 @@ export const TOOL_INPUTS = {
   ...OPS_WRITE_TOOL_INPUTS,
   ...OUTBOUND_TOOL_INPUTS,
   ...REPORT_TOOL_INPUTS,
+  ...POS_STOCK_TOOL_INPUTS, // 2026-11-15 門市套餐與庫存異動（./pos-stock-tools.ts）
 } as const;
 
 export type ToolName = keyof typeof TOOL_INPUTS;
@@ -2178,6 +2180,7 @@ export function registerContentTools(server: McpServer): void {
     [OPS_WRITE_TOOL_META, OPS_WRITE_HANDLERS as never],
     [OUTBOUND_TOOL_META, OUTBOUND_HANDLERS as never],
     [REPORT_TOOL_META, REPORT_HANDLERS as never],
+    [POS_STOCK_TOOL_META, POS_STOCK_HANDLERS as never],
   ];
   for (const [metaMap, handlers] of extra) {
     for (const name of Object.keys(metaMap) as ToolName[]) {
