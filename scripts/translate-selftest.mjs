@@ -491,10 +491,18 @@ const translateImporters = srcFiles
 // 自動補英日文）。同樣 server-only；能呼叫它的只有通過 MCP_TOKEN 閘門的請求
 // （src/server/mcp/core.ts#gateMcpRequest，沒設 token 整支 404）—— 那把 token 由老闆
 // 自己設、自己持有，等同後台 admin，額度的決定權沒有交給任何新的人。
+// 第三個例外（2026-11-15）：MCP 上架工具 src/server/mcp/catalog-inventory-tools.ts
+// （create_inventory_listing 的三語商品名稱／摘要只給中文時補英日文）。與 tools.ts 同一個閘門、
+// 同一個「金鑰只經 env.ts」寫法，只在 OAuth 管理員呼叫時才會翻譯。
 check(
   "只有 fns/translate.ts、一頁新增活動、MCP 寫入工具匯入 @/server/translate",
   translateImporters,
-  ["src/lib/admin/fns/translate.ts", "src/server/event-quick-create.ts", "src/server/mcp/tools.ts"],
+  [
+    "src/lib/admin/fns/translate.ts",
+    "src/server/event-quick-create.ts",
+    "src/server/mcp/catalog-inventory-tools.ts",
+    "src/server/mcp/tools.ts",
+  ],
 );
 {
   const quickSrc = readFile(join(ROOT, "src/server/event-quick-create.ts"));

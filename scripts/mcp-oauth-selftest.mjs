@@ -839,9 +839,9 @@ async function codeFor(client, redirectUri, userId = ADMIN, now) {
     { isActiveAdmin: fakeAdmin, oauthStore: oc.__TEST_ONLY__.defaultStore() },
   );
   check(
-    "handleMcpRequest：靜態 token → tools/list 133 支（30 支＋create_event／create_journey／create_shop_product＋0052 set_event_status＋4 支直接上傳圖片＋21 支後台唯讀查詢＋26 支營運／對外／報表＋5 支進銷存新增／審核／門市結帳＋11 支門市套餐與庫存異動＋13 支訂單與活動＋19 支選品／廠商／推薦人／電話）",
+    "handleMcpRequest：靜態 token → tools/list 142 支（30 支＋create_event／create_journey／create_shop_product＋0052 set_event_status＋4 支直接上傳圖片＋21 支後台唯讀查詢＋26 支營運／對外／報表＋5 支進銷存新增／審核／門市結帳＋11 支門市套餐與庫存異動＋13 支訂單與活動＋19 支選品／廠商／推薦人／電話＋9 支上架／商品修改／拍照辨識進貨／刊物連結）",
     [viaStatic.status, await toolsCount(viaStatic)],
-    [200, 133],
+    [200, 142],
   );
   check("靜態 token 不查 profiles", lookups.length, 0);
   const viaOauth = await http.handleMcpRequest(
@@ -849,9 +849,9 @@ async function codeFor(client, redirectUri, userId = ADMIN, now) {
     { isActiveAdmin: fakeAdmin, oauthStore: oc.__TEST_ONLY__.defaultStore() },
   );
   check(
-    "handleMcpRequest：OAuth token → tools/list 133 支",
+    "handleMcpRequest：OAuth token → tools/list 142 支",
     [viaOauth.status, await toolsCount(viaOauth)],
-    [200, 133],
+    [200, 142],
   );
   check("🔴 OAuth 每次呼叫都查一次 profiles（用 token 裡的 user id）", lookups, [ADMIN]);
   admins.delete(ADMIN);

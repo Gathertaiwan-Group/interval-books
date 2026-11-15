@@ -318,7 +318,18 @@ const CLAIM_PREFIX = "used/";
  * 同一個 upload_id 只有一個 finalize 搶得到，其他的回「已經 finalize 過」。檔案還沒傳上去
  * 的那一次會把標記收回，傳好之後可以再 finalize。
  */
-export async function finalizeStagedUpload(uploadId: string, nowMs = Date.now()) {
+export async function finalizeStagedUpload<S = { key: string; url: string }>(
+  uploadId: string,
+  nowMs = Date.now(),
+  /**
+   * 驗過的 bytes 存去哪裡。預設＝site-images（finalize_image_upload）。
+   * 2026-11-15 拍照辨識進貨單（catalog-inventory-tools.ts）改傳「存進私有 ocr-scans」——
+   * 進貨單有廠商與單價，不能進公開 bucket。暫存、認領、墓碑、10 分鐘窗口全部共用。
+   */
+  store: (bytes: Uint8Array) => Promise<S> = storeSiteImageBytes as unknown as (
+    bytes: Uint8Array,
+  ) => Promise<S>,
+) {
   const parsed = parseUploadId(uploadId);
   if (!parsed) throw new McpInputError("upload_id 格式不對，請用 create_image_upload_url 回傳的值");
   const { supabaseAdmin } = await import("@/server/supabase-admin");
@@ -367,7 +378,7 @@ export async function finalizeStagedUpload(uploadId: string, nowMs = Date.now())
     }
     const bytes = new Uint8Array(await data.arrayBuffer());
     const validated = validateImageBytes(bytes, declared);
-    const stored = await storeSiteImageBytes(validated.bytes);
+    const stored = await store(validated.bytes);
     return { validated, stored };
   } finally {
     await tombstone();

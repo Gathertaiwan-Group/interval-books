@@ -622,6 +622,17 @@ const OPS_WRITE_EXPECTED = [
   "reorder_event_blocks",
   "sync_google_calendar",
 ];
+// 2026-11-15 上架／進銷存商品修改／拍照辨識進貨／刊物連結（catalog-inventory-tools.ts，
+// 行為測試在 mcp-catalog-inventory-selftest）。
+OPS_WRITE_EXPECTED.push(
+  "create_inventory_listing",
+  "update_inventory_product",
+  "set_inventory_product_active",
+  "request_inventory_price_change",
+  "import_purchases",
+  "update_purchase",
+  "link_publication_to_inventory",
+);
 const OPS_READ_EXPECTED = [
   "list_event_sessions",
   "list_event_blocks",
@@ -631,6 +642,7 @@ const OPS_READ_EXPECTED = [
   "get_combo_set",
   "list_stock_adjustments",
   "get_stock_adjustment",
+  "list_inventory_listings",
   "get_ui_strings",
   "get_site_settings",
   "get_email_copy",
@@ -669,6 +681,9 @@ const PARTNERS_READ_EXPECTED = [
 OPS_WRITE_EXPECTED.push(...PARTNERS_WRITE_EXPECTED);
 OPS_READ_EXPECTED.push(...PARTNERS_READ_EXPECTED);
 EXPECTED_TOOLS.push(...OPS_WRITE_EXPECTED, ...OPS_READ_EXPECTED);
+// 辨識進貨單：不改業務資料、沒有 dry_run（與上傳圖片同類），但會存檔與花額度，所以不是 readOnly。
+const OPS_OTHER_EXPECTED = ["recognize_purchase_order"];
+EXPECTED_TOOLS.push(...OPS_OTHER_EXPECTED);
 {
   const names = Object.keys(tools.TOOL_INPUTS).sort();
   check("工具清單（白名單）與預期一致", names, [...EXPECTED_TOOLS].sort());
@@ -682,6 +697,7 @@ EXPECTED_TOOLS.push(...OPS_WRITE_EXPECTED, ...OPS_READ_EXPECTED);
     ...tools.ADMIN_READ_TOOLS,
     ...OPS_WRITE_EXPECTED,
     ...OPS_READ_EXPECTED,
+    ...OPS_OTHER_EXPECTED,
   ]);
   for (const n of OPS_WRITE_EXPECTED) {
     const parsed = tools.TOOL_INPUTS[n]?.shape?.dry_run?.safeParse(undefined);
