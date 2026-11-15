@@ -63,6 +63,11 @@ import { OPS_WRITE_HANDLERS, OPS_WRITE_TOOL_INPUTS, OPS_WRITE_TOOL_META } from "
 import { OUTBOUND_HANDLERS, OUTBOUND_TOOL_INPUTS, OUTBOUND_TOOL_META } from "./outbound-tools";
 import { REPORT_HANDLERS, REPORT_TOOL_INPUTS, REPORT_TOOL_META } from "./report-tools";
 import { POS_STOCK_HANDLERS, POS_STOCK_TOOL_INPUTS, POS_STOCK_TOOL_META } from "./pos-stock-tools";
+import {
+  ORDERS_EVENTS_HANDLERS,
+  ORDERS_EVENTS_TOOL_INPUTS,
+  ORDERS_EVENTS_TOOL_META,
+} from "./orders-events-tools";
 
 /* ------------------------------------------------------------------ 共用 */
 
@@ -164,7 +169,7 @@ const WRITE_NOTE =
  * 有翻譯金鑰就回一個翻譯函式，沒有就回 null（fillLocalized 會叫呼叫端自己給 en/ja）。
  * 金鑰一律經 env.ts 讀（translate-selftest 守著「只有 env.ts 讀 GEMINI_API_KEY」）。
  */
-async function translator(): Promise<Translator | null> {
+export async function translator(): Promise<Translator | null> {
   const { geminiApiKey } = await import("@/server/env");
   try {
     geminiApiKey();
@@ -655,6 +660,8 @@ export const TOOL_INPUTS = {
   ...OUTBOUND_TOOL_INPUTS,
   ...REPORT_TOOL_INPUTS,
   ...POS_STOCK_TOOL_INPUTS, // 2026-11-15 門市套餐與庫存異動（./pos-stock-tools.ts）
+  /* 2026-11-15 訂單與活動（./orders-events-tools.ts）。 */
+  ...ORDERS_EVENTS_TOOL_INPUTS,
 } as const;
 
 export type ToolName = keyof typeof TOOL_INPUTS;
@@ -968,7 +975,7 @@ export function registerContentTools(server: McpServer): void {
     {
       title: "單一活動",
       description:
-        "用 id 取一場活動的完整內容，加上票券商品、場次與票種的**唯讀**摘要（場次／票種／票價不能用 MCP 修改）。",
+        "用 id 取一場活動的完整內容，加上票券商品、場次與票種的摘要。要改場次／票種用 list_event_sessions → update_event_session／update_ticket_type。",
       annotations: READ_ONLY,
     },
     async ({ id }) => {
@@ -987,7 +994,7 @@ export function registerContentTools(server: McpServer): void {
       return jsonText({
         event: row,
         read_only: {
-          note: "以下只供參考；票價、場次、票種、名額請在後台修改。上架狀態用 set_event_status 改。",
+          note: "以下只供參考；場次與票種用 create_event_session／update_event_session／create_ticket_type／update_ticket_type 改。上架狀態用 set_event_status 改。",
           ticket_product: products[id] ? ticket : null,
           sessions,
           plans: plans
@@ -2181,6 +2188,7 @@ export function registerContentTools(server: McpServer): void {
     [OUTBOUND_TOOL_META, OUTBOUND_HANDLERS as never],
     [REPORT_TOOL_META, REPORT_HANDLERS as never],
     [POS_STOCK_TOOL_META, POS_STOCK_HANDLERS as never],
+    [ORDERS_EVENTS_TOOL_META, ORDERS_EVENTS_HANDLERS as never],
   ];
   for (const [metaMap, handlers] of extra) {
     for (const name of Object.keys(metaMap) as ToolName[]) {

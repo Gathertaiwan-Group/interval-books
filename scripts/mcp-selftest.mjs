@@ -609,8 +609,22 @@ const OPS_WRITE_EXPECTED = [
   "resend_order_email",
   "reissue_invoice",
   "request_invoice_void",
+  // 2026-11-15 訂單與活動（orders-events-tools.ts；行為測試在 mcp-orders-events-selftest.mjs）
+  "collect_onsite_payment",
+  "ship_order",
+  "archive_order",
+  "create_event_session",
+  "update_event_session",
+  "create_ticket_type",
+  "update_ticket_type",
+  "create_event_block",
+  "update_event_block",
+  "reorder_event_blocks",
+  "sync_google_calendar",
 ];
 const OPS_READ_EXPECTED = [
+  "list_event_sessions",
+  "list_event_blocks",
   "list_phone_order_options",
   "list_pending_approvals",
   "list_combo_sets",
