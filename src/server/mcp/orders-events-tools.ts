@@ -116,15 +116,28 @@ const notifyCustomerArg = (what: string) =>
       `預設 false＝不寄。true＝與後台按鈕一樣，寫入成功後立刻寄${what}給訂購人（真的會寄到客人信箱）。`,
     );
 
-/** 三語：一段中文（en/ja 自動翻譯），或 {zh, en?, ja?}。 */
+/**
+ * 三語：一段中文（en/ja 自動翻譯），或 {zh, en?, ja?}。
+ *
+ * en/ja 上限是中文的 3 倍（與 create-tools.ts#localizedText 同一規則）：英日文常比中文長，
+ * 若與中文同上限，預覽自動翻譯出來的 confirm_args 原樣送回會被 schema 擋下，「預覽＝寫入」失效。
+ */
 const localizedArg = (what: string, max = 2000) =>
   z
     .union([
       z.string().trim().min(1).max(max),
       z.object({
         zh: z.string().trim().min(1).max(max),
-        en: z.string().trim().max(max).optional(),
-        ja: z.string().trim().max(max).optional(),
+        en: z
+          .string()
+          .trim()
+          .max(max * 3, `${what}的英文最多 ${max * 3} 字`)
+          .optional(),
+        ja: z
+          .string()
+          .trim()
+          .max(max * 3, `${what}的日文最多 ${max * 3} 字`)
+          .optional(),
       }),
     ])
     .describe(`${what}：一段中文（英日文自動翻譯），或 {"zh","en","ja"}`);

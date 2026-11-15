@@ -164,6 +164,11 @@ const FAKE_TRANSLATE =
   encodeURIComponent(`
     export async function translateToEnJa({ text }) {
       globalThis.__translateCalls.push(text);
+      // __translateLong：模擬英日文比中文長（約 1.5 倍），驗 en/ja 上限不會擋回送的 confirm_args。
+      if (globalThis.__translateLong) {
+        const n = Math.ceil(text.length * 1.5);
+        return { en: "E".repeat(n), ja: "ジ".repeat(n) };
+      }
       return { en: "EN" + globalThis.__translateCalls.length + " " + text, ja: "JA " + text };
     }
   `);
@@ -1015,6 +1020,78 @@ await expectError(
     ),
   );
   check("update_event_session 沒人報名改期：沒有警告", empty.warning, undefined);
+}
+
+console.log("\n[6c] 長翻譯（英日文約 1.5 倍中文）：預覽的 confirm_args 仍通過 schema 並可寫入");
+{
+  // 中文剛好頂到上限，假翻譯回 1.5 倍長：舊版 en/ja 與中文同上限會被 schema 擋下。
+  const zh = (n) => "長".repeat(n);
+  const cases = [
+    [
+      "create_event_session",
+      { ...SAMPLE.create_event_session, title: zh(200), location: zh(500) },
+      ["title", "location"],
+    ],
+    ["create_ticket_type", { ...SAMPLE.create_ticket_type, title: zh(200) }, ["title"]],
+    [
+      "create_event_block",
+      { ...SAMPLE.create_event_block, title: zh(500), body: zh(2000) },
+      ["title", "body"],
+    ],
+    [
+      "update_event_session",
+      { session_id: SESS1, title: zh(200), location: zh(500) },
+      ["title", "location"],
+    ],
+    ["update_ticket_type", { ticket_type_id: PLAN1, title: zh(200) }, ["title"]],
+    [
+      "update_event_block",
+      { event_id: EVENT1, block_id: 12, title: zh(500), body: zh(2000) },
+      ["title", "body"],
+    ],
+  ];
+  globalThis.__translateLong = true;
+  try {
+    for (const [tool, args, fields] of cases) {
+      resetDb(BASE, RPC);
+      // 輸入走工具 schema（與 MCP 實際呼叫同一條路），不直接把原始物件丟給 handler。
+      const parsedIn = INPUTS[tool].safeParse(args);
+      checkTrue(`${tool} 中文頂到上限的輸入通過 schema`, parsedIn.success);
+      if (!parsedIn.success) continue;
+      const pv = parseOut(await asOAuth(() => H[tool](parsedIn.data)));
+      const ca = pv.confirm_args;
+      checkTrue(
+        `${tool} 預覽的英日文確實比中文上限長（1.5 倍）`,
+        fields.every(
+          (f) =>
+            typeof ca?.[f]?.en === "string" &&
+            ca[f].en.length > ca[f].zh.length &&
+            ca[f].ja.length > ca[f].zh.length,
+        ),
+      );
+      const parsedCa = INPUTS[tool].safeParse(ca);
+      checkTrue(`${tool} 長翻譯的 confirm_args 通過 INPUTS.${tool}.safeParse`, parsedCa.success);
+      if (!parsedCa.success) continue;
+      const n = globalThis.__translateCalls.length;
+      resetDb(BASE, RPC);
+      const w = parseOut(await asOAuth(() => H[tool](parsedCa.data)));
+      check(
+        `${tool} 長翻譯 confirm_args 經 schema 後寫入成功、沒有再翻譯`,
+        [w.written, globalThis.__translateCalls.length - n],
+        [true, 0],
+      );
+    }
+    // 上限仍在：超過中文上限 3 倍的英文要擋。
+    checkTrue(
+      "create_event_block 英文超過中文上限 3 倍仍被擋",
+      !INPUTS.create_event_block.safeParse({
+        ...SAMPLE.create_event_block,
+        title: { zh: "問", en: "E".repeat(1501), ja: "ジ" },
+      }).success,
+    );
+  } finally {
+    globalThis.__translateLong = false;
+  }
 }
 
 console.log("\n[7] 靜態");
