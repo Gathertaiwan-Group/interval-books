@@ -207,8 +207,12 @@ check(
   true,
 );
 check("寫入工具清單", WRITES, [
+  "approve_inventory_record",
+  "create_inventory_product",
   "create_phone_order",
+  "create_pos_sale",
   "create_purchase",
+  "create_secondhand_sale",
   "create_stock_adjustment",
   "mark_order_paid",
   "record_stock_count",
@@ -295,6 +299,13 @@ const WISH1 = U(8);
 const INQ1 = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const PROD1 = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const PROD2 = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+const PROD_PENDING = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+const PUR_PENDING = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+const PUR_DONE = "12121212-1212-4121-8121-121212121212";
+const ADJ_PENDING = "13131313-1313-4131-8131-131313131313";
+const PAY_CASH = "14141414-1414-4141-8141-141414141414";
+const PAY_LINE = "15151515-1515-4151-8151-151515151515";
+const CAT1 = "16161616-1616-4161-8161-161616161616";
 const L = (zh) => ({ zh, en: `${zh}-en`, ja: `${zh}-ja` });
 const FUTURE = new Date(Date.now() + 7 * 86400000).toISOString();
 
@@ -428,16 +439,111 @@ const BASE_TABLES = {
       inv_product_id: PROD1,
       name: "小誌 12 期",
       issue_number: "12",
+      barcode: "9789860000001",
       stock_quantity: 10,
       cost_price: 100,
+      selling_price: 150,
+      approval_status: "approved",
+      is_active: true,
+      product_type: "outright",
       user_id: "x",
     },
     {
       inv_product_id: PROD2,
       name: "明信片",
       issue_number: null,
+      barcode: null,
       stock_quantity: 4,
       cost_price: 10,
+      selling_price: 30,
+      approval_status: "approved",
+      is_active: true,
+      product_type: "outright",
+      user_id: "x",
+    },
+    {
+      inv_product_id: PROD_PENDING,
+      name: "個人藏書：海邊的卡夫卡",
+      issue_number: null,
+      barcode: null,
+      stock_quantity: 0,
+      cost_price: 0,
+      selling_price: 200,
+      approval_status: "pending",
+      is_active: true,
+      product_type: "outright",
+      creator_name: "店長",
+      user_id: "x",
+    },
+  ],
+  inv_pos_products: [
+    {
+      inv_product_id: PROD1,
+      name: "小誌 12 期",
+      issue_number: "12",
+      selling_price: 150,
+      stock_quantity: 10,
+      reserved: 2,
+      available: 8,
+    },
+    {
+      inv_product_id: PROD2,
+      name: "明信片",
+      issue_number: null,
+      selling_price: 30,
+      stock_quantity: 4,
+      reserved: 0,
+      available: 4,
+    },
+  ],
+  inv_pos_payment_methods: [
+    { payment_method_id: PAY_CASH, name: "現金", is_default: true, display_order: 1 },
+    { payment_method_id: PAY_LINE, name: "LINE Pay", is_default: false, display_order: 2 },
+  ],
+  inv_admin_categories: [{ category_id: CAT1, name: "二手書", icon: null, display_order: 1 }],
+  inv_admin_vendors: [],
+  inv_admin_approval_settings: [
+    { module: "products", is_enabled: true, updated_at: "2026-11-01T00:00:00Z" },
+    { module: "purchases", is_enabled: true, updated_at: "2026-11-01T00:00:00Z" },
+  ],
+  inv_admin_purchases: [
+    {
+      purchase_id: PUR_PENDING,
+      product_id: PROD_PENDING,
+      product_name: "個人藏書：海邊的卡夫卡",
+      item_name: null,
+      purchase_date: "2026-11-15",
+      quantity: 1,
+      unit_cost: 0,
+      subtotal: 0,
+      approval_status: "pending",
+      creator_name: "店長",
+      user_id: "x",
+    },
+    {
+      purchase_id: PUR_DONE,
+      product_id: PROD1,
+      product_name: "小誌 12 期",
+      item_name: null,
+      purchase_date: "2026-11-01",
+      quantity: 5,
+      unit_cost: 80,
+      subtotal: 400,
+      approval_status: "approved",
+      user_id: "x",
+    },
+  ],
+  inv_admin_stock_adjustments: [
+    {
+      adjustment_id: ADJ_PENDING,
+      adjustment_number: "EXP-0001",
+      product_id: PROD1,
+      product_name: "小誌 12 期",
+      product_stock_quantity: 10,
+      category: "EXP",
+      quantity: -1,
+      reason: "damage",
+      status: "pending_approval",
       user_id: "x",
     },
   ],
@@ -500,6 +606,21 @@ const BASE_RPC = {
     created: true,
     approval_status: "pending",
     needs_approval: true,
+  },
+  // 回讀用：假 DB 不會真的建列，所以讓 RPC 回傳表裡那件待審商品的 id。
+  inv_save_product: {
+    id: PROD_PENDING,
+    created: true,
+    purchase_created: true,
+    price_change_pending: false,
+  },
+  inv_approve_record: { changed: true, module: "purchases", previous_status: "pending" },
+  pos_checkout: { sale_ids: ["sale-1"], total_amount: 270, total_cost: 110, oversold: [] },
+  inv_secondhand_checkout: {
+    sale_id: "sale-2",
+    item_name: "海邊的卡夫卡",
+    quantity: 1,
+    amount: 200,
   },
 };
 
@@ -671,6 +792,96 @@ const CASES = {
       "approval_status" in (log.rpc[0]?.args?.p_payload ?? {}),
     ],
     want: [["inv_save_purchase"], ADMIN_ID, null, PROD1, 20, false],
+  },
+  create_inventory_product: {
+    args: {
+      idempotency_key: "11111111-aaaa-4aaa-8aaa-aaaaaaaaaab1",
+      name: "個人藏書：海邊的卡夫卡",
+      selling_price: 200,
+      category_id: CAT1,
+      notes: "店長個人藏書",
+      purchase: { quantity: 1, cost_price: 0, purchase_date: "2026-11-15" },
+    },
+    expect: () => [
+      log.rpc.map((r) => r.name),
+      log.rpc[0]?.args?.p_user_id,
+      log.rpc[0]?.args?.p_id,
+      log.rpc[0]?.args?.p_payload?.name,
+      log.rpc[0]?.args?.p_payload?.low_stock_alert,
+      log.rpc[0]?.args?.p_payload?.pack_size,
+      log.rpc[0]?.args?.p_payload?.product_type,
+      ["approval_status", "stock_quantity", "user_id", "purchase", "id"].filter(
+        (k) => k in (log.rpc[0]?.args?.p_payload ?? {}),
+      ),
+      log.rpc[0]?.args?.p_purchase,
+    ],
+    want: [
+      ["inv_save_product"],
+      ADMIN_ID,
+      null,
+      "個人藏書：海邊的卡夫卡",
+      5,
+      1,
+      "outright",
+      [],
+      { quantity: 1, cost_price: 0, vendor: null, purchase_date: "2026-11-15" },
+    ],
+  },
+  approve_inventory_record: {
+    args: { module: "purchases", id: PUR_PENDING, decision: "approve" },
+    expect: () => [log.rpc.map((r) => r.name), log.rpc[0]?.args],
+    want: [
+      ["inv_approve_record"],
+      { p_user_id: ADMIN_ID, p_module: "purchases", p_id: PUR_PENDING, p_approved: true },
+    ],
+  },
+  create_pos_sale: {
+    args: {
+      idempotency_key: "11111111-aaaa-4aaa-8aaa-aaaaaaaaaab2",
+      items: [
+        { product_id: PROD1, quantity: 1, unit_price: 120 },
+        { product_id: PROD2, quantity: 2 },
+      ],
+      payment_method: "LINE Pay",
+      notes: "熟客折扣",
+      sale_date: "2026-11-15",
+    },
+    expect: () => [log.rpc.map((r) => r.name), log.rpc[0]?.args],
+    want: [
+      ["pos_checkout"],
+      {
+        p_user_id: ADMIN_ID,
+        p_items: [
+          { inv_product_id: PROD1, quantity: 1, unit_price: 120 },
+          { inv_product_id: PROD2, quantity: 2, unit_price: 30 },
+        ],
+        p_payment_method_id: PAY_LINE,
+        p_sale_date: "2026-11-15",
+        p_notes: "熟客折扣",
+        p_override_reservation: false,
+      },
+    ],
+  },
+  create_secondhand_sale: {
+    args: {
+      idempotency_key: "11111111-aaaa-4aaa-8aaa-aaaaaaaaaab3",
+      item_name: "海邊的卡夫卡",
+      unit_price: 200,
+      sale_date: "2026-11-15",
+    },
+    expect: () => [log.rpc.map((r) => r.name), log.rpc[0]?.args],
+    want: [
+      ["inv_secondhand_checkout"],
+      {
+        p_user_id: ADMIN_ID,
+        p_item_name: "海邊的卡夫卡",
+        p_quantity: 1,
+        p_unit_price: 200,
+        p_sale_date: "2026-11-15",
+        p_payment_method_id: PAY_CASH,
+        p_notes: null,
+      },
+    ],
   },
   update_ui_string: {
     args: {
@@ -973,7 +1184,14 @@ await expectError("mark_order_paid 線上金流的單不能手動標記", () =>
   H.mark_order_paid({ order_id: ORDER_CARD, dry_run: false }),
 );
 // ── idempotency_key（審查 2026-11-03）：dry_run=false 必填、同一組只建一次 ─────────
-for (const n of ["create_stock_adjustment", "record_stock_count", "create_purchase"]) {
+for (const n of [
+  "create_stock_adjustment",
+  "record_stock_count",
+  "create_purchase",
+  "create_inventory_product",
+  "create_pos_sale",
+  "create_secondhand_sale",
+]) {
   const { idempotency_key: _k, ...noKey } = CASES[n].args;
   await expectError(`${n}：dry_run=false 沒帶 idempotency_key → 拒絕`, () =>
     asOAuth(() => H[n]({ ...noKey, dry_run: false })),
@@ -1221,6 +1439,10 @@ for (const n of [
   "create_stock_adjustment",
   "record_stock_count",
   "create_purchase",
+  "create_inventory_product",
+  "approve_inventory_record",
+  "create_pos_sale",
+  "create_secondhand_sale",
 ]) {
   const r = await expectError(
     `${n} 靜態 token 拒絕`,
@@ -1258,6 +1480,212 @@ const same = parseOut(
   await asOAuth(() => H.update_journey_wish({ id: WISH1, status: "new", dry_run: false })),
 );
 check("update_journey_wish 沒有變更 → 不寫", [dataWrites().length, same.written], [0, false]);
+
+// [5c] 進銷存新增／審核／門市結帳（2026-11-15）-------------------------------
+console.log("\n[5c] 新增商品／審核／門市結帳／二手書");
+{
+  resetDb(BASE_TABLES, BASE_RPC);
+  const out = parseOut(
+    await asOAuth(() => H.create_inventory_product(CASES.create_inventory_product.args)),
+  );
+  check(
+    "create_inventory_product 預覽：商品與進貨都預告待審、分類名稱帶出",
+    [
+      out.will_create?.product?.approval?.startsWith("pending"),
+      out.will_create?.purchase?.approval?.startsWith("pending"),
+      out.will_create?.product?.category_name,
+      out.will_create?.product?.stock_quantity,
+    ],
+    [true, true, "二手書", 0],
+  );
+  resetDb(BASE_TABLES, BASE_RPC);
+  const dup = parseOut(
+    await asOAuth(() =>
+      H.create_inventory_product({
+        name: "小誌 12 期",
+        selling_price: 150,
+        barcode: "9789860000001",
+      }),
+    ),
+  );
+  check("create_inventory_product 預覽：同條碼 → 警告", (dup.warnings ?? []).length, 1);
+  resetDb(BASE_TABLES, BASE_RPC);
+  const done = parseOut(
+    await asOAuth(() =>
+      H.create_inventory_product({ ...CASES.create_inventory_product.args, dry_run: false }),
+    ),
+  );
+  check(
+    "create_inventory_product 寫入後回報待審的商品與進貨 id（給 approve_inventory_record）",
+    done.needs_approval,
+    [
+      { module: "products", id: PROD_PENDING },
+      { module: "purchases", id: PUR_PENDING },
+    ],
+  );
+  await expectError("create_inventory_product 不存在的分類", () =>
+    H.create_inventory_product({ name: "x", selling_price: 1, category_id: U(9), dry_run: false }),
+  );
+  await expectError("create_inventory_product 售價負數", () =>
+    H.create_inventory_product({ name: "x", selling_price: -1, dry_run: false }),
+  );
+
+  resetDb(BASE_TABLES, BASE_RPC);
+  const pend = parseOut(await asOAuth(() => H.list_pending_approvals({})));
+  check(
+    "list_pending_approvals：三類各列出待審那一筆、不寫",
+    [
+      pend.products?.rows?.map((r) => r.id),
+      pend.purchases?.rows?.map((r) => r.id),
+      pend.stock_adjustments?.rows?.map((r) => r.id),
+      pend.approval_settings?.stock_adjustments,
+      log.rpc.length,
+      log.writes.length,
+    ],
+    [[PROD_PENDING], [PUR_PENDING], [ADJ_PENDING], "需要審核", 0, 0],
+  );
+
+  resetDb(BASE_TABLES, BASE_RPC);
+  const ap = parseOut(
+    await asOAuth(() =>
+      H.approve_inventory_record({ module: "purchases", id: PUR_PENDING, decision: "approve" }),
+    ),
+  );
+  check(
+    "approve_inventory_record 預覽：pending → approved、庫存 0 → 1",
+    [ap.changes?.status, ap.target?.stock_now, ap.target?.stock_after_if_approved],
+    [{ before: "pending", after: "approved" }, 0, 1],
+  );
+  resetDb(BASE_TABLES, BASE_RPC);
+  const adj = parseOut(
+    await asOAuth(() =>
+      H.approve_inventory_record({
+        module: "stock_adjustments",
+        id: ADJ_PENDING,
+        decision: "approve",
+        dry_run: false,
+      }),
+    ),
+  );
+  check(
+    "approve_inventory_record 在庫異動：pending_approval → confirmed，走 inv_approve_record",
+    [adj.written, log.rpc[0]?.args?.p_module, log.rpc[0]?.args?.p_approved],
+    [true, "stock_adjustments", true],
+  );
+  resetDb(BASE_TABLES, BASE_RPC);
+  const noop = parseOut(
+    await asOAuth(() =>
+      H.approve_inventory_record({
+        module: "purchases",
+        id: PUR_DONE,
+        decision: "approve",
+        dry_run: false,
+      }),
+    ),
+  );
+  check(
+    "approve_inventory_record 已核准的 → 不呼叫 RPC、written=false",
+    [log.rpc.length, noop.written],
+    [0, false],
+  );
+  resetDb(BASE_TABLES, BASE_RPC);
+  await asOAuth(() =>
+    H.approve_inventory_record({
+      module: "products",
+      id: PROD_PENDING,
+      decision: "reject",
+      dry_run: false,
+    }),
+  );
+  check("approve_inventory_record 退回 → p_approved=false", log.rpc[0]?.args?.p_approved, false);
+  await expectError("approve_inventory_record 不開放的模組（vendors）", () =>
+    H.approve_inventory_record({
+      module: "vendors",
+      id: PUR_PENDING,
+      decision: "approve",
+      dry_run: false,
+    }),
+  );
+  await expectError("approve_inventory_record 找不到", () =>
+    H.approve_inventory_record({
+      module: "purchases",
+      id: U(9),
+      decision: "approve",
+      dry_run: false,
+    }),
+  );
+
+  // 超過可售量：預覽警告；不帶 override 照樣交給資料庫判斷（與後台同一個守門）。
+  resetDb(BASE_TABLES, BASE_RPC);
+  const over = parseOut(
+    await asOAuth(() => H.create_pos_sale({ items: [{ product_id: PROD1, quantity: 9 }] })),
+  );
+  check(
+    "create_pos_sale 預覽：超過可售量 → 警告會被拒、預設付款方式＝現金、單價＝售價",
+    [
+      typeof over.warning === "string" && over.warning.includes("拒絕"),
+      over.will_create?.payment_method,
+      over.will_create?.lines?.[0]?.unit_price,
+      over.will_create?.lines?.[0]?.over_available,
+    ],
+    [true, "現金", 150, 1],
+  );
+  resetDb(BASE_TABLES, BASE_RPC);
+  await asOAuth(() =>
+    H.create_pos_sale({
+      items: [{ product_id: PROD1, quantity: 9 }],
+      override_reservation: true,
+      idempotency_key: "11111111-aaaa-4aaa-8aaa-aaaaaaaaaab9",
+      dry_run: false,
+    }),
+  );
+  check(
+    "create_pos_sale override_reservation=true 原樣傳給 pos_checkout",
+    log.rpc[0]?.args?.p_override_reservation,
+    true,
+  );
+  const unapproved = await expectError("create_pos_sale 待審商品 → 拒絕並說明要先核准", () =>
+    H.create_pos_sale({ items: [{ product_id: PROD_PENDING, quantity: 1 }], dry_run: false }),
+  );
+  check(
+    "create_pos_sale 待審商品的錯誤訊息指向 approve_inventory_record",
+    unapproved.content[0].text.includes("approve_inventory_record"),
+    true,
+  );
+  await expectError("create_pos_sale 同一件商品兩行", () =>
+    H.create_pos_sale({
+      items: [
+        { product_id: PROD1, quantity: 1 },
+        { product_id: PROD1, quantity: 1 },
+      ],
+    }),
+  );
+  await expectError("create_pos_sale 不存在的付款方式", () =>
+    H.create_pos_sale({ items: [{ product_id: PROD1, quantity: 1 }], payment_method: "比特幣" }),
+  );
+  await expectError("create_pos_sale 備註超過 500 字", () =>
+    H.create_pos_sale({ items: [{ product_id: PROD1, quantity: 1 }], notes: "字".repeat(501) }),
+  );
+  resetDb(BASE_TABLES, BASE_RPC);
+  const sh = parseOut(
+    await asOAuth(() =>
+      H.create_secondhand_sale({ item_name: "海邊的卡夫卡", unit_price: 200, quantity: 2 }),
+    ),
+  );
+  check(
+    "create_secondhand_sale 預覽：金額＝數量×售價、不動庫存",
+    [sh.will_create?.amount, sh.will_create?.is_secondhand, typeof sh.will_create?.stock_change],
+    [400, true, "string"],
+  );
+  await expectError("create_secondhand_sale 沒有書名", () =>
+    H.create_secondhand_sale({ item_name: " ", unit_price: 1, dry_run: false }),
+  );
+  check(
+    "create_secondhand_sale 輸入沒有 product_id（二手書不建商品）",
+    "product_id" in (z.toJSONSchema(INPUTS.create_secondhand_sale).properties ?? {}),
+    false,
+  );
+}
 
 // [6] ------------------------------------------------------------------------
 console.log("\n[6] 靜態");

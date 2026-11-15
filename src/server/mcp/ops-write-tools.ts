@@ -57,7 +57,11 @@ import {
   zodIssuesText,
   type TextResult,
 } from "./core";
-import { INV_ADJUSTMENT_CATEGORIES, INV_ADJUSTMENT_REASONS } from "@/lib/admin/schemas";
+import {
+  INV_ADJUSTMENT_CATEGORIES,
+  INV_ADJUSTMENT_REASONS,
+  INV_PRODUCT_TYPES,
+} from "@/lib/admin/schemas";
 import { WISH_STATUSES } from "@/lib/journey-wish-inbox";
 import { INQUIRY_STATUSES } from "@/lib/partnership-inbox";
 import { INVOICE_TYPES } from "@/lib/invoice-format";
@@ -155,6 +159,20 @@ const SETTINGS_TEXT = [
 ] as const;
 /** get_site_settings 回的欄位：可寫的全部＋notify_emails（只讀）＋updated_at。bank_* 永遠不回。 */
 const SETTINGS_READABLE = [...SETTINGS_LOCALIZED, ...SETTINGS_TEXT, "notify_emails"] as const;
+
+/* ------------------------------------------------------------------ 進銷存審核 */
+
+/**
+ * MCP 開放核准的三個模組（APPROVAL_MODULES 的子集，代號與 inv_approve_record() 的 CASE 同名）。
+ * 供應商、套餐、調價、舊異動表不開放——那幾種仍到後台處理。
+ */
+const MCP_APPROVAL_MODULES = ["products", "purchases", "stock_adjustments"] as const;
+type McpApprovalModule = (typeof MCP_APPROVAL_MODULES)[number];
+const APPROVAL_LABEL: Record<McpApprovalModule, string> = {
+  products: "商品新增",
+  purchases: "進貨",
+  stock_adjustments: "在庫異動／盤點",
+};
 
 /* ------------------------------------------------------------------ 輸入 schema */
 
@@ -491,6 +509,138 @@ export const OPS_WRITE_TOOL_INPUTS = {
     idempotency_key: idempotencyKeyArg,
     dry_run: dryRunArg,
   }),
+  create_inventory_product: z.object({
+    name: z.string().trim().min(1).max(200).describe("商品名稱（必填）"),
+    selling_price: z.number().min(0).describe("售價（元，必填；0 也可以）"),
+    product_type: z
+      .enum(INV_PRODUCT_TYPES)
+      .default("outright")
+      .describe("outright 買斷（預設）／consignment 寄賣／rental 租借（展示用，櫃檯不能賣）"),
+    cost_price: z
+      .number()
+      .min(0)
+      .optional()
+      .describe("成本（元）。省略時資料庫用一起建的那筆進貨的單位成本，再沒有就是 0"),
+    issue_number: z.string().trim().max(50).optional().describe("期數"),
+    barcode: z.string().trim().max(64).optional().describe("條碼／ISBN"),
+    category_id: z.string().trim().uuid().optional().describe("分類 id（預覽會列出可選分類）"),
+    series: z.string().trim().max(200).optional(),
+    publisher: z.string().trim().max(200).optional().describe("出版社"),
+    vendor_id: z.string().trim().uuid().optional().describe("供應商 id（見 list_vendors）"),
+    low_stock_alert: z
+      .number()
+      .int()
+      .min(0)
+      .default(5)
+      .describe("低庫存警示數量（預設 5，與後台表單相同；0＝不警示）"),
+    pack_size: z.number().int().min(1).default(1).describe("每組數量（預設 1）"),
+    base_product_id: z
+      .string()
+      .trim()
+      .uuid()
+      .optional()
+      .describe("母品項 id（組合子品項才需要；一般商品省略）"),
+    image_key: z
+      .string()
+      .trim()
+      .max(300)
+      .optional()
+      .describe("商品照片 key（先用 upload_image_* 上傳，填回傳的 storage:… key）"),
+    notes: z.string().trim().max(2000).optional(),
+    purchase: z
+      .object({
+        quantity: z.number().int().min(1).max(1_000_000).describe("進貨數量"),
+        cost_price: z.number().min(0).optional().describe("單位成本（元）"),
+        vendor: z.string().trim().max(200).optional().describe("供應商名稱（文字）"),
+        purchase_date: dateArg("進貨日期，省略＝今天").optional(),
+      })
+      .optional()
+      .describe(
+        "同時建立第一筆進貨（＝後台表單的「同時建立一筆進貨記錄」）。省略＝只建商品，庫存 0。",
+      ),
+    idempotency_key: idempotencyKeyArg,
+    dry_run: dryRunArg,
+  }),
+  list_pending_approvals: z.object({
+    module: z
+      .enum(["all", ...MCP_APPROVAL_MODULES])
+      .default("all")
+      .describe("all（預設）／products 商品新增／purchases 進貨／stock_adjustments 在庫異動與盤點"),
+    limit: z.number().int().min(1).max(100).default(50).describe("每一類最多列幾筆（預設 50）"),
+  }),
+  approve_inventory_record: z.object({
+    module: z
+      .enum(MCP_APPROVAL_MODULES)
+      .describe("products 商品新增／purchases 進貨／stock_adjustments 在庫異動與盤點"),
+    id: uuidArg("待審那一筆的 id（見 list_pending_approvals）"),
+    decision: z.enum(["approve", "reject"]).describe("approve 通過／reject 退回"),
+    dry_run: dryRunArg,
+  }),
+  create_pos_sale: z.object({
+    items: z
+      .array(
+        z.object({
+          product_id: uuidArg("進銷存商品 id（見 list_inventory）"),
+          quantity: z.number().int().min(1).max(9999).describe("數量（銷售單位）"),
+          unit_price: z
+            .number()
+            .min(0)
+            .optional()
+            .describe("成交單價（元）。省略＝商品售價；可改（折扣、議價）"),
+        }),
+      )
+      .min(1)
+      .max(50)
+      .describe("這一筆結帳的品項（同一件商品只列一次）"),
+    payment_method_id: z
+      .string()
+      .trim()
+      .uuid()
+      .optional()
+      .describe(
+        "付款方式 id（預覽會列出可選的）。與 payment_method 二選一，都省略＝後台的預設付款方式",
+      ),
+    payment_method: z
+      .string()
+      .trim()
+      .min(1)
+      .max(60)
+      .optional()
+      .describe("付款方式名稱（例如「現金」，需與後台名稱完全相同）"),
+    sale_date: dateArg("銷售日期，省略＝今天").optional(),
+    notes: z.string().trim().max(500).optional().describe("備註（最多 500 字）"),
+    override_reservation: z
+      .boolean()
+      .default(false)
+      .describe(
+        "超過可售量時要不要照賣（＝後台「客人就站在櫃檯，我確認架上有貨，先賣」）。預設 false：超賣會被資料庫拒絕。" +
+          "true 會照樣結帳、庫存可能變負數，並記一筆賣超告警。",
+      ),
+    idempotency_key: idempotencyKeyArg,
+    dry_run: dryRunArg,
+  }),
+  create_secondhand_sale: z.object({
+    item_name: z.string().trim().min(1).max(200).describe("書名（必填）"),
+    unit_price: z.number().min(0).describe("售價（元，每本）"),
+    quantity: z.number().int().min(1).max(999).default(1).describe("數量（預設 1）"),
+    payment_method_id: z
+      .string()
+      .trim()
+      .uuid()
+      .optional()
+      .describe("付款方式 id。與 payment_method 二選一，都省略＝後台的預設付款方式"),
+    payment_method: z
+      .string()
+      .trim()
+      .min(1)
+      .max(60)
+      .optional()
+      .describe("付款方式名稱（例如「現金」，需與後台名稱完全相同）"),
+    sale_date: dateArg("銷售日期，省略＝今天").optional(),
+    notes: z.string().trim().max(2000).optional(),
+    idempotency_key: idempotencyKeyArg,
+    dry_run: dryRunArg,
+  }),
 
   /* ---- 文案與設定 ---- */
   get_ui_strings: z.object({
@@ -638,6 +788,55 @@ export const OPS_WRITE_TOOL_META: Record<
     title: "新增進貨",
     description:
       "與後台「進貨」同一支 RPC（inv_save_purchase）。審核狀態由資料庫決定；核准後庫存由 trigger 增加。" +
+      "需要 OAuth 管理員身分。" +
+      PREVIEW,
+    annotations: CREATE,
+  },
+  create_inventory_product: {
+    title: "新增進銷存商品（可同時建第一筆進貨）",
+    description:
+      "與後台 /admin/inventory-products/new「新增商品」表單同一支 RPC（inv_save_product，同一份欄位驗證）：" +
+      "同一個交易建商品，給 purchase 就同時建第一筆進貨（＝勾「同時建立一筆進貨記錄」）。" +
+      "庫存從 0 開始，由進貨加上去；商品與進貨要不要審核由資料庫的審核設定決定，呼叫端指定不了——" +
+      "需要審核時，商品核准前櫃檯不能賣、進貨核准前庫存不會加，請接著用 approve_inventory_record。" +
+      "⚠️ 一本不進貨的個人藏書／二手書直接用 create_secondhand_sale，不需要建商品。" +
+      "需要 OAuth 管理員身分。" +
+      PREVIEW,
+    annotations: CREATE,
+  },
+  list_pending_approvals: {
+    title: "待審核的商品／進貨／在庫異動",
+    description:
+      "與後台商品管理、進貨、在庫異動三頁的「待審核」篩選同一支查詢：列出等待核准的商品新增、進貨、在庫異動與盤點單，" +
+      "附上各模組目前是否開啟審核。拿到 id 後用 approve_inventory_record 核准或退回。唯讀。",
+    annotations: READ_ONLY,
+  },
+  approve_inventory_record: {
+    title: "核准／退回待審的商品、進貨或在庫異動",
+    description:
+      "與後台商品管理／進貨／在庫異動頁的「通過」「退回」按鈕同一支 RPC（inv_approve_record）。" +
+      "只動待審（pending／pending_approval）的那一筆，已處理過的回 written=false。" +
+      "通過進貨後庫存由資料庫 trigger 增加；通過在庫異動後庫存依異動數量加減；通過商品後櫃檯才賣得到。" +
+      "後台審核需要 approve_products／approve_purchases／approve_stock_adjustments 權限，MCP 的 OAuth 連線只發給管理員（每次請求重查），管理員具備這三種權限。" +
+      "資料庫沒有「建立者不能自己核准」的規則，與後台相同。需要 OAuth 管理員身分（審核必須記錄操作人員）。" +
+      PREVIEW,
+    annotations: WRITE,
+  },
+  create_pos_sale: {
+    title: "門市結帳（單品）",
+    description:
+      "與後台 /admin/pos「單品結帳」同一支 RPC（pos_checkout，整車一個交易）：寫入門市銷售、扣庫存（FIFO 成本由資料庫算）、記付款方式。" +
+      "單價可改（省略＝售價）。只能賣已核准、啟用、不是租借的商品——待審的商品請先 approve_inventory_record。" +
+      "超過可售量時與後台相同：預設被資料庫拒絕；override_reservation=true（＝後台「客人就站在櫃檯，我確認架上有貨，先賣」）才照賣並記賣超告警。" +
+      "需要 OAuth 管理員身分。" +
+      PREVIEW,
+    annotations: CREATE,
+  },
+  create_secondhand_sale: {
+    title: "二手書入帳",
+    description:
+      "與後台 /admin/pos 右上「二手書入帳」同一支 RPC（inv_secondhand_checkout）：寫一筆門市銷售（標記二手書），" +
+      "不進商品主檔、不扣任何庫存、沒有成本，金額＝數量×售價由資料庫算。賣掉一本個人藏書／二手書用這支。" +
       "需要 OAuth 管理員身分。" +
       PREVIEW,
     annotations: CREATE,
@@ -859,6 +1058,34 @@ async function loadOrderFacts(ref: { order_id?: string; order_no?: string }): Pr
   if (error) throw new Error(`訂單讀取失敗：${error.code}`);
   if (!data) notFound("訂單", ref.order_id ?? ref.order_no ?? "");
   return data as unknown as OrderFacts;
+}
+
+/* ---- 門市付款方式 ---- */
+
+/**
+ * 付款方式：id 或名稱二選一；都沒給＝後台 /admin/pos 的預設（is_default，沒有就第一個），
+ * 與 PosPage 的 defaultPaymentMethodId 同一個規則。清單是空的 → null（RPC 接受 null）。
+ */
+async function resolvePaymentMethod(
+  id: string | undefined,
+  name: string | undefined,
+): Promise<{ payment_method_id: string; name: string } | null> {
+  if (id && name) throw new McpInputError("payment_method_id 與 payment_method 只給一個。");
+  const { listPosPaymentMethods } = await import("@/server/repos/inv-sales");
+  const methods = await listPosPaymentMethods();
+  const options = methods.map((m) => m.name).join("、") || "（沒有）";
+  let hit = null as (typeof methods)[number] | null;
+  if (id) {
+    hit = methods.find((m) => m.payment_method_id === id) ?? null;
+    if (!hit) throw new McpInputError(`找不到付款方式「${id}」。可選：${options}`);
+  } else if (name) {
+    const key = name.trim().toLowerCase();
+    hit = methods.find((m) => m.name.trim().toLowerCase() === key) ?? null;
+    if (!hit) throw new McpInputError(`找不到付款方式「${name}」。可選：${options}`);
+  } else {
+    hit = methods.find((m) => m.is_default) ?? methods[0] ?? null;
+  }
+  return hit ? { payment_method_id: hit.payment_method_id, name: hit.name } : null;
 }
 
 /* ------------------------------------------------------------------ handlers */
@@ -1916,6 +2143,629 @@ const IMPL: Handlers = {
       "create",
       { written: true, result: res },
       { ...payload, result: res },
+    );
+  },
+
+  async create_inventory_product(args) {
+    const tool = "create_inventory_product";
+    const userId = await oauthUserId(tool);
+    const { invProductSchema } = await import("@/lib/admin/schemas");
+    // 與後台 ProductForm 送出的形狀一致：空的欄位送 null，進貨只在新增時帶。
+    const data = validateWith(invProductSchema, {
+      id: null,
+      name: args.name,
+      issue_number: args.issue_number ?? null,
+      barcode: args.barcode ?? null,
+      category_id: args.category_id ?? null,
+      product_type: args.product_type,
+      series: args.series ?? null,
+      publisher: args.publisher ?? null,
+      vendor_id: args.vendor_id ?? null,
+      selling_price: args.selling_price,
+      cost_price: args.cost_price ?? null,
+      low_stock_alert: args.low_stock_alert,
+      pack_size: args.pack_size,
+      base_product_id: args.base_product_id ?? null,
+      image_key: args.image_key ?? null,
+      notes: args.notes ?? null,
+      purchase: args.purchase
+        ? {
+            quantity: args.purchase.quantity,
+            cost_price: args.purchase.cost_price ?? null,
+            vendor: args.purchase.vendor ?? null,
+            purchase_date: args.purchase.purchase_date ?? taipeiToday(),
+          }
+        : null,
+    });
+    const { id: _id, purchase, ...payload } = data;
+
+    const { listAdminCategories, listAdminVendors, listApprovalSettings, getAdminProduct } =
+      await import("@/server/repos/inv-products");
+    const [categories, vendors, settings] = await Promise.all([
+      listAdminCategories(),
+      listAdminVendors(),
+      listApprovalSettings(),
+    ]);
+    const category = payload.category_id
+      ? categories.find((c) => c.category_id === payload.category_id)
+      : null;
+    if (payload.category_id && !category) notFound("分類", payload.category_id);
+    const vendor = payload.vendor_id
+      ? vendors.find((v) => v.vendor_id === payload.vendor_id)
+      : null;
+    if (payload.vendor_id && !vendor) notFound("供應商", payload.vendor_id);
+    if (payload.base_product_id) {
+      const base = await getAdminProduct(payload.base_product_id);
+      if (!base) notFound("母品項", payload.base_product_id);
+    }
+    // 「查不到設定＝要審核」，與 inv.initial_approval_status() 同一個 fail-closed 語意（只用來預告）。
+    const needsApproval = (m: string) => settings.find((s) => s.module === m)?.is_enabled ?? true;
+
+    const warnings: string[] = [];
+    if (payload.barcode) {
+      const { supabaseAdmin } = await import("@/server/supabase-admin");
+      const { data: dup, error } = await supabaseAdmin()
+        .from("inv_admin_products")
+        .select("inv_product_id, name, issue_number")
+        .eq("barcode", payload.barcode)
+        .limit(5);
+      if (error) throw new Error(`商品讀取失敗：${error.code ?? error.message}`);
+      if ((dup ?? []).length) {
+        warnings.push(
+          `已有相同條碼的商品：${(dup as { name: string; inv_product_id: string }[])
+            .map((d) => `${d.name}（${d.inv_product_id}）`)
+            .join("、")}。確認不是同一件再建立。`,
+        );
+      }
+    }
+
+    const willCreate = {
+      product: {
+        ...payload,
+        category_name: category?.name ?? null,
+        vendor_name: vendor?.name ?? null,
+        stock_quantity: 0,
+        approval: needsApproval("products") ? "pending（需要核准，核准前櫃檯不能賣）" : "approved",
+      },
+      purchase: purchase
+        ? {
+            ...purchase,
+            notes: "新增商品時建立",
+            subtotal: purchase.cost_price === null ? null : purchase.cost_price * purchase.quantity,
+            approval: needsApproval("purchases")
+              ? "pending（需要核准，核准後庫存才會加上去）"
+              : "approved（建立後庫存直接 +" + purchase.quantity + "）",
+          }
+        : null,
+    };
+    const auditChanges = { payload, purchase };
+
+    if (args.dry_run) {
+      return preview(
+        tool,
+        "inv_product",
+        "(未建立)",
+        "create",
+        {
+          idempotency_key: args.idempotency_key ?? randomUUID(),
+          will_create: willCreate,
+          ...(warnings.length ? { warnings } : {}),
+          ...(payload.category_id
+            ? {}
+            : { category_options: categories.map((c) => ({ id: c.category_id, name: c.name })) }),
+        },
+        auditChanges,
+      );
+    }
+    await claimIdempotencyKey(tool, args.idempotency_key);
+    const { saveProduct } = await import("@/server/repos/inv-products");
+    const res = await commitOrAudit(tool, "inv_product", "(未建立)", "create", auditChanges, () =>
+      saveProduct({ userId, id: null, payload, purchase: purchase ?? null }),
+    );
+
+    // 寫入後回讀審核狀態與那筆進貨的 id，讓下一步（核准）不用再查。
+    const created = await getAdminProduct(res.id);
+    type PurchaseBrief = { purchase_id: string; approval_status: string; quantity: number };
+    let purchaseRow: PurchaseBrief | null = null;
+    if (res.purchase_created) {
+      const { supabaseAdmin } = await import("@/server/supabase-admin");
+      const { data: rows } = await supabaseAdmin()
+        .from("inv_admin_purchases")
+        .select("purchase_id, approval_status, quantity")
+        .eq("product_id", res.id)
+        .limit(1);
+      purchaseRow = ((rows ?? []) as unknown as PurchaseBrief[])[0] ?? null;
+    }
+    const pending: { module: McpApprovalModule; id: string }[] = [];
+    if (created?.approval_status === "pending") pending.push({ module: "products", id: res.id });
+    if (purchaseRow?.approval_status === "pending")
+      pending.push({ module: "purchases", id: purchaseRow.purchase_id });
+
+    return committed(
+      tool,
+      "inv_product",
+      res.id,
+      "create",
+      {
+        written: true,
+        result: res,
+        product: {
+          id: res.id,
+          name: created?.name ?? payload.name,
+          approval_status: created?.approval_status ?? null,
+          stock_quantity: created?.stock_quantity ?? null,
+        },
+        purchase: purchaseRow,
+        ...(pending.length
+          ? {
+              needs_approval: pending,
+              next_step:
+                "有待審的資料：用 approve_inventory_record 逐筆核准（module 與 id 如上），核准後才能在櫃檯賣／庫存才會加。",
+            }
+          : {}),
+      },
+      { ...auditChanges, result: res },
+    );
+  },
+
+  async list_pending_approvals(args) {
+    const want = (m: McpApprovalModule) => args.module === "all" || args.module === m;
+    const { listAdminProducts, listApprovalSettings } = await import("@/server/repos/inv-products");
+    const { listAdminPurchases } = await import("@/server/repos/inv-purchases");
+    const { listAdminAdjustments } = await import("@/server/repos/inv-adjustments");
+    const [settings, products, purchases, adjustments] = await Promise.all([
+      listApprovalSettings(),
+      want("products")
+        ? listAdminProducts({
+            keyword: null,
+            categoryId: null,
+            productType: null,
+            vendorId: null,
+            approvalStatus: "pending",
+            activeStatus: "all",
+            priceChange: "all",
+            sort: "created_at",
+            page: 0,
+            pageSize: args.limit,
+          })
+        : null,
+      want("purchases")
+        ? listAdminPurchases({
+            keyword: null,
+            categoryId: null,
+            vendorId: null,
+            productType: null,
+            approvalStatus: "pending",
+            expiryStatus: "all",
+            stockStatus: "all",
+            dateFrom: null,
+            dateTo: null,
+            sort: "created_at",
+            page: 0,
+            pageSize: args.limit,
+          })
+        : null,
+      want("stock_adjustments")
+        ? listAdminAdjustments({
+            keyword: null,
+            category: null,
+            status: "pending_approval",
+            productId: null,
+            dateFrom: null,
+            dateTo: null,
+            sort: "created_at",
+            page: 0,
+            pageSize: args.limit,
+          })
+        : null,
+    ]);
+    return jsonText({
+      approval_settings: Object.fromEntries(
+        MCP_APPROVAL_MODULES.map((m) => [
+          m,
+          (settings.find((s) => s.module === m)?.is_enabled ?? true) ? "需要審核" : "不需審核",
+        ]),
+      ),
+      ...(products
+        ? {
+            products: {
+              total: products.total,
+              rows: products.rows.map((r) => ({
+                module: "products",
+                id: r.inv_product_id,
+                name: r.name,
+                issue_number: r.issue_number,
+                selling_price: r.selling_price,
+                stock_quantity: r.stock_quantity,
+                creator_name: r.creator_name,
+                created_at: r.created_at,
+              })),
+            },
+          }
+        : {}),
+      ...(purchases
+        ? {
+            purchases: {
+              total: purchases.total,
+              rows: purchases.rows.map((r) => ({
+                module: "purchases",
+                id: r.purchase_id,
+                product_id: r.product_id,
+                product_name: r.product_name ?? r.item_name,
+                purchase_date: r.purchase_date,
+                quantity: r.quantity,
+                unit_cost: r.unit_cost,
+                subtotal: r.subtotal,
+                vendor_name: r.vendor_name ?? r.vendor_text,
+                creator_name: r.creator_name,
+                created_at: r.created_at,
+              })),
+            },
+          }
+        : {}),
+      ...(adjustments
+        ? {
+            stock_adjustments: {
+              total: adjustments.total,
+              rows: adjustments.rows.map((r) => ({
+                module: "stock_adjustments",
+                id: r.adjustment_id,
+                adjustment_number: r.adjustment_number,
+                product_id: r.product_id,
+                product_name: r.product_name,
+                category: r.category,
+                quantity: r.quantity,
+                reason: r.reason,
+                adjustment_date: r.adjustment_date,
+                creator_name: r.creator_name,
+                created_at: r.created_at,
+              })),
+            },
+          }
+        : {}),
+      note: "核准／退回用 approve_inventory_record（module＋id）。價格變更、供應商、套餐的審核仍請到後台。",
+    });
+  },
+
+  async approve_inventory_record(args) {
+    const tool = "approve_inventory_record";
+    const userId = await oauthUserId(tool);
+    const approved = args.decision === "approve";
+    const { approveRecordSchema } = await import("@/lib/admin/schemas");
+    validateWith(approveRecordSchema, { module: args.module, id: args.id, approved });
+
+    // 讀「改前」：只讀後台詳情頁那一支 view，算出核准後的影響給 AI 看。
+    let target: Record<string, unknown>;
+    let status: string;
+    let pendingValue: string;
+    if (args.module === "products") {
+      const { getAdminProduct } = await import("@/server/repos/inv-products");
+      const p = await getAdminProduct(args.id);
+      if (!p) notFound("進銷存商品", args.id);
+      status = p.approval_status;
+      pendingValue = "pending";
+      target = {
+        name: p.name,
+        issue_number: p.issue_number,
+        selling_price: p.selling_price,
+        stock_quantity: p.stock_quantity,
+        creator_name: p.creator_name,
+        effect: approved
+          ? "核准後櫃檯與網站上架流程才能使用這件商品。"
+          : "退回後不能販售，可在後台修改後重新送審。",
+      };
+    } else if (args.module === "purchases") {
+      const { getAdminPurchase } = await import("@/server/repos/inv-purchases");
+      const p = await getAdminPurchase(args.id);
+      if (!p) notFound("進貨單", args.id);
+      status = p.approval_status;
+      pendingValue = "pending";
+      const { getAdminProduct } = await import("@/server/repos/inv-products");
+      const prod = await getAdminProduct(p.product_id);
+      target = {
+        product_id: p.product_id,
+        product_name: p.product_name ?? p.item_name,
+        quantity: p.quantity,
+        unit_cost: p.unit_cost,
+        purchase_date: p.purchase_date,
+        creator_name: p.creator_name,
+        stock_now: prod?.stock_quantity ?? null,
+        stock_after_if_approved:
+          approved && prod ? prod.stock_quantity + p.quantity : (prod?.stock_quantity ?? null),
+      };
+    } else {
+      const { getAdminAdjustment } = await import("@/server/repos/inv-adjustments");
+      const a = await getAdminAdjustment(args.id);
+      if (!a) notFound("在庫異動單", args.id);
+      status = a.status;
+      pendingValue = "pending_approval";
+      target = {
+        adjustment_number: a.adjustment_number,
+        product_id: a.product_id,
+        product_name: a.product_name,
+        category: a.category,
+        quantity: a.quantity,
+        reason: a.reason,
+        creator_name: a.creator_name,
+        stock_now: a.product_stock_quantity,
+        stock_after_if_approved:
+          approved && a.product_stock_quantity !== null
+            ? a.product_stock_quantity + a.quantity
+            : a.product_stock_quantity,
+      };
+    }
+
+    const label = APPROVAL_LABEL[args.module];
+    const after =
+      args.module === "stock_adjustments"
+        ? approved
+          ? "confirmed"
+          : "rejected"
+        : approved
+          ? "approved"
+          : "rejected";
+    // inv_approve_record() 只動 pending（異動單另含 draft）；其他狀態不呼叫，回 no-op。
+    const actionable =
+      status === pendingValue || (args.module === "stock_adjustments" && status === "draft");
+    if (!actionable) {
+      return jsonText({
+        module: args.module,
+        id: args.id,
+        dry_run: args.dry_run,
+        written: false,
+        status,
+        message: `這筆${label}目前是「${status}」，不是待審，不需要（也不能）再審核。`,
+      });
+    }
+    const changes = { status: { before: status, after } };
+    const auditChanges = { module: args.module, decision: args.decision, ...changes };
+
+    if (args.dry_run) {
+      return preview(
+        tool,
+        `inv_${args.module}`,
+        args.id,
+        args.decision,
+        { module: args.module, id: args.id, label, target, changes },
+        auditChanges,
+      );
+    }
+    const { approveRecord } = await import("@/server/repos/inv-products");
+    const res = await commitOrAudit(
+      tool,
+      `inv_${args.module}`,
+      args.id,
+      args.decision,
+      auditChanges,
+      () => approveRecord({ userId, module: args.module, id: args.id, approved }),
+    );
+    return committed(
+      tool,
+      `inv_${args.module}`,
+      args.id,
+      args.decision,
+      {
+        module: args.module,
+        id: args.id,
+        written: res.changed,
+        result: res,
+        ...(res.changed ? {} : { message: "資料庫回報沒有變更：可能剛剛已經有人處理過。" }),
+      },
+      { ...auditChanges, result: res },
+    );
+  },
+
+  async create_pos_sale(args) {
+    const tool = "create_pos_sale";
+    const userId = await oauthUserId(tool);
+    const ids = args.items.map((i) => i.product_id);
+    if (new Set(ids).size !== ids.length)
+      throw new McpInputError("同一件商品在 items 裡出現了兩次，請合併成一行並改數量。");
+
+    const { supabaseAdmin } = await import("@/server/supabase-admin");
+    // 櫃檯賣得動的範圍＝後台 POS 的商品清單（inv_pos_products：已核准、啟用、不是租借）。
+    const { data: posRows, error } = await supabaseAdmin()
+      .from("inv_pos_products")
+      .select(
+        "inv_product_id, name, issue_number, selling_price, stock_quantity, reserved, available",
+      )
+      .in("inv_product_id", ids);
+    if (error) throw new Error(`商品讀取失敗：${error.code ?? error.message}`);
+    type PosRow = {
+      inv_product_id: string;
+      name: string;
+      issue_number: string | null;
+      selling_price: number | null;
+      stock_quantity: number;
+      reserved: number;
+      available: number;
+    };
+    const byId = new Map(
+      ((posRows ?? []) as unknown as PosRow[]).map((p) => [p.inv_product_id, p]),
+    );
+    const missing = ids.filter((id) => !byId.has(id));
+    if (missing.length) {
+      // 講清楚為什麼賣不動（與 pos_checkout() 的檢查同一組原因）。
+      const { getAdminProduct } = await import("@/server/repos/inv-products");
+      const reasons = await Promise.all(
+        missing.map(async (id) => {
+          const p = await getAdminProduct(id);
+          if (!p) return `找不到商品 ${id}`;
+          if (p.approval_status !== "approved")
+            return `「${p.name}」還沒通過審核（${p.approval_status}），請先用 approve_inventory_record 核准`;
+          if (!p.is_active) return `「${p.name}」已停用，不能販售`;
+          if (p.product_type === "rental") return `「${p.name}」是租借品，不能販售`;
+          return `「${p.name}」不在櫃檯可販售的清單裡`;
+        }),
+      );
+      throw new McpInputError(`這一車有不能賣的商品：${reasons.join("；")}`);
+    }
+
+    const items = args.items.map((i) => {
+      const p = byId.get(i.product_id)!;
+      const unitPrice = i.unit_price ?? (p.selling_price === null ? null : Number(p.selling_price));
+      if (unitPrice === null) throw new McpInputError(`「${p.name}」沒有售價，請給 unit_price。`);
+      return { inv_product_id: i.product_id, quantity: i.quantity, unit_price: unitPrice };
+    });
+    const payment = await resolvePaymentMethod(args.payment_method_id, args.payment_method);
+    const { posCheckoutSchema } = await import("@/lib/admin/schemas");
+    const data = validateWith(posCheckoutSchema, {
+      items,
+      payment_method_id: payment?.payment_method_id ?? null,
+      sale_date: args.sale_date ?? taipeiToday(),
+      notes: args.notes ?? null,
+      override_reservation: args.override_reservation,
+    });
+
+    const lines = data.items.map((i) => {
+      const p = byId.get(i.inv_product_id)!;
+      return {
+        product_id: i.inv_product_id,
+        name: p.name,
+        issue_number: p.issue_number,
+        quantity: i.quantity,
+        list_price: p.selling_price,
+        unit_price: i.unit_price,
+        subtotal: i.unit_price * i.quantity,
+        available: p.available,
+        over_available: Math.max(i.quantity - p.available, 0),
+      };
+    });
+    const over = lines.filter((l) => l.over_available > 0);
+    const total = lines.reduce((n, l) => n + l.subtotal, 0);
+    const auditChanges = {
+      items: data.items,
+      payment_method_id: data.payment_method_id,
+      sale_date: data.sale_date,
+      notes: data.notes,
+      override_reservation: data.override_reservation,
+      total_amount: total,
+    };
+
+    if (args.dry_run) {
+      const { listPosPaymentMethods } = await import("@/server/repos/inv-sales");
+      return preview(
+        tool,
+        "inv_sale",
+        "(未建立)",
+        "checkout",
+        {
+          idempotency_key: args.idempotency_key ?? randomUUID(),
+          will_create: {
+            channel: "pos",
+            sale_date: data.sale_date,
+            payment_method: payment?.name ?? null,
+            lines,
+            total_amount: total,
+            notes: data.notes,
+            override_reservation: data.override_reservation,
+          },
+          payment_method_options: (await listPosPaymentMethods()).map((m) => ({
+            id: m.payment_method_id,
+            name: m.name,
+            is_default: m.is_default,
+          })),
+          ...(over.length
+            ? {
+                warning: data.override_reservation
+                  ? `有 ${over.length} 項超過可售量：會照樣結帳、庫存可能變負數，並記一筆賣超告警（與後台勾「先賣」相同）。`
+                  : `有 ${over.length} 項超過可售量：照這樣送出會被資料庫拒絕（與後台相同）。確認架上真的有貨，才加 override_reservation=true。`,
+              }
+            : {}),
+          note: "可售量以送出當下資料庫重算為準（這裡的 available 是預覽當下讀到的）。",
+        },
+        auditChanges,
+      );
+    }
+    await claimIdempotencyKey(tool, args.idempotency_key);
+    const { posCheckout } = await import("@/server/repos/inv-sales");
+    const res = await commitOrAudit(tool, "inv_sale", "(未建立)", "checkout", auditChanges, () =>
+      posCheckout({
+        userId,
+        items: data.items,
+        paymentMethodId: data.payment_method_id,
+        saleDate: data.sale_date,
+        notes: data.notes,
+        overrideReservation: data.override_reservation,
+      }),
+    );
+    return committed(
+      tool,
+      "inv_sale",
+      res.sale_ids.join(",").slice(0, 200) || "(無)",
+      "checkout",
+      {
+        written: true,
+        result: res,
+        ...((res.oversold ?? []).length
+          ? { warning: "已結帳，但這一筆賣超了——已記進賣超告警（list_stock_alerts 看得到）。" }
+          : {}),
+      },
+      { ...auditChanges, result: res },
+    );
+  },
+
+  async create_secondhand_sale(args) {
+    const tool = "create_secondhand_sale";
+    const userId = await oauthUserId(tool);
+    const payment = await resolvePaymentMethod(args.payment_method_id, args.payment_method);
+    const { secondhandSaleSchema } = await import("@/lib/admin/schemas");
+    const data = validateWith(secondhandSaleSchema, {
+      item_name: args.item_name,
+      quantity: args.quantity,
+      unit_price: args.unit_price,
+      sale_date: args.sale_date ?? taipeiToday(),
+      payment_method_id: payment?.payment_method_id ?? null,
+      notes: args.notes ?? null,
+    });
+    const auditChanges = { ...data };
+
+    if (args.dry_run) {
+      const { listPosPaymentMethods } = await import("@/server/repos/inv-sales");
+      return preview(
+        tool,
+        "inv_sale",
+        "(未建立)",
+        "secondhand",
+        {
+          idempotency_key: args.idempotency_key ?? randomUUID(),
+          will_create: {
+            channel: "pos",
+            is_secondhand: true,
+            ...data,
+            payment_method: payment?.name ?? null,
+            amount: (Math.round(data.unit_price * 100) / 100) * data.quantity,
+            stock_change: "無（二手書不進商品主檔、不扣庫存、沒有成本）",
+          },
+          payment_method_options: (await listPosPaymentMethods()).map((m) => ({
+            id: m.payment_method_id,
+            name: m.name,
+            is_default: m.is_default,
+          })),
+        },
+        auditChanges,
+      );
+    }
+    await claimIdempotencyKey(tool, args.idempotency_key);
+    const { secondhandCheckout } = await import("@/server/repos/inv-combos");
+    const res = await commitOrAudit(tool, "inv_sale", "(未建立)", "secondhand", auditChanges, () =>
+      secondhandCheckout({
+        userId,
+        itemName: data.item_name,
+        quantity: data.quantity,
+        unitPrice: data.unit_price,
+        saleDate: data.sale_date,
+        paymentMethodId: data.payment_method_id,
+        notes: data.notes,
+      }),
+    );
+    return committed(
+      tool,
+      "inv_sale",
+      res.sale_id,
+      "secondhand",
+      { written: true, result: res },
+      { ...auditChanges, result: res },
     );
   },
 

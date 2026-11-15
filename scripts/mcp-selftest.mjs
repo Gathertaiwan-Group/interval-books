@@ -591,6 +591,11 @@ const OPS_WRITE_EXPECTED = [
   "create_stock_adjustment",
   "record_stock_count",
   "create_purchase",
+  // 2026-11-15 進銷存商品新增／審核／門市結帳／二手書入帳（ops-write-tools.ts）
+  "create_inventory_product",
+  "approve_inventory_record",
+  "create_pos_sale",
+  "create_secondhand_sale",
   "update_ui_string",
   "update_site_settings",
   "resend_order_email",
@@ -599,6 +604,7 @@ const OPS_WRITE_EXPECTED = [
 ];
 const OPS_READ_EXPECTED = [
   "list_phone_order_options",
+  "list_pending_approvals",
   "get_ui_strings",
   "get_site_settings",
   "get_email_copy",
