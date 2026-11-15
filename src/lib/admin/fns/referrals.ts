@@ -12,34 +12,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { adminFnMiddleware } from "@/lib/admin/middleware";
-import { parseCommissionTiers, REFERRAL_CODE_RE } from "@/lib/referral";
+import { referralSettingsSchema, referrerSchema } from "@/lib/admin/referral-schemas";
 import { PERIOD_RE } from "@/lib/taipei-time";
-
-const tiersSchema = z
-  .array(
-    z.object({ upTo: z.number().int().positive().nullable(), rate: z.number().min(0).max(100) }),
-  )
-  .min(1)
-  .max(10)
-  .refine((t) => parseCommissionTiers(t) !== null, "級距要由小到大，最後一級不設上限");
-
-const referrerSchema = z.object({
-  name: z.string().trim().min(1).max(60),
-  code: z
-    .string()
-    .trim()
-    .transform((v) => v.replace(/\s+/g, "").toUpperCase())
-    .pipe(z.string().regex(REFERRAL_CODE_RE, "推薦碼限 2–20 個英文字母或數字")),
-  kind: z.enum(["team", "external"]),
-  contact: z.string().trim().max(200).nullable(),
-  email: z.string().trim().max(120).nullable(),
-  phone: z.string().trim().max(30).nullable(),
-  baseSalary: z.number().int().min(0).nullable(),
-  discountPercent: z.number().min(0).max(50).nullable(),
-  commissionTiers: tiersSchema.nullable(),
-  active: z.boolean(),
-  note: z.string().trim().max(500).nullable(),
-});
 
 const periodSchema = z.string().regex(PERIOD_RE);
 
@@ -70,19 +44,7 @@ export const updateReferrerAdmin = createServerFn({ method: "POST" })
 
 export const updateReferralSettingsAdmin = createServerFn({ method: "POST" })
   .middleware([adminFnMiddleware])
-  .inputValidator(
-    z.object({
-      defaultDiscountPercent: z.number().min(0).max(50),
-      defaultMarginPercent: z.number().min(0).max(100),
-      commissionTiers: tiersSchema,
-      newCustomerMultiplier: z.number().min(1).max(3),
-      teamPoolBaseline: z.number().int().min(0).nullable(),
-      teamPoolPercent: z.number().min(0).max(50),
-      teamPoolEqualPercent: z.number().min(0).max(100),
-      payoutCapPercent: z.number().min(0).max(100),
-      clawbackDays: z.number().int().min(0).max(365),
-    }),
-  )
+  .inputValidator(referralSettingsSchema)
   .handler(async ({ data }) => {
     const { updateReferralSettings } = await import("@/server/repos/referrals");
     await updateReferralSettings(data);

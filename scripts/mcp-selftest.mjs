@@ -641,6 +641,33 @@ const OPS_READ_EXPECTED = [
   "get_event_fill_rates",
   "get_repurchase_rate",
 ];
+// 2026-11-15 選品／廠商／推薦人／聯絡電話（partners-content-tools.ts；行為測試在
+// mcp-partners-content-selftest）。與營運工具同一套規則：寫入預設 dry_run=true、讀取 readOnlyHint。
+const PARTNERS_WRITE_EXPECTED = [
+  "create_curated_theme",
+  "update_curated_theme",
+  "create_curated_item",
+  "update_curated_item",
+  "reorder_curated_items",
+  "approve_vendor_submission",
+  "create_vendor",
+  "update_vendor",
+  "approve_vendor",
+  "save_vendor_contact",
+  "create_referrer",
+  "update_referrer",
+  "update_referral_settings",
+  "create_contact_phone",
+  "update_contact_phone",
+];
+const PARTNERS_READ_EXPECTED = [
+  "list_vendor_submissions",
+  "list_vendor_contacts",
+  "get_referral_settings",
+  "list_contact_phones",
+];
+OPS_WRITE_EXPECTED.push(...PARTNERS_WRITE_EXPECTED);
+OPS_READ_EXPECTED.push(...PARTNERS_READ_EXPECTED);
 EXPECTED_TOOLS.push(...OPS_WRITE_EXPECTED, ...OPS_READ_EXPECTED);
 {
   const names = Object.keys(tools.TOOL_INPUTS).sort();

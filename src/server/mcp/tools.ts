@@ -68,6 +68,11 @@ import {
   ORDERS_EVENTS_TOOL_INPUTS,
   ORDERS_EVENTS_TOOL_META,
 } from "./orders-events-tools";
+import {
+  PARTNERS_CONTENT_HANDLERS,
+  PARTNERS_CONTENT_TOOL_INPUTS,
+  PARTNERS_CONTENT_TOOL_META,
+} from "./partners-content-tools";
 
 /* ------------------------------------------------------------------ 共用 */
 
@@ -662,6 +667,8 @@ export const TOOL_INPUTS = {
   ...POS_STOCK_TOOL_INPUTS, // 2026-11-15 門市套餐與庫存異動（./pos-stock-tools.ts）
   /* 2026-11-15 訂單與活動（./orders-events-tools.ts）。 */
   ...ORDERS_EVENTS_TOOL_INPUTS,
+  /* 2026-11-15 選品／廠商／推薦人／聯絡電話（./partners-content-tools.ts） */
+  ...PARTNERS_CONTENT_TOOL_INPUTS,
 } as const;
 
 export type ToolName = keyof typeof TOOL_INPUTS;
@@ -2189,6 +2196,7 @@ export function registerContentTools(server: McpServer): void {
     [REPORT_TOOL_META, REPORT_HANDLERS as never],
     [POS_STOCK_TOOL_META, POS_STOCK_HANDLERS as never],
     [ORDERS_EVENTS_TOOL_META, ORDERS_EVENTS_HANDLERS as never],
+    [PARTNERS_CONTENT_TOOL_META, PARTNERS_CONTENT_HANDLERS as never],
   ];
   for (const [metaMap, handlers] of extra) {
     for (const name of Object.keys(metaMap) as ToolName[]) {
