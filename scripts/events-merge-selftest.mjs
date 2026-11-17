@@ -170,9 +170,24 @@ checkTrue(
   ),
 );
 checkTrue(
-  "月曆／列表切換鈕保留 type（與 month）",
+  "月曆／列表切換鈕保留 type（與 month）；切回列表不帶 view（預設網址）",
   eventsCode.includes("{ view: target, month: search.month, type }") &&
-    eventsCode.includes("{ view: target, type }"),
+    eventsCode.includes(": { type }"),
+);
+// 2026-11-18 業主：「/events 預設顯示卡片列表，不要行事曆」。
+checkTrue(
+  "預設檢視＝卡片列表：只有 ?view=calendar 才是月曆",
+  eventsCode.includes('const view: EventsView = search.view === "calendar" ? "calendar" : "list";'),
+);
+checkTrue(
+  "不再依螢幕寬度自動切月曆（無 matchMedia／autoView、無 CSS 斷點隱藏）",
+  !eventsCode.includes("matchMedia") &&
+    !eventsCode.includes("autoView") &&
+    !eventsCode.includes("view === null"),
+);
+checkTrue(
+  "列表只在 view=list 畫、月曆只在 view=calendar 畫",
+  eventsCode.includes('{view === "list" ? (') && eventsCode.includes('{view === "calendar" ? ('),
 );
 
 // 2026-11-10 業主：「篩選設計現在太複雜，我要畫面簡潔；活動卡片用左右滑動。」
@@ -398,6 +413,11 @@ check(
 check(
   "canonical：/events?type=event&view=calendar&month=2026-12 → /events",
   canonicalUrl("/events", { type: "event", view: "calendar", month: "2026-12" }),
+  `${SITE_ORIGIN}/events`,
+);
+check(
+  "canonical：/events?view=list → /events（與預設同一頁）",
+  canonicalUrl("/events", { view: "list" }),
   `${SITE_ORIGIN}/events`,
 );
 check(

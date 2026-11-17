@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { journeyKicker } from "@/lib/journey-events";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CalendarDays, List } from "lucide-react";
 import { isEventPast } from "@/lib/event-status";
 import { PageShell, PageHeader } from "@/components/PageShell";
@@ -210,10 +210,10 @@ const PAST_SHELF_ALL = {
  * search，它們要去的就是預設檢視。canonical 不含這兩個參數（canonicalUrl() 只對 /shop
  * 保留 ?tab），所以分享出去的月曆網址不會變成另一頁被收錄。
  *
- * 沒帶 view 時是「自動」：桌機（md 以上）看月曆、手機看原本的卡片列表 —— 用 CSS 斷點切，
- * 不是用 JS 量螢幕（SSR 不知道螢幕多寬，量了就會在 hydrate 時跳一次）。理由：桌機一眼
- * 看得完一整個月，月曆最能回答「這個月有什麼」；手機上卡片有封面圖、是主要的報名入口，
- * 月曆（議程）一鍵可達。
+ * 預設（沒帶 view）＝卡片列表，桌機手機一致（2026-11-18 業主：「/events 預設顯示卡片
+ * 列表，不要行事曆」）。月曆要 ?view=calendar；?view=list 仍接受、與不帶參數同一畫面，
+ * 但站內切回列表的鈕連到不帶 view 的乾淨網址。此前（11 月初）是「桌機月曆、手機列表」
+ * 的 CSS 斷點自動切換，已拿掉。
  */
 type EventsView = "list" | "calendar";
 type EventsSearch = { view?: EventsView; month?: string; type?: EventsType };
@@ -298,18 +298,8 @@ function Events() {
   const type = search.type;
   const currentMonth = taipeiMonthAt(loadedAt);
   const calendarMonth = search.month ?? currentMonth;
-  // 沒帶 ?view＝自動（見 Route 上方的說明）。掛載後才用 matchMedia 決定「現在算哪一個」，
-  // 只為了切換鈕的 aria-current；畫面本身在 SSR 時就由 CSS 斷點決定好了。
-  const [autoView, setAutoView] = useState<EventsView | null>(null);
-  useEffect(() => {
-    if (search.view) return;
-    const mq = window.matchMedia("(min-width: 768px)");
-    const sync = () => setAutoView(mq.matches ? "calendar" : "list");
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, [search.view]);
-  const view: EventsView | null = search.view ?? autoView;
+  // 沒帶 ?view＝卡片列表（見 Route 上方的說明）；只有 ?view=calendar 才是月曆。
+  const view: EventsView = search.view === "calendar" ? "calendar" : "list";
   const p = pageText(page);
   const jp = pageText(journeysPage);
   const { contactEmail } = useSiteContent();
@@ -428,14 +418,12 @@ function Events() {
         ? t(p.block("emptyUpcoming", EMPTY_UPCOMING))
         : t(EMPTY_UPCOMING_ALL);
 
-  // 月曆／列表切換鈕：顯示「另一個」檢視的圖示。沒帶 ?view（自動：手機列表、桌機月曆）而且
-  // 還沒掛載時，用 CSS 斷點各畫一顆，SSR 與 hydrate 不跳。
+  // 月曆／列表切換鈕：顯示「另一個」檢視的圖示。切回列表連到不帶 view 的 /events（預設就是
+  // 列表，網址與 canonical 一致）；切到月曆帶 ?view=calendar（與 month）。兩者都保留 type。
   const toggle = (target: EventsView, cls = "") => (
     <Link
       to="/events"
-      search={
-        target === "calendar" ? { view: target, month: search.month, type } : { view: target, type }
-      }
+      search={target === "calendar" ? { view: target, month: search.month, type } : { type }}
       resetScroll={false}
       aria-label={t(VIEW_LABELS.toggle[target])}
       title={t(VIEW_LABELS.toggle[target])}
@@ -499,20 +487,13 @@ function Events() {
             </ul>
           </nav>
 
-          {view === null ? (
-            <>
-              {toggle("calendar", "md:hidden")}
-              {toggle("list", "max-md:hidden")}
-            </>
-          ) : (
-            toggle(view === "list" ? "calendar" : "list")
-          )}
+          {toggle(view === "list" ? "calendar" : "list")}
         </div>
       </div>
 
-      {view !== "list" ? (
+      {view === "calendar" ? (
         <section
-          className={`container-editorial pb-32 ${view === null ? "hidden md:block" : ""}`}
+          className="container-editorial pb-32"
           data-testid="events-calendar-section"
           data-reveal
         >
@@ -527,8 +508,8 @@ function Events() {
         </section>
       ) : null}
 
-      {view !== "calendar" ? (
-        <div className={view === null ? "md:hidden" : ""}>
+      {view === "list" ? (
+        <div>
           {nothing ? (
             <section className="container-editorial pb-16">
               <div className="border border-border p-8 md:p-10">
