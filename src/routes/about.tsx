@@ -83,7 +83,7 @@ const PAGE = {
     ja: "小時光について｜小時光書店",
   },
   metaDescription: {
-    zh: "小時光的故事：從一櫃書、一張長桌開始，慢慢有了陶藝家的器物、地方夥伴的選物與每月一場讀書會。這一頁介紹我們做的三件事——風土誌策展、活動與讀書會、策旅與合作共創，也附上紅磚六合院的交通方式與營業時間。",
+    zh: "小時光的故事：從一櫃書、一張長桌開始，慢慢有了陶藝家的器物、地方夥伴的選物與每月至少四場讀書會。這一頁介紹我們做的三件事——風土誌策展、活動與讀書會、策旅與合作共創，也附上紅磚六合院的交通方式與營業時間。",
     en: "Our story, from one bookcase and a long table: terroir curation, reading circles and journeys — plus hours and how to find us in Huashan's Red Brick Courtyard.",
     ja: "一棚の本と長いテーブルから始まった小時光の歩み。風土誌のキュレーション、読書会、旅と共創という三つの仕事と、華山・紅煉瓦六合院への行き方、営業時間をご案内します。",
   },

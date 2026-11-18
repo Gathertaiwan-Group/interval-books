@@ -216,7 +216,7 @@ values
   ('visit', 'openApple', '{"zh":"Apple 地圖導航","en":"Open in Apple Maps","ja":"Apple マップで開く"}'::jsonb, 14),
   ('visit', 'navigateEyebrow', '{"zh":"Navigate","en":"Navigate","ja":"Navigate"}'::jsonb, 15),
   ('visit', 'contactEyebrow', '{"zh":"Contact","en":"Contact","ja":"Contact"}'::jsonb, 16),
-  ('about', 'story', '{"zh":"從一櫃書、一張長桌開始，我們慢慢有了陶藝家的器物、地方夥伴的選物、與每月一場讀書會。書店並不大，但它是我們對於「閱讀」的長時間練習——讓書頁與生活，能彼此呼吸。","en":"We began with a single shelf and a long table. Then came the ceramicists'' vessels, the local partners'' selections, and a monthly reading circle. The shop is small, but it is our long practice of reading — letting page and life breathe together.","ja":"一棚の本と一脚の長机から始まりました。やがて陶芸家の器、地方の作り手の品、月に一度の読書会が加わりました。小さな店ですが、本と暮らしがともに呼吸できる場をめざす、長い練習なのです。"}'::jsonb, 1),
+  ('about', 'story', '{"zh":"從一櫃書、一張長桌開始，我們慢慢有了陶藝家的器物、地方夥伴的選物、與每月至少四場讀書會。書店並不大，但它是我們對於「閱讀」的長時間練習——讓書頁與生活，能彼此呼吸。","en":"We began with a single shelf and a long table. Then came the ceramicists'' vessels, the local partners'' selections, and at least four reading circles a month. The shop is small, but it is our long practice of reading — letting page and life breathe together.","ja":"一棚の本と一脚の長机から始まりました。やがて陶芸家の器、地方の作り手の品、月4回以上の読書会が加わりました。小さな店ですが、本と暮らしがともに呼吸できる場をめざす、長い練習なのです。"}'::jsonb, 1),
   ('about', 'workTitle', '{"zh":"我們做的事","en":"What we do","ja":"わたしたちのしごと"}'::jsonb, 2),
   ('about', 'spaceTitle', '{"zh":"空間特色","en":"Inside the space","ja":"空間"}'::jsonb, 3),
   ('contact', 'email', '{"zh":"Email","en":"Email","ja":"メール"}'::jsonb, 1),

@@ -95,9 +95,9 @@ const HOME = {
     ja: "本屋を器に、台湾の素晴らしさを届ける。",
   },
   heroInsetAlt: {
-    zh: "書店裡攤開在木桌上的台灣與日本地方刊物",
-    en: "Local publications from Taiwan and Japan laid out on wooden tables in the store",
-    ja: "店内の木の台に並ぶ、台湾と日本の地域刊行物",
+    zh: "書店裡攤開在木桌上、來自台灣各地的地方刊物",
+    en: "Local publications from across Taiwan laid out on wooden tables in the store",
+    ja: "店内の木の台に並ぶ、台湾各地の地域刊行物",
   },
   heroCaption: {
     zh: "華山 1914 文創園區，紅磚六合院西 7-3 館。",
@@ -125,9 +125,9 @@ const HOME = {
     ja: "読書会・トーク・作家の会",
   },
   gatherBody: {
-    zh: "每月一場讀書會，不定期的講座、作家分享與手作工作坊。一張長桌，讓讀過的書被好好說出來。",
-    en: "A reading circle every month, plus talks, author evenings and hands-on workshops. One long table, where the books we read get talked through.",
-    ja: "毎月の読書会に、不定期のトーク、作家の会、手しごとのワークショップ。長いテーブルひとつで、読んだ本をゆっくり語り合います。",
+    zh: "每月至少四場讀書會，不定期的講座、作家分享與手作工作坊。一張長桌，讓讀過的書被好好說出來。",
+    en: "At least four reading circles every month, plus talks, author evenings and hands-on workshops. One long table, where the books we read get talked through.",
+    ja: "毎月4回以上の読書会に、不定期のトーク、作家の会、手しごとのワークショップ。長いテーブルひとつで、読んだ本をゆっくり語り合います。",
   },
   gatherCta: { zh: "看活動", en: "See events", ja: "イベントを見る" },
   goChar: { zh: "行", en: "Go", ja: "行" },
@@ -181,9 +181,9 @@ const HOME = {
   },
   archiveUnit: { zh: "本地方刊物", en: "local publications", ja: "冊の地域刊行物" },
   archiveSplit: {
-    zh: "台灣 {tw}．日本 {jp}",
-    en: "Taiwan {tw} · Japan {jp}",
-    ja: "台湾 {tw}・日本 {jp}",
+    zh: "以台灣各地為主",
+    en: "Mostly from across Taiwan",
+    ja: "台湾各地を中心に",
   },
   archiveTitle: {
     zh: "一個地方，怎麼被自己的人寫下來。",
@@ -668,7 +668,7 @@ function Index() {
             ) : null}
             {counts ? (
               <p className="mt-3 text-sm tracking-[0.12em] text-muted-foreground">
-                {fill(t(HOME.archiveSplit), { tw: counts.tw, jp: counts.jp })}
+                {t(HOME.archiveSplit)}
               </p>
             ) : null}
             <h2 id="home-archive" className="display mt-10 text-3xl md:text-4xl">
