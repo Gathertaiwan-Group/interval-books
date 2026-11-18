@@ -79,6 +79,11 @@ import {
   CATALOG_INV_TOOL_INPUTS,
   CATALOG_INV_TOOL_META,
 } from "./catalog-inventory-tools";
+import {
+  PAGE_CONTENT_HANDLERS,
+  PAGE_CONTENT_TOOL_INPUTS,
+  PAGE_CONTENT_TOOL_META,
+} from "./page-content-tools";
 
 /* ------------------------------------------------------------------ 共用 */
 
@@ -684,6 +689,8 @@ export const TOOL_INPUTS = {
   /* 2026-11-15 選品／廠商／推薦人／聯絡電話（./partners-content-tools.ts） */
   ...PARTNERS_CONTENT_TOOL_INPUTS,
   ...CATALOG_INV_TOOL_INPUTS,
+  /* 2026-11-18 頁面設定／清單項目（./page-content-tools.ts） */
+  ...PAGE_CONTENT_TOOL_INPUTS,
 } as const;
 
 export type ToolName = keyof typeof TOOL_INPUTS;
@@ -1783,7 +1790,9 @@ export function registerContentTools(server: McpServer): void {
     "list_pages",
     {
       title: "頁面列表",
-      description: "列出網站各頁（slug、標題）。頁面文案用 get_page 看、update_page_blocks 改。",
+      description:
+        "列出網站各頁（slug、標題）。頁面內容用 get_page 看；文案區塊用 update_page_blocks 改，" +
+        "SEO／社群分享／頁首設定用 update_page_meta 改，清單項目用 update_page_list_item 改。",
       annotations: READ_ONLY,
     },
     async () => {
@@ -1803,7 +1812,11 @@ export function registerContentTools(server: McpServer): void {
     "get_page",
     {
       title: "單一頁面文案",
-      description: "取一頁的 SEO 資訊、所有文案區塊（block_key → 三語文字）與清單項目（唯讀）。",
+      description:
+        "取一頁的 SEO 資訊、所有文案區塊（block_key → 三語文字）與清單項目（唯讀）。" +
+        "要修改：文案區塊用 update_page_blocks（block_key）；page 裡的 meta_title／meta_description／og_*／" +
+        "header_title／header_intro／eyebrow_* 用 update_page_meta（slug）；list_items 用 update_page_list_item" +
+        "（page_slug＋id，只改 label／note／image_key，不能新增或刪除）。",
       annotations: READ_ONLY,
     },
     async ({ slug }) => {
@@ -2213,6 +2226,7 @@ export function registerContentTools(server: McpServer): void {
     [ORDERS_EVENTS_TOOL_META, ORDERS_EVENTS_HANDLERS as never],
     [PARTNERS_CONTENT_TOOL_META, PARTNERS_CONTENT_HANDLERS as never],
     [CATALOG_INV_TOOL_META, CATALOG_INV_HANDLERS as never],
+    [PAGE_CONTENT_TOOL_META, PAGE_CONTENT_HANDLERS as never],
   ];
   for (const [metaMap, handlers] of extra) {
     for (const name of Object.keys(metaMap) as ToolName[]) {

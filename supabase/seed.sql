@@ -251,7 +251,7 @@ values
   ('visit', 'bus', '{"zh":"審計部（忠孝東路）：205、232、262(區間)、276、299、忠孝新幹線","en":"National Audit Office on Zhongxiao E. Rd. (審計部): 205, 232, 262(local), 276, 299, Zhongxiao Express","ja":"審計部（忠孝東路）停留所：205、232、262(区間)、276、299、忠孝新幹線"}'::jsonb, null, null, 3),
   ('visit', 'inside', '{"zh":"自選茶點與小份量甜食","en":"Self-serve tea and small sweets","ja":"セルフのお茶と小ぶりな甘いもの"}'::jsonb, null, null, 1),
   ('visit', 'inside', '{"zh":"安靜閱讀座位（請小聲交談）","en":"Quiet reading seats (please keep voices low)","ja":"静かな読書席（小声でどうぞ）"}'::jsonb, null, null, 2),
-  ('visit', 'inside', '{"zh":"不定期舉辦讀書會、講座與身心靈活動","en":"Occasional reading circles, talks, and healing sessions","ja":"読書会、トーク、ヒーリングを随時開催"}'::jsonb, null, null, 3),
+  ('visit', 'inside', '{"zh":"定期舉辦讀書會，不定期舉辦講座與身心靈活動","en":"Regular reading circles, plus occasional talks and healing sessions","ja":"読書会を定期開催、トークやヒーリングも随時開催"}'::jsonb, null, null, 3),
   ('visit', 'inside', '{"zh":"可詢問主理人選書與選品建議","en":"Ask the owner for book and object recommendations","ja":"店主におすすめの本や品をお気軽にご相談ください"}'::jsonb, null, null, 4),
   ('about', 'work', '{"zh":"風土誌策展","en":"Terroir Curation","ja":"風土誌キュレーション"}'::jsonb, '{"zh":"以地方為線索，策劃書展、選物與內容。","en":"Place as the thread for book shows, objects, and content.","ja":"土地を糸口に、書展・選品・コンテンツを編む。"}'::jsonb, null, 1),
   ('about', 'work', '{"zh":"活動與讀書會","en":"Events & Reading Circles","ja":"イベントと読書会"}'::jsonb, '{"zh":"讀書會、講座、工作坊、身心靈活動。","en":"Reading circles, talks, workshops, and healing practice.","ja":"読書会、トーク、ワークショップ、ヒーリング。"}'::jsonb, null, 2),

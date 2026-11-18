@@ -6,6 +6,10 @@
  * 改成國家三段切換＋一個原生 <select>。這個檔案是那個介面背後的純函式——不碰
  * React、不碰資料庫，PublicationsPanel.tsx 只負責把結果畫出來。
  *
+ * 2026-11-18：前台拿掉國家切換（業主：網站不出現日本篩選），PublicationsPanel 只用
+ * regionOptionGroups(台灣那一批, "tw") 列台灣地區；sheet="all"／"jp" 的分支與
+ * regionAfterSheetChange 目前前台沒有用到，留著是給日後要恢復時不用重寫。
+ *
  * 🔴 「篩出哪幾本」的語意跟舊的 chips **完全相同**，換的只是選的方式：
  *
  *   國家：sheet === "all" → 全部；否則 e.sheet === sheet

@@ -287,9 +287,9 @@ const INSIDE: Localized[] = [
     ja: "静かな読書席（小声でどうぞ）",
   },
   {
-    zh: "不定期舉辦讀書會、講座與身心靈活動",
-    en: "Occasional reading circles, talks, and healing sessions",
-    ja: "読書会、トーク、ヒーリングを随時開催",
+    zh: "定期舉辦讀書會，不定期舉辦講座與身心靈活動",
+    en: "Regular reading circles, plus occasional talks and healing sessions",
+    ja: "読書会を定期開催、トークやヒーリングも随時開催",
   },
   {
     zh: "可詢問主理人選書與選品建議",

@@ -711,6 +711,8 @@ OPS_WRITE_EXPECTED.push(
   "update_purchase",
   "link_publication_to_inventory",
 );
+// 2026-11-18 頁面設定／清單項目（page-content-tools.ts，行為測試在 mcp-page-content-selftest）。
+OPS_WRITE_EXPECTED.push("update_page_meta", "update_page_list_item");
 const OPS_READ_EXPECTED = [
   "list_event_sessions",
   "list_event_blocks",
