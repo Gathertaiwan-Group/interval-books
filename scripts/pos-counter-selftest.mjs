@@ -314,14 +314,14 @@ checkTrue(
 );
 checkTrue("也沒有把 adminFnMiddleware import 進來", !/^import .*adminFnMiddleware/m.test(fnsPos));
 check(
-  "八支 POS server fn 全部都有 middleware（2026-10-26 加 getPosSale：銷售明細內頁）",
+  "九支 POS server fn 全部都有 middleware（2026-10-26 加 getPosSale：銷售明細內頁；2026-11-19 加 listSalesSellers：經手人篩選）",
   (fnsPos.match(/\.middleware\(\[staffFnMiddleware/g) ?? []).length,
-  8,
+  9,
 );
 check(
-  "八支 POS server fn（createServerFn 的數量與上面一致）",
+  "九支 POS server fn（createServerFn 的數量與上面一致）",
   (fnsPos.match(/createServerFn\(/g) ?? []).length,
-  8,
+  9,
 );
 checkTrue(
   "標記告警已處理需要 approve_stock_adjustments",

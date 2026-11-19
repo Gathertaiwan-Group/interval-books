@@ -948,6 +948,11 @@ export const salesFilterSchema = z.object({
   keyword: z.string().trim().max(100).nullable(),
   reconciled: z.enum(["all", "yes", "no"]),
   paymentMethodId: z.string().trim().uuid().nullable(),
+  /** 經手人：null＝全部；"web"＝網站訂單；其他＝門市經手人的 user_id。 */
+  seller: z
+    .union([z.literal("web"), z.string().trim().uuid()])
+    .nullable()
+    .optional(),
   page: z.number().int().min(0),
   pageSize: z.number().int().min(1).max(200),
 });

@@ -73,6 +73,14 @@ export const listPosSales = createServerFn({ method: "POST" })
     return { ...page, summary };
   });
 
+/** 銷售紀錄「經手人」篩選的下拉選項（有銷售紀錄的人員＋網站）。 */
+export const listSalesSellers = createServerFn({ method: "GET" })
+  .middleware([staffFnMiddleware()])
+  .handler(async () => {
+    const { listSalesSellers } = await import("@/server/repos/inv-sales");
+    return await listSalesSellers();
+  });
+
 /** 一筆銷售的完整明細（/admin/sales/$saleId 的 loader）。與 listPosSales 同樣是 staffFnMiddleware()。 */
 export const getPosSale = createServerFn({ method: "GET" })
   .middleware([staffFnMiddleware()])

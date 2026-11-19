@@ -174,6 +174,13 @@ export const ADMIN_READ_TOOL_INPUTS = {
     channel: z.enum(["all", "pos", "online"]).default("all").describe("pos 門市／online 網站"),
     reconciled: z.enum(["all", "yes", "no"]).default("all").describe("是否已對帳"),
     keyword: keywordArg("搜尋品名、期數、系列、備註"),
+    seller: z
+      .string()
+      .trim()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe("經手人名稱（與回傳的 seller_name 同字樣）；「網站」＝網站訂單。省略＝全部"),
     ...pageArgs,
   }),
   get_sale: z.object({ sale_id: uuidArg("銷售紀錄 sale_id（見 list_sales）") }),
@@ -280,11 +287,11 @@ export const ADMIN_READ_TOOL_META: Record<
   },
   list_sales: {
     title: "銷售紀錄列表",
-    description: `進銷存的銷售紀錄（門市 POS 與網站），與後台「銷售紀錄」頁同一支查詢。可依日期、通路、對帳狀態、關鍵字篩選；回傳附同條件的合計。${NOTE}`,
+    description: `進銷存的銷售紀錄（門市 POS 與網站），與後台「銷售紀錄」頁同一支查詢。可依日期、通路、對帳狀態、關鍵字、經手人篩選；每列附 seller_name（經手人：結帳的店員／管理員，網站訂單為「網站」，舊資料查不到為「—」）；回傳附同條件的合計與可用的經手人名單。${NOTE}`,
   },
   get_sale: {
     title: "單筆銷售紀錄",
-    description: `一筆銷售的完整明細（品項、數量、單價、成本、毛利、付款方式、操作人員、對帳、備註）。${NOTE}`,
+    description: `一筆銷售的完整明細（品項、數量、單價、成本、毛利、付款方式、經手人 seller_name（結帳的店員／管理員；網站訂單為「網站」）、對帳、備註）。${NOTE}`,
   },
   get_sales_summary: {
     title: "期間營收彙總",
@@ -683,7 +690,25 @@ export const ADMIN_READ_HANDLERS: Handlers = {
   /* ============================================================ 銷售 */
 
   async list_sales(args) {
-    const { listPosSales, summarisePosSales } = await import("@/server/repos/inv-sales");
+    const { listPosSales, summarisePosSales, listSalesSellers } =
+      await import("@/server/repos/inv-sales");
+    const sellers = await listSalesSellers();
+    let seller: string | null = null;
+    if (args.seller) {
+      const want = args.seller.trim().toLowerCase();
+      const hits = sellers.filter((s) => s.name.toLowerCase() === want);
+      if (hits.length === 0) {
+        throw new McpInputError(
+          `找不到經手人「${args.seller}」。有銷售紀錄的經手人：${sellers.map((s) => s.name).join("、") || "（無）"}`,
+        );
+      }
+      if (hits.length > 1) {
+        throw new McpInputError(
+          `經手人「${args.seller}」有 ${hits.length} 位同名，請到後台用下拉篩選。`,
+        );
+      }
+      seller = hits[0].value;
+    }
     const filter = {
       from: args.date_from ?? null,
       to: args.date_to ?? null,
@@ -691,6 +716,7 @@ export const ADMIN_READ_HANDLERS: Handlers = {
       keyword: args.keyword ?? null,
       reconciled: args.reconciled,
       paymentMethodId: null,
+      seller,
       page: args.page - 1,
       pageSize: args.limit,
     };
@@ -698,6 +724,7 @@ export const ADMIN_READ_HANDLERS: Handlers = {
     return jsonText({
       ...pageMeta(list.total, args.limit, args.page, list.rows.length),
       summary: { ...sum, gross_profit: sum.amount - sum.cost },
+      sellers: sellers.map((s) => ({ name: s.name, count: s.count })),
       rows: list.rows,
     });
   },
@@ -706,7 +733,7 @@ export const ADMIN_READ_HANDLERS: Handlers = {
     const { getPosSale } = await import("@/server/repos/inv-sales");
     const row = await getPosSale(sale_id);
     if (!row) notFound("銷售紀錄", sale_id);
-    const { user_id: _user, ...rest } = row;
+    const { user_id: _user, operator_name: _op, ...rest } = row;
     return jsonText(rest);
   },
 

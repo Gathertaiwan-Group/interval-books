@@ -15,6 +15,7 @@ import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
 import { readAllPages } from "@/server/repos/read-all-pages";
 import { findInvProductIdsByNoteBarcode } from "@/server/repos/inv-products";
+import { SELLER_FILTER_WEB, sellerLabel } from "@/lib/admin/seller-name";
 
 /**
  * 櫃檯賣得動的品項。available 已經是**銷售單位**，前端不要再乘 pack_size。
@@ -91,6 +92,8 @@ export type PosSaleRow = {
   payment_method_name: string | null;
   user_id: string;
   operator_name: string | null;
+  /** 經手人顯示名稱（見 src/lib/admin/seller-name.ts）。網站訂單＝「網站」、查不到＝「—」。 */
+  seller_name: string;
 };
 
 /**
@@ -108,9 +111,58 @@ export const POS_SALE_LIST_COLUMNS = [
   "gross_profit",
   "product_name",
   "payment_method_name",
+  // 經手人（2026-11-19）：user_id 只在伺服器端用來補 email 前綴，回給畫面前拿掉。
+  "user_id",
+  "operator_name",
 ] as const;
 
-export type PosSaleListRow = Pick<PosSaleRow, (typeof POS_SALE_LIST_COLUMNS)[number]>;
+export type PosSaleListRow = Pick<
+  PosSaleRow,
+  Exclude<(typeof POS_SALE_LIST_COLUMNS)[number], "user_id" | "operator_name">
+> & { seller_name: string };
+
+/** 篩選下拉的一個選項：有銷售紀錄的經手人。value＝user_id 或 "web"（網站訂單）。 */
+export type SalesSellerOption = { value: string; name: string; count: number };
+
+/**
+ * 替一批銷售列補上 seller_name。inv.profiles 沒有名字的人（後台帳號只在 public.profiles）
+ * 才多查一次 public.profiles 拿 email 前綴；網站訂單不查（一律「網站」）。
+ */
+export async function attachSellerNames<
+  T extends { channel: string; user_id: string; operator_name: string | null },
+>(rows: T[]): Promise<(T & { seller_name: string })[]> {
+  const needEmail = [
+    ...new Set(
+      rows
+        .filter((r) => r.channel !== "online")
+        .filter((r) => {
+          const op = (r.operator_name ?? "").trim();
+          return !op || op.includes("@");
+        })
+        .map((r) => r.user_id)
+        .filter(Boolean),
+    ),
+  ];
+  const emails = new Map<string, string | null>();
+  if (needEmail.length > 0) {
+    const { data, error } = await supabaseAdmin()
+      .from("profiles")
+      .select("id, email")
+      .in("id", needEmail);
+    if (error) throw new Error(`[repo/inv-sales] 經手人帳號讀取失敗：${error.message}`);
+    for (const p of (data ?? []) as { id: string; email: string | null }[]) {
+      emails.set(p.id, p.email);
+    }
+  }
+  return rows.map((r) => ({
+    ...r,
+    seller_name: sellerLabel({
+      channel: r.channel,
+      operatorName: r.operator_name,
+      accountEmail: emails.get(r.user_id) ?? null,
+    }),
+  }));
+}
 
 export type StockAlertRow = {
   alert_id: number;
@@ -270,9 +322,25 @@ export type SalesFilter = {
   keyword: string | null;
   reconciled: "all" | "yes" | "no";
   paymentMethodId: string | null;
+  /** 經手人：null／省略＝全部；"web"＝網站訂單；其他＝門市經手人的 user_id。 */
+  seller?: string | null;
   page: number;
   pageSize: number;
 };
+
+/**
+ * 經手人篩選。網站訂單的 user_id 是品項擁有者、不是經手人（見 seller-name.ts），所以
+ * 選某個人時一定要同時限定 channel = 'pos'，否則會把他擁有的品項的網站訂單也算進來。
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applySellerFilter<Q extends { eq: (c: string, v: any) => Q }>(
+  query: Q,
+  seller: string | null | undefined,
+): Q {
+  if (!seller) return query;
+  if (seller === SELLER_FILTER_WEB) return query.eq("channel", "online");
+  return query.eq("channel", "pos").eq("user_id", seller);
+}
 
 /**
  * 銷售紀錄。
@@ -299,6 +367,7 @@ export async function listPosSales(
   if (filter.channel !== "all") query = query.eq("channel", filter.channel);
   if (filter.reconciled !== "all") query = query.eq("is_reconciled", filter.reconciled === "yes");
   if (filter.paymentMethodId) query = query.eq("payment_method_id", filter.paymentMethodId);
+  query = applySellerFilter(query, filter.seller);
   if (filter.keyword) {
     // PostgREST 的 or() 語法：逗號分隔，值裡的逗號與括號會壞掉，所以先剝掉。
     const safe = filter.keyword.replace(/[(),]/g, " ").trim();
@@ -311,7 +380,12 @@ export async function listPosSales(
 
   const { data, error, count } = await query;
   if (error) throw new Error(`[repo/inv-sales] 銷售紀錄讀取失敗：${error.message}`);
-  return { rows: (data ?? []) as unknown as PosSaleListRow[], total: count ?? 0 };
+  type Raw = PosSaleListRow & { user_id: string; operator_name: string | null };
+  const named = await attachSellerNames((data ?? []) as unknown as Raw[]);
+  const rows: PosSaleListRow[] = named.map(
+    ({ user_id: _u, operator_name: _o, ...rest }) => rest as PosSaleListRow,
+  );
+  return { rows, total: count ?? 0 };
 }
 
 /**
@@ -326,7 +400,9 @@ export async function getPosSale(saleId: string): Promise<PosSaleRow | null> {
     .limit(1)
     .maybeSingle();
   if (error) throw new Error(`[repo/inv-sales] 銷售明細讀取失敗：${error.message}`);
-  return (data ?? null) as unknown as PosSaleRow | null;
+  if (!data) return null;
+  const [row] = await attachSellerNames([data as unknown as Omit<PosSaleRow, "seller_name">]);
+  return row as PosSaleRow;
 }
 
 /** 篩選條件下的合計。分頁只影響看得到幾列，總數要算全部。 */
@@ -347,6 +423,7 @@ export async function summarisePosSales(
     if (filter.channel !== "all") query = query.eq("channel", filter.channel);
     if (filter.reconciled !== "all") query = query.eq("is_reconciled", filter.reconciled === "yes");
     if (filter.paymentMethodId) query = query.eq("payment_method_id", filter.paymentMethodId);
+    query = applySellerFilter(query, filter.seller);
     if (filter.keyword) {
       const safe = filter.keyword.replace(/[(),]/g, " ").trim();
       if (safe) {
@@ -368,6 +445,43 @@ export async function summarisePosSales(
     // cost_price 是**單位**成本，所以要乘數量。來源系統的統計卡也是這樣算的。
     cost: rows.reduce((n, r) => n + Number(r.cost_price ?? 0) * r.quantity, 0),
   };
+}
+
+/**
+ * 經手人篩選的下拉選項：有門市銷售紀錄的每一位（依筆數多到少），最後加「網站」（有網站訂單時）。
+ * 只讀 user_id／operator_name／channel 三欄，依 sale_id 分段讀完（不被 db-max-rows 截斷）。
+ */
+export async function listSalesSellers(): Promise<SalesSellerOption[]> {
+  type Raw = { sale_id: string; channel: string; user_id: string; operator_name: string | null };
+  const rows = await readAllPages<Raw>(
+    (a, b) =>
+      supabaseAdmin()
+        .from("inv_pos_sales")
+        .select("sale_id, channel, user_id, operator_name")
+        .order("sale_id", { ascending: true })
+        .range(a, b) as unknown as PromiseLike<{
+        data: Raw[] | null;
+        error: { code?: string; message: string } | null;
+      }>,
+    { label: "[repo/inv-sales] 經手人清單" },
+  );
+  const byUser = new Map<string, Raw & { count: number }>();
+  let web = 0;
+  for (const r of rows) {
+    if (r.channel === "online") {
+      web += 1;
+      continue;
+    }
+    const g = byUser.get(r.user_id);
+    if (g) g.count += 1;
+    else byUser.set(r.user_id, { ...r, count: 1 });
+  }
+  const named = await attachSellerNames([...byUser.values()]);
+  const out: SalesSellerOption[] = named
+    .map((r) => ({ value: r.user_id, name: r.seller_name, count: r.count }))
+    .sort((x, y) => y.count - x.count || x.name.localeCompare(y.name, "zh-Hant"));
+  if (web > 0) out.push({ value: SELLER_FILTER_WEB, name: "網站", count: web });
+  return out;
 }
 
 export async function listStockAlerts(

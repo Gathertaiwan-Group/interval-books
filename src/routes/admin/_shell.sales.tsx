@@ -47,18 +47,21 @@ const DEFAULT_FILTER: SalesFilterValues = {
   keyword: null,
   reconciled: "all",
   paymentMethodId: null,
+  seller: null,
   page: 0,
   pageSize: PAGE_SIZE,
 };
 
 export const Route = createFileRoute("/admin/_shell/sales")({
   loader: async () => {
-    const { listPosSales, listPosPaymentMethods } = await import("@/lib/admin/fns/pos");
-    const [initial, paymentMethods] = await Promise.all([
+    const { listPosSales, listPosPaymentMethods, listSalesSellers } =
+      await import("@/lib/admin/fns/pos");
+    const [initial, paymentMethods, sellers] = await Promise.all([
       listPosSales({ data: DEFAULT_FILTER }),
       listPosPaymentMethods(),
+      listSalesSellers(),
     ]);
-    return { initial, paymentMethods };
+    return { initial, paymentMethods, sellers };
   },
   head: () => ({ meta: [{ title: "銷售紀錄｜小時光書店後台" }] }),
   component: SalesPage,
@@ -70,7 +73,7 @@ function money(n: number | null | undefined) {
 }
 
 function SalesPage() {
-  const { initial: loaderSales, paymentMethods } = Route.useLoaderData();
+  const { initial: loaderSales, paymentMethods, sellers } = Route.useLoaderData();
   const loaderUpdatedAt = Route.useMatch({ select: (m) => m.updatedAt });
   const navigate = Route.useNavigate();
 
@@ -104,6 +107,7 @@ function SalesPage() {
         value={filter}
         onChange={setFilter}
         paymentMethods={paymentMethods}
+        sellers={sellers}
         disabled={loading}
       />
 
@@ -128,19 +132,20 @@ function SalesPage() {
               <TableHead className="w-16 text-right">數量</TableHead>
               <TableHead className="w-24 text-right">金額</TableHead>
               <TableHead className="w-24 text-right">毛利</TableHead>
-              <TableHead className="w-28">付款方式</TableHead>
+              <TableHead className="hidden w-28 sm:table-cell">付款方式</TableHead>
+              <TableHead className="hidden w-24 sm:table-cell">經手人</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center">
+                <TableCell colSpan={8} className="h-32 text-center">
                   <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={8} className="h-32 text-center text-sm text-muted-foreground">
                   這個條件下沒有銷售紀錄
                 </TableCell>
               </TableRow>
@@ -169,6 +174,10 @@ function SalesPage() {
                     >
                       {row.product_name ?? "（無品名）"}
                     </Link>
+                    {/* 手機：付款方式與經手人兩欄收起來，改在品名下面一行小字，表格不會被撐寬 */}
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground sm:hidden">
+                      {row.payment_method_name ?? "—"}・經手人 {row.seller_name}
+                    </p>
                     {row.override_reservation ? (
                       <Badge variant="destructive" className="mt-0.5 font-normal">
                         強制放行
@@ -192,7 +201,18 @@ function SalesPage() {
                       money(row.gross_profit)
                     )}
                   </TableCell>
-                  <TableCell className="truncate">{row.payment_method_name ?? "—"}</TableCell>
+                  <TableCell className="hidden truncate sm:table-cell">
+                    {row.payment_method_name ?? "—"}
+                  </TableCell>
+                  <TableCell
+                    className={
+                      row.seller_name === "—"
+                        ? "hidden text-muted-foreground sm:table-cell"
+                        : "hidden max-w-[8rem] truncate sm:table-cell"
+                    }
+                  >
+                    {row.seller_name}
+                  </TableCell>
                 </TableRow>
               ))
             )}

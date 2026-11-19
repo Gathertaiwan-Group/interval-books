@@ -83,8 +83,10 @@ export function SaleDetailView({ sale }: { sale: PosSaleRow }) {
         <dt className="text-muted-foreground">付款方式</dt>
         <dd>{sale.payment_method_name ?? "—"}</dd>
 
-        <dt className="text-muted-foreground">操作人員</dt>
-        <dd>{sale.operator_name ?? "—"}</dd>
+        <dt className="text-muted-foreground">經手人</dt>
+        <dd className={sale.seller_name === "—" ? "text-muted-foreground" : undefined}>
+          {sale.seller_name}
+        </dd>
 
         {sale.web_order_id ? (
           <>

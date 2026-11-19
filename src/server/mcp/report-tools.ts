@@ -257,6 +257,8 @@ type SaleRow = {
   gross_profit: number | null;
   payment_method_name: string | null;
   is_reconciled: boolean | null;
+  user_id: string;
+  operator_name: string | null;
 };
 
 /** 進銷存銷售紀錄（inv_pos_sales，與 /admin/sales 同一個 view），sale_date 在 [from, to]。 */
@@ -272,7 +274,7 @@ async function readInventorySales(
       let q = supabaseAdmin()
         .from("inv_pos_sales")
         .select(
-          "sale_id, sale_date, created_at, channel, inv_product_id, product_name, issue_number, series, product_type, quantity, unit_price, amount, cost_price, gross_profit, payment_method_name, is_reconciled",
+          "sale_id, sale_date, created_at, channel, inv_product_id, product_name, issue_number, series, product_type, quantity, unit_price, amount, cost_price, gross_profit, payment_method_name, is_reconciled, user_id, operator_name",
         )
         .gte("sale_date", from)
         .lte("sale_date", to)
@@ -556,7 +558,7 @@ export const REPORT_TOOL_META: Record<
   },
   export_sales_csv: {
     title: "匯出營收明細 CSV",
-    description: `匯出期間（最多 366 天）的營收明細 CSV。source=inventory：進銷存銷售紀錄逐筆（銷售日、通路、品名、期數、數量、單價、金額、成本、毛利、付款方式、對帳）；source=web_orders：網站已付款訂單的逐項明細（付款時間、訂單編號、品名、類型、單價、數量、小計、付款方式、來源；不含客人資料）。${EXPORT_NOTE}`,
+    description: `匯出期間（最多 366 天）的營收明細 CSV。source=inventory：進銷存銷售紀錄逐筆（銷售日、通路、品名、期數、數量、單價、金額、成本、毛利、付款方式、對帳、經手人）；source=web_orders：網站已付款訂單的逐項明細（付款時間、訂單編號、品名、類型、單價、數量、小計、付款方式、來源；不含客人資料）。${EXPORT_NOTE}`,
     annotations: EXPORT_ANN,
   },
   get_top_products: {
@@ -696,14 +698,17 @@ export const REPORT_HANDLERS: Handlers = {
     const span = `${args.date_from.replace(/-/g, "")}-${args.date_to.replace(/-/g, "")}`;
 
     if (args.source === "inventory") {
-      const rows = await readInventorySales(args.date_from, args.date_to, args.channel);
+      const { attachSellerNames } = await import("@/server/repos/inv-sales");
+      const rows = await attachSellerNames(
+        await readInventorySales(args.date_from, args.date_to, args.channel),
+      );
       rows.sort(
         (x, y) =>
           x.sale_date.localeCompare(y.sale_date) ||
           x.created_at.localeCompare(y.created_at) ||
           x.sale_id.localeCompare(y.sale_id),
       );
-      const csv = toCsv<SaleRow>(rows, [
+      const csv = toCsv<SaleRow & { seller_name: string }>(rows, [
         { header: "銷售日", value: (r) => r.sale_date },
         {
           header: "通路",
@@ -721,6 +726,7 @@ export const REPORT_HANDLERS: Handlers = {
         { header: "毛利", value: (r) => r.gross_profit ?? "" },
         { header: "付款方式", value: (r) => r.payment_method_name ?? "" },
         { header: "已對帳", value: (r) => (r.is_reconciled ? "是" : "否") },
+        { header: "經手人", value: (r) => r.seller_name },
       ]);
       return publishCsv({
         tool: "export_sales_csv",

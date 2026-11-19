@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { PosPaymentMethod } from "@/server/repos/inv-sales";
+import type { PosPaymentMethod, SalesSellerOption } from "@/server/repos/inv-sales";
 import type { SalesFilterValues } from "@/lib/admin/schemas";
 
 /**
@@ -23,19 +23,21 @@ type Props = {
   value: SalesFilterValues;
   onChange: (next: SalesFilterValues) => void;
   paymentMethods: PosPaymentMethod[];
+  /** 經手人下拉：有銷售紀錄的人員（＋「網站」）。見 listSalesSellers()。 */
+  sellers: SalesSellerOption[];
   disabled?: boolean;
 };
 
 const ALL = "__all__";
 
-export function SalesFilterBar({ value, onChange, paymentMethods, disabled }: Props) {
+export function SalesFilterBar({ value, onChange, paymentMethods, sellers, disabled }: Props) {
   /** 改任何條件都要回到第 1 頁 —— 停在第 5 頁然後看到空白是最容易誤會的畫面。 */
   function set(patch: Partial<SalesFilterValues>) {
     onChange({ ...value, ...patch, page: 0 });
   }
 
   return (
-    <div className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2 lg:grid-cols-6">
+    <div className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
       <div className="space-y-1.5">
         <Label htmlFor="sales-from" className="text-xs">
           起始日
@@ -106,6 +108,29 @@ export function SalesFilterBar({ value, onChange, paymentMethods, disabled }: Pr
       </div>
 
       <div className="space-y-1.5">
+        <Label htmlFor="sales-seller" className="text-xs">
+          經手人
+        </Label>
+        <Select
+          value={value.seller ?? ALL}
+          onValueChange={(v) => set({ seller: v === ALL ? null : v })}
+          disabled={disabled}
+        >
+          <SelectTrigger id="sales-seller">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>全部</SelectItem>
+            {sellers.map((s) => (
+              <SelectItem key={s.value} value={s.value}>
+                {s.name}（{s.count.toLocaleString("zh-TW")}）
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1.5">
         <Label htmlFor="sales-reconciled" className="text-xs">
           對帳狀態
         </Label>
@@ -149,6 +174,7 @@ export function SalesFilterBar({ value, onChange, paymentMethods, disabled }: Pr
                 keyword: null,
                 reconciled: "all",
                 paymentMethodId: null,
+                seller: null,
                 page: 0,
                 pageSize: value.pageSize,
               })
