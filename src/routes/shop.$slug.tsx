@@ -7,6 +7,7 @@ import { PRODUCT_TYPE_LABELS, SEATS_LEFT_LABEL } from "@/components/shop/labels"
 import { PlanPicker } from "@/components/shop/PlanPicker";
 import { EventEndedNotice, SessionPicker } from "@/components/shop/SessionPicker";
 import { PriceTag, QuantityStepper, StockBadge } from "@/components/shop/ShopBits";
+import { VariantSwitcher } from "@/components/shop/VariantSwitcher";
 import { useT } from "@/i18n/LanguageContext";
 import type { Localized } from "@/i18n/types";
 import { useDocumentMeta } from "@/i18n/useDocumentMeta";
@@ -23,6 +24,8 @@ import { langFromMatches, pageHead } from "@/lib/seo/head";
 import { contentTranslation, productSeo } from "@/lib/seo/pages";
 import { publicationPath, publicationTranslation } from "@/lib/seo/publication";
 import { fetchPublicationForProduct } from "@/lib/publications";
+import { buildVariantGroup, type VariantSource } from "@/lib/product-variants";
+import { getProductVariants } from "@/lib/product-variants-fns";
 import { unavailableHeaders } from "@/lib/seo/status";
 import {
   fetchActiveProductBySlug,
@@ -129,8 +132,20 @@ export const Route = createFileRoute("/shop/$slug")({
       product && product.productType === "book"
         ? await fetchPublicationForProduct(product.id)
         : null;
+    // 2026-11 規格切換：同一組（進銷存 series）的兄弟商品。只有選物／書會有；讀不到
+    // 就是沒有切換鈕，商品頁照常（server 端已 console.warn，這裡再記一次呼叫失敗）。
+    let variants: VariantSource[] = [];
+    if (product && (product.productType === "goods" || product.productType === "book")) {
+      try {
+        variants = await getProductVariants({ data: { productId: product.id } });
+      } catch (err) {
+        console.warn(
+          `[shop] variants unavailable — ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
     // now：「場次開始了沒」的判斷時間點，SSR 與第一次 hydrate 共用（見 useBookingNow）。
-    return { product, unavailable, publication, now: Date.now() };
+    return { product, unavailable, publication, variants, now: Date.now() };
   },
   // SEO（2026-11 健檢）：title「{品名}｜{類別}｜小時光書店」、描述取摘要＋介紹文、
   // JSON-LD 輸出 Product（刊物另標 Book）與麵包屑。組裝在 src/lib/seo/pages.ts#productSeo。
@@ -167,12 +182,20 @@ export const Route = createFileRoute("/shop/$slug")({
 
 function ProductDetail() {
   const t = useT();
-  const { product, unavailable, publication, now: loadedAt } = Route.useLoaderData();
+  const { product, unavailable, publication, variants, now: loadedAt } = Route.useLoaderData();
   const { ui } = useSiteContent();
   // 場次開始了沒（isSessionClosedForBooking）。在 early return 之前（hook 規則）。
   const now = useBookingNow(loadedAt, product?.sessions ?? []);
   const addItem = useCart((s) => s.addItem);
   const [qty, setQty] = useState(1);
+  // 規格切換是同一條路由換 slug，元件不會重新掛載：換了商品就把數量收回 1
+  // （上一件的數量可能超過這一件的庫存）。render 期間調整 state 的寫法，不用 effect。
+  const [qtyFor, setQtyFor] = useState(product?.id ?? null);
+  if ((product?.id ?? null) !== qtyFor) {
+    setQtyFor(product?.id ?? null);
+    setQty(1);
+  }
+  const variantGroup = product ? buildVariantGroup(product.id, variants ?? []) : null;
   /**
    * 只有 event/journey 用得到。預設選第一個**還有位子**的場次，沒有的話就是 null
    * —— 不預設一個已額滿的場次，否則「加入購物車」會在客人還沒選之前就是灰的，
@@ -291,6 +314,9 @@ function ProductDetail() {
             size="lg"
             className="mt-8"
           />
+
+          {/* 2026-11 規格切換（大小罐 × 口味這類）：每顆鈕連到那一件的商品頁。 */}
+          {variantGroup ? <VariantSwitcher group={variantGroup} /> : null}
 
           {/* 名額／庫存徽章。
               🔴 **售罄（活動就是「已額滿」）永遠顯示**，不受 showSeatsRemaining 影響 ——

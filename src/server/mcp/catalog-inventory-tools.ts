@@ -197,14 +197,20 @@ export const CATALOG_INV_TOOL_INPUTS = {
     .object({
       id: uuidArg("進銷存商品 id（見 list_inventory／get_inventory_product）"),
       name: z.string().trim().min(1).max(200).optional().describe("商品名稱"),
-      issue_number: nullableText(50, "期數"),
+      issue_number: nullableText(
+        50,
+        "期數／規格。series 相同的已上架商品會在商品頁出現規格切換，規格用「罐別:大罐｜口味:焦糖」格式（｜分隔各軸）",
+      ),
       barcode: nullableText(64, "條碼／ISBN"),
       category_id: z.string().trim().uuid().nullable().optional().describe("分類 id（null＝清空）"),
       product_type: z
         .enum(INV_PRODUCT_TYPES)
         .optional()
         .describe("outright 買斷／consignment 寄賣／rental 租借"),
-      series: nullableText(200, "系列"),
+      series: nullableText(
+        200,
+        "系列。series 相同的已上架商品會在商品頁出現規格切換（各件的 issue_number 用「罐別:大罐｜口味:焦糖」格式）",
+      ),
       publisher: nullableText(200, "出版社"),
       vendor_id: z.string().trim().uuid().nullable().optional().describe("供應商 id（null＝清空）"),
       selling_price: z

@@ -529,10 +529,20 @@ export const OPS_WRITE_TOOL_INPUTS = {
       .min(0)
       .optional()
       .describe("成本（元）。省略時資料庫用一起建的那筆進貨的單位成本，再沒有就是 0"),
-    issue_number: z.string().trim().max(50).optional().describe("期數"),
+    issue_number: z
+      .string()
+      .trim()
+      .max(50)
+      .optional()
+      .describe("期數／規格（同 series 的商品頁規格切換用「罐別:大罐｜口味:焦糖」格式）"),
     barcode: z.string().trim().max(64).optional().describe("條碼／ISBN"),
     category_id: z.string().trim().uuid().optional().describe("分類 id（預覽會列出可選分類）"),
-    series: z.string().trim().max(200).optional(),
+    series: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .describe("系列。series 相同的已上架商品會在商品頁出現規格切換"),
     publisher: z.string().trim().max(200).optional().describe("出版社"),
     vendor_id: z.string().trim().uuid().optional().describe("供應商 id（見 list_vendors）"),
     low_stock_alert: z
