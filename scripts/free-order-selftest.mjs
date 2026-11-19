@@ -284,7 +284,9 @@ assertMigrationDependencies(check, MIG_DIR, {
   // order_total 兩欄；既有欄位與其他付款方式的語意不變——這支的斷言照樣成立。
   // 0059 重審：admin_event_roster 只在最後加 ticket_price 等四欄（left join order_items／
   // event_session_plans），既有十八欄與 on_roster 定義不動——這支的斷言照樣成立。
-  reviewedThrough: "0059_roster_ticket_price.sql",
+  // 0062（不限庫存）動到的區域在這支自檢關心的部分是逐字重建（order_items／event_sessions／profiles
+  // 的讀法、product_availability 的形狀都沒變；只多了不限庫存目標回 10），斷言重讀後仍成立。
+  reviewedThrough: "0062_inventory_unlimited_stock.sql",
 });
 
 // =============================================================================

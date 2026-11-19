@@ -203,9 +203,14 @@ function AdminInventoryListingPage() {
                   <TableCell className="text-muted-foreground">{row.inv_name}</TableCell>
                   <TableCell className="text-right">{formatTWD(row.price)}</TableCell>
                   <TableCell className="text-right">{row.units_per_sale}</TableCell>
-                  <TableCell className="text-right">{row.stock_quantity}</TableCell>
+                  {/* 0062：不限庫存（寄賣不限量）不顯示數字——帳上庫存可能是負數，沒有意義。 */}
+                  <TableCell className="text-right">
+                    {row.unlimited_stock ? "—" : row.stock_quantity}
+                  </TableCell>
                   <TableCell className="text-right">{row.reserved}</TableCell>
-                  <TableCell className="text-right font-medium">{row.available}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    {row.unlimited_stock ? "不限量" : row.available}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={row.status === "active" ? "default" : "secondary"}>
                       {row.status === "active"
@@ -344,14 +349,14 @@ function ListingForm({ candidates, onSubmit, submitting }: ListingFormProps) {
                 <SelectContent className="max-h-72">
                   {candidates.map((c) => (
                     <SelectItem key={c.inv_product_id} value={c.inv_product_id}>
-                      {c.name}（庫存 {c.stock_quantity}
+                      {c.name}（{c.unlimited_stock ? "不限庫存" : `庫存 ${c.stock_quantity}`}
                       {c.pack_size > 1 ? `，一組 ${c.pack_size}` : ""}）
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <FormDescription>
-                只列出已核准、未停用、有庫存，而且還沒上架過的品項。
+                只列出已核准、未停用、有庫存（或設為不限庫存），而且還沒上架過的品項。
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -361,8 +366,8 @@ function ListingForm({ candidates, onSubmit, submitting }: ListingFormProps) {
         {selected !== null && (
           <div className="rounded-md border border-border bg-muted/40 p-3 text-sm">
             <p className="text-muted-foreground">
-              進銷存售價 {formatTWD(Math.round(Number(selected.selling_price)))}
-              ｜現有庫存 {selected.stock_quantity}
+              進銷存售價 {formatTWD(Math.round(Number(selected.selling_price)))}｜
+              {selected.unlimited_stock ? "不限庫存" : `現有庫存 ${selected.stock_quantity}`}
               {selected.pack_size > 1 ? `｜一組 ${selected.pack_size} 個` : ""}
             </p>
           </div>

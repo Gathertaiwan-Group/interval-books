@@ -1001,42 +1001,65 @@ export const INV_PRODUCT_TYPE_LABELS: Record<(typeof INV_PRODUCT_TYPES)[number],
  *
  * 價格的下限鏡射 inv.products 的 positive_cost_price / positive_selling_price。
  */
-export const invProductSchema = z.object({
-  id: z.string().trim().uuid().nullable().optional(),
-  name: z.string().trim().min(1, "請輸入商品名稱").max(200, "商品名稱最多 200 字"),
-  issue_number: z.string().trim().max(50).nullable().optional(),
-  barcode: z.string().trim().max(64).nullable().optional(),
-  category_id: z.string().trim().uuid().nullable().optional(),
-  product_type: z.enum(INV_PRODUCT_TYPES),
-  series: z.string().trim().max(200).nullable().optional(),
-  publisher: z.string().trim().max(200).nullable().optional(),
-  vendor_id: z.string().trim().uuid().nullable().optional(),
-  selling_price: z
-    .number({ invalid_type_error: "售價必須是數字" })
-    .min(0, "售價不可為負數")
-    .finite("售價必須是數字"),
-  cost_price: z
-    .number({ invalid_type_error: "成本必須是數字" })
-    .min(0, "成本不可為負數")
-    .finite("成本必須是數字")
-    .nullable()
-    .optional(),
-  low_stock_alert: z.number().int("低庫存警示必須是整數").min(0, "不可為負數"),
-  pack_size: z.number().int("每組數量必須是整數").min(1, "每組數量至少是 1"),
-  base_product_id: z.string().trim().uuid().nullable().optional(),
-  image_key: z.string().trim().max(300).nullable().optional(),
-  notes: z.string().trim().max(2000).nullable().optional(),
-  /** 只在新增時看。來源新增商品預設會一起建一筆進貨，庫存靠它的 trigger 加上去。 */
-  purchase: z
-    .object({
-      quantity: z.number().int("數量必須是整數").min(1, "數量至少是 1"),
-      cost_price: z.number().min(0, "成本不可為負數").finite().nullable(),
-      vendor: z.string().trim().max(200).nullable(),
-      purchase_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "日期格式必須是 YYYY-MM-DD"),
-    })
-    .nullable()
-    .optional(),
-});
+export const invProductSchema = z
+  .object({
+    id: z.string().trim().uuid().nullable().optional(),
+    name: z.string().trim().min(1, "請輸入商品名稱").max(200, "商品名稱最多 200 字"),
+    issue_number: z.string().trim().max(50).nullable().optional(),
+    barcode: z.string().trim().max(64).nullable().optional(),
+    category_id: z.string().trim().uuid().nullable().optional(),
+    product_type: z.enum(INV_PRODUCT_TYPES),
+    series: z.string().trim().max(200).nullable().optional(),
+    publisher: z.string().trim().max(200).nullable().optional(),
+    vendor_id: z.string().trim().uuid().nullable().optional(),
+    selling_price: z
+      .number({ invalid_type_error: "售價必須是數字" })
+      .min(0, "售價不可為負數")
+      .finite("售價必須是數字"),
+    cost_price: z
+      .number({ invalid_type_error: "成本必須是數字" })
+      .min(0, "成本不可為負數")
+      .finite("成本必須是數字")
+      .nullable()
+      .optional(),
+    low_stock_alert: z.number().int("低庫存警示必須是整數").min(0, "不可為負數"),
+    pack_size: z.number().int("每組數量必須是整數").min(1, "每組數量至少是 1"),
+    base_product_id: z.string().trim().uuid().nullable().optional(),
+    image_key: z.string().trim().max(300).nullable().optional(),
+    notes: z.string().trim().max(2000).nullable().optional(),
+    /**
+     * 不限庫存（0062）。沒帶＝不改（新增時＝關）。只限寄賣品、而且不能是子品項——資料庫
+     * 另有 CHECK 與 inv_save_product() 的錯誤訊息守著，這裡先在表單層講清楚。
+     */
+    unlimited_stock: z.boolean().optional(),
+    /** 只在新增時看。來源新增商品預設會一起建一筆進貨，庫存靠它的 trigger 加上去。 */
+    purchase: z
+      .object({
+        quantity: z.number().int("數量必須是整數").min(1, "數量至少是 1"),
+        cost_price: z.number().min(0, "成本不可為負數").finite().nullable(),
+        vendor: z.string().trim().max(200).nullable(),
+        purchase_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "日期格式必須是 YYYY-MM-DD"),
+      })
+      .nullable()
+      .optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (!v.unlimited_stock) return;
+    if (v.product_type !== "consignment") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["unlimited_stock"],
+        message: "只有寄賣品可以設定不限庫存",
+      });
+    }
+    if (v.base_product_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["unlimited_stock"],
+        message: "子品項不能設定不限庫存，請改在母品項設定",
+      });
+    }
+  });
 
 export type InvProductFormValues = z.infer<typeof invProductSchema>;
 

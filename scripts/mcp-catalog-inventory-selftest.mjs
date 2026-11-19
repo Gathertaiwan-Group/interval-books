@@ -747,6 +747,42 @@ reset();
   check("以上都沒有呼叫 RPC", log.rpc.length, 0);
 }
 
+console.log("\n[4b] update_inventory_product：不限庫存（0062）");
+reset();
+{
+  // 買斷品不能開：schema 先擋（資料庫另有 CHECK），不呼叫 RPC。
+  const bad = await asOAuth(() => H.update_inventory_product({ id: P1, unlimited_stock: true }));
+  checkTrue("買斷品開不限庫存 → isError（只限寄賣）", bad.isError && /寄賣/.test(text(bad)));
+  check("買斷品：不呼叫 RPC", log.rpc.length, 0);
+
+  // 寄賣品：預覽列出 unlimited_stock 這一欄的變更；寫入時整列送出、旗標為 true。
+  tables.inv_admin_products = tables.inv_admin_products.map((r) =>
+    r.inv_product_id === P1 ? { ...r, product_type: "consignment", unlimited_stock: false } : r,
+  );
+  const pv = parseOut(
+    await asOAuth(() => H.update_inventory_product({ id: P1, unlimited_stock: true })),
+  );
+  check("寄賣品預覽：只列 unlimited_stock", Object.keys(pv.changes ?? {}), ["unlimited_stock"]);
+  check("寄賣品預覽：不呼叫 RPC", log.rpc.length, 0);
+  await asOAuth(() =>
+    H.update_inventory_product({ id: P1, unlimited_stock: true, dry_run: false }),
+  );
+  const call = log.rpc.find((c) => c.name === "inv_save_product");
+  check(
+    "寄賣品寫入：inv_save_product 帶 unlimited_stock=true、類型不變",
+    [call?.args.p_payload.unlimited_stock, call?.args.p_payload.product_type],
+    [true, "consignment"],
+  );
+
+  // 沒帶 unlimited_stock 的修改：送出原值（false），不會意外打開或關掉。
+  reset();
+  await asOAuth(() =>
+    H.update_inventory_product({ id: P1, name: "地味手帖（新版）", dry_run: false }),
+  );
+  const keep = log.rpc.find((c) => c.name === "inv_save_product");
+  check("沒帶旗標：送出原值 false", keep?.args.p_payload.unlimited_stock, false);
+}
+
 console.log("\n[5] set_inventory_product_active／request_inventory_price_change");
 reset();
 {

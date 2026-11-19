@@ -603,9 +603,10 @@ console.log("\n[6] 🔴 沒有動到不該動的檔案（對真的工作目錄�
     //   四支都沒碰 admin_delete_order／admin_archive_order／admin_mark_order_paid（現場收款就是呼叫它）。
     // 0060（Google 日曆同步）：新表＋三支新函式＋一個新排程，沒碰任何訂單函式。
     // 0061（國內個人廠商身分證選填）：只重建 inv_save_vendor()，沒碰任何訂單函式。
-    "supabase/migrations 剛好 61 個 .sql 檔（0001–0055 + 0056–0059 現場付款 + 0060 Google 日曆 + 0061 個人戶廠商）",
+    // 0062（進銷存不限庫存）：重建保留／入帳／櫃檯／成本函式與幾個 view，沒碰任何訂單函式。
+    "supabase/migrations 剛好 62 個 .sql 檔（0001–0055 + 0056–0059 現場付款 + 0060 Google 日曆 + 0061 個人戶廠商 + 0062 不限庫存）",
     migFiles.length,
-    61,
+    62,
   );
 }
 

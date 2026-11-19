@@ -87,7 +87,10 @@ export function ComboCheckoutPanel({
           className="tabular-nums"
           disabled={submitting || !set}
         />
-        {maxSets !== null ? (
+        {set && set.item_count > 0 && set.unlimited_items === set.item_count ? (
+          // 0062：組成品項全部是不限庫存，max_sets 只是單次上限（100），不是庫存。
+          <p className="text-xs text-muted-foreground">組成品項皆為不限庫存</p>
+        ) : maxSets !== null ? (
           <p className="text-xs text-muted-foreground tabular-nums">
             以現在的庫存還能組 {maxSets} 份
           </p>

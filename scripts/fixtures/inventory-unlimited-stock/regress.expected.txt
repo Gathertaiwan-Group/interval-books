@@ -1,0 +1,17 @@
+avail|t-n|f|0
+avail|t-o|t|2
+reserveN|OK:INSUFFICIENT_STOCK
+posN|OK:POS_INSUFFICIENT_STOCK
+posO2|60.0000000000000000
+posO1more|OK:POS_INSUFFICIENT_STOCK
+posO_override|1
+stockO|-1
+costO|2|30.0000000000000000
+costO|1|0.00000000000000000000
+reserveO|1
+commitO|0
+alerts|pos_override|1
+count|{"status": "pending_approval", "created": 1, "skipped": 1, "surplus": 1, "shrinkage": 0, "needs_approval": true}
+comboN|OK:INSUFFICIENT_STOCK
+comboview|1|0
+save|false

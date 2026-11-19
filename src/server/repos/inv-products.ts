@@ -61,6 +61,8 @@ export type AdminProductRow = {
   listed_product_id: string | null;
   listed_slug: string | null;
   listed_status: string | null;
+  /** 0062：不限庫存（寄賣不限量）。開著時 stock_quantity／available 沒有意義（可能是負數），畫面顯示「不限量」。 */
+  unlimited_stock: boolean;
 };
 
 export type AdminCategory = {
@@ -109,7 +111,7 @@ const COLUMNS =
   "base_product_id, base_product_name, approval_status, approved_at, approved_by_name, " +
   "pending_cost_price, pending_selling_price, price_change_status, price_change_requested_at, " +
   "price_change_requested_by_name, user_id, creator_name, created_at, updated_at, " +
-  "reserved, available, listed_product_id, listed_slug, listed_status";
+  "reserved, available, listed_product_id, listed_slug, listed_status, unlimited_stock";
 
 /** 排序鍵 → PostgREST order()。issue_number 是 text，所以數字期數只能字典序排。 */
 const SORTS: Record<ProductFilter["sort"], { column: string; ascending: boolean }> = {

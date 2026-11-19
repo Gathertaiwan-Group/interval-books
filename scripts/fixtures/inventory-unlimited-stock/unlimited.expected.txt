@@ -1,0 +1,28 @@
+chk_outright|OK:new row for relation "products" violates check constraint "products_unlimited_stock_consignment_only"
+save_outright|OK:PRODUCT_UNLIMITED_CONSIGNMENT_ONLY
+save_child|OK:PRODUCT_UNLIMITED_NO_BASE
+save_new_outright|OK:PRODUCT_UNLIMITED_CONSIGNMENT_ONLY
+save_on|00000000-0000-0000-0000-00000000000d
+flag|t
+save_keep|t|t
+save_type_change|OK:PRODUCT_UNLIMITED_CONSIGNMENT_ONLY
+avail|t-u|t|10
+admin|t|0
+reserveU|1
+listed|5|t
+commitU|0
+webcost|5|50.00|online
+posU|150.0000000000000000
+pos_view|0|t
+mixcost|129.9999999999999999
+comboview|1|100|1
+comboU|400.0000000000000000
+comboview2|2|0|1
+comboUN|OK:INSUFFICIENT_STOCK
+combo_items|N 一般寄賣|f
+combo_items|U 寄賣|t
+alerts_total|0
+stockU|-17
+count|{"status": "pending_approval", "created": 0, "skipped": 0, "surplus": 0, "shrinkage": 0, "needs_approval": true, "unlimited_skipped": 1}
+stockU_after_delete|-14
+off_pos|OK:POS_INSUFFICIENT_STOCK

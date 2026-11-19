@@ -558,6 +558,12 @@ export const OPS_WRITE_TOOL_INPUTS = {
       .uuid()
       .optional()
       .describe("母品項 id（組合子品項才需要；一般商品省略）"),
+    unlimited_stock: z
+      .boolean()
+      .optional()
+      .describe(
+        "不限庫存（寄賣不限量）。只限 product_type=consignment 且沒有 base_product_id；開啟後不必進貨也能上架販售，成本用 cost_price，不進低庫存與盤點。與後台商品表單的「不限庫存」勾選相同。",
+      ),
     image_key: z
       .string()
       .trim()
@@ -2054,7 +2060,7 @@ const IMPL: Handlers = {
     const { supabaseAdmin } = await import("@/server/supabase-admin");
     const { data: prods, error } = await supabaseAdmin()
       .from("inv_admin_products")
-      .select("inv_product_id, name, issue_number, stock_quantity")
+      .select("inv_product_id, name, issue_number, stock_quantity, unlimited_stock")
       .in("inv_product_id", ids);
     if (error) throw new Error(`商品讀取失敗：${error.code ?? error.message}`);
     const byId = new Map(
@@ -2064,11 +2070,18 @@ const IMPL: Handlers = {
           name: string;
           issue_number: string | null;
           stock_quantity: number;
+          unlimited_stock: boolean;
         }[]
       ).map((p) => [p.inv_product_id, p]),
     );
     const missing = ids.filter((id) => !byId.has(id));
     if (missing.length) throw new McpInputError(`找不到進銷存商品：${missing.join("、")}`);
+    // 0062：不限庫存品項不盤點（後台盤點頁也不列出它們；資料庫端會略過）。
+    const unlimited = ids.filter((id) => byId.get(id)!.unlimited_stock === true);
+    if (unlimited.length)
+      throw new McpInputError(
+        `這些是「不限庫存」品項，不盤點：${unlimited.map((id) => byId.get(id)!.name).join("、")}。請從 rows 移除。`,
+      );
 
     const lines = data.rows.map((r) => {
       const p = byId.get(r.product_id)!;
@@ -2211,6 +2224,7 @@ const IMPL: Handlers = {
       base_product_id: args.base_product_id ?? null,
       image_key: args.image_key ?? null,
       notes: args.notes ?? null,
+      unlimited_stock: args.unlimited_stock,
       purchase: args.purchase
         ? {
             quantity: args.purchase.quantity,
@@ -2655,7 +2669,7 @@ const IMPL: Handlers = {
     const { data: posRows, error } = await supabaseAdmin()
       .from("inv_pos_products")
       .select(
-        "inv_product_id, name, issue_number, selling_price, stock_quantity, reserved, available",
+        "inv_product_id, name, issue_number, selling_price, stock_quantity, reserved, available, unlimited_stock",
       )
       .in("inv_product_id", ids);
     if (error) throw new Error(`商品讀取失敗：${error.code ?? error.message}`);
@@ -2667,6 +2681,7 @@ const IMPL: Handlers = {
       stock_quantity: number;
       reserved: number;
       available: number;
+      unlimited_stock: boolean;
     };
     const byId = new Map(
       ((posRows ?? []) as unknown as PosRow[]).map((p) => [p.inv_product_id, p]),
@@ -2720,8 +2735,9 @@ const IMPL: Handlers = {
         list_price: p.selling_price,
         unit_price: i.unit_price,
         subtotal: i.unit_price * i.quantity,
-        available: p.available,
-        over_available: Math.max(i.quantity - p.available, 0),
+        // 0062：不限庫存不比可售量（與 pos_checkout() 相同）。
+        available: p.unlimited_stock ? "不限量" : p.available,
+        over_available: p.unlimited_stock ? 0 : Math.max(i.quantity - p.available, 0),
       };
     });
     const over = lines.filter((l) => l.over_available > 0);

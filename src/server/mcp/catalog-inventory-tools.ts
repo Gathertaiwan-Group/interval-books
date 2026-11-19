@@ -236,6 +236,12 @@ export const CATALOG_INV_TOOL_INPUTS = {
         .optional()
         .describe("商品照片 key（先用 upload_image_* 上傳；null＝清空）"),
       notes: nullableText(2000, "備註"),
+      unlimited_stock: z
+        .boolean()
+        .optional()
+        .describe(
+          "不限庫存（寄賣不限量）。只限寄賣品、非子品項；開啟後庫存 0 也能上架販售、網站不顯示數字、不進低庫存與盤點，成本用 cost_price。與後台商品編輯的「不限庫存」勾選相同",
+        ),
       dry_run: dryRunArg,
     })
     .refine(
@@ -461,7 +467,7 @@ export const CATALOG_INV_TOOL_META: Record<
     description:
       "與後台商品「編輯」同一支 RPC（inv_save_product，同一份欄位驗證）：只送要改的欄位，其他維持原值。" +
       "改到售價或成本時：調價審核開著就變成待審調價（核准後才生效，用 approve_inventory_record 的 price_changes 以外請到後台審），關著就直接生效——預覽會說是哪一種。" +
-      "庫存不能在這裡改（用進貨／在庫異動／盤點）。" +
+      "庫存不能在這裡改（用進貨／在庫異動／盤點）；寄賣不限量的品項可設 unlimited_stock=true（只限寄賣、非子品項）。" +
       OAUTH +
       PREVIEW,
     annotations: WRITE,
@@ -706,7 +712,10 @@ async function requireCandidate(invProductId: string) {
   if (p.approval_status !== "approved")
     why.push(`商品還沒核准（${p.approval_status}，用 approve_inventory_record）`);
   if (!p.is_active) why.push("商品已停用（set_inventory_product_active）");
-  if (!(p.stock_quantity > 0)) why.push("庫存是 0（進貨核准後才有庫存）");
+  if (!(p.stock_quantity > 0) && !p.unlimited_stock)
+    why.push(
+      "庫存是 0（進貨核准後才有庫存；寄賣不限量的品項可用 update_inventory_product 開 unlimited_stock）",
+    );
   throw new McpInputError(
     `「${p.name}」目前不能上架：${why.length ? why.join("；") : "不在可上架清單裡"}。與後台上架頁的下拉選單同一個條件。`,
   );
@@ -730,6 +739,7 @@ const PRODUCT_FIELDS = [
   "base_product_id",
   "image_key",
   "notes",
+  "unlimited_stock",
 ] as const;
 
 const PURCHASE_FIELDS = [
@@ -891,6 +901,7 @@ const IMPL: { [N in CatalogInvToolName]: (args: Args<N>) => Promise<TextResult> 
           stock_quantity: r.stock_quantity,
           pack_size: r.pack_size,
           barcode: r.barcode,
+          unlimited_stock: r.unlimited_stock === true,
         })),
       },
       listed: {
@@ -906,10 +917,11 @@ const IMPL: { [N in CatalogInvToolName]: (args: Args<N>) => Promise<TextResult> 
           units_per_sale: r.units_per_sale,
           stock_quantity: r.stock_quantity,
           reserved: r.reserved,
-          available: r.available,
+          available: r.unlimited_stock ? "不限量" : r.available,
+          unlimited_stock: r.unlimited_stock === true,
         })),
       },
-      note: "candidates 只列已核准、啟用、有庫存、還沒上架的進銷存商品（與後台上架頁相同）。",
+      note: "candidates 只列已核准、啟用、有庫存（或不限庫存）、還沒上架的進銷存商品（與後台上架頁相同）。",
     });
   },
 
@@ -1051,6 +1063,8 @@ const IMPL: { [N in CatalogInvToolName]: (args: Args<N>) => Promise<TextResult> 
     const before: Record<string, unknown> = {};
     for (const k of PRODUCT_FIELDS)
       before[k] = (row as unknown as Record<string, unknown>)[k] ?? null;
+    // 0062：旗標是 not null boolean；舊資料列（或還沒讀到這一欄）一律當 false。
+    before.unlimited_stock = row.unlimited_stock === true;
     const next: Record<string, unknown> = { ...before };
     for (const k of PRODUCT_FIELDS) {
       const v = (args as Record<string, unknown>)[k];

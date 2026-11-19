@@ -23,6 +23,8 @@ export type ProductFormState = {
   base_product_id: string;
   image_key: string | null;
   notes: string;
+  /** 不限庫存（0062）：只限寄賣品、非子品項。 */
+  unlimited_stock: boolean;
 };
 
 export const EMPTY_PRODUCT_FORM: ProductFormState = {
@@ -41,4 +43,5 @@ export const EMPTY_PRODUCT_FORM: ProductFormState = {
   base_product_id: "",
   image_key: null,
   notes: "",
+  unlimited_stock: false,
 };

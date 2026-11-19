@@ -241,9 +241,13 @@ console.log("\n[3] production 函式 × 假 Supabase（每次最多 1000 列）"
     low_stock_alert: 5,
     is_active: true,
     approval_status: "approved",
+    // 0062：view 多了 unlimited_stock；盤點／低庫存清單只讀 false 的那些。
+    unlimited_stock: false,
   }));
   rows[1100] = { ...rows[1100], stock_quantity: 8, low_stock_alert: 10 };
   rows[1150] = { ...rows[1150], stock_quantity: 2, low_stock_alert: 5 };
+  // 不限庫存（寄賣不限量）：帳上 -3、警示 5，但不能出現在低庫存清單裡。
+  rows[1120] = { ...rows[1120], stock_quantity: -3, low_stock_alert: 5, unlimited_stock: true };
   rows[1199] = { ...rows[1199], stock_quantity: 0, low_stock_alert: 0 };
   tables.set("inv_admin_products", rows);
   const { listStockCountProducts } = await import(join(SRC, "server/repos/inv-adjustments.ts"));

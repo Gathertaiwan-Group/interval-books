@@ -234,7 +234,9 @@ assertMigrationDependencies(check, MIG_DIR, {
   // 0061 重審：只 create or replace public.inv_save_vendor()（廠商存檔；國內個人的身分證字號改
   // 選填、有填驗形狀），簽章／grant 不變，沒有碰訂單、名單、場次、票種或庫存保留的任何表或函式——
   // 這支的斷言照樣成立。
-  reviewedThrough: "0061_vendor_individual_optional_id.sql",
+  // 0062（不限庫存）動到的區域在這支自檢關心的部分是逐字重建（order_items／event_sessions／profiles
+  // 的讀法、product_availability 的形狀都沒變；只多了不限庫存目標回 10），斷言重讀後仍成立。
+  reviewedThrough: "0062_inventory_unlimited_stock.sql",
 });
 
 // =============================================================================

@@ -70,6 +70,7 @@ function formFromProduct(product: AdminProductRow): ProductFormState {
     base_product_id: product.base_product_id ?? "",
     image_key: product.image_key,
     notes: product.notes ?? "",
+    unlimited_stock: product.unlimited_stock === true,
   };
 }
 
@@ -127,6 +128,9 @@ export function ProductForm({
       base_product_id: form.base_product_id || null,
       image_key: form.image_key,
       notes: form.notes.trim() || null,
+      // 不是寄賣品（或改成子品項）時一律送 false：旗標只對寄賣母品項有意義。
+      unlimited_stock:
+        form.unlimited_stock && form.product_type === "consignment" && !form.base_product_id,
       purchase:
         !isEdit && withPurchase
           ? {

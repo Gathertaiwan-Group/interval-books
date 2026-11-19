@@ -422,7 +422,9 @@ assertMigrationDependencies(check, MIG_DIR, {
   //   return null。既有 expire-unpaid-orders、dispatch-invoice-task、dispatch-notify-task、
   //   ib_mcp_oauth_used_codes_purge 的名稱、排程、指令都沒動；分鐘 9,24,39,54 不在 */5、3-53/10、
   //   6-56/10、17 任何一個 tick 上。其他區域一個都沒碰——這支的斷言照樣成立。
-  reviewedThrough: "0060_google_calendar_sync.sql",
+  // 0062（不限庫存）動到的區域在這支自檢關心的部分是逐字重建（order_items／event_sessions／profiles
+  // 的讀法、product_availability 的形狀都沒變；只多了不限庫存目標回 10），斷言重讀後仍成立。
+  reviewedThrough: "0062_inventory_unlimited_stock.sql",
 });
 for (const f of [
   "0004_commerce_products.sql",

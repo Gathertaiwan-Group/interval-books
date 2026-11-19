@@ -88,9 +88,16 @@ export function ProductDetailView({
           <Field label="售價">{money(product.selling_price)}</Field>
           <Field label="成本">{money(product.cost_price)}</Field>
           <Field label="每組數量">{product.pack_size}</Field>
-          <Field label="庫存">{product.stock_quantity} 件</Field>
+          {product.unlimited_stock ? (
+            // 0062：不限庫存（寄賣不限量）——帳上數字可能是負數，沒有意義，不顯示。
+            <Field label="庫存">不限量（寄賣）</Field>
+          ) : (
+            <Field label="庫存">{product.stock_quantity} 件</Field>
+          )}
           <Field label="網站保留">{product.reserved} 件</Field>
-          <Field label="可售">{product.available} 件</Field>
+          <Field label="可售">
+            {product.unlimited_stock ? "不限量" : `${product.available} 件`}
+          </Field>
         </div>
       </div>
 

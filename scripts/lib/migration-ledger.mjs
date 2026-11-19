@@ -958,6 +958,22 @@ export const MIGRATION_LEDGER = Object.freeze([
     // vendors、inv.initial_approval_status、inv.assert_rate／assert_day_of_month）。
     touches: ["inventory"],
   },
+  {
+    file: "0062_inventory_unlimited_stock.sql",
+    note: "進銷存品項「不限庫存」旗標：inv.products 加 unlimited_stock（CHECK 只限寄賣品、非子品項）。create or replace（簽名不變）reserve_inventory_stock／commit_inventory_reservations／inv.update_stock_on_sale／pos_checkout／inv.allocate_fifo_cost／inv_record_stock_count／inv_save_product：不限庫存目標不比可售量、不寫賣超告警、批次不足的件數用 cost_price 計成本、盤點略過（unlimited_skipped）、存檔可切換。view：product_availability 對不限庫存回 10（形狀不變）、inv_listing_candidates 允許庫存 0 的不限庫存品項、inv_admin_products／inv_listed_products／inv_pos_products／inv_admin_combo_set_items 尾端加 unlimited_stock、inv_admin_combo_sets 的 max_sets 不計不限庫存品項並尾端加 unlimited_items。非不限庫存品項行為逐字不變",
+    // touches 是用 AREAS 的識別字掃過剝掉註解的 SQL 算出來的：inventory（inv.*）、pos（pos_checkout／
+    // inv_pos_products）、products_availability（product_availability 重建）、session_seats（同一個 view
+    // 裡 event_sessions／seats_taken 那一段逐字照抄）、order_expiry（commit 讀 order_items，逐字照抄）、
+    // admin_auth（inv_admin_* view 照舊 join inv.profiles）。後四者都是重建時逐字帶過，語意沒變。
+    touches: [
+      "inventory",
+      "pos",
+      "products_availability",
+      "session_seats",
+      "order_expiry",
+      "admin_auth",
+    ],
+  },
 ]);
 
 /**

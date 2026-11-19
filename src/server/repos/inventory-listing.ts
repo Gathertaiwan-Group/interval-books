@@ -31,6 +31,8 @@ export type InventoryCandidate = {
   stock_quantity: number;
   pack_size: number;
   barcode: string | null;
+  /** 0062：不限庫存（寄賣不限量）——庫存 0 也在候選清單裡。 */
+  unlimited_stock: boolean;
 };
 
 /** 已經上架的商品，型錄端與庫存端的數字並排。 */
@@ -46,6 +48,8 @@ export type ListedInventoryProduct = {
   stock_quantity: number;
   reserved: number;
   available: number;
+  /** 0062：庫存目標是不限庫存。開著時 available 沒有意義，畫面顯示「不限量」。 */
+  unlimited_stock: boolean;
 };
 
 export type ListingInput = {
@@ -74,7 +78,9 @@ export type ListingInput = {
 export async function listInventoryCandidates(): Promise<InventoryCandidate[]> {
   const { data, error } = await supabaseAdmin()
     .from("inv_listing_candidates")
-    .select("inv_product_id, name, selling_price, stock_quantity, pack_size, barcode")
+    .select(
+      "inv_product_id, name, selling_price, stock_quantity, pack_size, barcode, unlimited_stock",
+    )
     .order("name", { ascending: true })
     .limit(2000);
 
@@ -87,7 +93,7 @@ export async function listListedInventoryProducts(): Promise<ListedInventoryProd
   const { data, error } = await supabaseAdmin()
     .from("inv_listed_products")
     .select(
-      "product_id, slug, title, price, status, inv_product_id, inv_name, units_per_sale, stock_quantity, reserved, available",
+      "product_id, slug, title, price, status, inv_product_id, inv_name, units_per_sale, stock_quantity, reserved, available, unlimited_stock",
     )
     .order("slug", { ascending: true });
 

@@ -36,10 +36,12 @@ export type PosProduct = {
   stock_quantity: number;
   reserved: number;
   available: number;
+  /** 0062：庫存目標是不限庫存（寄賣不限量）。開著時 available 沒有意義，結帳不比可售量。 */
+  unlimited_stock: boolean;
 };
 
 const POS_PRODUCT_COLUMNS =
-  "inv_product_id, name, barcode, issue_number, series, selling_price, stock_target_name, units_per_item, stock_quantity, reserved, available";
+  "inv_product_id, name, barcode, issue_number, series, selling_price, stock_target_name, units_per_item, stock_quantity, reserved, available, unlimited_stock";
 
 /**
  * 套餐表單的商品選擇器要的欄位（2026-10-26 後台第 3 批瘦身）。原本套餐表單直接沿用櫃檯那一支
@@ -54,6 +56,7 @@ export type ComboPickerProduct = Pick<
   | "series"
   | "selling_price"
   | "stock_quantity"
+  | "unlimited_stock"
 >;
 
 export type PosPaymentMethod = {
@@ -221,7 +224,9 @@ export async function listPosProducts(): Promise<PosProduct[]> {
 export async function listComboPickerProducts(): Promise<ComboPickerProduct[]> {
   const { data, error } = await supabaseAdmin()
     .from("inv_pos_products")
-    .select("inv_product_id, name, barcode, issue_number, series, selling_price, stock_quantity")
+    .select(
+      "inv_product_id, name, barcode, issue_number, series, selling_price, stock_quantity, unlimited_stock",
+    )
     .order("name", { ascending: true })
     .limit(5000);
 

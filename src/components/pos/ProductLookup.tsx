@@ -66,7 +66,7 @@ export function ProductLookup({ products, onPick, inCart }: Props) {
             <ul className="divide-y divide-border">
               {results.map((p) => {
                 const remaining = p.available - (inCart[p.inv_product_id] ?? 0);
-                const soldOut = remaining <= 0;
+                const soldOut = !p.unlimited_stock && remaining <= 0;
                 return (
                   <li key={p.inv_product_id}>
                     <button
@@ -95,7 +95,7 @@ export function ProductLookup({ products, onPick, inCart }: Props) {
                           variant={soldOut ? "destructive" : "secondary"}
                           className="mt-1 font-normal tabular-nums"
                         >
-                          {soldOut ? "可售 0" : `可售 ${remaining}`}
+                          {p.unlimited_stock ? "不限量" : soldOut ? "可售 0" : `可售 ${remaining}`}
                         </Badge>
                       </span>
                     </button>

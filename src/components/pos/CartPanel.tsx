@@ -42,7 +42,8 @@ export function CartPanel({ lines, onQuantityChange, onPriceChange, onRemove, di
           const { product: p } = line;
           // 這一車已經超過可售量。不擋，但要讓店員看見 —— 送出時他還要再確認
           // 一次逃生門（見 CheckoutPanel）。
-          const over = line.quantity > p.available;
+          // 不限庫存（0062）沒有「超過可售量」這件事。
+          const over = !p.unlimited_stock && line.quantity > p.available;
           const listPrice = Number(p.selling_price ?? 0);
           const discounted = line.unitPrice !== listPrice;
 
@@ -136,7 +137,7 @@ export function CartPanel({ lines, onQuantityChange, onPriceChange, onRemove, di
                   variant={over ? "destructive" : "secondary"}
                   className="font-normal tabular-nums"
                 >
-                  可售 {p.available}
+                  {p.unlimited_stock ? "不限量" : `可售 ${p.available}`}
                 </Badge>
                 {discounted ? (
                   <Badge variant="outline" className="font-normal tabular-nums">

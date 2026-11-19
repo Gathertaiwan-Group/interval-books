@@ -39,6 +39,11 @@ export type AdminComboSetRow = {
   max_sets: number | null;
   sold_sets: number;
   sold_revenue: number;
+  /**
+   * 0062：組成品項裡有幾件是不限庫存。不限庫存的品項不參與 max_sets 的最小值；全部都不限時
+   * max_sets＝100（inv_combo_checkout 單次上限）。
+   */
+  unlimited_items: number;
 };
 
 export type AdminComboItemRow = {
@@ -55,6 +60,8 @@ export type AdminComboItemRow = {
   base_product_id: string | null;
   pack_size: number;
   stock_quantity: number;
+  /** 0062：庫存目標（母品項或自己）是不限庫存。 */
+  unlimited_stock: boolean;
 };
 
 export type AdminComboSaleRow = {
@@ -75,11 +82,13 @@ export type AdminComboSaleRow = {
 const SET_COLUMNS =
   "combo_set_id, name, selling_price, is_active, notes, approval_status, approved_at, " +
   "approved_by_name, user_id, creator_name, created_at, updated_at, item_count, " +
-  "total_list_price, allocation_basis, zero_priced_items, max_sets, sold_sets, sold_revenue";
+  "total_list_price, allocation_basis, zero_priced_items, max_sets, sold_sets, sold_revenue, " +
+  "unlimited_items";
 
 const ITEM_COLUMNS =
   "item_id, combo_set_id, product_id, quantity, product_name, issue_number, series, " +
-  "product_type, selling_price, product_active, base_product_id, pack_size, stock_quantity";
+  "product_type, selling_price, product_active, base_product_id, pack_size, stock_quantity, " +
+  "unlimited_stock";
 
 const SALE_COLUMNS =
   "sale_group, combo_set_id, combo_name, sale_date, created_at, row_count, revenue, cost, " +

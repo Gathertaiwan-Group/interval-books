@@ -244,6 +244,9 @@ export async function listStockCountProducts(filter: {
       )
       .eq("is_active", true)
       .eq("approval_status", "approved")
+      // 0062：不限庫存（寄賣不限量）的品項不盤點——帳上數字沒有意義，盤出來只會產生
+      // 假的盤盈／盤損單。資料庫端 inv_record_stock_count() 也會略過（unlimited_skipped）。
+      .eq("unlimited_stock", false)
       .order("name", { ascending: true })
       .order("inv_product_id", { ascending: true });
 

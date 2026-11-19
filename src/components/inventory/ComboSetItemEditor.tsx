@@ -102,7 +102,8 @@ export function ComboSetItemEditor({ items, products, disabled, onChange }: Prop
                 <SelectItem key={p.inv_product_id} value={p.inv_product_id}>
                   {productLabel(p.name, p.issue_number)}
                   <span className="ml-2 text-xs text-muted-foreground">
-                    {p.selling_price ? money(p.selling_price) : "未填售價"}・庫存 {p.stock_quantity}
+                    {p.selling_price ? money(p.selling_price) : "未填售價"}・庫存{" "}
+                    {p.unlimited_stock ? "不限量" : p.stock_quantity}
                   </span>
                 </SelectItem>
               ))}
@@ -140,7 +141,7 @@ export function ComboSetItemEditor({ items, products, disabled, onChange }: Prop
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {product?.selling_price ? (
-                      `定價 ${money(product.selling_price)}・庫存 ${product.stock_quantity}`
+                      `定價 ${money(product.selling_price)}・庫存 ${product.unlimited_stock ? "不限量" : product.stock_quantity}`
                     ) : (
                       <span className="text-amber-700">沒有填售價 —— 整組會改成按數量均分</span>
                     )}

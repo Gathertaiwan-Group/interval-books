@@ -303,7 +303,7 @@ export const ADMIN_READ_TOOL_META: Record<
   },
   list_inventory: {
     title: "進銷存商品與庫存",
-    description: `列出進銷存商品的庫存（庫存、預留、可售、警示數量、售價、分類、廠商、是否上架網站）。low_stock_only=true 只列低庫存。${NOTE}`,
+    description: `列出進銷存商品的庫存（庫存、預留、可售、警示數量、售價、分類、廠商、是否上架網站、unlimited_stock 不限庫存）。unlimited_stock=true 的品項庫存數字沒有意義（可能是負數），視為不限量；low_stock_only=true 只列低庫存（不含不限庫存品項）。${NOTE}`,
   },
   get_inventory_product: {
     title: "單一進銷存商品",
@@ -832,6 +832,7 @@ export const ADMIN_READ_HANDLERS: Handlers = {
       available?: number;
       is_active?: boolean;
       listed_slug?: string | null;
+      unlimited_stock?: boolean;
     }) => ({
       inv_product_id: r.inv_product_id,
       name: r.name,
@@ -848,6 +849,7 @@ export const ADMIN_READ_HANDLERS: Handlers = {
       low_stock_alert: r.low_stock_alert,
       is_active: r.is_active,
       listed_slug: r.listed_slug,
+      unlimited_stock: r.unlimited_stock === true,
     });
 
     if (args.low_stock_only) {

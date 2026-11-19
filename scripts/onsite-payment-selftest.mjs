@@ -316,7 +316,9 @@ assertLedgerDeclarationsHonest(check, MIG_DIR);
 assertMigrationDependencies(check, MIG_DIR, {
   suite: "onsite-payment-selftest",
   dependsOn: ["orders_payments", "order_expiry", "event_registrations", "session_seats"],
-  reviewedThrough: "0059_roster_ticket_price.sql",
+  // 0062（不限庫存）動到的區域在這支自檢關心的部分是逐字重建（order_items／event_sessions／profiles
+  // 的讀法、product_availability 的形狀都沒變；只多了不限庫存目標回 10），斷言重讀後仍成立。
+  reviewedThrough: "0062_inventory_unlimited_stock.sql",
 });
 
 // =============================================================================

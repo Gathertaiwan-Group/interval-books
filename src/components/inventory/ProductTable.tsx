@@ -26,6 +26,7 @@ import {
 import { ApprovalActions } from "@/components/inventory/ApprovalActions";
 import { ApprovalStatusBadge, PriceChangeBadge } from "@/components/inventory/ApprovalStatusBadge";
 import { INV_PRODUCT_TYPE_LABELS } from "@/lib/admin/schemas";
+import { isLowStock } from "@/lib/admin/low-stock";
 import { rememberAdminPeek } from "@/lib/admin/list-memory";
 import type { AdminProductRow } from "@/server/repos/inv-products";
 
@@ -92,10 +93,8 @@ export function ProductTable({
         </TableHeader>
         <TableBody>
           {rows.map((row) => {
-            const lowStock =
-              row.low_stock_alert !== null &&
-              row.low_stock_alert > 0 &&
-              row.stock_quantity <= row.low_stock_alert;
+            // 同一個低庫存定義（含「不限庫存不算低庫存」，0062）。
+            const lowStock = isLowStock(row);
             const busy = busyId === row.inv_product_id;
 
             return (
@@ -167,7 +166,16 @@ export function ProductTable({
                 </TableCell>
 
                 <TableCell className="text-right">
-                  {row.base_product_id ? (
+                  {row.unlimited_stock ? (
+                    <div className="flex flex-col items-end">
+                      <span>不限量</span>
+                      {row.reserved > 0 ? (
+                        <span className="text-xs text-muted-foreground">
+                          網站保留 {row.reserved}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : row.base_product_id ? (
                     <div className="flex flex-col items-end">
                       <span className="tabular-nums">{row.available} 組</span>
                       <span className="text-xs text-muted-foreground">

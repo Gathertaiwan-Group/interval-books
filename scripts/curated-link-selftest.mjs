@@ -575,7 +575,9 @@ console.log("\n[4] migration 0041 與帳本");
     // 本體的場次段逐字沿用，seats_taken 一個字沒動）。本檔的斷言逐條重跑全綠，原樣成立。
     // 0056（現場付款）重審：CHECK 只多一個值 onsite、expire_unpaid_orders 候選條件只多一行
     // payment_method is distinct from 'onsite'，本體其餘逐字沿用 0050——這支的斷言照樣成立。
-    reviewedThrough: "0056_onsite_payment.sql",
+    // 0062（不限庫存）動到的區域在這支自檢關心的部分是逐字重建（order_items／event_sessions／profiles
+    // 的讀法、product_availability 的形狀都沒變；只多了不限庫存目標回 10），斷言重讀後仍成立。
+    reviewedThrough: "0062_inventory_unlimited_stock.sql",
   });
 }
 

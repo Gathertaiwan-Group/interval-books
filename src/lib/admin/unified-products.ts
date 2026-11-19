@@ -109,7 +109,13 @@ export type UPCuratedItem = {
 };
 
 /** inv_listed_products 的一列：連到進銷存的商品，可售量由 view 算好。 */
-export type UPListed = { product_id: string; inv_name: string; available: number };
+export type UPListed = {
+  product_id: string;
+  inv_name: string;
+  available: number;
+  /** 0062：庫存目標是不限庫存（寄賣不限量）。 */
+  unlimited_stock?: boolean;
+};
 
 // ---------------------------------------------------------------------------
 // 一列
@@ -202,6 +208,7 @@ export function productStock(p: UPProduct, listed: UPListed | undefined) {
   if (p.product_type === "event" || p.product_type === "journey") {
     return { stock: null, stockNote: "按場次" };
   }
+  if (listed?.unlimited_stock) return { stock: null, stockNote: "不限量（進銷存）" };
   if (listed) return { stock: listed.available, stockNote: "進銷存" };
   if (p.stock != null) return { stock: p.stock, stockNote: "" };
   return { stock: null, stockNote: "不管理" };

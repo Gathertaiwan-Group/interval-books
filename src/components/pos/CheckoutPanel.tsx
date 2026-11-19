@@ -53,7 +53,10 @@ export function CheckoutPanel({
   const discount = listTotal - totalAmount;
 
   /** 這一車有幾件超過可售量。決定要不要逼店員走逃生門。 */
-  const overLines = lines.filter((l) => l.quantity > l.product.available);
+  // 不限庫存（0062）的品項不比可售量，與 pos_checkout() 相同。
+  const overLines = lines.filter(
+    (l) => !l.product.unlimited_stock && l.quantity > l.product.available,
+  );
   const needsOverride = overLines.length > 0;
   const blocked = needsOverride && !override;
 

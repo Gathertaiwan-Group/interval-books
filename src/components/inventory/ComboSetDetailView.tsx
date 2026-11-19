@@ -101,7 +101,7 @@ export function ComboSetDetailView({ set, items, sales }: Props) {
                 </span>
                 <span className="text-xs text-muted-foreground tabular-nums">
                   定價 {item.selling_price > 0 ? money(item.selling_price) : "未填"}・庫存{" "}
-                  {item.stock_quantity}
+                  {item.unlimited_stock ? "不限量" : item.stock_quantity}
                 </span>
               </li>
             ))}

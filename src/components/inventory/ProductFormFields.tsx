@@ -23,6 +23,7 @@ import { INV_PRODUCT_TYPES, INV_PRODUCT_TYPE_LABELS } from "@/lib/admin/schemas"
 import bookstoreInterior from "@/assets/bookstore-interior.jpg";
 import type { AdminCategory, AdminVendor } from "@/server/repos/inv-products";
 import type { ProductFormState } from "@/components/inventory/product-form-state";
+import { UnlimitedStockField } from "@/components/inventory/UnlimitedStockField";
 
 const NONE = "__none__";
 
@@ -212,6 +213,9 @@ export function ProductFormFields({
           onChange={(e) => setForm({ ...form, low_stock_alert: e.target.value })}
         />
       </div>
+
+      {/* 不限庫存（0062）：只給寄賣母品項。 */}
+      <UnlimitedStockField form={form} setForm={setForm} error={errors.unlimited_stock} />
 
       <div className="space-y-1.5">
         <Label htmlFor="p-pack">每組數量（pack_size）</Label>
