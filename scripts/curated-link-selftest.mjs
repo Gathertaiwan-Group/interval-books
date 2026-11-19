@@ -577,7 +577,10 @@ console.log("\n[4] migration 0041 與帳本");
     // payment_method is distinct from 'onsite'，本體其餘逐字沿用 0050——這支的斷言照樣成立。
     // 0062（不限庫存）動到的區域在這支自檢關心的部分是逐字重建（order_items／event_sessions／profiles
     // 的讀法、product_availability 的形狀都沒變；只多了不限庫存目標回 10），斷言重讀後仍成立。
-    reviewedThrough: "0062_inventory_unlimited_stock.sql",
+    // 0063（廠商面不限庫存）重審：只重建 inv_vendor_products()（尾端加 unlimited_stock）與
+    // inv_admin_vendor_list（stock_units 排除不限庫存、尾端加欄）；對 public.products／inv.profiles
+    // 的 join 逐字照抄，沒碰訂單、場次、名單或權限——這支的斷言照樣成立。
+    reviewedThrough: "0063_vendor_views_unlimited_stock.sql",
   });
 }
 

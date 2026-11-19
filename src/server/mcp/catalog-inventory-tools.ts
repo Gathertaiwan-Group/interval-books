@@ -1120,6 +1120,13 @@ const IMPL: { [N in CatalogInvToolName]: (args: Args<N>) => Promise<TextResult> 
         "調價審核開著：售價／成本會變成待審調價，核准後才生效（目前價格不變）；其他欄位立即生效。",
       );
     }
+    // 不限庫存＋成本 0：只提醒、不擋（與後台表單 UnlimitedStockField 同一句）。
+    // 只在這次有動到旗標或成本時講，避免改個書名也一直跳。
+    if (changes.unlimited_stock || changes.cost_price) {
+      const { unlimitedStockZeroCostWarning } = await import("@/lib/admin/unlimited-stock");
+      const costWarning = unlimitedStockZeroCostWarning(payload);
+      if (costWarning) notes.push(costWarning);
+    }
     if (row.listed_product_id && changes.selling_price) {
       notes.push(
         `這件已上架到網站（${row.listed_slug ?? row.listed_product_id}），網站售價不會跟著變，要改請用 update_shop_product。`,

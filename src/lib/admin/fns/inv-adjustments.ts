@@ -42,6 +42,8 @@ const stockCountFilterSchema = z.object({
   lowStockOnly: z.boolean(),
   page: z.number().int().min(0),
   pageSize: z.number().int().min(1).max(200),
+  // 省略＝排除不限庫存品項（盤點）。在庫異動的商品選單傳 false。
+  excludeUnlimited: z.boolean().optional(),
 });
 
 // ---------------------------------------------------------------------------

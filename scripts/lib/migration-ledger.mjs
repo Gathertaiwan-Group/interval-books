@@ -974,6 +974,14 @@ export const MIGRATION_LEDGER = Object.freeze([
       "admin_auth",
     ],
   },
+  {
+    file: "0063_vendor_views_unlimited_stock.sql",
+    note: "廠商面跟上 0062 的不限庫存：public.inv_vendor_products(uuid) 回傳表尾端加 unlimited_stock（RETURNS TABLE 改形狀，drop 再 create，函式體與 0019 逐字相同，重申只給 service_role）；public.inv_admin_vendor_list 的 stock_units 只加總非不限庫存品項（欄位位置／型別不變），尾端加 unlimited_product_count，security_invoker=false 與權限照 0019。沒有碰任何表或其他函式",
+    // touches 是用 AREAS 的識別字掃過剝掉註解的 SQL 算出來的：inventory（inv.*）、
+    // products_availability（inv_vendor_products 照舊 join public.products 取上架 slug，逐字照抄）、
+    // admin_auth（inv_admin_vendor_list 照舊 join inv.profiles 取核准人，逐字照抄）。
+    touches: ["inventory", "products_availability", "admin_auth"],
+  },
 ]);
 
 /**

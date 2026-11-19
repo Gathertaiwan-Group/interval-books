@@ -75,6 +75,8 @@ export function AdjustmentFormDialog({ open, onOpenChange, approvalOn, onSaved }
             lowStockOnly: false,
             page: 0,
             pageSize: 50,
+            // 在庫異動（報損、贈送…）要選得到「不限庫存」的寄賣品；盤點才排除它。
+            excludeUnlimited: false,
           },
         });
         if (!cancelled) setProducts(page.rows);

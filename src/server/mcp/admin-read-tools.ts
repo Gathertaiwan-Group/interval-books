@@ -979,6 +979,7 @@ export const ADMIN_READ_HANDLERS: Handlers = {
         product_count: r.product_count,
         active_product_count: r.active_product_count,
         stock_units: r.stock_units,
+        unlimited_product_count: r.unlimited_product_count,
         purchase_count: r.purchase_count,
         contract_end_date: r.contract_end_date,
       })),
@@ -1006,6 +1007,7 @@ export const ADMIN_READ_HANDLERS: Handlers = {
             product_count: row.product_count,
             active_product_count: row.active_product_count,
             stock_units: row.stock_units,
+            unlimited_product_count: row.unlimited_product_count,
             purchase_count: row.purchase_count,
             contract_end_date: row.contract_end_date,
           }

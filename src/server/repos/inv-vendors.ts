@@ -93,12 +93,15 @@ export type AdminVendorRow = {
   updated_at: string;
   product_count: number;
   active_product_count: number;
+  /** 0063 起只加總非不限庫存品項（不限庫存品項賣出會扣成負數，不能算進件數）。 */
   stock_units: number;
   purchase_count: number;
   bank_account_count: number;
   attachment_count: number;
   contract_end_date: string | null;
   portal_account_count: number;
+  /** 0063：該廠商不限庫存（寄賣不限量）品項數，沒有算進 stock_units。 */
+  unlimited_product_count: number;
 };
 
 /** 0019 §3.2 的 inv_admin_vendor_detail。⚠️ 四個識別碼只有 *_masked 版本。 */
@@ -230,7 +233,7 @@ const LIST_COLUMNS =
   "phone, email, tax_id_masked, id_number_masked, has_tax_id, has_id_number, has_foreign_id, " +
   "commission_rate, payment_terms, created_at, updated_at, product_count, active_product_count, " +
   "stock_units, purchase_count, bank_account_count, attachment_count, contract_end_date, " +
-  "portal_account_count";
+  "portal_account_count, unlimited_product_count";
 
 const DETAIL_COLUMNS =
   "vendor_id, vendor_code, entity_type, category_id, name, name_en, short_name, representative, " +
@@ -718,6 +721,8 @@ export type VendorPortalProduct = {
   sold_quantity: number;
   listed_slug: string | null;
   listed_status: string | null;
+  /** 0063：不限庫存（寄賣不限量）。stock_quantity 可能是負數，畫面改顯示「不限量」。 */
+  unlimited_stock: boolean;
 };
 
 /**

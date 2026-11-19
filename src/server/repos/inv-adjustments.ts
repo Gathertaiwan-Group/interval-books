@@ -222,6 +222,8 @@ export type StockCountProductRow = {
   cost_price: number | null;
   category_id: string | null;
   category_name: string | null;
+  /** 0062：不限庫存（寄賣不限量）。在庫異動的商品選單要靠它顯示「不限量」而不是帳上數字。 */
+  unlimited_stock: boolean;
 };
 
 export async function listStockCountProducts(filter: {
@@ -231,6 +233,12 @@ export async function listStockCountProducts(filter: {
   lowStockOnly: boolean;
   page: number;
   pageSize: number;
+  /**
+   * 排除不限庫存的品項。**省略＝排除**（盤點頁、批次盤點、MCP low_stock_only 都靠預設）。
+   * 只有在庫異動（報損、贈送、樣品…）明確傳 false——寄賣不限量的品項也會破損、被拿去送人，
+   * 異動單要選得到它（2026-11-19 驗收）。
+   */
+  excludeUnlimited?: boolean;
 }): Promise<{ rows: StockCountProductRow[]; total: number }> {
   const from = filter.page * filter.pageSize;
 
@@ -239,16 +247,20 @@ export async function listStockCountProducts(filter: {
       .from("inv_admin_products")
       .select(
         "inv_product_id, name, issue_number, series, barcode, product_type, stock_quantity, " +
-          "low_stock_alert, cost_price, category_id, category_name",
+          "low_stock_alert, cost_price, category_id, category_name, unlimited_stock",
         { count: "exact" },
       )
       .eq("is_active", true)
       .eq("approval_status", "approved")
-      // 0062：不限庫存（寄賣不限量）的品項不盤點——帳上數字沒有意義，盤出來只會產生
-      // 假的盤盈／盤損單。資料庫端 inv_record_stock_count() 也會略過（unlimited_skipped）。
-      .eq("unlimited_stock", false)
       .order("name", { ascending: true })
       .order("inv_product_id", { ascending: true });
+
+    // 0062：不限庫存（寄賣不限量）的品項不盤點——帳上數字沒有意義，盤出來只會產生
+    // 假的盤盈／盤損單。資料庫端 inv_record_stock_count() 也會略過（unlimited_skipped）。
+    // 低庫存也一律排除（isLowStock 本來就不把它算進去）。
+    if (filter.excludeUnlimited !== false || filter.lowStockOnly) {
+      query = query.eq("unlimited_stock", false);
+    }
 
     if (filter.categoryId) query = query.eq("category_id", filter.categoryId);
     if (filter.productType) query = query.eq("product_type", filter.productType);

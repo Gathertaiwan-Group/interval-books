@@ -781,6 +781,34 @@ reset();
   );
   const keep = log.rpc.find((c) => c.name === "inv_save_product");
   check("沒帶旗標：送出原值 false", keep?.args.p_payload.unlimited_stock, false);
+
+  // 成本 0 的寄賣品開不限庫存：預覽提醒（不擋）；成本 > 0 不提醒。
+  reset();
+  tables.inv_admin_products = tables.inv_admin_products.map((r) =>
+    r.inv_product_id === P1
+      ? { ...r, product_type: "consignment", unlimited_stock: false, cost_price: 0 }
+      : r,
+  );
+  const zero = parseOut(
+    await asOAuth(() => H.update_inventory_product({ id: P1, unlimited_stock: true })),
+  );
+  check(
+    "成本 0 開不限庫存：預覽有成本警告、不呼叫 RPC",
+    [(zero.notes ?? []).some((n) => /成本是 0/.test(n)), log.rpc.length],
+    [true, 0],
+  );
+  reset();
+  tables.inv_admin_products = tables.inv_admin_products.map((r) =>
+    r.inv_product_id === P1 ? { ...r, product_type: "consignment", unlimited_stock: false } : r,
+  );
+  const priced = parseOut(
+    await asOAuth(() => H.update_inventory_product({ id: P1, unlimited_stock: true })),
+  );
+  check(
+    "成本 250 開不限庫存：沒有成本警告",
+    (priced.notes ?? []).some((n) => /成本是 0/.test(n)),
+    false,
+  );
 }
 
 console.log("\n[5] set_inventory_product_active／request_inventory_price_change");

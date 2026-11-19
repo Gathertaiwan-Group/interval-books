@@ -2276,6 +2276,11 @@ const IMPL: Handlers = {
       }
     }
 
+    // 不限庫存＋成本 0：只提醒、不擋（與後台表單 UnlimitedStockField 同一句）。
+    const { unlimitedStockZeroCostWarning } = await import("@/lib/admin/unlimited-stock");
+    const costWarning = unlimitedStockZeroCostWarning(payload);
+    if (costWarning) warnings.push(costWarning);
+
     const willCreate = {
       product: {
         ...payload,

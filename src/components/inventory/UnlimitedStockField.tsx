@@ -8,6 +8,7 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import type { ProductFormState } from "@/components/inventory/product-form-state";
+import { unlimitedStockZeroCostWarning } from "@/lib/admin/unlimited-stock";
 
 export function UnlimitedStockField({
   form,
@@ -20,6 +21,13 @@ export function UnlimitedStockField({
 }) {
   if (form.product_type !== "consignment") return null;
   const isChild = Boolean(form.base_product_id);
+  // 只提醒、不擋（銷貨成本會用表單上的「成本」）。
+  const costWarning = isChild
+    ? null
+    : unlimitedStockZeroCostWarning({
+        unlimited_stock: form.unlimited_stock,
+        cost_price: form.cost_price,
+      });
   return (
     <div className="space-y-1.5 sm:col-span-2">
       <div className="flex items-center gap-2">
@@ -38,6 +46,11 @@ export function UnlimitedStockField({
           ? "子品項跟著母品項的設定，要在母品項開啟。"
           : "開啟後不需要進貨也能上架與販售，不會顯示庫存數字、不進低庫存與盤點；銷貨成本用上面的「成本」。"}
       </p>
+      {costWarning ? (
+        <p className="text-xs text-amber-700 dark:text-amber-500" role="status">
+          {costWarning}
+        </p>
+      ) : null}
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>
   );

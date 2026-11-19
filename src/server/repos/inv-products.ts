@@ -18,6 +18,7 @@
 import "@tanstack/react-start/server-only";
 import { supabaseAdmin } from "@/server/supabase-admin";
 import { findIdsByNoteBarcode, normalizeScannedCode } from "@/lib/admin/note-barcode";
+import { UNLIMITED_STOCK_CHECK } from "@/lib/admin/unlimited-stock";
 
 /** 0016 的 inv_admin_products。與 inv_pos_products 不同，這一支含待審／停用／租借。 */
 export type AdminProductRow = {
@@ -273,6 +274,27 @@ function speak(message: string, fallback: string): string {
   return message.replace(/^[A-Z_]+:\s*/, "").trim() || fallback;
 }
 
+/**
+ * 撞到 0062 的 products_unlimited_stock_consignment_only（不限庫存只限寄賣、非子品項）時，
+ * Postgres 給的是英文原文（new row for relation "products" violates check constraint …）。
+ * 換成店員看得懂、知道下一步怎麼做的中文；其他錯誤照舊交給 speak()。
+ *
+ * 選在 repo 層對應、不另開 migration 用函式先擋：資料庫的 CHECK 已經是真正的守門，
+ * 這裡只是翻譯，不必為了一句話重建 inv_batch_update_products()。
+ */
+export const UNLIMITED_CHECK_BATCH_MESSAGE =
+  "勾選的商品中有「不限庫存」的寄賣品，不能改成買斷或租借；請先到該商品頁關閉「不限庫存」，再批次修改。";
+export const UNLIMITED_CHECK_IMPORT_MESSAGE =
+  "匯入的資料會把「不限庫存」的寄賣品改成買斷或租借；請先到該商品頁關閉「不限庫存」，再匯入。";
+function speakProductError(message: string, fallback: string, unlimitedMessage: string): string {
+  if (message.includes(UNLIMITED_STOCK_CHECK)) return unlimitedMessage;
+  return speak(message, fallback);
+}
+const speakImportError = (message: string) =>
+  speakProductError(message, "匯入失敗，沒有任何一列被寫入", UNLIMITED_CHECK_IMPORT_MESSAGE);
+const speakBatchError = (message: string) =>
+  speakProductError(message, "批次更新失敗，請再試一次", UNLIMITED_CHECK_BATCH_MESSAGE);
+
 export type SaveProductInput = {
   userId: string;
   id: string | null;
@@ -389,7 +411,7 @@ export async function importProducts(input: {
     p_options: input.options,
   });
 
-  if (error) throw new Error(speak(error.message, "匯入失敗，沒有任何一列被寫入"));
+  if (error) throw new Error(speakImportError(error.message));
   return data as { created: number; updated: number; purchases: number; approval_status: string };
 }
 
@@ -404,6 +426,6 @@ export async function batchUpdateProducts(input: {
     p_patch: input.patch,
   });
 
-  if (error) throw new Error(speak(error.message, "批次更新失敗，請再試一次"));
+  if (error) throw new Error(speakBatchError(error.message));
   return data as { updated: number; price_change_pending: boolean };
 }

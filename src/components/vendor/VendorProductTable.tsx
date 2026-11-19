@@ -175,7 +175,12 @@ export function VendorProductTable({ rows, busyId, onEdit, onWithdraw }: Props) 
                 <TableCell className="text-right text-sm">{priceText(row.selling_price)}</TableCell>
                 {/* 庫存與已售只有核准之後才是真的數字，見檔頭。 */}
                 <TableCell className="text-right text-sm">
-                  {approved ? row.stock_quantity.toLocaleString("zh-TW") : "—"}
+                  {/* 不限庫存（0063）：賣出照扣會變負數，數字沒有意義，顯示「不限量」。 */}
+                  {!approved
+                    ? "—"
+                    : row.unlimited_stock
+                      ? "不限量"
+                      : row.stock_quantity.toLocaleString("zh-TW")}
                 </TableCell>
                 <TableCell className="text-right text-sm">
                   {approved ? row.sold_quantity.toLocaleString("zh-TW") : "—"}

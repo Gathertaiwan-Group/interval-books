@@ -138,7 +138,15 @@ export function VendorDetailView({
         <Field label="商品數">{row.product_count}</Field>
         <Field label="進貨筆數">{row.purchase_count}</Field>
         <Field label="自助入口帳號">{row.portal_account_count}</Field>
-        <Field label="庫存件數">{row.stock_units}</Field>
+        <Field label="庫存件數">
+          {row.stock_units}
+          {/* 0063：不限庫存品項不算進件數（賣出照扣會變負數）。 */}
+          {row.unlimited_product_count > 0 ? (
+            <span className="ml-1 text-xs text-muted-foreground">
+              （另有 {row.unlimited_product_count} 件不限量）
+            </span>
+          ) : null}
+        </Field>
       </div>
 
       <Separator />

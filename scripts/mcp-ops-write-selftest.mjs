@@ -1509,6 +1509,40 @@ console.log("\n[5c] 新增商品／審核／門市結帳／二手書");
     ),
   );
   check("create_inventory_product 預覽：同條碼 → 警告", (dup.warnings ?? []).length, 1);
+  // 不限庫存＋成本 0（或沒填）：預覽提醒、不擋（銷貨成本會用 cost_price）。
+  resetDb(BASE_TABLES, BASE_RPC);
+  const zeroCost = parseOut(
+    await asOAuth(() =>
+      H.create_inventory_product({
+        name: "寄賣薏仁",
+        selling_price: 120,
+        product_type: "consignment",
+        unlimited_stock: true,
+      }),
+    ),
+  );
+  check(
+    "create_inventory_product 預覽：不限庫存＋成本 0 → 成本警告、不呼叫 RPC",
+    [(zeroCost.warnings ?? []).some((w) => /成本是 0/.test(w)), log.rpc.length],
+    [true, 0],
+  );
+  resetDb(BASE_TABLES, BASE_RPC);
+  const withCost = parseOut(
+    await asOAuth(() =>
+      H.create_inventory_product({
+        name: "寄賣薏仁",
+        selling_price: 120,
+        cost_price: 80,
+        product_type: "consignment",
+        unlimited_stock: true,
+      }),
+    ),
+  );
+  check(
+    "create_inventory_product 預覽：不限庫存＋成本 80 → 沒有成本警告",
+    (withCost.warnings ?? []).some((w) => /成本是 0/.test(w)),
+    false,
+  );
   resetDb(BASE_TABLES, BASE_RPC);
   const done = parseOut(
     await asOAuth(() =>

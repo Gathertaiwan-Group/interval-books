@@ -73,8 +73,11 @@ export function AdjustmentFormFields({
 }: Props) {
   const selected = products.find((p) => p.inv_product_id === productId) ?? null;
   const qty = quantity.trim() === "" ? null : Number(quantity);
+  // 不限庫存的品項帳上數字沒有意義，不預告「異動後為負值」。
   const after =
-    selected && qty !== null && !Number.isNaN(qty) ? selected.stock_quantity + qty : null;
+    selected && !selected.unlimited_stock && qty !== null && !Number.isNaN(qty)
+      ? selected.stock_quantity + qty
+      : null;
 
   return (
     <>
@@ -123,14 +126,17 @@ export function AdjustmentFormFields({
             {products.map((p) => (
               <SelectItem key={p.inv_product_id} value={p.inv_product_id}>
                 {p.name}
-                {p.issue_number ? ` #${p.issue_number}` : ""}（庫存 {p.stock_quantity}）
+                {p.issue_number ? ` #${p.issue_number}` : ""}
+                {p.unlimited_stock ? "（不限量）" : `（庫存 ${p.stock_quantity}）`}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         {selected ? (
           <p className="text-xs text-muted-foreground">
-            現有庫存 {selected.stock_quantity} 件・
+            {selected.unlimited_stock
+              ? "不限庫存（寄賣不限量）・"
+              : `現有庫存 ${selected.stock_quantity} 件・`}
             {INV_PRODUCT_TYPE_LABELS[
               selected.product_type as keyof typeof INV_PRODUCT_TYPE_LABELS
             ] ?? selected.product_type}
